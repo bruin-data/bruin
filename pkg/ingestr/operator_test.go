@@ -1687,6 +1687,97 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	}
 }
 
+func TestBasicOperator_CDCDeleteBehavior(t *testing.T) {
+	t.Parallel()
+
+	mockPg := new(mockConnection)
+	mockPg.On("GetIngestrURI").Return("postgresql://user:pass@localhost:5432/db", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+	fetcher := &simpleConnectionFetcher{connections: map[string]*mockConnection{"pg": mockPg, "bq": mockBq}}
+
+	tests := []struct {
+		name         string
+		params       pipeline.ParameterMap
+		wantBehavior string
+		wantStream   bool
+		fullRefresh  bool
+		wantErr      string
+	}{
+		{name: "omitted uses ingestr default"},
+		{name: "omitted supports older engine", params: pipeline.ParameterMap{"version": "v1.1.76"}},
+		{name: "batch soft", params: pipeline.ParameterMap{"cdc_delete_behavior": "soft"}, wantBehavior: "soft"},
+		{name: "batch hard", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard"}, wantBehavior: "hard"},
+		{name: "stream soft", params: pipeline.ParameterMap{"cdc_delete_behavior": "soft", "stream": true}, wantBehavior: "soft", wantStream: true},
+		{name: "stream hard", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "stream": true}, wantBehavior: "hard", wantStream: true},
+		{name: "batch alias", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "cdc_mode": "batch"}, wantBehavior: "hard"},
+		{name: "stream alias", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "cdc_mode": "stream"}, wantBehavior: "hard", wantStream: true},
+		{name: "batch full refresh", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard"}, wantBehavior: "hard", fullRefresh: true},
+		{name: "stream full refresh", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "stream": true}, wantBehavior: "hard", wantStream: true, fullRefresh: true},
+		{name: "exact supported version", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "version": "v1.1.77"}, wantBehavior: "hard"},
+		{name: "invalid", params: pipeline.ParameterMap{"cdc_delete_behavior": "delete"}, wantErr: `invalid cdc_delete_behavior: must be "soft" or "hard"`},
+		{name: "empty", params: pipeline.ParameterMap{"cdc_delete_behavior": ""}, wantErr: `invalid cdc_delete_behavior: must be "soft" or "hard"`},
+		{name: "null", params: pipeline.ParameterMap{"cdc_delete_behavior": nil}, wantErr: `invalid cdc_delete_behavior: must be "soft" or "hard"`},
+		{name: "non CDC", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "cdc": false}, wantErr: "cdc_delete_behavior requires cdc: true"},
+		{name: "legacy engine", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "version": "v0"}, wantErr: "cdc_delete_behavior requires ingestr 1.1.77 or newer, but parameters.version resolved to " + python.IngestrVersionV0},
+		{name: "older engine", params: pipeline.ParameterMap{"cdc_delete_behavior": "soft", "version": "v1.1.76"}, wantErr: "cdc_delete_behavior requires ingestr 1.1.77 or newer, but parameters.version resolved to 1.1.76"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			params := pipeline.ParameterMap{
+				"source_connection": "pg",
+				"source_table":      "public.users",
+				"cdc":               true,
+			}
+			for key, value := range tt.params {
+				params[key] = value
+			}
+			asset := &pipeline.Asset{
+				Name:       "public.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bq",
+				Parameters: params,
+			}
+			runner := new(mockRunner)
+			if tt.wantErr == "" {
+				want := []string{
+					"ingest",
+					"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+					"--source-table", "public.users",
+					"--dest-uri", "bigquery://uri-here",
+					"--dest-table", "public.users",
+					"--yes",
+					"--progress", "log",
+				}
+				if tt.wantBehavior != "" {
+					want = append(want, "--cdc-delete-behavior", tt.wantBehavior)
+				}
+				want = append(want, "--incremental-strategy", "merge")
+				if tt.wantStream {
+					want = append(want, "--stream")
+				}
+				if tt.fullRefresh {
+					want = append(want, "--full-refresh")
+				}
+				runner.On("RunIngestr", mock.Anything, want, []string(nil), repo).Return(nil).Once()
+			}
+			o := &BasicOperator{conn: fetcher, finder: &mockFinder{}, runner: runner}
+			ti := &scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: asset}
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			err := o.Run(ctx, ti)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				runner.AssertNotCalled(t, "RunIngestr", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				return
+			}
+			require.NoError(t, err)
+			runner.AssertExpectations(t)
+		})
+	}
+}
+
 func TestIsStreamingAsset(t *testing.T) {
 	t.Parallel()
 

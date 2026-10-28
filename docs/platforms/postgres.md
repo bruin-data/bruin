@@ -203,6 +203,7 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
+| `cdc_delete_behavior` | No | `soft` (default) retains deleted rows with `_cdc_deleted = true`; `hard` removes them from the destination. Applies to batch and streaming CDC. Requires ingestr v1.1.77 or later; see [Delete behavior](#delete-behavior) |
 | `stream` | No | Set to `true` for continuous (real-time) streaming. Omit for batch replication (read up to the current WAL position and exit) |
 | `cdc_mode` | No | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true` |
 | `cdc_publication` | No | Name of the PostgreSQL publication to use |
@@ -216,6 +217,17 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 
 > [!NOTE]
 > When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table.
+
+### Delete behavior
+
+Set `cdc_delete_behavior` to control how source deletes affect the destination in both batch and streaming CDC assets:
+
+- `soft` (default): Keep the row and set `_cdc_deleted = true`. Filter on `NOT _cdc_deleted` to read only live rows.
+- `hard`: Remove the row from the destination. PostgreSQL CDC supports this with PostgreSQL, MySQL/MariaDB, SQL Server, Snowflake, BigQuery, DuckDB, and StarRocks destinations. Ingestr keeps the replication position in destination-managed CDC state so deleting rows does not lose the resume position.
+
+The setting requires ingestr v1.1.77 or later and applies to tables with a usable merge key. PostgreSQL keyless tables with `REPLICA IDENTITY FULL` remain append-only change logs in either mode, including their delete events. See the [ingestr CDC guide](https://getbruin.com/docs/ingestr/getting-started/cdc.html#deletes) for source and destination restrictions.
+
+Switching an existing asset from `soft` to `hard` leaves previously written tombstones in place until their keys change again. To remove them, rebuild the destination with `bruin run --full-refresh`; for a streaming asset, use [streaming full refresh](../assets/ingestr.md#refreshing-a-stream).
 
 ### Examples
 
@@ -231,6 +243,25 @@ parameters:
   destination: bigquery
   cdc: "true"
 ```
+
+#### CDC with hard deletes
+
+This batch asset removes rows deleted at the source:
+
+```yaml
+name: public.users
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.users
+  destination: bigquery
+  cdc: "true"
+  cdc_delete_behavior: hard
+```
+
+Add `stream: true` to use the same delete behavior continuously, then launch the asset with `bruin run --stream assets/public.users.asset.yml`.
 
 #### CDC with explicit publication and slot
 ```yaml

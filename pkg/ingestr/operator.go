@@ -215,6 +215,20 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
+	deleteBehavior, _ := asset.Parameters.GetString("cdc_delete_behavior")
+	_, hasDeleteBehavior := asset.Parameters["cdc_delete_behavior"]
+	if hasDeleteBehavior {
+		if deleteBehavior != "soft" && deleteBehavior != "hard" {
+			return errors.New("invalid cdc_delete_behavior: must be \"soft\" or \"hard\"")
+		}
+		if !isCDCAsset(asset) {
+			return errors.New("cdc_delete_behavior requires cdc: true")
+		}
+		if semver.Compare("v"+engine.ingestrVersion, "v1.1.77") < 0 {
+			return fmt.Errorf("cdc_delete_behavior requires ingestr 1.1.77 or newer, but parameters.version resolved to %s", engine.ingestrVersion)
+		}
+	}
+
 	// Source connection
 	sourceConnectionName, ok := asset.Parameters.GetString("source_connection")
 	if !ok {
@@ -403,6 +417,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--progress",
 		"log",
 	)
+
+	if hasDeleteBehavior {
+		baseArgs = append(baseArgs, "--cdc-delete-behavior", deleteBehavior)
+	}
 
 	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
 	// and rejects --metrics-addr unless --stream is set as well, so only emit it

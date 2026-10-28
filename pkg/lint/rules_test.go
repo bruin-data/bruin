@@ -3187,6 +3187,115 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	}
 }
 
+func TestEnsureIngestrAssetCDCDeleteBehavior(t *testing.T) {
+	t.Parallel()
+
+	const invalidBehavior = "Invalid 'cdc_delete_behavior' value: must be 'soft' or 'hard'"
+	const requiresCDC = "'cdc_delete_behavior' requires 'cdc: true'"
+	tests := []struct {
+		name       string
+		parameters pipeline.ParameterMap
+		wantIssue  string
+	}{
+		{
+			name:       "unset behavior in batch CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true"},
+		},
+		{
+			name:       "unset behavior in streaming CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+		},
+		{
+			name:       "soft deletes in batch CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": "soft"},
+		},
+		{
+			name:       "hard deletes in batch CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "stream": "false", "cdc_delete_behavior": "hard"},
+		},
+		{
+			name:       "soft deletes in streaming CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true", "cdc_delete_behavior": "soft"},
+		},
+		{
+			name:       "hard deletes in streaming CDC with YAML booleans",
+			parameters: pipeline.ParameterMap{"cdc": true, "stream": true, "cdc_delete_behavior": "hard"},
+		},
+		{
+			name:       "invalid behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": "ignore"},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "empty behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": ""},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "boolean behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": true},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "numeric behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": 1},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "null behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": nil},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "list behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": []string{"soft"}},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "map behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": map[string]string{"mode": "soft"}},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "CDC disabled",
+			parameters: pipeline.ParameterMap{"cdc": "false", "cdc_delete_behavior": "soft"},
+			wantIssue:  requiresCDC,
+		},
+		{
+			name:       "CDC unset",
+			parameters: pipeline.ParameterMap{"cdc_delete_behavior": "hard"},
+			wantIssue:  requiresCDC,
+		},
+		{
+			name:       "streaming without CDC",
+			parameters: pipeline.ParameterMap{"stream": "true", "cdc_delete_behavior": "hard"},
+			wantIssue:  requiresCDC,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tt.parameters["source_connection"] = "postgres"
+			tt.parameters["source_table"] = "public.users"
+			tt.parameters["destination"] = "bigquery"
+			asset := &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: tt.parameters}
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}
+
+			issues, err := EnsureIngestrAssetIsValidForASingleAsset(t.Context(), p, asset)
+			require.NoError(t, err)
+			if tt.wantIssue == "" {
+				assert.Empty(t, issues)
+				return
+			}
+
+			require.Len(t, issues, 1)
+			assert.Equal(t, tt.wantIssue, issues[0].Description)
+		})
+	}
+}
+
 func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
 	t.Parallel()
 

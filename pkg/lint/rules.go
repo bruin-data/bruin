@@ -363,6 +363,20 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
 		})
 	}
+	if _, exists := asset.Parameters["cdc_delete_behavior"]; exists {
+		behavior, _ := asset.Parameters.GetString("cdc_delete_behavior")
+		if behavior != "soft" && behavior != "hard" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Invalid 'cdc_delete_behavior' value: must be 'soft' or 'hard'",
+			})
+		} else if cdc, _ := asset.Parameters.GetString("cdc"); cdc != "true" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "'cdc_delete_behavior' requires 'cdc: true'",
+			})
+		}
+	}
 	if capture, exists := asset.Parameters.GetString("cdc_sql_capture"); exists && capture != "cdc" && capture != "change_tracking" {
 		issues = append(issues, &Issue{
 			Task:        asset,

@@ -85,6 +85,7 @@ parameters:
   flush_records: integer
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
   cdc: "true"|"false"
+  cdc_delete_behavior: soft | hard
   cdc_mode: stream | batch # deprecated, use stream instead
   cdc_sql_capture: cdc | change_tracking
   cdc_publication: string
@@ -147,6 +148,7 @@ parameters:
 | `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 | `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, PlanetScale, MongoDB, and SQL Server (log-based CDC and Change Tracking) sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
+| `cdc_delete_behavior` | No | `--cdc-delete-behavior` | How CDC merges apply source deletes in batch and streaming assets: `soft` (default) retains rows with `_cdc_deleted = true`; `hard` removes them. Requires `cdc: true` and ingestr v1.1.77 or later. Hard deletes require a supported source and destination with destination-managed CDC state; see [PostgreSQL delete behavior](../platforms/postgres.md#delete-behavior) and the [ingestr CDC guide](https://getbruin.com/docs/ingestr/getting-started/cdc.html#deletes). |
 | `cdc_mode` | No | `--stream` flag | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true`; `cdc_mode: batch` is the default (omit it). |
 | `cdc_sql_capture` | No | source URI scheme | SQL Server capture mechanism, either `cdc` (log-based, `mssql+cdc`; default) or `change_tracking` (`mssql+ct`). |
 | `cdc_publication` | No | source URI query | PostgreSQL publication name. |
