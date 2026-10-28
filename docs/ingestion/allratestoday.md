@@ -35,12 +35,12 @@ parameters:
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------|---------|
 | `central_banks` | `code` | – | replace | Institutions with a published table: code, name, latest published date, cadence and a stale flag. |
-| `central_bank_rates:<bank>` | `bank`, `date`, `base`, `quote`, `rate_type` | – | merge | The latest published table of one institution, e.g. `central_bank_rates:rbi`. Use the `code` column of `central_banks` for the bank code. |
+| `central_bank_rates:<bank>` | `bank`, `date`, `base`, `quote`, `rate_type` | `date` | delete+insert | The latest published table of one institution, e.g. `central_bank_rates:rbi`. Use the `code` column of `central_banks` for the bank code. |
 
 Each row of `central_bank_rates` reads as "1 `base` = `rate` `quote`" on `date`, as published. `rate_type` is what the institution calls the rate (`reference`, `middle`, `buy`, `sell`, ...).
 
 > [!NOTE]
-> Only the **latest** table each institution has published is available, so this source cannot backfill history. Schedule the asset daily and the `merge` strategy keeps one set of rows per published date. The data is free to use, including commercially, with a visible link to allratestoday.com wherever the rates are shown; see the [open API terms](https://allratestoday.com/open-api/).
+> Only the **latest** table each institution has published is available, so this source cannot backfill history. Schedule the asset daily and each run replaces the rows for that published date. Load each bank into its own asset and destination table, since banks sharing a table would overwrite each other's rates for the same date. The data is free to use, including commercially, with a visible link to allratestoday.com wherever the rates are shown; see the [open API terms](https://allratestoday.com/open-api/).
 
 ### Step 2: [Run](/commands/run) asset to ingest data
 

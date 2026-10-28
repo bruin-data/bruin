@@ -608,7 +608,7 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// AllRatesToday - Official central bank exchange rates
 	"allratestoday": {
 		{Name: "central_banks", PrimaryKey: "code", IncKey: "", IncStrategy: "replace"},
-		{Name: "central_bank_rates:<bank>", PrimaryKey: "bank,date,base,quote,rate_type", IncKey: "", IncStrategy: "merge"},
+		{Name: "central_bank_rates:<bank>", PrimaryKey: "bank,date,base,quote,rate_type", IncKey: "date", IncStrategy: "delete+insert"},
 	},
 
 	// Frankfurter - Exchange rates API
