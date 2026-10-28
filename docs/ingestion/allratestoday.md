@@ -40,7 +40,7 @@ parameters:
 Each row of `central_bank_rates` reads as "1 `base` = `rate` `quote`" on `date`, as published. `rate_type` is what the institution calls the rate (`reference`, `middle`, `buy`, `sell`, ...).
 
 > [!NOTE]
-> Only the **latest** table each institution has published is available, so this source cannot backfill history. Schedule the asset daily and each run replaces the rows for that published date. Load each bank into its own asset and destination table, since banks sharing a table would overwrite each other's rates for the same date. The data is free to use, including commercially, with a visible link to allratestoday.com wherever the rates are shown; see the [open API terms](https://allratestoday.com/open-api/).
+> Only the **latest** table each institution has published is available, so this source cannot backfill history. Schedule the asset daily and each run replaces the rows for that published date. Load each bank into its own asset and destination table, since banks sharing a table would overwrite each other's rates for the same date. `central_bank_rates` ignores the run's start and end dates: each run replaces only the date of the table it fetched. The data is free to use, including commercially, with a visible link to allratestoday.com wherever the rates are shown; see the [open API terms](https://allratestoday.com/open-api/).
 
 ### Step 2: [Run](/commands/run) asset to ingest data
 
