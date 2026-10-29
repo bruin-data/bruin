@@ -254,12 +254,42 @@ Answers are saved before the destination load, so retrying after a failed load d
 
 Separately, Bruin structures requests so providers can cache the shared prefix: `instructions` are sent before the row's `context`, with explicit cache hints for OpenAI (GPT-5.6+), Anthropic, and OpenRouter, and system instructions for Google. To benefit, keep long, stable guidance in `instructions` and column prompts and put only row values in `context`. Run output reports the cache-read and cache-write tokens providers return. See the [OpenAI](https://developers.openai.com/api/docs/guides/prompt-caching), [Anthropic](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), [Gemini](https://ai.google.dev/gemini-api/docs/generate-content/caching), and [OpenRouter](https://openrouter.ai/docs/guides/best-practices/prompt-caching) docs for thresholds and pricing.
 
+## Quality checks
+
+[Column checks](../quality/available_checks.md) and [custom checks](../quality/custom.md) work on inference assets. Bruin runs them after the load, against the destination table, on the platform of the asset's `connection`: a DuckDB connection runs them on DuckDB, a Snowflake connection on Snowflake.
+
+```yaml
+columns:
+  - name: ticket_id
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: unique
+  - name: category
+    type: string
+    inference:
+      prompt: Choose the ticket's primary category.
+      choices:
+        billing: Charges, invoices, or refunds
+        technical: Product errors or unexpected behavior
+    checks:
+      - name: accepted_values
+        value: [billing, technical]
+
+custom_checks:
+  - name: every ticket is enriched
+    query: SELECT count(*) FROM analytics.ticket_enrichment WHERE summary = ''
+    value: 0
+```
+
+Checks are supported on Athena, BigQuery, ClickHouse, Databricks, Doris, DuckDB, Fabric, MSSQL, Oracle, Postgres, Redshift, Snowflake, StarRocks, Synapse, and Vertica connections. On other connections, such as MySQL, Trino, or MotherDuck, `bruin validate` reports an asset with checks, and a run fails before sending any requests; put the checks on a downstream SQL asset instead.
+
 ## Materialization and limits
 
 - **`merge`** upserts by primary key. Rows deleted from the source stay in the destination.
 - **`create+replace`** rebuilds the table from the current input.
 
-Inference assets do not support views, `append`, incremental keys, partitioning, clustering, hooks, or column checks. Put quality checks on a downstream SQL asset.
+Inference assets do not support views, `append`, incremental keys, partitioning, clustering, or hooks.
 
 Rate limits (HTTP 429) and server errors (5xx) are retried, up to 10 attempts in total, honoring `Retry-After` headers and otherwise backing off up to 60 seconds. Each attempt times out after 120 seconds. Any other failure cancels outstanding requests and skips the load; requests already sent may still be billed.
 

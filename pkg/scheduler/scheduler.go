@@ -650,11 +650,14 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 	for _, instance := range instances {
 		asset := instance.GetAsset()
 		assetType := asset.Type
-		if assetType == pipeline.AssetTypeIngestr && taskType != pipeline.AssetTypeIngestr {
-			assetType, _ = helpers.GetIngestrCheckType(asset)
-		}
 		if assetType == taskType {
 			return true
+		}
+		// Ingestr and inference assets run their checks on the destination platform.
+		if assetType == pipeline.AssetTypeIngestr || assetType == pipeline.AssetTypeInference {
+			if checkType, err := helpers.GetIngestrCheckType(asset); err == nil && checkType == taskType {
+				return true
+			}
 		}
 	}
 

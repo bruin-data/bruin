@@ -70,6 +70,11 @@ func (i IngestrMetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskI
 	asset := ti.GetAsset()
 	assetType, err := helpers.GetIngestrDestinationType(asset)
 	if err != nil {
+		// Inference connections without an ingestr destination have no metadata pusher either.
+		if asset.Type == pipeline.AssetTypeInference {
+			ti.MarkAs(scheduler.Skipped)
+			return nil
+		}
 		return err
 	}
 

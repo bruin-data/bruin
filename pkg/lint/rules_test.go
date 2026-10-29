@@ -6983,3 +6983,41 @@ func TestEnsureTimeIntervalIsValidForAssetWithPipelineMacros(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, issues)
 }
+
+type staticConnectionTypes map[string]string
+
+func (s staticConnectionTypes) GetConnectionType(name string) string { return s[name] }
+
+func TestValidateInferenceCheckPlatform(t *testing.T) {
+	t.Parallel()
+
+	validator := ValidateInferenceCheckPlatform(staticConnectionTypes{"wh": "duckdb", "my": "mysql"})
+	newAsset := func(connection string, checks bool) *pipeline.Asset {
+		asset := &pipeline.Asset{Name: "enriched", Type: pipeline.AssetTypeInference, Connection: connection}
+		if checks {
+			asset.Columns = []pipeline.Column{{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}}}
+		}
+		return asset
+	}
+
+	tests := []struct {
+		name       string
+		asset      *pipeline.Asset
+		wantIssues int
+	}{
+		{name: "supported platform", asset: newAsset("wh", true)},
+		{name: "unsupported platform", asset: newAsset("my", true), wantIssues: 1},
+		{name: "unsupported platform without checks", asset: newAsset("my", false)},
+		{name: "unknown connection is left to other rules", asset: newAsset("missing", true)},
+		{name: "non-inference asset", asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Connection: "my", CustomChecks: []pipeline.CustomCheck{{Name: "c"}}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := validator(t.Context(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Len(t, issues, tt.wantIssues)
+		})
+	}
+}

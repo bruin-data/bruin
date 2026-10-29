@@ -2149,6 +2149,28 @@ func EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset(ctx context.Conte
 	return issues, nil
 }
 
+// ValidateInferenceCheckPlatform rejects quality checks on inference assets whose
+// connection platform cannot run them, so `bruin validate` catches what the run
+// would otherwise reject. Connections whose type is unknown are left to other rules.
+func ValidateInferenceCheckPlatform(connections python.ConnectionTypeGetter) AssetValidator {
+	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if asset.Type != pipeline.AssetTypeInference || asset.CheckCount() == 0 {
+			return nil, nil
+		}
+
+		connectionType := connections.GetConnectionType(asset.Connection)
+		if connectionType == "" {
+			return nil, nil
+		}
+
+		var issues []*Issue
+		if err := inference.ValidateQualityCheckPlatform(asset, connectionType); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+		return issues, nil
+	}
+}
+
 // ValidateCustomCheckQueryDryRun validates CustomCheck.Query using a dry-run against the DB.
 func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinja.RendererInterface) AssetValidator {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

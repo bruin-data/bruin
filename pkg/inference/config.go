@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 )
 
 type assetConfig struct {
@@ -22,6 +23,30 @@ type assetConfig struct {
 func ValidateAsset(asset *pipeline.Asset) error {
 	_, err := readConfig(asset)
 	return err
+}
+
+// checkDestinations are the ingestr destinations whose warehouses have column
+// and custom check executors. Keep in sync with SetupExecutors and the docs.
+var checkDestinations = map[string]bool{
+	"athena": true, "bigquery": true, "clickhouse": true, "databricks": true, "doris": true,
+	"duckdb": true, "fabric": true, "mssql": true, "oracle": true, "postgres": true,
+	"redshift": true, "snowflake": true, "starrocks": true, "synapse": true, "vertica": true,
+}
+
+// ValidateQualityCheckPlatform rejects quality checks on an asset whose
+// connection type is unknown or has no check executor. Checks run on the
+// platform of the `destination` inferred from the connection, as for ingestr.
+func ValidateQualityCheckPlatform(asset *pipeline.Asset, connectionType string) error {
+	if asset.CheckCount() == 0 {
+		return nil
+	}
+	if connectionType == "" {
+		return fmt.Errorf("could not determine the platform of connection %q to run inference quality checks", asset.Connection)
+	}
+	if destination, _ := python.IngestrDestinationForConnectionType(connectionType); !checkDestinations[destination] {
+		return fmt.Errorf("inference quality checks are not supported on %q connections; define checks on a downstream SQL asset", connectionType)
+	}
+	return nil
 }
 
 // Supported inference providers.
@@ -101,7 +126,8 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	for name := range asset.Parameters {
 		switch name {
 		case "provider", "model", "context", "instructions", "input_query", "input_asset",
-			"inference_connection", "max_rows", "max_output_tokens", "extract_parallelism", "cache", "force":
+			"inference_connection", "max_rows", "max_output_tokens", "extract_parallelism", "cache", "force",
+			"destination": // inferred from the connection so checks run on the destination platform
 		default:
 			return nil, fmt.Errorf("unsupported inference parameter %q", name)
 		}
@@ -138,13 +164,8 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	if len(asset.ColumnNamesWithPrimaryKey()) == 0 {
 		return nil, errors.New("inference requires primary key columns for result identity")
 	}
-	for _, column := range asset.Columns {
-		if len(column.Checks) != 0 {
-			return nil, errors.New("inference checks are not yet supported; define checks on a downstream SQL asset")
-		}
-	}
-	if len(asset.CustomChecks) != 0 || len(asset.Hooks.Pre) != 0 || len(asset.Hooks.Post) != 0 {
-		return nil, errors.New("inference custom checks and hooks are not yet supported")
+	if len(asset.Hooks.Pre) != 0 || len(asset.Hooks.Post) != 0 {
+		return nil, errors.New("inference hooks are not yet supported")
 	}
 	return c, nil
 }

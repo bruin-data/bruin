@@ -30,16 +30,35 @@ func buildIngestrDestinationsByConnectionType() map[string]string {
 	return destinations
 }
 
+// IngestrDestinationForConnectionType returns the ingestr `destination` that
+// writes to connections of the given type.
+func IngestrDestinationForConnectionType(connectionType string) (string, bool) {
+	destination, ok := ingestrDestinationsByConnectionType[connectionType]
+	return destination, ok
+}
+
 // InferIngestrDestination fills the `destination` parameter of an ingestr
 // asset that leaves it out, using the type of the connection the asset writes
 // to. This lets `connection` or `destination_connection` alone pick the
 // destination. An explicit `destination` is never overwritten.
+//
+// Inference assets publish through ingestr to their own `connection`, so their
+// `destination` is always derived from it. Quality checks use it to pick the
+// warehouse that runs them, the same way they do for ingestr assets.
 func InferIngestrDestination(asset *pipeline.Asset, p *pipeline.Pipeline, connections ConnectionTypeGetter) {
-	if asset.Type != pipeline.AssetTypeIngestr || connections == nil {
+	if connections == nil {
 		return
 	}
 
-	if destination, _ := asset.Parameters.GetString("destination"); destination != "" {
+	switch asset.Type {
+	case pipeline.AssetTypeIngestr:
+		if destination, _ := asset.Parameters.GetString("destination"); destination != "" {
+			return
+		}
+	case pipeline.AssetTypeInference:
+		// Never route checks by a user-set value that disagrees with the connection.
+		delete(asset.Parameters, "destination")
+	default:
 		return
 	}
 
@@ -48,7 +67,7 @@ func InferIngestrDestination(asset *pipeline.Asset, p *pipeline.Pipeline, connec
 		return
 	}
 
-	destination, ok := ingestrDestinationsByConnectionType[connections.GetConnectionType(connectionName)]
+	destination, ok := IngestrDestinationForConnectionType(connections.GetConnectionType(connectionName))
 	if !ok {
 		return
 	}
