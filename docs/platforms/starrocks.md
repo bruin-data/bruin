@@ -20,6 +20,8 @@ connections:
       ssl: "true"                   # optional — "true" or "skip-verify"
 ```
 
+The `ssl` setting controls SQL connections, including native assets and seeds. For ingestion into an HTTPS Stream Load endpoint, configure `http_scheme: https` and its `http_port` separately; see [StarRocks destination connections](/ingestion/starrocks#using-starrocks-as-a-destination).
+
 ## StarRocks Assets
 
 ### `starrocks.sql`

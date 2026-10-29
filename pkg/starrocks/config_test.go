@@ -25,6 +25,16 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 			config: Config{Username: "root", Password: "password", Host: "fe", Database: "db", SSL: "skip-verify"},
 			want:   "root:password@tcp(fe:9030)/db?multiStatements=true&parseTime=true&tls=skip-verify",
 		},
+		{
+			name:   "Stream Load HTTPS does not enable SQL TLS",
+			config: Config{Username: "root", Password: "password", Host: "fe", Database: "db", HTTPPort: 443, HTTPScheme: "https"},
+			want:   "root:password@tcp(fe:9030)/db?multiStatements=true&parseTime=true",
+		},
+		{
+			name:   "Stream Load scheme does not change SQL TLS",
+			config: Config{Username: "root", Password: "password", Host: "fe", Database: "db", SSL: "skip-verify", HTTPPort: 443, HTTPScheme: "https"},
+			want:   "root:password@tcp(fe:9030)/db?multiStatements=true&parseTime=true&tls=skip-verify",
+		},
 	}
 
 	for _, tt := range tests {
@@ -88,6 +98,31 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			name:   "destination params combine with ssl",
 			config: Config{Username: "root", Host: "fe", Port: 9030, SSL: "true", HTTPPort: 8040},
 			want:   "starrocks://root@fe:9030?http_port=8040&ssl=true",
+		},
+		{
+			name:   "HTTPS destination with SQL TLS",
+			config: Config{Username: "root", Host: "fe", Database: "analytics", SSL: "true", HTTPPort: 443, HTTPScheme: "https", ReplicationNum: 1},
+			want:   "starrocks://root@fe:9030/analytics?http_port=443&http_scheme=https&replication_num=1&ssl=true",
+		},
+		{
+			name:   "HTTPS without an explicit port leaves the ingestr default",
+			config: Config{Username: "root", Host: "fe", HTTPScheme: "https"},
+			want:   "starrocks://root@fe:9030?http_scheme=https",
+		},
+		{
+			name:   "explicit HTTP scheme",
+			config: Config{Username: "root", Host: "fe", HTTPScheme: "http"},
+			want:   "starrocks://root@fe:9030?http_scheme=http",
+		},
+		{
+			name:   "scheme is normalized",
+			config: Config{Username: "root", Host: "fe", HTTPScheme: " HTTPS "},
+			want:   "starrocks://root@fe:9030?http_scheme=https",
+		},
+		{
+			name:   "blank scheme preserves the default",
+			config: Config{Username: "root", Host: "fe", HTTPScheme: " "},
+			want:   "starrocks://root@fe:9030",
 		},
 	}
 

@@ -377,6 +377,12 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			})
 		}
 	}
+	if err := python.ValidateCDCSnapshotParameters(asset, false); err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: err.Error(),
+		})
+	}
 	if capture, exists := asset.Parameters.GetString("cdc_sql_capture"); exists && capture != "cdc" && capture != "change_tracking" {
 		issues = append(issues, &Issue{
 			Task:        asset,

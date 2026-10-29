@@ -26,6 +26,7 @@ To connect to StarRocks, you need to add a configuration item to the connections
           catalog: "iceberg_catalog"    # optional
           ssl: "true"                   # optional
           http_port: 8030               # optional, destination only
+          http_scheme: "http"            # optional, destination only
           replication_num: 1            # optional, destination only
 ```
 
@@ -35,8 +36,9 @@ To connect to StarRocks, you need to add a configuration item to the connections
 - `password`: the password for the user. Optional.
 - `database`: the default database for unqualified table names. Optional.
 - `catalog`: the default catalog. Optional, defaults to the internal catalog (`default_catalog`). Set this to an external catalog name (e.g. an Iceberg/Hudi/Hive catalog configured in StarRocks) to read lakehouse tables.
-- `ssl`: enable a TLS-encrypted connection. Optional — use `true` to verify the server certificate, or `skip-verify` for TLS without verification.
-- `http_port`: the FE HTTP port used for Stream Load when StarRocks is the destination. Optional, defaults to `8030`.
+- `ssl`: enable TLS for the SQL query-port connection. Optional — use `true` to verify the server certificate, or `skip-verify` for TLS without verification. This setting does not control Stream Load HTTPS or its certificate verification.
+- `http_port`: the FE HTTP or HTTPS port used for Stream Load when StarRocks is the destination. Optional, defaults to `8030` for either scheme.
+- `http_scheme`: `http` (default) or `https` for Stream Load when StarRocks is the destination. Requires ingestr v1.1.78 or later when explicitly set. HTTPS verifies certificates using the system trust store and rejects plaintext redirect and error-log targets.
 - `replication_num`: the replica count for tables created when StarRocks is the destination. Optional, defaults to the cluster default (set `1` for a single-backend cluster).
 
 ### Step 2: Create an asset file for data ingestion
@@ -109,6 +111,24 @@ parameters:
 
 Bruin creates the destination table if it does not exist and loads rows via StarRocks [Stream Load](https://docs.starrocks.io/docs/loading/StreamLoad/). The `replace`, `append`, and `merge` strategies are supported; `merge` requires a primary key and produces a StarRocks PRIMARY KEY table. Only the internal catalog is writable — external lakehouse catalogs (Iceberg/Hudi/Hive) are read-only, so they can be used as a source but not a destination.
 
+For an HTTPS Stream Load endpoint such as CelerData on port `443`, configure the connection as follows:
+
+```yaml
+connections:
+  starrocks:
+    - name: my_starrocks
+      host: your-celerdata-host
+      username: your-user
+      password: YOUR_PASSWORD
+      database: analytics
+      port: 9030
+      ssl: "true"
+      http_scheme: https
+      http_port: 443
+```
+
+These connection settings apply to batch ingestion and streaming CDC. Set `http_port` explicitly when the HTTPS endpoint uses a port other than `8030`.
+
 ### CDC replication
 
 StarRocks supports PostgreSQL and MySQL CDC snapshots, incremental catch-up, continuous streaming, and full refresh. Configure the source for [PostgreSQL CDC](/platforms/postgres#cdc-change-data-capture) or [MySQL CDC](/platforms/mysql#cdc-change-data-capture) before running these assets.
@@ -165,15 +185,17 @@ In multi-table mode, ingestr chooses each target name from the source schema and
 
 ### CDC keys, deletes, and requirements
 
-Keyed tables keep one row per source key, including composite keys. Source deletes remain as rows with `_cdc_deleted = true`; query the current mirror with:
+Keyed tables keep one row per source key, including composite keys. By default, source deletes remain as rows with `_cdc_deleted = true`; query the current mirror with:
 
 ```sql
 SELECT * FROM analytics.events WHERE NOT _cdc_deleted;
 ```
 
+Set `cdc_delete_behavior: hard` to remove deleted rows instead. For externally loaded PostgreSQL baselines using [`cdc_snapshot_mode: never`](/platforms/postgres#cdc-without-snapshots), untouched rows have NULL CDC metadata; filter with `COALESCE(_cdc_deleted, false) = false` to include them.
+
 - StarRocks PRIMARY KEY restrictions apply, including the cluster's encoded key size limit (128 bytes by default). PostgreSQL tables without keys but with `REPLICA IDENTITY FULL` become append-only change logs and can contain replayed events. Filtering `_cdc_deleted` does not turn those logs into a current-state mirror.
 - Ingestr stores checkpoints and ownership metadata in `_bruin_staging`. Preserve its tables and views across runs. The destination user needs permission to create databases, tables, and views, inspect metadata and load transactions, and select, insert, alter, delete, truncate, and drop managed tables.
-- The client must reach both the SQL query port and the Stream Load HTTP endpoint, including the backend address returned by the frontend's redirect. Configure `http_port` and `replication_num` on the existing StarRocks connection as needed.
+- The client must reach both the SQL query port and the Stream Load HTTP or HTTPS endpoint, including the backend address returned by the frontend's redirect. Configure `http_port`, `http_scheme`, and `replication_num` on the existing StarRocks connection as needed.
 - Keep one writer per target and avoid external destination schema changes during ingestion. Multi-table replication does not apply changes atomically across all tables. MySQL changes to a captured table's schema stop replication and require a full refresh.
 
 See the [ingestr StarRocks reference](https://getbruin.com/docs/ingestr/supported-sources/starrocks.html#postgresql-cdc) for source schema changes, PostgreSQL TOAST handling, and destination limits.

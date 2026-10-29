@@ -4195,6 +4195,49 @@ func TestConnections_ConnectionConcurrencyLimitsValidation(t *testing.T) {
 	assert.Contains(t, err.Error(), "empty name")
 }
 
+func TestConfig_StarRocksHTTPSchemeRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	for _, scheme := range []string{"", "http", "https"} {
+		t.Run("scheme="+scheme, func(t *testing.T) {
+			t.Parallel()
+
+			conf := &Config{
+				Environments: map[string]Environment{
+					"default": {Connections: &Connections{}},
+				},
+			}
+			credentials := map[string]any{"host": "fe", "username": "root"}
+			if scheme != "" {
+				credentials["http_scheme"] = scheme
+			}
+			require.NoError(t, conf.AddConnection("default", "starrocks", "starrocks", credentials))
+			conn := conf.Environments["default"].Connections.StarRocks[0]
+			require.Equal(t, scheme, conn.HTTPScheme)
+
+			yamlData, err := yaml.Marshal(conn)
+			require.NoError(t, err)
+			var yamlConn StarRocksConnection
+			require.NoError(t, yaml.Unmarshal(yamlData, &yamlConn))
+			require.Equal(t, conn, yamlConn)
+
+			jsonData, err := json.Marshal(conn)
+			require.NoError(t, err)
+			var jsonConn StarRocksConnection
+			require.NoError(t, json.Unmarshal(jsonData, &jsonConn))
+			require.Equal(t, conn, jsonConn)
+
+			if scheme == "" {
+				assert.NotContains(t, string(yamlData), "http_scheme")
+				assert.NotContains(t, string(jsonData), "http_scheme")
+			} else {
+				assert.Contains(t, string(yamlData), "http_scheme: "+scheme)
+				assert.Contains(t, string(jsonData), `"http_scheme":"`+scheme+`"`)
+			}
+		})
+	}
+}
+
 func TestConfig_AddConnectionWithMaxConcurrentAssets(t *testing.T) {
 	t.Parallel()
 

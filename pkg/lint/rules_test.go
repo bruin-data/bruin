@@ -3296,6 +3296,95 @@ func TestEnsureIngestrAssetCDCDeleteBehavior(t *testing.T) {
 	}
 }
 
+func TestEnsureIngestrAssetCDCSnapshotParameters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		parameters        pipeline.ParameterMap
+		refreshRestricted bool
+		wantIssue         string
+	}{
+		{
+			name:       "batch bootstrap without declared primary keys",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "cdc_start_lsn": "0/16B6C50", "incremental_strategy": "merge"},
+		},
+		{
+			name:       "streaming bootstrap",
+			parameters: pipeline.ParameterMap{"stream": true, "cdc_snapshot_mode": "never", "cdc_start_lsn": "0/16B6C50"},
+		},
+		{
+			name:       "automatic snapshots",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "auto"},
+		},
+		{
+			name:       "empty mode is invalid",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": ""},
+			wantIssue:  "invalid cdc_snapshot_mode: must be \"auto\" or \"never\"",
+		},
+		{
+			name:       "snapshot options require CDC",
+			parameters: pipeline.ParameterMap{"cdc": false, "cdc_snapshot_mode": "auto"},
+			wantIssue:  "cdc_snapshot_mode and cdc_start_lsn require cdc: true",
+		},
+		{
+			name:       "zero LSN is invalid",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "cdc_start_lsn": "0/0"},
+			wantIssue:  "invalid cdc_start_lsn: must be a nonzero PostgreSQL LSN in X/Y hexadecimal format with at most 8 digits per part",
+		},
+		{
+			name:       "bootstrap requires explicit snapshot policy",
+			parameters: pipeline.ParameterMap{"cdc_start_lsn": "0/16B6C50"},
+			wantIssue:  "cdc_start_lsn requires cdc_snapshot_mode: never",
+		},
+		{
+			name:       "snapshot free mode requires slot",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "cdc_slot": ""},
+			wantIssue:  "cdc_snapshot_mode: never requires a nonempty cdc_slot",
+		},
+		{
+			name:       "snapshot free mode rejects wildcard tables",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "source_table": "*"},
+			wantIssue:  "cdc_snapshot_mode: never requires explicit, nonempty source_table names without wildcards",
+		},
+		{
+			name:       "snapshot free mode rejects full refresh",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "full_refresh": true},
+			wantIssue:  "cdc_snapshot_mode: never cannot be used with full refresh",
+		},
+		{
+			name:              "refresh restriction prevents full refresh conflict",
+			parameters:        pipeline.ParameterMap{"cdc_snapshot_mode": "never", "full_refresh": true},
+			refreshRestricted: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parameters := pipeline.ParameterMap{
+				"cdc":               true,
+				"cdc_slot":          "bruin_slot",
+				"source_connection": "postgres",
+				"source_table":      "public.users",
+				"destination":       "bigquery",
+			}
+			for key, value := range tt.parameters {
+				parameters[key] = value
+			}
+			asset := &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: parameters, RefreshRestricted: &tt.refreshRestricted}
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}
+			issues, err := EnsureIngestrAssetIsValidForASingleAsset(t.Context(), p, asset)
+			require.NoError(t, err)
+			if tt.wantIssue == "" {
+				assert.Empty(t, issues)
+				return
+			}
+			require.Len(t, issues, 1)
+			assert.Equal(t, tt.wantIssue, issues[0].Description)
+		})
+	}
+}
+
 func TestWarnIngestrCDCModeDeprecated(t *testing.T) {
 	t.Parallel()
 

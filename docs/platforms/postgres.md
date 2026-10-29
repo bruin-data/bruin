@@ -204,6 +204,8 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 |-----------|----------|-------------|
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
 | `cdc_delete_behavior` | No | `soft` (default) retains deleted rows with `_cdc_deleted = true`; `hard` removes them from the destination. Applies to batch and streaming CDC. Requires ingestr v1.1.77 or later; see [Delete behavior](#delete-behavior) |
+| `cdc_snapshot_mode` | No | `auto` allows snapshots and backfills; `never` prohibits them. Omission inherits the saved policy; new connectors default to `auto`. Requires ingestr v1.1.78 or later; see [CDC without snapshots](#cdc-without-snapshots) |
+| `cdc_start_lsn` | No | Nonzero PostgreSQL LSN for bootstrapping preloaded destination tables with `cdc_snapshot_mode: never`. Remove after successful bootstrap. Requires ingestr v1.1.78 or later |
 | `stream` | No | Set to `true` for continuous (real-time) streaming. Omit for batch replication (read up to the current WAL position and exit) |
 | `cdc_mode` | No | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true` |
 | `cdc_publication` | No | Name of the PostgreSQL publication to use |
@@ -228,6 +230,64 @@ Set `cdc_delete_behavior` to control how source deletes affect the destination i
 The setting requires ingestr v1.1.77 or later and applies to tables with a usable merge key. PostgreSQL keyless tables with `REPLICA IDENTITY FULL` remain append-only change logs in either mode, including their delete events. See the [ingestr CDC guide](https://getbruin.com/docs/ingestr/getting-started/cdc.html#deletes) for source and destination restrictions.
 
 Switching an existing asset from `soft` to `hard` leaves previously written tombstones in place until their keys change again. To remove them, rebuild the destination with `bruin run --full-refresh`; for a streaming asset, use [streaming full refresh](../assets/ingestr.md#refreshing-a-stream).
+
+Full refresh is unavailable for connectors using `cdc_snapshot_mode: never`; remove existing tombstones explicitly if you change their delete behavior.
+
+### CDC without snapshots
+
+With ingestr v1.1.78 or later, PostgreSQL CDC can start from destination tables you loaded externally. Set `cdc_snapshot_mode: never` and supply their snapshot boundary in `cdc_start_lsn`. This works for batch and streaming assets.
+
+The destination data must represent a transaction-consistent snapshot at the supplied LSN, with all subsequent changes retained in the replication slot. Ingestr verifies the slot and table schemas, but cannot verify that the preloaded rows match that boundary. Use the verified boundary from your external loading process, not the current WAL position after loading or an Aurora snapshot timestamp.
+
+Requirements:
+
+- Set `source_table` to one table or a comma-separated list, rather than `"*"`. All selected tables must share the same external snapshot boundary.
+- Set `cdc_slot` to an existing, inactive, persistent `pgoutput` slot in the source database. Ingestr does not create or replace the slot in this mode and rejects unavailable WAL, a future LSN, or a boundary older than the slot's confirmed or restart position.
+- Preload every destination table with compatible columns and merge keys. The source must have usable merge keys, and the destination must support managed CDC state and CDC merges.
+
+For the initial bootstrap, configure the asset as follows. Replace the example LSN with your verified boundary:
+
+```yaml
+name: public.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.orders
+  destination: bigquery
+  cdc: true
+  cdc_publication: my_publication
+  cdc_slot: my_slot
+  cdc_snapshot_mode: never
+  cdc_start_lsn: "0/16B6C50"
+  stream: true
+```
+
+Launch it with `bruin run --stream assets/public.orders.asset.yml`. For a batch run, omit `stream: true` and run the asset without `--stream`.
+
+After bootstrap succeeds, remove `cdc_start_lsn` before the next run: supplying it again is rejected because it cannot reset existing checkpoints. The snapshot policy is saved with the connector, so subsequent runs can omit both snapshot options. Keep the same asset and replace its parameters with:
+
+```yaml
+parameters:
+  source_connection: my_pg
+  source_table: public.orders
+  destination: bigquery
+  cdc: true
+  cdc_publication: my_publication
+  cdc_slot: my_slot
+  stream: true
+```
+
+An interrupted bootstrap can retry the same `cdc_start_lsn` with `cdc_snapshot_mode: never`, or resume with both options omitted. Keep the connector identity, selected tables, destination, and staging namespace unchanged across retries and subsequent runs.
+
+Continue using ingestr v1.1.78 or later even when omitting the snapshot options: older versions do not enforce the saved `never` policy.
+
+For a new connector, omitting `cdc_snapshot_mode` defaults to `auto`, which permits snapshots and backfills. For a connector with a saved `never` policy, omission preserves `never`; explicitly switching to `auto` is rejected. Both `bruin run --full-refresh` and `parameters.full_refresh: true` are rejected for that connector. Missing checkpoints, replaced destinations, or source schema and identity changes stop the run instead of triggering a recovery snapshot or backfill.
+
+Ingestr adds CDC metadata columns without rewriting the preloaded rows, so untouched rows initially have NULL metadata. To include those live rows, filter with `COALESCE(_cdc_deleted, false) = false`. Source WAL `TRUNCATE` events still clear the destination table even under `never`.
+
+See the [ingestr snapshot-free CDC guide](https://getbruin.com/docs/ingestr/supported-sources/postgres.html#cdc-without-snapshots) for the full setup and recovery requirements.
 
 ### Examples
 
