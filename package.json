@@ -20,6 +20,7 @@
     "vue": "^3.5.16"
   },
   "overrides": {
+    "dompurify": "^3.4.17",
     "esbuild": "^0.28.1",
     "js-yaml": "^4.3.2",
     "linkify-it": "^5.0.2",
