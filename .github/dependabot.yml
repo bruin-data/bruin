@@ -2,8 +2,7 @@ version: 2
 updates:
   # Keep version-update PRs disabled; exclusions also constrain security updates.
   - package-ecosystem: "pip"
-    directories:
-      - "**/*"
+    directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
@@ -34,8 +33,7 @@ updates:
       - "integration-tests/test-pipelines/python-pyproject/assets/nested/uv.lock"
       - "examples/simple-pipeline/assets/nested/requirements.txt"
   - package-ecosystem: "gomod"
-    directories:
-      - "**/*"
+    directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
