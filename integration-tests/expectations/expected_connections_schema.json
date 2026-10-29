@@ -5603,6 +5603,9 @@
         "http_port": {
           "type": "integer"
         },
+        "http_scheme": {
+          "type": "string"
+        },
         "replication_num": {
           "type": "integer"
         }

@@ -4380,6 +4380,7 @@ func (m *Manager) AddStarRocksConnectionFromConfig(connection *config.StarRocksC
 		Catalog:        connection.Catalog,
 		SSL:            connection.SSL,
 		HTTPPort:       connection.HTTPPort,
+		HTTPScheme:     connection.HTTPScheme,
 		ReplicationNum: connection.ReplicationNum,
 	})
 	if err != nil {

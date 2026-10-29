@@ -2108,6 +2108,7 @@ type StarRocksConnection struct {
 	Catalog            string `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
 	SSL                string `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
 	HTTPPort           int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
+	HTTPScheme         string `yaml:"http_scheme,omitempty" json:"http_scheme,omitempty" mapstructure:"http_scheme"`
 	ReplicationNum     int    `yaml:"replication_num,omitempty" json:"replication_num,omitempty" mapstructure:"replication_num"`
 }
 
