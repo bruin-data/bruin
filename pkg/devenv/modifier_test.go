@@ -979,3 +979,81 @@ func TestDevEnvQueryModifierBatchesCrossCatalogTableChecks(t *testing.T) {
 	connectionFetcher.AssertExpectations(t)
 	sqlParser.AssertExpectations(t)
 }
+
+func TestDevEnvQueryModifier_ModifyForConnection(t *testing.T) {
+	t.Parallel()
+
+	const inputQuery = "select * from schema1.table1 t1 join schema2.table1 t2 using (someid)"
+
+	t.Run("no prefix, nothing changes", func(t *testing.T) {
+		t.Parallel()
+
+		d := &DevEnvQueryModifier{Dialect: "postgres", Parser: new(mockSQLParser)}
+		got, err := d.ModifyForConnection(context.Background(), "", "postgres-default", new(mockConnectionWithoutDatabaseSummary), &query.Query{Query: inputQuery})
+		require.NoError(t, err)
+		assert.Equal(t, inputQuery, got.Query)
+	})
+
+	t.Run("connection cannot be used for devenv, error", func(t *testing.T) {
+		t.Parallel()
+
+		d := &DevEnvQueryModifier{Dialect: "postgres", Parser: new(mockSQLParser)}
+		_, err := d.ModifyForConnection(context.Background(), "dev_", "postgres-default", new(mockConnectionWithoutDatabaseSummary), &query.Query{Query: inputQuery})
+		require.EqualError(t, err, "the connection 'postgres-default' does not support developer environments, please create an issue if you'd like that")
+	})
+
+	t.Run("only tables with a prefixed copy are renamed", func(t *testing.T) {
+		t.Parallel()
+
+		conn := new(mockConnectionInstance)
+		conn.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{
+			Name: "db1",
+			Schemas: []*ansisql.DBSchema{
+				{Name: "schema1", Tables: []*ansisql.DBTable{{Name: "table1"}}},
+				{Name: "schema2", Tables: []*ansisql.DBTable{{Name: "table1"}}},
+				{Name: "dev_schema1", Tables: []*ansisql.DBTable{{Name: "table1"}}},
+			},
+		}, nil)
+
+		parser := new(mockSQLParser)
+		parser.On("UsedTables", inputQuery, "postgres").Return([]string{"schema1.table1", "schema2.table1"}, nil)
+		// No asset owns the query, so there is no self-reference mapping.
+		parser.On("RenameTables", inputQuery, "postgres", map[string]string{"schema1.table1": "dev_schema1.table1"}).
+			Return("select * from dev_schema1.table1 t1 join schema2.table1 t2 using (someid)", nil)
+
+		d := &DevEnvQueryModifier{Dialect: "postgres", Parser: parser}
+		got, err := d.ModifyForConnection(context.Background(), "dev_", "postgres-default", conn, &query.Query{Query: inputQuery})
+		require.NoError(t, err)
+		assert.Equal(t, "select * from dev_schema1.table1 t1 join schema2.table1 t2 using (someid)", got.Query)
+		parser.AssertExpectations(t)
+		conn.AssertExpectations(t)
+	})
+}
+
+func TestUnprefixedName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		assetName string
+		prefix    string
+		want      string
+		wantOK    bool
+	}{
+		{name: "schema.table", assetName: "dev_mart.table1", prefix: "dev_", want: "mart.table1", wantOK: true},
+		{name: "catalog.schema.table", assetName: "db.dev_mart.table1", prefix: "dev_", want: "db.mart.table1", wantOK: true},
+		{name: "schema is not prefixed", assetName: "mart.table1", prefix: "dev_"},
+		{name: "empty prefix", assetName: "dev_mart.table1", prefix: ""},
+		{name: "no schema", assetName: "dev_table1", prefix: "dev_"},
+		{name: "empty name", assetName: "", prefix: "dev_"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := UnprefixedName(tt.assetName, tt.prefix)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

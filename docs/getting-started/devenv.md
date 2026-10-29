@@ -268,6 +268,13 @@ flowchart LR
 > [!IMPORTANT]
 > Bruin rewrote the references to both `raw.table1` and `raw.table2` to `dev1_raw.table1` and `dev1_raw.table2`, respectively. In this scenario, the tables from the original `raw` schema are not used at all.
 
+### Previewing and querying
+
+[`bruin render`](/commands/render#schema-prefixes) and [`bruin query`](/commands/query#schema-prefixes) take the same `--environment` flag and apply its schema prefix:
+
+- `bruin render --environment dev` shows the prefixed destination table. It does not connect to the database, so it leaves source tables as they are.
+- `bruin query --environment dev` rewrites the query against the database the same way `bruin run` does, so you can check what a query reads in your developer environment.
+
 ---
 
 This approach has a few advantages:

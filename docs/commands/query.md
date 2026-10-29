@@ -111,6 +111,25 @@ bruin query --connection my_connection \
 
 Scalar values are kept as literal strings (matching how pipeline variables work in YAML); only values that look like a JSON object or array are parsed as JSON.
 
+## Schema prefixes
+
+If the selected environment has a [`schema_prefix`](/getting-started/devenv#schema-based-environments), `bruin query` reads from the developer schemas the same way `bruin run` does. This applies in direct, asset and auto-detect modes:
+
+- `{{ schema_prefix }}` renders to the prefix of the environment given with `--environment`.
+- Each `schema.table` reference points at `<prefix>schema.table` if that table exists on the connection. Tables without a prefixed copy are read as they are.
+
+```bash
+# .bruin.yml: environment "dev" has schema_prefix: jane_
+# jane_raw.events exists, jane_raw.users does not
+bruin query --env dev --connection my_connection \
+  --query "SELECT * FROM raw.events JOIN raw.users USING (user_id)"
+# runs: SELECT * FROM jane_raw.events JOIN raw.users USING (user_id)
+```
+
+Bruin reads the list of tables from the connection to decide what to rewrite. The query that was executed is returned in the `query` field of `--output json`.
+
+Semantic queries prefix every `schema.table` reference without checking that the prefixed table exists, the same as [`bruin semantic check`](/commands/semantic).
+
 ## Querying MongoDB
 
 MongoDB connections (`mongo` and `mongo_atlas`) are not SQL, so the `--query` value is a JSON object describing a single **find** or **aggregation** against one collection instead of a SQL statement. The returned documents are flattened into a table: columns are the union of the top-level fields (in first-seen order), and nested documents and arrays are shown as JSON.

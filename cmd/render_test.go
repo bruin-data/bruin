@@ -344,6 +344,109 @@ func TestRenderCommand_Run(t *testing.T) {
 	}
 }
 
+type mockTableRenamer struct {
+	mock.Mock
+}
+
+func (m *mockTableRenamer) UsedTables(sql, dialect string) ([]string, error) {
+	res := m.Called(sql, dialect)
+	return res.Get(0).([]string), res.Error(1)
+}
+
+func (m *mockTableRenamer) RenameTables(sql, dialect string, tableMapping map[string]string) (string, error) {
+	res := m.Called(sql, dialect, tableMapping)
+	return res.String(0), res.Error(1)
+}
+
+func TestRenderCommandRenamesSelfReferencesForSchemaPrefix(t *testing.T) {
+	t.Parallel()
+
+	const selfReferencing = "SELECT * FROM raw.events WHERE id > (SELECT max(id) FROM mart.events)"
+
+	tests := []struct {
+		name         string
+		assetName    string
+		assetType    pipeline.AssetType
+		schemaPrefix string
+		query        string
+		setup        func(r *mockTableRenamer)
+		want         string
+	}{
+		{
+			name:         "self reference is pointed at the prefixed table",
+			assetName:    "dev_mart.events",
+			assetType:    pipeline.AssetTypeBigqueryQuery,
+			schemaPrefix: "dev_",
+			query:        selfReferencing,
+			setup: func(r *mockTableRenamer) {
+				r.On("UsedTables", selfReferencing, "bigquery").Return([]string{"raw.events", "mart.events"}, nil)
+				r.On("RenameTables", selfReferencing, "bigquery", map[string]string{"mart.events": "dev_mart.events"}).
+					Return("SELECT * FROM raw.events WHERE id > (SELECT MAX(id) FROM dev_mart.events)", nil)
+			},
+			want: "SELECT * FROM raw.events WHERE id > (SELECT MAX(id) FROM dev_mart.events)",
+		},
+		{
+			name:         "query without a self reference is left untouched",
+			assetName:    "dev_mart.events",
+			assetType:    pipeline.AssetTypeBigqueryQuery,
+			schemaPrefix: "dev_",
+			query:        "SELECT * FROM raw.events",
+			setup: func(r *mockTableRenamer) {
+				r.On("UsedTables", "SELECT * FROM raw.events", "bigquery").Return([]string{"raw.events"}, nil)
+			},
+			want: "SELECT * FROM raw.events",
+		},
+		{
+			name:      "no schema prefix, parser is not used",
+			assetName: "mart.events",
+			assetType: pipeline.AssetTypeBigqueryQuery,
+			query:     selfReferencing,
+			want:      selfReferencing,
+		},
+		{
+			name:         "query sensors are left untouched",
+			assetName:    "dev_mart.events",
+			assetType:    pipeline.AssetTypeBigqueryQuerySensor,
+			schemaPrefix: "dev_",
+			query:        selfReferencing,
+			want:         selfReferencing,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			extractor := new(mockExtractor)
+			extractor.On("ExtractQueriesFromString", tt.query).Return([]*query.Query{{Query: tt.query}}, nil)
+			renamer := new(mockTableRenamer)
+			if tt.setup != nil {
+				tt.setup(renamer)
+			}
+			asset := &pipeline.Asset{
+				Name:           tt.assetName,
+				Type:           tt.assetType,
+				ExecutableFile: pipeline.ExecutableFile{Content: tt.query},
+				Parameters:     pipeline.ParameterMap{"query": tt.query},
+			}
+			writer := new(bytes.Buffer)
+			render := &RenderCommand{
+				extractor:    extractor,
+				tableRenamer: renamer,
+				schemaPrefix: tt.schemaPrefix,
+				writer:       writer,
+				output:       "json",
+			}
+
+			require.NoError(t, render.Run(&pipeline.Pipeline{}, asset, ModifierInfo{}))
+			var payload map[string]string
+			require.NoError(t, json.Unmarshal(writer.Bytes(), &payload))
+			assert.Equal(t, tt.want, payload["query"])
+			renamer.AssertExpectations(t)
+		})
+	}
+}
+
 func TestRenderCommandUsesSparkRendererHookOrdering(t *testing.T) {
 	t.Parallel()
 

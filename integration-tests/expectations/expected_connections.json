@@ -681,6 +681,28 @@
       },
       "schema_prefix": "test"
     },
+    "env-schema-prefix-query": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-schema-prefix-query",
+            "path": "duckdb-files/schema-prefix-query.db"
+          }
+        ]
+      },
+      "schema_prefix": "test"
+    },
+    "env-schema-prefix-query-seed": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-schema-prefix-query",
+            "path": "duckdb-files/schema-prefix-query.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-selector-downstream": {
       "connections": {
         "duckdb": [
