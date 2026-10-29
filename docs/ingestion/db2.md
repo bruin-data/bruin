@@ -41,7 +41,7 @@ Bruin connects to Db2 using ingestr's native implementation of the DRDA wire pro
 The same connection type works for Db2 for i, which many ERP systems (including Infor Signature) store their data in:
 
 - `database` must be the **relational database name** the IBM i system is registered under in its relational database directory (`WRKRDBDIRE` on the host), not an arbitrary label. This is often the system's own name.
-- `source_table` should reference `LIBRARY.FILE`, where "library" is the IBM i equivalent of a schema and "file" is a physical file exposed as a table, e.g. `GSTDTA.ARCUST`.
+- `source_table` should reference `LIBRARY.FILE`, where "library" is the IBM i equivalent of a schema and "file" is a physical file exposed as a table, e.g. `MYLIB.MYFILE`.
 - The platform is auto-detected, so `platform: "ibmi"` is normally unnecessary. Set it explicitly only if detection picks the wrong catalog dialect.
 
 ### Step 2: Create an asset file for data ingestion
@@ -75,12 +75,12 @@ connection: neon
 
 parameters:
   source_connection: signature
-  source_table: 'GSTDTA.ARCUST'
+  source_table: 'MYLIB.MYFILE'
 
   destination: postgres
 ```
 
-Here `signature` is a `db2` connection in `.bruin.yml` pointed at the IBM i LPAR that hosts Signature, and `GSTDTA.ARCUST` is a library/file pair from the Signature data dictionary.
+Here `signature` is a `db2` connection in `.bruin.yml` pointed at the IBM i LPAR that hosts Signature, and `MYLIB.MYFILE` is a library/file pair from the Signature data dictionary.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

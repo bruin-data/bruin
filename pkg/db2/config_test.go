@@ -23,11 +23,11 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		Password: "password",
 		Host:     "localhost",
 		Port:     "446",
-		Database: "SIGLPAR",
-		Schema:   "GSTDTA",
+		Database: "MYRDB",
+		Schema:   "MYLIB",
 		SSL:      true,
 		Timeout:  15,
 		Platform: "ibmi",
 	}
-	assert.Equal(t, "db2://user:password@localhost:446/SIGLPAR?platform=ibmi&schema=GSTDTA&ssl=true&timeout=15", c.GetIngestrURI())
+	assert.Equal(t, "db2://user:password@localhost:446/MYRDB?platform=ibmi&schema=MYLIB&ssl=true&timeout=15", c.GetIngestrURI())
 }
