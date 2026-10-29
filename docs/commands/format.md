@@ -3,6 +3,8 @@
 The `format` command is used to process and format asset definition files in a project. It can handle a single asset file or process all asset files in a given path.
 The command supports two output types: plain text and JSON.
 
+For secret mappings, `format` omits `inject_as` when it matches `key`, since the key name is already the default environment variable name. Different names, including differences in letter case, are preserved.
+
 ## Usage
 
 ```bash
