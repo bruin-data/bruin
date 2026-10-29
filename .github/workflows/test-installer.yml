@@ -6,7 +6,6 @@ on:
     paths:
       - 'install.sh'
   pull_request:
-    branches: [ main ]
     paths:
       - 'install.sh'
 
