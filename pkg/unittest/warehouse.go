@@ -166,6 +166,9 @@ func buildInjected(p Rewriter, dialect, renderedSQL string, test pipeline.UnitTe
 // BigQuery cannot CAST a string to JSON and does not coerce string literals to
 // JSON across a UNION ALL, so declared JSON columns are built with PARSE_JSON
 // on every row there.
+//
+// A timestamp written with a zone keeps it where the column can take one; see
+// keepsZone.
 func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column, dialect string) (string, error) {
 	if len(input.Rows) == 0 {
 		return "", fmt.Errorf("input %q has no rows", input.Asset)
@@ -181,6 +184,9 @@ func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column, diale
 		exprs := make([]string, len(cols))
 		for j, c := range cols {
 			lit := sqlLiteral(row[c])
+			if t, ok := row[c].(time.Time); ok && keepsZone(t, dialect, declared[c]) {
+				lit = quoteStringLiteral(t.Format(time.RFC3339Nano))
+			}
 			switch {
 			case row[c] != nil && isBigQueryJSON(dialect, declared[c]):
 				lit = "PARSE_JSON(" + bigQueryStringLiteral(jsonText(row[c])) + ")"
@@ -261,6 +267,20 @@ func declaredTypes(schema []pipeline.Column) map[string]string {
 
 func isBigQueryJSON(dialect, typ string) bool {
 	return dialect == "bigquery" && strings.EqualFold(typ, "JSON")
+}
+
+// keepsZone reports whether a fixture timestamp's literal should carry its zone.
+// A time.Time in time.UTC was written with no zone (see pipeline.FixtureRows).
+//
+// DuckDB reads a zone-less string in the session timezone, which defaults to the
+// machine's, so a zoned value keeps its zone on a TIMESTAMPTZ column and on an
+// undeclared column, which stays a string until the query casts it. Other
+// dialects keep the portable zone-less literal.
+func keepsZone(t time.Time, dialect, typ string) bool {
+	if dialect != "duckdb" || t.Location() == time.UTC {
+		return false
+	}
+	return typ == "" || strings.EqualFold(typ, "TIMESTAMPTZ") || strings.EqualFold(typ, "TIMESTAMP WITH TIME ZONE")
 }
 
 // jsonText renders a fixture value for a JSON column: a string is taken as JSON
