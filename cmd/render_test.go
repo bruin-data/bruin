@@ -397,6 +397,17 @@ func TestRenderCommandRenamesSelfReferencesForSchemaPrefix(t *testing.T) {
 			want: "SELECT * FROM raw.events",
 		},
 		{
+			name:         "differently cased self reference is left as is, like bruin run",
+			assetName:    "dev_mart.events",
+			assetType:    pipeline.AssetTypeBigqueryQuery,
+			schemaPrefix: "dev_",
+			query:        "SELECT * FROM MART.events",
+			setup: func(r *mockTableRenamer) {
+				r.On("UsedTables", "SELECT * FROM MART.events", "bigquery").Return([]string{"MART.events"}, nil)
+			},
+			want: "SELECT * FROM MART.events",
+		},
+		{
 			name:      "no schema prefix, parser is not used",
 			assetName: "mart.events",
 			assetType: pipeline.AssetTypeBigqueryQuery,

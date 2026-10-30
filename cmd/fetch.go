@@ -643,6 +643,9 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
+		if cm.SelectedEnvironment != nil {
+			renderer.SetContextValue("schema_prefix", cm.SelectedEnvironment.SchemaPrefix)
+		}
 		queryStr, err = extractQuery(queryStr, extractor)
 		if err != nil {
 			return "", nil, "", "", nil, err

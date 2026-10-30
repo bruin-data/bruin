@@ -2439,6 +2439,20 @@ func TestWorkflowTasks(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 					},
 					{
+						Name:    "query_with_schema_prefix: direct query renders schema_prefix for the given environment",
+						Command: binary,
+						Args: []string{
+							"query", "--env", "env-schema-prefix-query", "--connection", "duckdb-schema-prefix-query", "--output", "json",
+							"--query", "SELECT '{{ schema_prefix }}' AS prefix",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[["test_"]]`},
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+					},
+					{
 						Name:    "query_with_schema_prefix: asset query renders and rewrites for the given environment",
 						Command: binary,
 						Args: []string{

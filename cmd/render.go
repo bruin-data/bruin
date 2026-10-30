@@ -573,8 +573,11 @@ func (r *RenderCommand) renameSelfReferences(task *pipeline.Asset, sql string) (
 	if err != nil {
 		return "", err
 	}
-	// Renaming regenerates the SQL, so only do it when there is something to rename.
-	if !slices.ContainsFunc(usedTables, func(table string) bool { return strings.EqualFold(table, original) }) {
+	// Match the name exactly, as `bruin run` does: whether MART.events and
+	// mart.events are the same table depends on the dialect and on quoting,
+	// which UsedTables does not report. Renaming regenerates the SQL, so skip
+	// it when there is nothing to rename.
+	if !slices.Contains(usedTables, original) {
 		return sql, nil
 	}
 
