@@ -169,12 +169,19 @@ func sortStrings(s []string) {
 	}
 }
 
-// preserveTSQLInferredAliasCase mirrors rename._preserve_tsql_inferred_alias_case.
+// preserveTSQLInferredAliasCase mirrors rename._preserve_tsql_inferred_alias_case, except that it keeps user-written aliases.
 func preserveTSQLInferredAliasCase(q *sqlengine.Expr) {
+	userAliases := make(map[*sqlengine.Expr]struct{})
+	for alias := range q.FindAll(sqlengine.KAlias) {
+		userAliases[alias] = struct{}{}
+	}
 	for _, node := range q.FindAllList(sqlengine.KCTE, sqlengine.KSubquery) {
 		sqlengine.QualifyDerivedTableOutputsTSQL(node)
 	}
 	for alias := range q.FindAll(sqlengine.KAlias) {
+		if _, ok := userAliases[alias]; ok {
+			continue
+		}
 		aliasIdent := alias.ArgE("alias")
 		if !aliasIdent.IsA(sqlengine.KIdentifier) {
 			continue
