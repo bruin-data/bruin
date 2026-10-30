@@ -1,0 +1,244 @@
+package lint
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+	"sort"
+	"sync"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
+	semantic "github.com/bruin-data/bruin/semantic-engine"
+	"github.com/spf13/afero"
+)
+
+type semanticLayerChecker struct {
+	fs     afero.Fs
+	finder repoFinder
+	seen   sync.Map
+}
+
+func newSemanticLayerChecker(fs afero.Fs, finder repoFinder) *semanticLayerChecker {
+	return &semanticLayerChecker{fs: fs, finder: finder}
+}
+
+func (c *semanticLayerChecker) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	dir := semanticDirForPipeline(ctx, c.fs, p, c.finder)
+	if dir == "" || !semanticDirExists(c.fs, dir) {
+		return nil, nil
+	}
+	if _, loaded := c.seen.LoadOrStore(dir, true); loaded {
+		return nil, nil
+	}
+
+	issues, models := loadSemanticCatalogIssues(c.fs, dir)
+	if names := semantic.Names(models); len(names) > 0 {
+		if _, err := semantic.NewEngineWithModels(models[names[0]], models); err != nil {
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("Semantic catalog is invalid: %s", err),
+			})
+		}
+	}
+
+	return issues, nil
+}
+
+// ValidateAsset runs the same catalog check when `bruin validate` targets a
+// single asset. The semantic catalog is repository-scoped, so an invalid
+// catalog must fail asset-scoped validation too instead of being skipped
+// with the other pipeline-level rules.
+func (c *semanticLayerChecker) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, _ *pipeline.Asset) ([]*Issue, error) {
+	return c.Validate(ctx, p)
+}
+
+type semanticQueryDryRunner struct {
+	fs          afero.Fs
+	finder      repoFinder
+	connections connectionManager
+	seen        sync.Map
+}
+
+func GetSemanticQueryDryRunRule(fs afero.Fs, finder repoFinder, connections connectionManager) *SimpleRule {
+	runner := &semanticQueryDryRunner{
+		fs:          fs,
+		finder:      finder,
+		connections: connections,
+	}
+	return &SimpleRule{
+		Identifier:       "semantic-query-dry-run",
+		Fast:             false,
+		Severity:         ValidatorSeverityCritical,
+		Validator:        runner.Validate,
+		AssetValidator:   runner.ValidateAsset,
+		ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+	}
+}
+
+func (r *semanticQueryDryRunner) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	return r.validateWithPreferredAsset(ctx, p, nil)
+}
+
+func (r *semanticQueryDryRunner) validateWithPreferredAsset(ctx context.Context, p *pipeline.Pipeline, preferred *pipeline.Asset) ([]*Issue, error) {
+	dir := semanticDirForPipeline(ctx, r.fs, p, r.finder)
+	if dir == "" || !semanticDirExists(r.fs, dir) {
+		return nil, nil
+	}
+	if _, loaded := r.seen.Load(dir); loaded {
+		return nil, nil
+	}
+
+	_, models := loadSemanticCatalogIssues(r.fs, dir)
+
+	queryable := queryableSemanticModels(models)
+	if len(queryable) == 0 {
+		r.seen.Store(dir, true)
+		return nil, nil
+	}
+
+	validator := queryValidatorForPipeline(p, r.connections, preferred)
+	if validator == nil {
+		return nil, nil
+	}
+	r.seen.Store(dir, true)
+
+	var issues []*Issue
+	for _, model := range queryable {
+		q := &query.Query{Query: model.Source.DryRunSQL(model.Name)}
+		valid, err := validator.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), q)
+		switch {
+		case err != nil:
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("Failed to validate semantic model %q query: %s", model.Name, err),
+				Context:     []string{q.Query},
+			})
+		case !valid:
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("Semantic model %q query is invalid: %s", model.Name, q.Query),
+				Context:     []string{q.Query},
+			})
+		}
+	}
+
+	return issues, nil
+}
+
+// ValidateAsset dry-runs query sources when `bruin validate` targets a
+// single asset, mirroring Validate. Query sources are repository-scoped, so
+// they must not be skipped by asset-scoped validation. The dry-run prefers
+// the selected asset's connection so the queries are checked in the right
+// SQL dialect instead of a sibling asset's connection.
+func (r *semanticQueryDryRunner) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	return r.validateWithPreferredAsset(ctx, p, asset)
+}
+
+func loadSemanticCatalogIssues(fs afero.Fs, dir string) ([]*Issue, map[string]*semantic.Model) {
+	models, invalid, err := semantic.LoadDirPartialFS(fs, dir)
+	if err != nil {
+		return []*Issue{{
+			Description: fmt.Sprintf("Failed to load semantic models from '%s': %s", dir, err),
+		}}, nil
+	}
+
+	names := make([]string, 0, len(invalid))
+	for name := range invalid {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	issues := make([]*Issue, 0, len(names))
+	for _, name := range names {
+		issues = append(issues, &Issue{
+			Description: fmt.Sprintf("Semantic model %q is invalid: %s", name, invalid[name]),
+		})
+	}
+	return issues, models
+}
+
+func queryableSemanticModels(models map[string]*semantic.Model) []*semantic.Model {
+	names := semantic.Names(models)
+	out := make([]*semantic.Model, 0)
+	for _, name := range names {
+		model := models[name]
+		if model != nil && model.Source.IsQueryable() {
+			out = append(out, model)
+		}
+	}
+	return out
+}
+
+func queryValidatorForPipeline(p *pipeline.Pipeline, connections connectionManager, preferred *pipeline.Asset) queryValidator {
+	if p == nil || connections == nil {
+		return nil
+	}
+	if validator := queryValidatorForAsset(p, connections, preferred); validator != nil {
+		return validator
+	}
+	for _, asset := range p.Assets {
+		if asset != nil && asset == preferred {
+			continue
+		}
+		if validator := queryValidatorForAsset(p, connections, asset); validator != nil {
+			return validator
+		}
+	}
+	return nil
+}
+
+func queryValidatorForAsset(p *pipeline.Pipeline, connections connectionManager, asset *pipeline.Asset) queryValidator {
+	if p == nil || connections == nil || asset == nil || !asset.IsSQLAsset() {
+		return nil
+	}
+	name, err := p.GetConnectionNameForAsset(asset)
+	if err != nil || name == "" {
+		return nil
+	}
+	validator, ok := connections.GetConnection(name).(queryValidator)
+	if !ok {
+		return nil
+	}
+	return validator
+}
+
+func semanticDirForPipeline(ctx context.Context, fs afero.Fs, p *pipeline.Pipeline, finder repoFinder) string {
+	if configPath, ok := ctx.Value(config.ConfigFilePathContextKey).(string); ok && configPath != "" {
+		return filepath.Join(filepath.Dir(configPath), "semantic")
+	}
+	if p == nil || p.DefinitionFile.Path == "" {
+		return ""
+	}
+
+	dir := filepath.Dir(p.DefinitionFile.Path)
+	for {
+		if hasBruinConfig(fs, dir) {
+			return filepath.Join(dir, "semantic")
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	if finder != nil {
+		repo, err := finder.Repo(p.DefinitionFile.Path)
+		if err == nil && repo != nil && repo.Path != "" {
+			return filepath.Join(repo.Path, "semantic")
+		}
+	}
+	return ""
+}
+
+func hasBruinConfig(fs afero.Fs, dir string) bool {
+	info, err := fs.Stat(filepath.Join(dir, ".bruin.yml"))
+	return err == nil && !info.IsDir()
+}
+
+func semanticDirExists(fs afero.Fs, dir string) bool {
+	info, err := fs.Stat(dir)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
