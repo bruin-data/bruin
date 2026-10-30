@@ -595,6 +595,39 @@ func TestValidationQueries(t *testing.T) {
 	}
 }
 
+func TestCompileChecksQuerySource(t *testing.T) {
+	t.Parallel()
+
+	model := &Model{
+		Name:       "orders",
+		Source:     Source{Query: "select 1 as id -- keep the filter"},
+		Dimensions: []Dimension{{Name: "id", Type: "number", Checks: []Check{{Name: "not_null"}}}},
+	}
+	checks, err := minimalEngine(t, model).CompileChecks(CompileChecksOptions{})
+	if err != nil {
+		t.Fatalf("CompileChecks: %v", err)
+	}
+	check := compiledByID(t, checks, "orders.dimension.id.not_null")
+	want := "SELECT count(*) AS bruin_check_value FROM (select 1 as id -- keep the filter\n) AS orders WHERE id IS NULL"
+	if check.SQL != want {
+		t.Fatalf("check SQL = %q, want %q", check.SQL, want)
+	}
+}
+
+func TestValidationQueriesQuerySource(t *testing.T) {
+	t.Parallel()
+
+	model := &Model{Name: "orders", Source: Source{Query: "select 1 as id -- keep the filter"}}
+	queries, err := minimalEngine(t, model).ValidationQueries()
+	if err != nil {
+		t.Fatalf("ValidationQueries: %v", err)
+	}
+	want := "SELECT 1 AS bruin_check_value FROM (select 1 as id -- keep the filter\n) AS orders"
+	if len(queries) != 1 || queries[0] != want {
+		t.Fatalf("ValidationQueries() = %q, want %q", queries, want)
+	}
+}
+
 func TestLoadModelWithChecksFromYAML(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()

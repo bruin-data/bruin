@@ -287,7 +287,7 @@ func (e *Engine) ValidationQueries() ([]string, error) {
 		statements = append(statements, sql)
 	}
 	if len(statements) == 0 {
-		statements = append(statements, "SELECT 1 AS "+checkValueColumn+" FROM "+e.model.Source.Table)
+		statements = append(statements, "SELECT 1 AS "+checkValueColumn+" FROM "+e.model.SourceRelation())
 	}
 	return statements, nil
 }
@@ -445,7 +445,7 @@ func (e *Engine) compileDimensionCheck(d *Dimension, check Check, opts CompileCh
 	if d.Expression != "" {
 		expr = "(" + expr + ")"
 	}
-	table := e.model.Source.Table
+	table := e.model.SourceRelation()
 	name := strings.TrimSpace(check.Name)
 
 	var sql string

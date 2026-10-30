@@ -16,7 +16,7 @@
     "esbuild": "^0.28.1",
     "highlight.js": "^11.10.0",
     "markdown-it": "^14.3.2",
-    "vite": "^6.4.3",
+    "vite": "^6.4.4",
     "vue": "^3.5.16"
   },
   "overrides": {
@@ -26,6 +26,6 @@
     "markdown-it": "^14.3.2",
     "postcss": "^8.5.23",
     "smol-toml": "1.7.1",
-    "vite": "^6.4.3"
+    "vite": "^6.4.4"
   }
 }
