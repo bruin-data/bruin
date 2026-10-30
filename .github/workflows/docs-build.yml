@@ -12,7 +12,6 @@ on:
       - '.npmrc'
       - 'lychee.toml'
   pull_request:
-    branches: [ main ]
     paths:
       - 'docs/**'
       - '.github/workflows/docs-build.yml'

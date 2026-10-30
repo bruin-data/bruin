@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	path2 "path"
 	"path/filepath"
@@ -32,6 +34,8 @@ func Cloud(isDebug *bool) *cli.Command {
 		Usage: "Interact with Bruin Cloud API",
 		Commands: []*cli.Command{
 			CloudLogin(),
+			CloudLogout(),
+			CloudAuth(),
 			CloudTeams(),
 			CloudProjects(),
 			CloudPipelines(),
@@ -44,6 +48,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudConnectionSets(),
 			CloudDashboards(),
+			CloudSemanticLayers(),
 			CloudScheduledAgents(),
 			CloudNotificationRules(),
 			CloudSkills(),
@@ -65,7 +70,7 @@ func addTeamFlag(cmd *cli.Command) {
 	for _, sub := range cmd.Commands {
 		// "cloud config" manages the default team itself; it doesn't act on a
 		// team, so it neither takes --team nor reads the default.
-		if sub.Name == "config" || sub.Name == "login" {
+		if sub.Name == "config" || sub.Name == "login" || sub.Name == "logout" {
 			continue
 		}
 		if sub.Action != nil || len(sub.Commands) == 0 {
@@ -470,6 +475,7 @@ func CloudProjects() *cli.Command {
 		Usage: "Manage Bruin Cloud projects",
 		Commands: []*cli.Command{
 			cloudProjectsList(),
+			cloudProjectsCreate(),
 		},
 	}
 }
@@ -511,6 +517,125 @@ func cloudProjectsList() *cli.Command {
 				t.AppendRow(table.Row{p.ID, p.Name, p.Repo.URL, p.Repo.Branch})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+var gitProviderHosts = map[string]string{
+	"github.com":    "github",
+	"gitlab.com":    "gitlab",
+	"bitbucket.org": "bitbucket",
+}
+
+// resolveGitProvider validates an explicit --provider, or infers it from a
+// github.com/gitlab.com/bitbucket.org repo URL. Self-hosted URLs need it explicitly.
+func resolveGitProvider(provider, repoURL string) (string, error) {
+	if provider != "" {
+		for _, p := range gitProviderHosts {
+			if provider == p {
+				return provider, nil
+			}
+		}
+		return "", fmt.Errorf("provider must be 'github', 'gitlab' or 'bitbucket', got %q", provider)
+	}
+
+	u, err := url.Parse(repoURL)
+	if err == nil {
+		if p, ok := gitProviderHosts[strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")]; ok {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("could not infer the Git provider from %q, pass --provider github, gitlab or bitbucket", repoURL)
+}
+
+// Without a git token, Bruin Cloud connects the repo through the user's GitHub App access.
+func createProjectInput(name, repoURL, branch, gitToken, provider string, doNotParse bool) (bruincloud.CreateProjectInput, error) {
+	input := bruincloud.CreateProjectInput{Name: name, RepoURL: repoURL, RepoBranch: branch, DoNotParse: doNotParse}
+
+	if gitToken == "" {
+		if provider != "" && provider != "github" {
+			return input, fmt.Errorf("--provider %s needs --git-token; only GitHub repositories connect without one", provider)
+		}
+		return input, nil
+	}
+
+	resolved, err := resolveGitProvider(provider, repoURL)
+	if err != nil {
+		return input, err
+	}
+	input.GitToken = gitToken
+	input.Provider = resolved
+	if input.RepoBranch == "" {
+		input.RepoBranch = "main"
+	}
+	return input, nil
+}
+
+func cloudProjectsCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Connect a Git repository as a new project, through your GitHub App access or a personal access token",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "name",
+				Usage:    "the project name",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "repo-url",
+				Usage:    "URL of the Git repository, e.g. https://github.com/acme/analytics; without --git-token also an SSH URL or acme/analytics",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "branch",
+				Usage: "the branch Bruin Cloud should track (default: the repository's default branch, or main with --git-token)",
+			},
+			&cli.StringFlag{
+				Name:    "git-token",
+				Usage:   "personal access token with read access to the repository; omit it (and unset BRUIN_CLOUD_GIT_TOKEN) to connect a GitHub repository through the Bruin GitHub App",
+				Sources: cli.EnvVars("BRUIN_CLOUD_GIT_TOKEN"),
+			},
+			&cli.StringFlag{
+				Name:  "provider",
+				Usage: "Git provider: github, gitlab or bitbucket (inferred from the repo URL when omitted)",
+			},
+			&cli.BoolFlag{
+				Name:  "do-not-parse",
+				Usage: "create the project without parsing the repository's pipelines",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			input, err := createProjectInput(c.String("name"), c.String("repo-url"), c.String("branch"), c.String("git-token"), c.String("provider"), c.Bool("do-not-parse"))
+			if err != nil {
+				printError(err, output, "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			project, err := client.CreateProject(ctx, input)
+			if err != nil {
+				printError(err, output, "Failed to create project")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(project, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Created project %s (%s)\n", project.ID, project.Name)
 			return nil
 		},
 	}
@@ -2443,6 +2568,8 @@ func CloudAgents() *cli.Command {
 			cloudAgentsDelete(),
 			cloudAgentsSend(),
 			cloudAgentsStatus(),
+			cloudAgentsSteer(),
+			cloudAgentsStop(),
 			cloudAgentsThreads(),
 			cloudAgentsMessages(),
 			cloudAgentsGetPrompt(),
@@ -3272,6 +3399,236 @@ func cloudAgentsStatus() *cli.Command {
 			fmt.Printf("  Updated:   %s\n", msg.UpdatedAt)
 			return nil
 		},
+	}
+}
+
+// IDs are flags (only defaulting to the run env) so an agent can steer another's turn.
+func cloudAgentsSteer() *cli.Command {
+	return &cli.Command{
+		Name:  "steer",
+		Usage: "Steer a running agent message mid-turn (defaults to the thread's running message)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:    "agent-id",
+				Usage:   "agent ID (defaults to the current agent run's agent)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.IntFlag{
+				Name:    "thread-id",
+				Usage:   "thread ID (defaults to the current agent run's thread)",
+				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
+			},
+			&cli.IntFlag{
+				Name:  "message-id",
+				Usage: "message pair ID to steer (defaults to the thread's running message)",
+			},
+			&cli.StringFlag{
+				Name:     "message",
+				Usage:    "the follow-up for the running agent",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "steer-id",
+				Usage: "optional UUID for safe retries; a repeated ID returns the saved steer instead of steering twice",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentID, threadID := c.Int("agent-id"), c.Int("thread-id")
+			if agentID <= 0 || threadID <= 0 {
+				printError(fmt.Errorf("--agent-id and --thread-id must be positive integers (they default to BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID), got %d and %d", agentID, threadID), output, "Invalid agent or thread")
+				return cli.Exit("", 1)
+			}
+			if c.IsSet("message-id") && c.Int("message-id") <= 0 {
+				printError(fmt.Errorf("--message-id must be a positive integer, got %d", c.Int("message-id")), output, "Invalid --message-id")
+				return cli.Exit("", 1)
+			}
+			message := strings.TrimSpace(c.String("message"))
+			if message == "" {
+				printError(errors.New("--message is required"), output, "Missing --message")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			messageID := c.Int("message-id")
+			if !c.IsSet("message-id") {
+				messageID, err = runningMessageID(ctx, client, agentID, threadID)
+				if err != nil {
+					printError(err, output, "Failed to find the running message")
+					return cli.Exit("", 1)
+				}
+				if messageID == 0 {
+					printError(fmt.Errorf("thread %d has no running message to steer; send a normal message instead: %s", threadID, steerSendCommand(agentID, threadID)), output, "Nothing to steer")
+					return cli.Exit("", 1)
+				}
+			}
+
+			steer, err := client.SteerAgentMessage(ctx, agentID, threadID, messageID, message, c.String("steer-id"))
+			if err != nil {
+				var apiErr *bruincloud.APIError
+				if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict {
+					// The API message already says to send a new message; add the command.
+					err = fmt.Errorf("%w: %s", err, steerSendCommand(agentID, threadID))
+				}
+				printError(err, output, "Failed to steer message")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				// Include the ids so a caller that let the message default can follow it with 'status'.
+				data, _ := json.MarshalIndent(map[string]any{
+					"agent_id":   agentID,
+					"thread_id":  threadID,
+					"message_id": messageID,
+					"steer":      steer,
+				}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Steered message %d in thread %d (steer %s, status: %s)", messageID, threadID, steer.ID, steer.Status))
+			return nil
+		},
+	}
+}
+
+// runningMessageID returns the thread's latest steerable message, or 0 if none.
+// Messages come oldest first, so it reads the last page.
+func runningMessageID(ctx context.Context, client *bruincloud.APIClient, agentID, threadID int) (int, error) {
+	const pageSize = 100 // the API's max
+	msgs, total, err := client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, 0)
+	if err != nil {
+		return 0, err
+	}
+	if total > len(msgs) {
+		msgs, _, err = client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, max(0, total-pageSize))
+		if err != nil {
+			return 0, err
+		}
+	}
+	running := 0
+	for _, m := range msgs {
+		if m.Steerable {
+			running = m.ID
+		}
+	}
+	return running, nil
+}
+
+func steerSendCommand(agentID, threadID int) string {
+	return fmt.Sprintf(`bruin cloud agents send --agent-id %d --thread-id %d --message "<message>"`, agentID, threadID)
+}
+
+func cloudAgentsStop() *cli.Command {
+	return &cli.Command{
+		Name:  "stop",
+		Usage: "Stop an agent message (defaults to the thread's latest pending or processing message)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:    "agent-id",
+				Usage:   "agent ID (defaults to the current agent run's agent)",
+				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+			},
+			&cli.IntFlag{
+				Name:    "thread-id",
+				Usage:   "thread ID (defaults to the current agent run's thread)",
+				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
+			},
+			&cli.IntFlag{
+				Name:  "message-id",
+				Usage: "message pair ID to stop (defaults to the thread's latest pending or processing message)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			agentID, threadID := c.Int("agent-id"), c.Int("thread-id")
+			if agentID <= 0 || threadID <= 0 {
+				printError(fmt.Errorf("--agent-id and --thread-id must be positive integers (they default to BRUIN_CLOUD_AGENT_ID and BRUIN_THREAD_ID), got %d and %d", agentID, threadID), output, "Invalid agent or thread")
+				return cli.Exit("", 1)
+			}
+			if c.IsSet("message-id") && c.Int("message-id") <= 0 {
+				printError(fmt.Errorf("--message-id must be a positive integer, got %d", c.Int("message-id")), output, "Invalid --message-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			messageID := c.Int("message-id")
+			if !c.IsSet("message-id") {
+				messageID, err = stoppableMessageID(ctx, client, agentID, threadID)
+				if err != nil {
+					printError(err, output, "Failed to find a message to stop")
+					return cli.Exit("", 1)
+				}
+				if messageID == 0 {
+					printError(fmt.Errorf("thread %d has no pending or processing message to stop", threadID), output, "Nothing to stop")
+					return cli.Exit("", 1)
+				}
+			}
+
+			result, err := client.StopAgentMessage(ctx, agentID, threadID, messageID)
+			if err != nil {
+				printError(err, output, "Failed to stop message")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(map[string]any{
+					"agent_id":   agentID,
+					"thread_id":  result.ThreadID,
+					"message_id": result.MessagePairID,
+					"status":     result.Status,
+				}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Stop request accepted for message %d in thread %d (status: %s)", result.MessagePairID, result.ThreadID, result.Status))
+			return nil
+		},
+	}
+}
+
+func stoppableMessageID(ctx context.Context, client *bruincloud.APIClient, agentID, threadID int) (int, error) {
+	const pageSize = 100
+	firstPage, total, err := client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	for offset := max(0, total-pageSize); ; offset = max(0, offset-pageSize) {
+		messages := firstPage
+		if offset > 0 {
+			messages, _, err = client.ListAgentMessagesWithTotal(ctx, agentID, threadID, pageSize, offset)
+			if err != nil {
+				return 0, err
+			}
+		}
+		for i := len(messages) - 1; i >= 0; i-- {
+			if messages[i].Status == "pending" || messages[i].Status == "processing" {
+				return messages[i].ID, nil
+			}
+		}
+		if offset == 0 {
+			return 0, nil
+		}
 	}
 }
 
@@ -4846,10 +5203,327 @@ func CloudDashboards() *cli.Command {
 			cloudDashboardsVersion(),
 			cloudDashboardsCreate(),
 			cloudDashboardsUpdate(),
+			cloudDashboardsApplyFilters(),
 			cloudDashboardsPublish(),
 			cloudDashboardsDelete(),
+			cloudDashboardsNotes(),
 		},
 	}
+}
+
+func CloudSemanticLayers() *cli.Command {
+	return &cli.Command{
+		Name:  "semantic-layers",
+		Usage: "Manage Bruin Cloud semantic layers",
+		Commands: []*cli.Command{
+			cloudSemanticLayersList(),
+			cloudSemanticLayersGet(),
+			cloudSemanticLayersCreate(),
+			cloudSemanticLayersUpdate(),
+			cloudSemanticLayersDelete(),
+		},
+	}
+}
+
+func cloudSemanticLayersList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List semantic layers",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layers, err := client.ListSemanticLayers(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list semantic layers")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layers, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Updated At"})
+			for _, l := range layers {
+				updated := ""
+				if l.UpdatedAt != nil {
+					updated = *l.UpdatedAt
+				}
+				t.AppendRow(table.Row{l.ID, l.Name, updated})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersGet() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "Get a semantic layer including its model definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "semantic-layer-id",
+				Usage:    "semantic layer ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("semantic-layer-id") <= 0 {
+				printError(fmt.Errorf("--semantic-layer-id must be a positive integer, got %d", c.Int("semantic-layer-id")), output, "Invalid --semantic-layer-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layer, err := client.GetSemanticLayer(ctx, c.Int("semantic-layer-id"))
+			if err != nil {
+				printError(err, output, "Failed to get semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layer, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			infoPrinter.Printf("Semantic layer %d: %s\n", layer.ID, layer.Name)
+			if len(layer.State) > 0 {
+				fmt.Println(string(layer.State))
+			}
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersCreate() *cli.Command {
+	return &cli.Command{
+		Name:  "create",
+		Usage: "Create a semantic layer from a name and model definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:     "name",
+				Usage:    "the semantic layer name",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the model definition as a JSON or YAML string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the model definition as JSON or YAML",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			state, err := parseSemanticStateFlags(c, output)
+			if err != nil {
+				return err
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layer, err := client.CreateSemanticLayer(ctx, c.String("name"), state)
+			if err != nil {
+				printError(err, output, "Failed to create semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layer, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Created semantic layer %d (%s).\n", layer.ID, layer.Name)
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersUpdate() *cli.Command {
+	return &cli.Command{
+		Name:  "update",
+		Usage: "Update a semantic layer's name and/or model definition",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "semantic-layer-id",
+				Usage:    "semantic layer ID",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "a new name",
+			},
+			&cli.StringFlag{
+				Name:  "state",
+				Usage: "the model definition as a JSON or YAML string",
+			},
+			&cli.StringFlag{
+				Name:  "state-file",
+				Usage: "path to a file containing the model definition as JSON or YAML",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("semantic-layer-id") <= 0 {
+				printError(fmt.Errorf("--semantic-layer-id must be a positive integer, got %d", c.Int("semantic-layer-id")), output, "Invalid --semantic-layer-id")
+				return cli.Exit("", 1)
+			}
+
+			fields := map[string]any{}
+			if c.IsSet("name") {
+				fields["name"] = c.String("name")
+			}
+			if c.IsSet("state") || c.IsSet("state-file") {
+				state, err := parseSemanticStateFlags(c, output)
+				if err != nil {
+					return err
+				}
+				fields["state"] = state
+			}
+			if len(fields) == 0 {
+				printError(errors.New("nothing to update: pass --name and/or --state/--state-file"), output, "No fields")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			layer, err := client.UpdateSemanticLayer(ctx, c.Int("semantic-layer-id"), fields)
+			if err != nil {
+				printError(err, output, "Failed to update semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(layer, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			successPrinter.Printf("Updated semantic layer %d (%s).\n", layer.ID, layer.Name)
+			return nil
+		},
+	}
+}
+
+func cloudSemanticLayersDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a semantic layer",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "semantic-layer-id",
+				Usage:    "semantic layer ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("semantic-layer-id") <= 0 {
+				printError(fmt.Errorf("--semantic-layer-id must be a positive integer, got %d", c.Int("semantic-layer-id")), output, "Invalid --semantic-layer-id")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteSemanticLayer(ctx, c.Int("semantic-layer-id")); err != nil {
+				printError(err, output, "Failed to delete semantic layer")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				fmt.Println(`{"success": true}`)
+				return nil
+			}
+
+			successPrinter.Printf("Deleted semantic layer %d.\n", c.Int("semantic-layer-id"))
+			return nil
+		},
+	}
+}
+
+// parseSemanticStateFlags reads the model definition from --state or --state-file
+// (at most one). Returns nil when neither is set (name-only). Prints and returns
+// a cli.Exit error on failure. Accepts JSON or YAML (JSON is valid YAML).
+func parseSemanticStateFlags(c *cli.Command, output string) (map[string]any, error) {
+	if c.IsSet("state") && c.IsSet("state-file") {
+		printError(errors.New("pass only one of --state or --state-file"), output, "Ambiguous state")
+		return nil, cli.Exit("", 1)
+	}
+	if !c.IsSet("state") && !c.IsSet("state-file") {
+		return nil, nil
+	}
+
+	raw := c.String("state")
+	if file := c.String("state-file"); file != "" {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			printError(fmt.Errorf("failed to read --state-file: %w", err), output, "Invalid state file")
+			return nil, cli.Exit("", 1)
+		}
+		raw = string(data)
+	}
+
+	state, err := parseJSONOrYAMLObject([]byte(raw))
+	if err != nil {
+		printError(fmt.Errorf("invalid semantic model (expected a JSON or YAML object): %w", err), output, "Invalid state")
+		return nil, cli.Exit("", 1)
+	}
+	if state == nil {
+		printError(errors.New("semantic model must be a JSON or YAML object"), output, "Invalid state")
+		return nil, cli.Exit("", 1)
+	}
+	return state, nil
 }
 
 func cloudDashboardsList() *cli.Command {
@@ -5525,6 +6199,73 @@ func cloudDashboardsUpdate() *cli.Command {
 	}
 }
 
+func cloudDashboardsApplyFilters() *cli.Command {
+	return &cli.Command{
+		Name:  "apply-filters",
+		Usage: "Update the dashboard's filter selection",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "dashboard-id", Usage: "dashboard ID", Required: true},
+			&cli.StringFlag{Name: "parameters", Usage: "JSON object mapping filter names to typed values", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+			dashboardID := c.Int("dashboard-id")
+			if dashboardID <= 0 {
+				printError(errors.New("--dashboard-id must be a positive integer"), output, "Invalid dashboard ID")
+				return cli.Exit("", 1)
+			}
+
+			var parameters map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(c.String("parameters")), &parameters); err != nil || len(parameters) == 0 || len(parameters) > 100 {
+				printError(errors.New("--parameters must be a JSON object containing 1 to 100 filter names"), output, "Invalid parameters")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			result, err := client.ApplyDashboardFilters(ctx, dashboardID, parameters)
+			if err != nil {
+				printError(err, output, "Failed to apply dashboard filters")
+				return cli.Exit("", 1)
+			}
+
+			// The server applies only filters the dashboard declares and drops the rest.
+			var applied struct {
+				Parameters map[string]json.RawMessage `json:"parameters"`
+			}
+			if err := json.Unmarshal(result, &applied); err != nil {
+				printError(err, output, "Failed to parse response")
+				return cli.Exit("", 1)
+			}
+			ignored := make([]string, 0)
+			for name := range parameters {
+				if _, ok := applied.Parameters[name]; !ok {
+					ignored = append(ignored, name)
+				}
+			}
+			sort.Strings(ignored)
+
+			if output == "json" {
+				data, _ := json.Marshal(map[string]any{"parameters": applied.Parameters, "ignored": ignored})
+				fmt.Println(string(data))
+				return nil
+			}
+			successPrinter.Println("Updated dashboard filter selection.")
+			if len(ignored) > 0 {
+				warningPrinter.Printf("Ignored filters not declared on the dashboard: %s\n", strings.Join(ignored, ", "))
+			}
+			return nil
+		},
+	}
+}
+
 func cloudDashboardsDelete() *cli.Command {
 	return &cli.Command{
 		Name:  "delete",
@@ -5633,6 +6374,7 @@ func CloudScheduledAgents() *cli.Command {
 			cloudScheduledAgentsCreate(),
 			cloudScheduledAgentsUpdate(),
 			cloudScheduledAgentsTrigger(),
+			cloudScheduledAgentsResetThread(),
 			cloudScheduledAgentsDelete(),
 			cloudScheduledAgentsRunStates(),
 			cloudScheduledAgentsPipelineTrigger(),
@@ -6026,7 +6768,7 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 				fields["is_active"] = c.Bool("active")
 			}
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --active or --state-file)"), output, "Nothing to update")
+				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --same-thread, --active or --state-file)"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
@@ -6095,6 +6837,51 @@ func cloudScheduledAgentsTrigger() *cli.Command {
 	}
 }
 
+func cloudScheduledAgentsResetThread() *cli.Command {
+	return &cli.Command{
+		Name:  "reset-thread",
+		Usage: "Make a same-thread scheduled agent's next run start a new thread",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:     "scheduled-agent-id",
+				Usage:    "scheduled agent ID",
+				Required: true,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			run, err := client.ResetScheduledAgentThread(ctx, c.Int("scheduled-agent-id"))
+			if err != nil {
+				printError(err, output, "Failed to reset scheduled agent thread")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(run, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			if run.SameThread == nil || !*run.SameThread {
+				infoPrinter.Printf("Scheduled agent %d doesn't have same-thread on; every run already starts a new thread.\n", run.ID)
+				return nil
+			}
+			successPrinter.Printf("Scheduled agent %d will start a new thread on its next run.\n", run.ID)
+			return nil
+		},
+	}
+}
+
 func cloudScheduledAgentsDelete() *cli.Command {
 	return &cli.Command{
 		Name:  "delete",
@@ -6145,6 +6932,7 @@ func scheduledAgentPlanFlags() []cli.Flag {
 		&cli.StringFlag{Name: "instructions", Usage: "what the run should do"},
 		&cli.StringFlag{Name: "output-formatting", Usage: "how the result should be formatted"},
 		&cli.StringFlag{Name: "connection", Usage: "the data connection to query"},
+		&cli.BoolFlag{Name: "same-thread", Usage: "continue one thread across runs (true) or start a new thread each run (false)"},
 		&cli.StringFlag{Name: "state", Usage: "the full plan as a JSON or YAML object string"},
 		&cli.StringFlag{Name: "state-file", Usage: "path to a file with the full plan as JSON or YAML"},
 	}
@@ -6211,6 +6999,9 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	if c.IsSet("connection") {
 		fields["connection"] = c.String("connection")
 	}
+	if c.IsSet("same-thread") {
+		fields["same_thread"] = c.Bool("same-thread")
+	}
 	// --cron / --timezone are shorthand for the nested schedule object.
 	if c.IsSet("cron") || c.IsSet("timezone") {
 		schedule, _ := fields["schedule"].(map[string]any)
@@ -6239,6 +7030,13 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	fmt.Printf("  Timezone:  %s\n", derefString(run.ScheduleTimezone))
 	fmt.Printf("  Next run:  %s\n", derefString(run.NextRunAt))
 	fmt.Printf("  Last run:  %s\n", derefString(run.LastRunAt))
+	if run.SameThread != nil && *run.SameThread {
+		thread := "next run starts one"
+		if run.ExecutionThreadID != nil {
+			thread = strconv.Itoa(*run.ExecutionThreadID)
+		}
+		fmt.Printf("  Thread:    same every run (%s)\n", thread)
+	}
 	if len(run.NotificationIntegrations) > 0 {
 		fmt.Printf("  Notify:    %s\n", notificationChannels(run.NotificationIntegrations))
 	}

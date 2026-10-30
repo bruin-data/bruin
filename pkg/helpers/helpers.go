@@ -22,7 +22,7 @@ import (
 func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
 	ingestrDestination, ok := asset.Parameters.GetString("destination")
 	if !ok {
-		return "", errors.New("`destination` parameter not found")
+		return "", errors.New("`destination` parameter not found and could not be inferred from the asset connection")
 	}
 
 	value, ok := pipeline.IngestrTypeConnectionMapping[ingestrDestination]
@@ -31,6 +31,15 @@ func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error
 	}
 
 	return value, nil
+}
+
+func GetIngestrCheckType(asset *pipeline.Asset) (pipeline.AssetType, error) {
+	ingestrDestination, _ := asset.Parameters.GetString("destination")
+	if value, ok := pipeline.IngestrCheckTypeMapping[ingestrDestination]; ok {
+		return value, nil
+	}
+
+	return GetIngestrDestinationType(asset)
 }
 
 func PrefixGenerator() string {

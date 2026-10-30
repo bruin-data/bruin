@@ -37,6 +37,7 @@ import (
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/inference"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -531,7 +532,7 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 }
 
 var (
-	yesterday            = time.Now().AddDate(0, 0, -1)
+	yesterday            = date.StartOfYesterdayUTC(time.Now())
 	defaultStartDate     = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	defaultEndDate       = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
 	defaultExecutionDate = time.Now().UTC()
@@ -539,14 +540,14 @@ var (
 	startDateFlag = &cli.StringFlag{
 		Name:        "start-date",
 		Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
-		DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
+		DefaultText: "beginning of the previous UTC day, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Sources:     cli.EnvVars("BRUIN_START_DATE"),
 	}
 	endDateFlag = &cli.StringFlag{
 		Name:        "end-date",
 		Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
-		DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
+		DefaultText: "end of the previous UTC day, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Sources:     cli.EnvVars("BRUIN_END_DATE"),
 	}
@@ -568,6 +569,29 @@ func disableColorIfRequested(noColor bool) {
 	if noColor {
 		color.NoColor = true
 	}
+}
+
+func validateStreamingRun(c *cli.Command, asset *pipeline.Asset, runningForAsset bool) error {
+	if !runningForAsset || c.Args().Len() != 1 || asset == nil {
+		return errors.New("--stream requires a single streaming asset, e.g. bruin run --stream path/to/asset.yml")
+	}
+	if !ingestr.IsStreamingAsset(asset) {
+		return fmt.Errorf("asset %q is not a streaming asset; --stream requires an ingestr CDC asset with cdc_mode: stream (or a message-broker source with stream: true)", asset.Name)
+	}
+	for _, incompatible := range []string{"downstream", "continue", "modified", "interactive"} {
+		if c.Bool(incompatible) {
+			return fmt.Errorf("--stream cannot be combined with --%s", incompatible)
+		}
+	}
+	for _, incompatible := range []string{"selector", "sensor-mode"} {
+		if c.String(incompatible) != "" {
+			return fmt.Errorf("--stream cannot be combined with --%s", incompatible)
+		}
+	}
+	if c.String("refresh-id") != "" && !asset.FullRefreshEnabled(c.Bool("full-refresh")) {
+		return errors.New("--refresh-id requires full refresh to be enabled")
+	}
+	return nil
 }
 
 func Run(isDebug *bool) *cli.Command {
@@ -613,8 +637,12 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.BoolFlag{
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
-				Usage:   "truncate the table before running",
+				Usage:   "rebuild destination data before running; streaming CDC assets refresh once, then continue streaming",
 				Sources: cli.EnvVars("BRUIN_FULL_REFRESH"),
+			},
+			&cli.StringFlag{
+				Name:  "refresh-id",
+				Usage: "stable request ID for a streaming full refresh; reuse it when retrying the same refresh",
 			},
 			&cli.BoolFlag{
 				Name:        "apply-interval-modifiers",
@@ -719,6 +747,16 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "variant",
 				Usage: "name of the variant to materialize for a variant pipeline",
 			},
+			&cli.StringFlag{
+				Name:   "python-image",
+				Usage:  "run the Python assets on this image instead of their own, e.g. python:3.12",
+				Hidden: true,
+			},
+			&cli.StringFlag{
+				Name:   "connection-override",
+				Usage:  "run the asset, and its checks, on this connection instead of its own",
+				Hidden: true,
+			},
 			&cli.IntFlag{
 				Name:  "timeout",
 				Usage: "timeout for the entire pipeline run in seconds",
@@ -763,6 +801,9 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit(errUsePipDeprecated, 1)
 			}
 			fullRefresh := c.Bool("full-refresh")
+			if c.String("refresh-id") != "" && !c.Bool("stream") {
+				return errors.New("--refresh-id requires --stream and full refresh")
+			}
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
 			runConfig := &scheduler.RunConfig{
@@ -838,6 +879,14 @@ func Run(isDebug *bool) *cli.Command {
 			if len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
+			if pythonImage := c.String("python-image"); pythonImage != "" {
+				mutator, err := pythonImageMutator(pythonImage)
+				if err != nil {
+					printError(err, c.String("output"), "Invalid --python-image")
+					return cli.Exit("", 1)
+				}
+				DefaultPipelineBuilder.AddAssetMutator(mutator)
+			}
 			variantOpts := []pipeline.CreatePipelineOption{}
 			if variantName != "" {
 				variantOpts = append(variantOpts, pipeline.WithVariant(variantName))
@@ -860,6 +909,7 @@ func Run(isDebug *bool) *cli.Command {
 				runID = BackfillRunID(backfillID, startDate)
 			}
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigRefreshID, c.String("refresh-id"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
@@ -945,22 +995,8 @@ func Run(isDebug *bool) *cli.Command {
 			// assume a finite, multi-asset batch run.
 			streamMode := c.Bool("stream")
 			if streamMode {
-				if !preview.RunningForAnAsset || c.Args().Len() != 1 || task == nil {
-					printError(errors.New("--stream requires a single streaming asset, e.g. bruin run --stream path/to/asset.yml"), c.String("output"), "Invalid --stream usage")
-					return cli.Exit("", 1)
-				}
-				if !ingestr.IsStreamingAsset(task) {
-					printError(fmt.Errorf("asset %q is not a streaming asset; --stream requires an ingestr CDC asset with cdc_mode: stream (or a message-broker source with stream: true)", task.Name), c.String("output"), "Invalid --stream usage")
-					return cli.Exit("", 1)
-				}
-				for _, incompatible := range []string{"downstream", "continue", "modified", "selector", "interactive", "full-refresh"} {
-					if c.Bool(incompatible) || (incompatible == "selector" && c.String("selector") != "") {
-						printError(fmt.Errorf("--stream cannot be combined with --%s", incompatible), c.String("output"), "Invalid --stream usage")
-						return cli.Exit("", 1)
-					}
-				}
-				if runConfig.SensorMode != "" {
-					printError(errors.New("--stream cannot be combined with --sensor-mode"), c.String("output"), "Invalid --stream usage")
+				if err := validateStreamingRun(c, task, preview.RunningForAnAsset); err != nil {
+					printError(err, c.String("output"), "Invalid --stream usage")
 					return cli.Exit("", 1)
 				}
 				// A stream never "succeeds", so its column/custom checks and metadata
@@ -1014,7 +1050,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Load macros from the pipeline's macros directory
-			macroContent, err := jinja.LoadMacros(fs, preview.Pipeline.MacrosPath)
+			macroContent, err := jinja.LoadMacros(pipelineBuilderFs, preview.Pipeline.MacrosPath)
 			if err != nil {
 				logger.Error("Failed to load macros", "error", err)
 				return cli.Exit("", 1)
@@ -1219,14 +1255,31 @@ func Run(isDebug *bool) *cli.Command {
 			var connectionManager config.ConnectionAndDetailsGetter
 			var errs []error
 
+			// Errors are printed below, once credential masking is installed: a
+			// connection error can echo the DSN or URI it failed on, password included.
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
 
-			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
+			foundPipeline := pipelineInfo.Pipeline
+			connectionOverride, err := continuedConnectionOverride(c.String("connection-override"), c.Bool("continue"), runConfig.ConnectionOverride)
+			if err != nil {
+				printError(err, c.String("output"), "Invalid --connection-override")
 				return cli.Exit("", 1)
 			}
-
-			foundPipeline := pipelineInfo.Pipeline
+			runConfig.ConnectionOverride = connectionOverride
+			if connectionOverride != "" {
+				var connectionTypes connectionTypeGetter
+				if connectionManager != nil {
+					connectionTypes = connectionManager
+				}
+				if err := applyConnectionOverride(foundPipeline, task, connectionOverride, connectionTypes); err != nil {
+					printError(err, c.String("output"), "Invalid --connection-override")
+					return cli.Exit("", 1)
+				}
+			}
+			// The pipeline was built before the connections were available, so infer the ingestr
+			// destinations before anything reads them, credential masking included. Validation
+			// lints this same pipeline.
+			python.InferIngestrDestinations(foundPipeline, connectionManager)
 
 			if runConfig.Downstream {
 				infoPrinter.Println("The downstream tasks will be executed as well.")
@@ -1243,7 +1296,9 @@ func Run(isDebug *bool) *cli.Command {
 				!noColor
 
 			// Use the interactive TUI only when explicitly requested via --interactive flag
-			useTUI := c.Bool("interactive") && interactiveTerminal
+			// A run with connection errors exits before the TUI starts, so keep the
+			// terminal output for it: the TUI would discard the error printed below.
+			useTUI := c.Bool("interactive") && interactiveTerminal && len(errs) == 0
 
 			// Build the masker up front so both the log-file and no-log-file paths below
 			// install it as the output sink.
@@ -1314,6 +1369,11 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				defer fn()
 				color.Output = os.Stdout
+			}
+
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
+				return cli.Exit("", 1)
 			}
 
 			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
@@ -1403,7 +1463,7 @@ func Run(isDebug *bool) *cli.Command {
 				printError(parserErr, c.String("output"), "Could not initialize sql parser")
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit, cm.SelectedEnvironmentName)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1415,6 +1475,10 @@ func Run(isDebug *bool) *cli.Command {
 				MinimalLogs:           minimalLogs,
 				InteractivePythonLogs: interactivePythonLogs,
 			}
+
+			var closeDuckDB func()
+			runCtx, closeDuckDB = duck.WithConnectionReuse(runCtx)
+			defer closeDuckDB()
 
 			// Create a context with timeout. A streaming asset is meant to run
 			// indefinitely, so skip the default timeout unless the user set one
@@ -1980,6 +2044,7 @@ func SetupExecutors(
 	parser *sqlparser.SQLParser,
 	hoister pipeline.DeclareHoister,
 	commitHash string,
+	environment string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -1992,9 +2057,17 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash, environment)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeInference) {
+		// Inference results land in the asset's warehouse, so checks run there, like for ingestr.
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeMain] = inference.NewOperator(conn)
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeColumnCheck] = ingestr.NewColumnCheckOperator(&mainExecutors)
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeCustomCheck] = ingestr.NewCustomCheckOperator(&mainExecutors)
+		mainExecutors[pipeline.AssetTypeInference][scheduler.TaskInstanceTypeMetadataPush] = ingestr.NewMetadataPushOperator(&mainExecutors, conn)
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeR) {

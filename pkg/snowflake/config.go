@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/youmark/pkcs8"
@@ -15,6 +16,8 @@ import (
 type Config struct {
 	ReadOnly   bool
 	Account    string
+	Host       string
+	Port       int
 	Username   string
 	Password   string
 	Region     string
@@ -46,6 +49,8 @@ func (c Config) DSN() (string, error) {
 	snowflakeConfig := gosnowflake.Config{
 		Authenticator: authType,
 		Account:       c.Account,
+		Host:          c.Host,
+		Port:          c.Port,
 		User:          c.Username,
 		Password:      c.Password,
 		Region:        c.Region,
@@ -83,6 +88,12 @@ func (c Config) GetIngestrURI() (string, error) {
 	}
 	if c.Role != "" {
 		values.Add("role", c.Role)
+	}
+	if c.Host != "" {
+		values.Add("host", c.Host)
+	}
+	if c.Port != 0 {
+		values.Add("port", strconv.Itoa(c.Port))
 	}
 
 	if c.PrivateKey != "" {

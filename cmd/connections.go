@@ -19,6 +19,8 @@ import (
 	"golang.org/x/term"
 )
 
+const defaultEnvironmentName = "default"
+
 func Connections() *cli.Command {
 	return &cli.Command{
 		Name: "connections",
@@ -62,7 +64,9 @@ func ListConnections() *cli.Command {
 			}
 
 			configFilePath := c.String("config-file")
-			if configFilePath == "" {
+			// A secrets backend lists connections from the backend itself, so skip
+			// local .bruin.yml discovery (which would otherwise require a git repo).
+			if configFilePath == "" && secretsBackendFromContext(ctx) == "" {
 				repoRoot, err := git.FindRepoFromPath(path)
 				if err != nil {
 					printErrorForOutput(c.String("output"), errors2.Wrap(err, "failed to find the git repository root"))
@@ -72,7 +76,7 @@ func ListConnections() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			return r.ListConnections(path, c.String("output"), c.String("environment"), configFilePath, c.String("config-file") != "")
+			return r.ListConnections(ctx, path, c.String("output"), c.String("environment"), configFilePath, c.String("config-file") != "")
 		},
 	}
 }
@@ -293,13 +297,24 @@ func DeleteConnection() *cli.Command {
 
 type ConnectionsCommand struct{}
 
-func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment, configFilePath string, requireExistingConfig bool) error {
+func (r *ConnectionsCommand) ListConnections(ctx context.Context, pathToProject, output, environment, configFilePath string, requireExistingConfig bool) error {
 	defer RecoverFromPanic()
 
-	cm, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
-	if err != nil {
-		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
-		return cli.Exit("", 1)
+	var cm *config.Config
+	if backend := secretsBackendFromContext(ctx); backend != "" {
+		loaded, err := loadConfigFromSecretsBackend(ctx, environment)
+		if err != nil {
+			printErrorForOutput(output, errors2.Wrapf(err, "failed to list connections from secrets backend %q", backend))
+			return cli.Exit("", 1)
+		}
+		cm = loaded
+	} else {
+		loaded, err := loadConfig(afero.NewOsFs(), configFilePath, requireExistingConfig)
+		if err != nil {
+			errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
+			return cli.Exit("", 1)
+		}
+		cm = loaded
 	}
 
 	if output == "json" {
@@ -366,6 +381,38 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 	}
 
 	return nil
+}
+
+// loadConfigFromSecretsBackend builds an in-memory config.Config from the active
+// secrets backend so `connections list` can enumerate connections without a local .bruin.yml.
+func loadConfigFromSecretsBackend(ctx context.Context, environment string) (*config.Config, error) {
+	manager, errs := connectionManagerFromConfig(ctx, nil, makeLogger(false))
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+
+	lister, ok := manager.(config.ConnectionsConfigGetter)
+	if !ok {
+		return nil, errors.New("the configured secrets backend does not support listing connections")
+	}
+
+	connections, err := lister.GetConnectionsConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	envName := environment
+	if envName == "" {
+		envName = defaultEnvironmentName
+	}
+	env := config.Environment{Connections: connections}
+
+	return &config.Config{
+		Environments:            map[string]config.Environment{envName: env},
+		SelectedEnvironmentName: envName,
+		SelectedEnvironment:     &env,
+		DefaultEnvironmentName:  envName,
+	}, nil
 }
 
 func printErrorForOutput(output string, err error) {

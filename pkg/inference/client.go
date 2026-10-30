@@ -1,0 +1,370 @@
+package inference
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"math/rand/v2"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const (
+	defaultMaxOutputTokens = 1024
+	maxResponseBytes       = 1 << 20
+	maxAttempts            = 10
+	defaultTimeout         = 120 * time.Second
+)
+
+// Client calls a supported inference provider.
+type Client struct {
+	Provider        string
+	Model           string
+	APIKey          string
+	MaxOutputTokens int
+	HTTPClient      *http.Client
+	OnCacheUsage    func(readTokens, writtenTokens int64)
+}
+
+type chatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// Missing usage is not a zero-token cache miss: some providers omit it.
+// Usage is diagnostic only; malformed accounting must not discard a result.
+func (c *Client) reportCacheUsage(data []byte) {
+	if c.OnCacheUsage == nil {
+		return
+	}
+	type details struct {
+		Read  *int64 `json:"cached_tokens"`
+		Write int64  `json:"cache_write_tokens"`
+	}
+	var response struct {
+		Usage struct {
+			Input  details `json:"input_tokens_details"`
+			Prompt details `json:"prompt_tokens_details"`
+			Read   *int64  `json:"cache_read_input_tokens"`
+			Write  int64   `json:"cache_creation_input_tokens"`
+		} `json:"usage"`
+		Metadata struct {
+			Read *int64 `json:"cachedContentTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if json.Unmarshal(data, &response) != nil {
+		return
+	}
+	var usage details
+	switch c.Provider {
+	case providerOpenAI, providerOpenCode:
+		usage = response.Usage.Input
+	case providerOpenRouter:
+		usage = response.Usage.Prompt
+	case providerAnthropic:
+		usage = details{Read: response.Usage.Read, Write: response.Usage.Write}
+	case providerGoogle:
+		usage.Read = response.Metadata.Read
+	}
+	if usage.Read != nil {
+		c.OnCacheUsage(*usage.Read, usage.Write)
+	}
+}
+
+func (c *Client) do(ctx context.Context, endpoint string, body []byte) ([]byte, error) {
+	httpClient := c.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: defaultTimeout}
+	}
+
+	for attempt := range maxAttempts {
+		attemptCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		req, err := http.NewRequestWithContext(attemptCtx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if err != nil {
+			cancel()
+			return nil, errors.New("could not create inference request")
+		}
+		req.Header.Set("Content-Type", "application/json")
+		switch c.Provider {
+		case providerAnthropic:
+			req.Header.Set("X-Api-Key", c.APIKey)
+			req.Header.Set("Anthropic-Version", "2023-06-01")
+		case providerGoogle:
+			req.Header.Set("X-Goog-Api-Key", c.APIKey)
+		default:
+			if c.APIKey != "" {
+				req.Header.Set("Authorization", "Bearer "+c.APIKey)
+			}
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			contextErr := attemptCtx.Err()
+			cancel()
+			if contextErr != nil {
+				return nil, contextErr
+			}
+			return nil, errors.New("inference request failed")
+		}
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			responseBody, readErr := readBounded(resp.Body)
+			resp.Body.Close()
+			cancel()
+			return responseBody, readErr
+		}
+		// Error bodies are neither parsed nor surfaced; a truncated body must
+		// not prevent retrying an already-known rate limit or server error.
+		resp.Body.Close()
+		cancel()
+		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && attempt+1 < maxAttempts {
+			if err := waitForRetry(ctx, retryDelay(resp.Header, attempt, time.Now())); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		return nil, fmt.Errorf("inference provider returned HTTP status %d", resp.StatusCode)
+	}
+	panic("retry loop exhausted")
+}
+
+func readBounded(body io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(body, maxResponseBytes+1))
+	if err != nil {
+		return nil, errors.New("could not read inference response")
+	}
+	if len(data) > maxResponseBytes {
+		return nil, errors.New("inference response is too large")
+	}
+	return data, nil
+}
+
+func retryDelay(headers http.Header, attempt int, now time.Time) time.Duration {
+	value := strings.TrimSpace(headers.Get("Retry-After"))
+	if delay, err := time.ParseDuration(value + "s"); err == nil && delay >= 0 {
+		return delay
+	}
+	if when, err := http.ParseTime(value); err == nil {
+		return max(when.Sub(now), 0)
+	}
+	if delay, err := time.ParseDuration(strings.TrimSpace(headers.Get("Retry-After-Ms")) + "ms"); err == nil && delay >= 0 {
+		return delay
+	}
+	// Only exhausted quotas should delay a retry. Take the latest reset if
+	// multiple quotas are exhausted; another bucket may still have capacity.
+	var resetDelay time.Duration
+	for _, quota := range []struct{ remaining, reset string }{
+		{"X-Ratelimit-Remaining-Requests", "X-Ratelimit-Reset-Requests"},
+		{"X-Ratelimit-Remaining-Tokens", "X-Ratelimit-Reset-Tokens"},
+		{"X-Ratelimit-Remaining-Project-Tokens", "X-Ratelimit-Reset-Project-Tokens"},
+		{"Anthropic-Ratelimit-Requests-Remaining", "Anthropic-Ratelimit-Requests-Reset"},
+		{"Anthropic-Ratelimit-Input-Tokens-Remaining", "Anthropic-Ratelimit-Input-Tokens-Reset"},
+		{"Anthropic-Ratelimit-Output-Tokens-Remaining", "Anthropic-Ratelimit-Output-Tokens-Reset"},
+		{"Anthropic-Ratelimit-Tokens-Remaining", "Anthropic-Ratelimit-Tokens-Reset"},
+	} {
+		remaining, err := strconv.ParseInt(headers.Get(quota.remaining), 10, 64)
+		if err != nil || remaining > 0 {
+			continue
+		}
+		value := headers.Get(quota.reset)
+		if delay, err := time.ParseDuration(value); err == nil {
+			resetDelay = max(resetDelay, delay)
+		} else if when, err := time.Parse(time.RFC3339, value); err == nil {
+			resetDelay = max(resetDelay, when.Sub(now))
+		}
+	}
+	if resetDelay > 0 {
+		return resetDelay
+	}
+	// Equal jitter avoids synchronized retries while keeping the fallback bounded.
+	delay := min(time.Second<<attempt, time.Minute)
+	return delay/2 + time.Duration(rand.Int64N(int64(delay/2))) //nolint:gosec // Retry jitter does not require cryptographic randomness.
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func parseOpenCode(data []byte) (string, error) {
+	var response struct {
+		Status string          `json:"status"`
+		Error  json.RawMessage `json:"error"`
+		Output []struct {
+			Type    string `json:"type"`
+			Role    string `json:"role"`
+			Status  string `json:"status"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return "", errors.New("inference provider returned a malformed response")
+	}
+	if len(response.Error) != 0 && string(response.Error) != "null" {
+		return "", errors.New("inference provider returned an error")
+	}
+	if response.Status != "completed" {
+		return "", errors.New("inference response was not completed")
+	}
+	var parts []string
+	for _, output := range response.Output {
+		if output.Type != "message" || output.Role != "assistant" || output.Status != "completed" {
+			continue
+		}
+		for _, content := range output.Content {
+			if content.Type == "refusal" {
+				return "", errors.New("inference provider refused the request")
+			}
+			if content.Type == "output_text" {
+				parts = append(parts, content.Text)
+			}
+		}
+	}
+	text := strings.TrimSpace(strings.Join(parts, ""))
+	if text == "" {
+		return "", errors.New("inference provider returned an empty response")
+	}
+	return text, nil
+}
+
+func parseOpenRouter(data []byte) (string, error) {
+	var response struct {
+		Error   json.RawMessage `json:"error"`
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
+				Content string          `json:"content"`
+				Refusal json.RawMessage `json:"refusal"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return "", errors.New("inference provider returned a malformed response")
+	}
+	if len(response.Error) != 0 && string(response.Error) != "null" {
+		return "", errors.New("inference provider returned an error")
+	}
+	if len(response.Choices) == 0 {
+		return "", errors.New("inference provider returned an empty response")
+	}
+	choice := response.Choices[0]
+	if len(choice.Message.Refusal) != 0 && string(choice.Message.Refusal) != "null" && string(choice.Message.Refusal) != `""` {
+		return "", errors.New("inference provider refused the request")
+	}
+	if choice.FinishReason != "stop" {
+		return "", errors.New("inference response was not completed")
+	}
+	text := strings.TrimSpace(choice.Message.Content)
+	if text == "" {
+		return "", errors.New("inference provider returned an empty response")
+	}
+	return text, nil
+}
+
+func parseAnthropic(data []byte) (string, error) {
+	var response struct {
+		Type        string          `json:"type"`
+		Role        string          `json:"role"`
+		StopReason  string          `json:"stop_reason"`
+		Error       json.RawMessage `json:"error"`
+		StopDetails struct {
+			Type string `json:"type"`
+		} `json:"stop_details"`
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return "", errors.New("inference provider returned a malformed response")
+	}
+	if response.Type == "error" || (len(response.Error) != 0 && string(response.Error) != "null") {
+		return "", errors.New("inference provider returned an error")
+	}
+	if response.Type != "message" || response.Role != "assistant" || response.StopReason != "end_turn" {
+		return "", errors.New("inference response was not completed")
+	}
+	if response.StopDetails.Type == "refusal" {
+		return "", errors.New("inference provider refused the request")
+	}
+	var parts []string
+	for _, content := range response.Content {
+		if content.Type != "text" {
+			return "", errors.New("inference provider returned unsupported content")
+		}
+		parts = append(parts, content.Text)
+	}
+	text := strings.TrimSpace(strings.Join(parts, ""))
+	if text == "" {
+		return "", errors.New("inference provider returned an empty response")
+	}
+	return text, nil
+}
+
+func parseGoogle(data []byte) (string, error) {
+	var response struct {
+		Error          json.RawMessage `json:"error"`
+		PromptFeedback struct {
+			BlockReason string `json:"blockReason"`
+		} `json:"promptFeedback"`
+		Candidates []struct {
+			FinishReason  string `json:"finishReason"`
+			SafetyRatings []struct {
+				Blocked bool `json:"blocked"`
+			} `json:"safetyRatings"`
+			Content struct {
+				Parts []struct {
+					Text    *string `json:"text"`
+					Thought bool    `json:"thought"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return "", errors.New("inference provider returned a malformed response")
+	}
+	if len(response.Error) != 0 && string(response.Error) != "null" {
+		return "", errors.New("inference provider returned an error")
+	}
+	if response.PromptFeedback.BlockReason != "" {
+		return "", errors.New("inference provider blocked the request")
+	}
+	if len(response.Candidates) != 1 || response.Candidates[0].FinishReason != "STOP" {
+		return "", errors.New("inference response was not completed")
+	}
+	candidate := response.Candidates[0]
+	for _, rating := range candidate.SafetyRatings {
+		if rating.Blocked {
+			return "", errors.New("inference provider blocked the response")
+		}
+	}
+	var parts []string
+	for _, part := range candidate.Content.Parts {
+		if part.Thought {
+			continue
+		}
+		if part.Text == nil {
+			return "", errors.New("inference provider returned unsupported content")
+		}
+		parts = append(parts, *part.Text)
+	}
+	text := strings.TrimSpace(strings.Join(parts, ""))
+	if text == "" {
+		return "", errors.New("inference provider returned an empty response")
+	}
+	return text, nil
+}

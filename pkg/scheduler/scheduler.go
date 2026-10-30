@@ -150,6 +150,9 @@ type RunConfig struct {
 	SensorMode             string   `json:"sensorMode"`
 	ApplyIntervalModifiers bool     `json:"applyIntervalModifiers"`
 	Annotations            string   `json:"annotations"`
+	// ConnectionOverride is the connection the asset was run on instead of its own, so continuing
+	// the run doesn't go back to its own connection.
+	ConnectionOverride string `json:"connectionOverride,omitempty"`
 }
 
 type PipelineAssetState struct {
@@ -647,11 +650,14 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 	for _, instance := range instances {
 		asset := instance.GetAsset()
 		assetType := asset.Type
-		if assetType == pipeline.AssetTypeIngestr && taskType != pipeline.AssetTypeIngestr {
-			assetType, _ = helpers.GetIngestrDestinationType(asset)
-		}
 		if assetType == taskType {
 			return true
+		}
+		// Ingestr and inference assets run their checks on the destination platform.
+		if assetType == pipeline.AssetTypeIngestr || assetType == pipeline.AssetTypeInference {
+			if checkType, err := helpers.GetIngestrCheckType(asset); err == nil && checkType == taskType {
+				return true
+			}
 		}
 	}
 

@@ -60,6 +60,10 @@ GROUP BY 1,2
 
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
+::: info Reusing templates
+You can include other templates or import macros into your SQL assets, as long as the files are in the same repository. Symlinks are not supported.
+:::
+
 ## Builtin variables
 
 Bruin injects various variables by default, including date/time values (`start_date`, `end_date`, `execution_date` and their `_datetime`, `_timestamp`, and `_nodash` variants), pipeline metadata (`pipeline`, `run_id`, `commit_hash`), and the `full_refresh` flag.

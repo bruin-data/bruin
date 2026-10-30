@@ -157,9 +157,9 @@ func (e *Engine) validate() error {
 				return fmt.Errorf("note %q: duplicate dimension %q", note.ID, dimension.Name)
 			}
 			dimensionNames[dimension.Name] = true
-			// An empty type is treated as text.
+			// An empty type defaults to select.
 			switch dimension.Type {
-			case "", "select", "date-range", "date", "number", "boolean", "text":
+			case "", "select", "date", "date-range", "number", "boolean", "text":
 			default:
 				return fmt.Errorf("note %q: dimension %q has invalid type %q", note.ID, dimension.Name, dimension.Type)
 			}
@@ -210,6 +210,9 @@ func (e *Engine) ValidateNote(id string) error {
 			binding, err := e.resolveDimension(DimensionRef{Name: dimension.Name})
 			if err != nil {
 				return fmt.Errorf("note %q: %w", note.ID, err)
+			}
+			if dimension.Type == "date-range" && binding.dimension.Type != "time" {
+				return fmt.Errorf("note %q: dimension %q: date-range requires a time dimension", note.ID, dimension.Name)
 			}
 			key := resolvedKey{model: binding.model, relation: binding.relationName, dimension: binding.dimension.Name}
 			if resolved[key] {

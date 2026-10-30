@@ -1386,6 +1386,26 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	assert.True(t, s.WillRunTaskOfType("pg.sql"))
 }
 
+func TestScheduler_WillRunTaskOfType_InferenceDestination(t *testing.T) {
+	t.Parallel()
+
+	inference := &pipeline.Asset{
+		Name:       "enriched",
+		Type:       pipeline.AssetTypeInference,
+		Connection: "sf",
+		Parameters: pipeline.ParameterMap{"destination": "snowflake"},
+		Columns: []pipeline.Column{
+			{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Assets: []*pipeline.Asset{inference}}, "test")
+
+	assert.True(t, s.WillRunTaskOfType(pipeline.AssetTypeInference))
+	assert.True(t, s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery))
+	assert.False(t, s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery))
+}
+
 func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 	t.Parallel()
 

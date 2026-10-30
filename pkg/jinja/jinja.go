@@ -2,6 +2,7 @@ package jinja
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -20,6 +23,7 @@ type Renderer struct {
 	context         *exec.Context
 	queryRenderLock *sync.Mutex
 	macroContent    string
+	repositoryRoot  string
 }
 
 func init() { //nolint: gochecknoinits
@@ -37,32 +41,14 @@ type Context map[string]any
 
 // LoadMacros loads all macro files from the given directory and returns them as a single string.
 func LoadMacros(fs afero.Fs, macrosPath string) (string, error) {
-	exists, err := afero.DirExists(fs, macrosPath)
+	macros, err := pipeline.LoadMacros(fs, macrosPath, false)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to check if macros directory exists: %s", macrosPath)
-	}
-	if !exists {
-		return "", nil
-	}
-
-	entries, err := afero.ReadDir(fs, macrosPath)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to read macros directory: %s", macrosPath)
+		return "", errors.Wrapf(err, "failed to load macros from %s", macrosPath)
 	}
 
 	var macroContent strings.Builder
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-
-		filePath := filepath.Join(macrosPath, entry.Name())
-		content, err := afero.ReadFile(fs, filePath)
-		if err != nil {
-			return "", errors.Wrapf(err, "failed to read macro file: %s", filePath)
-		}
-
-		macroContent.Write(content)
+	for _, macro := range macros {
+		macroContent.WriteString(string(macro))
 		macroContent.WriteString("\n")
 	}
 
@@ -109,7 +95,7 @@ func NewRendererWithMacros(context Context, macroContent string) *Renderer {
 	}
 }
 
-func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool, commitHash string) map[string]string {
+func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool, commitHash, environment string) map[string]string {
 	vars := map[string]string{
 		"BRUIN_START_DATE":          startDate.Format("2006-01-02"),
 		"BRUIN_START_DATETIME":      startDate.Format("2006-01-02T15:04:05"),
@@ -122,6 +108,7 @@ func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineNa
 		"BRUIN_EXECUTION_TIMESTAMP": executionDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"BRUIN_RUN_ID":              runID,
 		"BRUIN_PIPELINE":            pipelineName,
+		"BRUIN_ENVIRONMENT":         environment,
 		"BRUIN_FULL_REFRESH":        "",
 		"BRUIN_COMMIT_HASH":         commitHash,
 		"PYTHONUNBUFFERED":          "1",
@@ -149,6 +136,13 @@ func NewRendererWithStartEndDates(startDate, endDate, executionDate *time.Time, 
 // callers must re-apply them on the cloned renderer.
 func (r *Renderer) SetContextValue(key string, value any) {
 	r.context.Set(key, value)
+}
+
+// WithRepositoryRoot returns a copy scoped to a trusted checkout root; without one, template file access is denied.
+func (r *Renderer) WithRepositoryRoot(root string) *Renderer {
+	clone := *r
+	clone.repositoryRoot = root
+	return &clone
 }
 
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
@@ -186,9 +180,8 @@ func defaultContext(startDate, endDate, executionDate *time.Time, pipelineName, 
 }
 
 func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
-	yesterday := time.Now().AddDate(0, 0, -1)
-	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+	startDate := date.StartOfYesterdayUTC(time.Now())
+	endDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 23, 59, 59, 999999999, time.UTC)
 	now := time.Now().UTC()
 	ctx := defaultContext(&startDate, &endDate, &now, pipelineName, runID, false)
 	ctx["var"] = nil
@@ -199,6 +192,14 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 }
 
 func (r *Renderer) Render(query string) (string, error) {
+	var root *os.Root
+	if r.repositoryRoot != "" {
+		// An unavailable or symlinked root disables file access but must still render inline SQL.
+		root, _ = openRepositoryRoot(r.repositoryRoot)
+		if root != nil {
+			defer root.Close()
+		}
+	}
 	r.queryRenderLock.Lock()
 
 	// Prepend macro content so its definitions are available to the query, separated
@@ -213,7 +214,7 @@ func (r *Renderer) Render(query string) (string, error) {
 		fullQuery = preamble + query
 	}
 
-	tpl, err := gonja.FromString(fullQuery)
+	tpl, err := templateFromString(fullQuery, root)
 	if err != nil {
 		customError := findParserErrorType(err)
 		if customError != "" && outputMarker != "" {
@@ -221,7 +222,7 @@ func (r *Renderer) Render(query string) (string, error) {
 			// Parse the query by itself after a recognized EOF error so the location we
 			// return refers to the template the user supplied. If the query parses on its
 			// own, keep the original error because it came from the macro preamble.
-			if _, queryErr := gonja.FromString(query); queryErr != nil {
+			if _, queryErr := templateFromString(query, root); queryErr != nil {
 				if queryCustomError := findParserErrorType(queryErr); queryCustomError != "" {
 					customError = queryCustomError
 				}
@@ -291,21 +292,34 @@ func hideMacroOutputMarker(err error, marker string) error {
 	return errors.New(strings.ReplaceAll(err.Error(), marker, ""))
 }
 
+// RestrictTemplateFilesystemEnv is retained for source compatibility.
+//
+// Deprecated: template file access is always repository-scoped, regardless of this environment variable.
+const RestrictTemplateFilesystemEnv = "BRUIN_RESTRICT_TEMPLATE_FILESYSTEM"
+
 //nolint:ireturn
 func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) (RendererInterface, error) {
+	// Only the current pipeline grants file access, never a reused clone's prior repository.
+	repositoryRoot := ""
+	if pipe.DefinitionFile.Path != "" {
+		if repo, err := git.FindRepoFromPath(filepath.Dir(pipe.DefinitionFile.Path)); err == nil {
+			repositoryRoot = repo.Path
+		}
+	}
+
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
-		return r, nil
+		return r.WithRepositoryRoot(repositoryRoot), nil
 	}
 
 	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	if !ok {
-		return r, nil
+		return r.WithRepositoryRoot(repositoryRoot), nil
 	}
 
 	executionDate, ok := ctx.Value(pipeline.RunConfigExecutionDate).(time.Time)
 	if !ok {
-		return r, nil
+		return r.WithRepositoryRoot(repositoryRoot), nil
 	}
 
 	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
@@ -324,6 +338,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
 			macroContent:    macroContent,
+			repositoryRoot:  repositoryRoot,
 		}
 		// Use non-mutating template resolution to avoid modifying the original asset
 		resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(tempRenderer)
@@ -354,6 +369,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
 		macroContent:    macroContent,
+		repositoryRoot:  repositoryRoot,
 	}, nil
 }
 
@@ -482,6 +498,7 @@ var assetTypePlatform = map[pipeline.AssetType]Platform{
 	pipeline.AssetTypeOracleSource: PlatformOracle,
 
 	pipeline.AssetTypeFabricQuery:             PlatformFabric,
+	pipeline.AssetTypeFabricSource:            PlatformFabric,
 	pipeline.AssetTypeFabricSeed:              PlatformFabric,
 	pipeline.AssetTypeFabricQuerySensor:       PlatformFabric,
 	pipeline.AssetTypeFabricTableSensor:       PlatformFabric,

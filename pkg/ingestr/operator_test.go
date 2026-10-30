@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/starrocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -715,6 +716,19 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "frankfurter://", "--source-table", "latest:USD", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "public allratestoday source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "allratestoday.com",
+					"source_table":      "central_bank_rates:rbi",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "allratestoday://", "--source-table", "central_bank_rates:rbi", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
 			name: "public ripestat source via domain name (no connection defined)",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
@@ -1271,22 +1285,121 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	mockPg.On("GetIngestrURI").Return("postgresql://user:pass@localhost:5432/db", nil)
 	mockBq := new(mockConnection)
 	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+	mockMySQL := new(mockConnection)
+	mockMySQL.On("GetIngestrURI").Return("mysql+pymysql://user:pass@localhost:3306/db", nil)
+	mockStarRocks := new(mockConnection)
+	mockStarRocks.On("GetIngestrURI").Return((starrocks.Config{
+		Username:       "root",
+		Password:       "pass",
+		Host:           "localhost",
+		Database:       "analytics",
+		HTTPPort:       8040,
+		HTTPScheme:     "https",
+		ReplicationNum: 1,
+		SSL:            "true",
+	}).GetIngestrURI(), nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"pg": mockPg,
-			"bq": mockBq,
+			"pg":        mockPg,
+			"bq":        mockBq,
+			"mysql":     mockMySQL,
+			"starrocks": mockStarRocks,
 		},
 	}
 
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name    string
-		asset   *pipeline.Asset
-		want    []string
-		wantErr string
+		name        string
+		asset       *pipeline.Asset
+		fullRefresh bool
+		refreshID   string
+		want        []string
+		wantErr     string
 	}{
+		{
+			name: "PostgreSQL CDC to StarRocks preserves destination options without explicit keys",
+			asset: &pipeline.Asset{
+				Name:       "analytics.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "starrocks",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "starrocks",
+					"cdc":               true,
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "starrocks://root:pass@localhost:9030/analytics?http_port=8040&http_scheme=https&replication_num=1&ssl=true",
+				"--dest-table", "analytics.users",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "PostgreSQL CDC to StarRocks routes multiple tables to a destination database",
+			asset: &pipeline.Asset{
+				Name:       "analytics.replica",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "starrocks",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "*",
+					"destination":       "starrocks",
+					"cdc":               true,
+					"cdc_dest_schema":   "replica",
+					"cdc_state_id":      "pg-starrocks",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?dest_schema=replica&state_id=pg-starrocks",
+				"--dest-uri", "starrocks://root:pass@localhost:9030/analytics?http_port=8040&http_scheme=https&replication_num=1&ssl=true",
+				"--dest-table", "analytics.replica",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name:        "MySQL CDC to StarRocks streams with full refresh",
+			fullRefresh: true,
+			refreshID:   "starrocks-refresh",
+			asset: &pipeline.Asset{
+				Name:       "analytics.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "starrocks",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "mysql",
+					"source_table":      "db.users",
+					"destination":       "starrocks",
+					"cdc":               true,
+					"cdc_server_id":     "23001",
+					"stream":            true,
+					"flush_interval":    "5s",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "mysql+pymysql+cdc://user:pass@localhost:3306/db?server_id=23001",
+				"--source-table", "db.users",
+				"--dest-uri", "starrocks://root:pass@localhost:9030/analytics?http_port=8040&http_scheme=https&replication_num=1&ssl=true",
+				"--dest-table", "analytics.users",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
+				"--flush-interval", "5s",
+				"--refresh-id", "starrocks-refresh",
+				"--full-refresh",
+			},
+		},
 		{
 			name: "CDC mode transforms URI and auto-sets merge strategy",
 			asset: &pipeline.Asset{
@@ -1355,6 +1468,35 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				"--yes",
 				"--progress", "log",
 				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name:        "runtime CDC full refresh ID survives the cdc_mode stream alias",
+			fullRefresh: true,
+			refreshID:   "request / 1",
+			asset: &pipeline.Asset{
+				Name:       "cdc-stream-refresh",
+				Connection: "bq",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               true,
+					"cdc_mode":          "stream",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-stream-refresh",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--stream",
+				"--refresh-id", "request / 1",
+				"--full-refresh",
 			},
 		},
 		{
@@ -1532,7 +1674,8 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				Asset:    tt.asset,
 			}
 
-			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRefreshID, tt.refreshID)
 
 			err := o.Run(ctx, &ti)
 			if tt.wantErr != "" {
@@ -1540,6 +1683,98 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			runner.AssertExpectations(t)
+		})
+	}
+}
+
+func TestBasicOperator_CDCDeleteBehavior(t *testing.T) {
+	t.Parallel()
+
+	mockPg := new(mockConnection)
+	mockPg.On("GetIngestrURI").Return("postgresql://user:pass@localhost:5432/db", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+	fetcher := &simpleConnectionFetcher{connections: map[string]*mockConnection{"pg": mockPg, "bq": mockBq}}
+
+	tests := []struct {
+		name         string
+		params       pipeline.ParameterMap
+		wantBehavior string
+		wantStream   bool
+		fullRefresh  bool
+		wantErr      string
+	}{
+		{name: "omitted uses ingestr default"},
+		{name: "omitted supports older engine", params: pipeline.ParameterMap{"version": "v1.1.76"}},
+		{name: "batch soft", params: pipeline.ParameterMap{"cdc_delete_behavior": "soft"}, wantBehavior: "soft"},
+		{name: "batch hard", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard"}, wantBehavior: "hard"},
+		{name: "stream soft", params: pipeline.ParameterMap{"cdc_delete_behavior": "soft", "stream": true}, wantBehavior: "soft", wantStream: true},
+		{name: "stream hard", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "stream": true}, wantBehavior: "hard", wantStream: true},
+		{name: "batch alias", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "cdc_mode": "batch"}, wantBehavior: "hard"},
+		{name: "stream alias", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "cdc_mode": "stream"}, wantBehavior: "hard", wantStream: true},
+		{name: "batch full refresh", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard"}, wantBehavior: "hard", fullRefresh: true},
+		{name: "stream full refresh", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "stream": true}, wantBehavior: "hard", wantStream: true, fullRefresh: true},
+		{name: "exact supported version", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "version": "v1.1.77"}, wantBehavior: "hard"},
+		{name: "invalid", params: pipeline.ParameterMap{"cdc_delete_behavior": "delete"}, wantErr: `invalid cdc_delete_behavior: must be "soft" or "hard"`},
+		{name: "empty", params: pipeline.ParameterMap{"cdc_delete_behavior": ""}, wantErr: `invalid cdc_delete_behavior: must be "soft" or "hard"`},
+		{name: "null", params: pipeline.ParameterMap{"cdc_delete_behavior": nil}, wantErr: `invalid cdc_delete_behavior: must be "soft" or "hard"`},
+		{name: "non CDC", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "cdc": false}, wantErr: "cdc_delete_behavior requires cdc: true"},
+		{name: "legacy engine", params: pipeline.ParameterMap{"cdc_delete_behavior": "hard", "version": "v0"}, wantErr: "cdc_delete_behavior requires ingestr 1.1.77 or newer, but parameters.version resolved to " + python.IngestrVersionV0},
+		{name: "older engine", params: pipeline.ParameterMap{"cdc_delete_behavior": "soft", "version": "v1.1.76"}, wantErr: "cdc_delete_behavior requires ingestr 1.1.77 or newer, but parameters.version resolved to 1.1.76"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			params := pipeline.ParameterMap{
+				"source_connection": "pg",
+				"source_table":      "public.users",
+				"cdc":               true,
+			}
+			for key, value := range tt.params {
+				params[key] = value
+			}
+			asset := &pipeline.Asset{
+				Name:       "public.users",
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bq",
+				Parameters: params,
+			}
+			runner := new(mockRunner)
+			if tt.wantErr == "" {
+				want := []string{
+					"ingest",
+					"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+					"--source-table", "public.users",
+					"--dest-uri", "bigquery://uri-here",
+					"--dest-table", "public.users",
+					"--yes",
+					"--progress", "log",
+				}
+				if tt.wantBehavior != "" {
+					want = append(want, "--cdc-delete-behavior", tt.wantBehavior)
+				}
+				want = append(want, "--incremental-strategy", "merge")
+				if tt.wantStream {
+					want = append(want, "--stream")
+				}
+				if tt.fullRefresh {
+					want = append(want, "--full-refresh")
+				}
+				runner.On("RunIngestr", mock.Anything, want, []string(nil), repo).Return(nil).Once()
+			}
+			o := &BasicOperator{conn: fetcher, finder: &mockFinder{}, runner: runner}
+			ti := &scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: asset}
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			err := o.Run(ctx, ti)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				runner.AssertNotCalled(t, "RunIngestr", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				return
+			}
+			require.NoError(t, err)
+			runner.AssertExpectations(t)
 		})
 	}
 }

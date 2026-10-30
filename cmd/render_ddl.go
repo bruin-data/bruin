@@ -92,7 +92,7 @@ func RenderDDL() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
+			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, pipelineBuilderFs)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to read the pipeline definition file:")
 				return cli.Exit("", 1)
@@ -105,7 +105,7 @@ func RenderDDL() *cli.Command {
 			}
 
 			// For DDL rendering, we use a default start/end date since DDL doesn't depend on time ranges
-			startDate := time.Now().AddDate(0, 0, -1) // Yesterday as default
+			startDate := date.StartOfYesterdayUTC(time.Now())
 			if c.String("start-date") != "" {
 				startDate, err = date.ParseTime(c.String("start-date"))
 				if err != nil {
@@ -197,7 +197,7 @@ func RenderDDL() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
 			// Load macros from the pipeline's macros directory
-			macroContent, err := jinja.LoadMacros(fs, pl.MacrosPath)
+			macroContent, err := jinja.LoadMacros(pipelineBuilderFs, pl.MacrosPath)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to load macros:")
 				return cli.Exit("", 1)

@@ -2,12 +2,41 @@ package python
 
 import (
 	"bytes"
+	"context"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
+
+func TestCommandRunnerBruinHome(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh to report the child environment")
+	}
+	t.Setenv("HOME", t.TempDir())
+	home := filepath.Join(t.TempDir(), "bruin home")
+	t.Setenv("BRUIN_HOME", home)
+	t.Setenv("UV_CACHE_DIR", "")
+	t.Setenv("UV_PYTHON_INSTALL_DIR", "/explicit-python")
+	t.Setenv("UV_TOOL_DIR", "")
+	t.Setenv("UV_TOOL_BIN_DIR", "")
+	var output bytes.Buffer
+	ctx := context.WithValue(context.Background(), executor.ContextLogger, zap.NewNop().Sugar())
+	ctx = context.WithValue(ctx, executor.KeyPrinter, &output)
+	err := (&CommandRunner{}).Run(ctx, &git.Repo{Path: t.TempDir()}, &CommandInstance{
+		Name:    "sh",
+		Args:    []string{"-c", `printf '%s\n' "$UV_CACHE_DIR" "$UV_PYTHON_INSTALL_DIR" "$UV_TOOL_DIR" "$UV_TOOL_BIN_DIR"`},
+		EnvVars: map[string]string{"UV_TOOL_DIR": "/asset-tools"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, ">> "+filepath.Join(home, "uv-cache")+"\n>> /explicit-python\n>> /asset-tools\n>> "+filepath.Join(home, "bin")+"\n", output.String())
+}
 
 func TestConsumePipe(t *testing.T) {
 	t.Parallel()

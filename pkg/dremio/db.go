@@ -207,9 +207,11 @@ func toString(value any) (string, bool) {
 // ANSI information_schema, which Dremio exposes.
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	tables, err := c.Select(ctx, &query.Query{Query: `
-SELECT table_schema, table_name, table_type
-FROM information_schema."tables"
-WHERE table_schema NOT IN ('information_schema', 'sys', 'INFORMATION_SCHEMA')
+SELECT t.table_schema, t.table_name, t.table_type, v.view_definition
+FROM information_schema."tables" t
+LEFT JOIN information_schema.views v
+    ON t.table_schema = v.table_schema AND t.table_name = v.table_name
+WHERE t.table_schema NOT IN ('information_schema', 'sys', 'INFORMATION_SCHEMA')
 `})
 	if err != nil {
 		return nil, fmt.Errorf("failed to query information_schema tables: %w", err)
@@ -227,7 +229,7 @@ WHERE table_schema NOT IN ('information_schema', 'sys', 'INFORMATION_SCHEMA')
 	schemaCache := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range tables {
-		if len(row) < 3 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -240,6 +242,7 @@ WHERE table_schema NOT IN ('information_schema', 'sys', 'INFORMATION_SCHEMA')
 			continue
 		}
 		tableType, _ := toString(row[2])
+		viewDefinition, _ := toString(row[3])
 
 		dbSchema, ok := schemaCache[schemaName]
 		if !ok {
@@ -256,8 +259,9 @@ WHERE table_schema NOT IN ('information_schema', 'sys', 'INFORMATION_SCHEMA')
 			dbTableType = ansisql.DBTableTypeView
 		}
 		dbSchema.Tables = append(dbSchema.Tables, &ansisql.DBTable{
-			Name: tableName,
-			Type: dbTableType,
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
 		})
 	}
 

@@ -139,15 +139,15 @@ func printError(err error, output string, message string) {
 		return
 	}
 	errorPrinter.Printf("%s: %v\n", message, err)
-	if hint := teamErrorHint(err); hint != "" {
+	if hint := apiErrorHint(err); hint != "" {
 		errorPrinter.Printf("%s\n", hint)
 	}
 }
 
-// teamErrorHint returns an actionable CLI hint for the team-scoping errors the
-// Bruin Cloud API raises, pointing users at the default-team shortcut. It
-// returns an empty string for any other error, so it's safe to call generically.
-func teamErrorHint(err error) string {
+// apiErrorHint returns an actionable CLI hint for the team-scoping and GitHub
+// connection errors the Bruin Cloud API raises. It returns an empty string for
+// any other error, so it's safe to call generically.
+func apiErrorHint(err error) string {
 	var apiErr *bruincloud.APIError
 	if !errors.As(err, &apiErr) {
 		return ""
@@ -157,6 +157,14 @@ func teamErrorHint(err error) string {
 		return "hint: pass --team <company_prefix>, or set a default once with 'bruin cloud config set-team <company_prefix>'"
 	case "team_not_in_scope":
 		return "hint: your token can't act on that team; target another with --team, or update the default via 'bruin cloud config set-team <company_prefix>' (clear it with 'bruin cloud config unset-team')"
+	case "not_connected", "reconnect_required":
+		return "hint: connect GitHub to Bruin Cloud and install the Bruin GitHub App, or pass --git-token to use a personal access token"
+	case "repo_not_accessible":
+		return "hint: install the Bruin GitHub App on the repository's owner and give it access to the repository, or pass --git-token"
+	case "github_error":
+		return "hint: the GitHub request failed; retry, or pass --git-token"
+	case "user_token_required":
+		return "hint: use a personal Bruin Cloud API token, or pass --git-token"
 	}
 	return ""
 }

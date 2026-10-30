@@ -107,7 +107,7 @@ The trade-offs Mode 2 brings with it:
   reservoir; `quantileTDigest` gives tighter tails per byte.
 - **Cascade rules.** Chaining materialized views means each level must consume the level
   below with `-MergeState`, not `-Merge`. See ClickHouse's
-  [cascading materialized views](https://clickhouse.com/docs/guides/developer/cascading-materialized-views).
+  [cascading materialized views](https://clickhouse.com/docs/concepts/features/materialized-views/cascading-materialized-views).
 - **Restatements are the hard part.** A materialized view is an insert trigger. It sees
   the new `chargeback` version and adds it, but it cannot retract the `approved` version
   it already folded into that minute's state, because that state is a sketch with no
@@ -169,7 +169,7 @@ re-reading raw or returning `NULL`.
 
 ## References
 
-- [Incremental materialized views](https://clickhouse.com/docs/materialized-view/incremental-materialized-view)
-- [Cascading materialized views](https://clickhouse.com/docs/guides/developer/cascading-materialized-views)
-- [AggregatingMergeTree](https://clickhouse.com/docs/engines/table-engines/mergetree-family/aggregatingmergetree)
-- [Aggregate function combinators](https://clickhouse.com/docs/sql-reference/aggregate-functions/combinators)
+- [Incremental materialized views](https://clickhouse.com/docs/concepts/features/materialized-views/incremental-materialized-view)
+- [Cascading materialized views](https://clickhouse.com/docs/concepts/features/materialized-views/cascading-materialized-views)
+- [AggregatingMergeTree](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/aggregatingmergetree)
+- [Aggregate function combinators](https://clickhouse.com/docs/reference/functions/aggregate-functions/combinators)

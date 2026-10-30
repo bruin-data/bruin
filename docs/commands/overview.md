@@ -77,7 +77,7 @@ bruin validate --help
 | Command | Description |
 |---------|-------------|
 | [`cloud`](/commands/cloud) | Interact with Bruin Cloud: list projects, manage pipelines, diagnose runs, and more |
-| [`cloud login`, `auth status`, `logout`](/commands/login) | Sign in to Bruin Cloud, check the active login, and sign out |
+| [`cloud login`, `cloud auth status`, `cloud logout`](/commands/login) | Sign in to Bruin Cloud, check the active login, and sign out |
 
 ## Common Workflows
 

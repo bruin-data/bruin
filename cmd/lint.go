@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
@@ -187,6 +188,7 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			logger.Debugf("built the connection manager instance")
+			builder := &ingestrDestinationBuilder{inner: DefaultPipelineBuilder, connections: connectionManager}
 
 			var parser sqlparser.Parser
 			var hookHoister pipeline.DeclareHoister
@@ -209,6 +211,7 @@ func Lint(isDebug *bool) *cli.Command {
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager, renderer))
 			rules = append(rules, lint.GetHookQueryDryRunRule(connectionManager))
 			rules = append(rules, lint.GetSemanticQueryDryRunRule(fs, &git.RepoFinder{}, connectionManager))
+			rules = append(rules, lint.GetInferenceCheckPlatformRule(connectionManager))
 			rules = append(rules, SeedAssetsValidator)
 
 			if c.Bool("fast") {
@@ -239,7 +242,7 @@ func Lint(isDebug *bool) *cli.Command {
 					// build inside Linter.Lint gets WithVariant injected. Non-
 					// variant pipelines no-op on WithVariant, so mixed projects
 					// work too.
-					linter := lint.NewLinter(pipelineFinder, &variantInjectingBuilder{inner: DefaultPipelineBuilder, variantName: variantName}, rules, logger, parser)
+					linter := lint.NewLinter(pipelineFinder, &ingestrDestinationBuilder{inner: &variantInjectingBuilder{inner: DefaultPipelineBuilder, variantName: variantName}, connections: connectionManager}, rules, logger, parser)
 					result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
 				default:
 					// No --variant flag. Probe paths first; only take the fan-out
@@ -263,7 +266,7 @@ func Lint(isDebug *bool) *cli.Command {
 						}
 					}
 					if !anyVariants {
-						linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
+						linter := lint.NewLinter(pipelineFinder, builder, rules, logger, parser)
 						result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
 						break
 					}
@@ -276,6 +279,9 @@ func Lint(isDebug *bool) *cli.Command {
 						if err != nil {
 							printError(err, c.String("output"), "Failed to load pipeline")
 							return cli.Exit("", 1)
+						}
+						for _, pl := range pls {
+							python.InferIngestrDestinations(pl, connectionManager)
 						}
 						pipelines = append(pipelines, pls...)
 					}
@@ -296,7 +302,7 @@ func Lint(isDebug *bool) *cli.Command {
 					lintCtxFanout := context.WithValue(lintCtx, lint.ExcludeTagKey, excludeTag)
 					lintCtxFanout = context.WithValue(lintCtxFanout, lint.AssetWithExcludeTagCountKey, excludedAssets)
 
-					linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
+					linter := lint.NewLinter(pipelineFinder, builder, rules, logger, parser)
 					result, errr = linter.LintPipelines(lintCtxFanout, pipelines)
 				}
 			} else {
@@ -310,7 +316,7 @@ func Lint(isDebug *bool) *cli.Command {
 				filteredRules := lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				crossPipelineRules := lint.FilterRulesByLevel(rules, lint.LevelCrossPipeline)
 				filteredRules = append(filteredRules, crossPipelineRules...)
-				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, filteredRules, logger, parser)
+				linter := lint.NewLinter(pipelineFinder, builder, filteredRules, logger, parser)
 				logger.Debugf("running %d rules for asset-only validation", len(filteredRules))
 
 				// Repo root lets cross-pipeline URI deps resolve against sibling pipelines.

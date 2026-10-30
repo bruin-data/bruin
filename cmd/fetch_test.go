@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
 
 func TestParseQueryVars(t *testing.T) {
@@ -590,6 +591,106 @@ metrics:
 	assert.NotContains(t, models, "root_orders")
 }
 
+func TestLoadRepoSemanticModelsUsesPipelineRepoWhenConfigIsOutsideIt(t *testing.T) {
+	t.Parallel()
+
+	workspaceDir := t.TempDir()
+	repoDir := filepath.Join(workspaceDir, "cloned-repo")
+	require.NoError(t, os.MkdirAll(filepath.Join(workspaceDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "semantic", "orders.yml"), []byte(`schema: v1
+name: orders
+source:
+  table: orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`), 0o644))
+
+	configPath := filepath.Join(workspaceDir, ".bruin.yml")
+	models, semanticPath, err := loadRepoSemanticModels(afero.NewOsFs(), configPath, filepath.Join(repoDir, "analytics"))
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(repoDir, "semantic"), semanticPath)
+	assert.Contains(t, models, "orders")
+}
+
+func TestLoadRepoSemanticModelsFallsBackToConfigDirectoryWhenRepoHasNoSemanticDir(t *testing.T) {
+	t.Parallel()
+
+	workspaceDir := t.TempDir()
+	repoDir := filepath.Join(workspaceDir, "cloned-repo")
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(workspaceDir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(workspaceDir, "semantic", "orders.yml"), []byte(`schema: v1
+name: orders
+source:
+  table: orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`), 0o644))
+
+	configPath := filepath.Join(workspaceDir, ".bruin.yml")
+	models, semanticPath, err := loadRepoSemanticModels(afero.NewOsFs(), configPath, filepath.Join(repoDir, "analytics"))
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(workspaceDir, "semantic"), semanticPath)
+	assert.Contains(t, models, "orders")
+}
+
+func TestLoadRepoSemanticModelsFallsBackToConfigDirectoryOutsideGitRepo(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "semantic", "orders.yml"), []byte(`schema: v1
+name: orders
+source:
+  table: orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`), 0o644))
+
+	configPath := filepath.Join(tmpDir, ".bruin.yml")
+	models, semanticPath, err := loadRepoSemanticModels(afero.NewOsFs(), configPath, filepath.Join(tmpDir, "analytics"))
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(tmpDir, "semantic"), semanticPath)
+	assert.Contains(t, models, "orders")
+}
+
+func TestLoadRepoSemanticModelsTreatsSymlinkedConfigInsideRepoAsInside(t *testing.T) {
+	t.Parallel()
+
+	realDir := t.TempDir()
+	linkDir := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(realDir, linkDir))
+
+	repoDir := filepath.Join(realDir, "repo")
+	projectDir := filepath.Join(repoDir, "project")
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoDir, "semantic"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(projectDir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "semantic", "orders.yml"), []byte(`schema: v1
+name: orders
+source:
+  table: orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`), 0o644))
+
+	configPath := filepath.Join(linkDir, "repo", "project", ".bruin.yml")
+	models, semanticPath, err := loadRepoSemanticModels(afero.NewOsFs(), configPath, filepath.Join(projectDir, "pipelines", "daily"))
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(linkDir, "repo", "project", "semantic"), semanticPath)
+	assert.Contains(t, models, "orders")
+}
+
 func TestQueryRendererRendersPipelineMacroWithListArgument(t *testing.T) {
 	t.Parallel()
 
@@ -1111,7 +1212,7 @@ func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
 func TestCloudQuerierSelectWithSchema(t *testing.T) {
 	t.Run("maps the columnar result", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/agents/9/query", r.URL.Path)
+			assert.Equal(t, "/connection-sets/9/query", r.URL.Path)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"columns":      []string{"n"},
 				"column_types": []string{"INT8"},
@@ -1121,7 +1222,7 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		defer server.Close()
 		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
-		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 9, connectionName: "c"}
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 9, connectionName: "c"}
 		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT 1 AS n"})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"n"}, res.Columns)
@@ -1140,7 +1241,7 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		defer server.Close()
 		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
-		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 1, connectionName: "c"}
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 1, connectionName: "c"}
 		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT * FROM t"})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"a", "b", "c"}, res.Columns)
@@ -1157,9 +1258,72 @@ func TestCloudQuerierSelectWithSchema(t *testing.T) {
 		defer server.Close()
 		t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
 
-		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), agentID: 1, connectionName: "c", limit: 2}
+		q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 1, connectionName: "c", limit: 2}
 		res, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT n FROM t"})
 		require.NoError(t, err)
 		assert.Len(t, res.Rows, 2)
 	})
+}
+
+func writeCloudQueryConfig(t *testing.T, bruinConnections string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), ".bruin.yml")
+	content := "environments:\n  default:\n    connections:\n      postgres:\n        - name: warehouse\n          use_cloud: true\n" + bruinConnections
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	return path
+}
+
+func runCloudQuery(t *testing.T, configPath string, extraArgs ...string) (string, error) {
+	t.Helper()
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/connection-sets/9/query", r.URL.Path)
+		authorization = r.Header.Get("Authorization")
+		_ = json.NewEncoder(w).Encode(map[string]any{"columns": []string{"n"}, "rows": [][]any{{1}}})
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_CONNECTION_SET_ID", "9")
+	t.Setenv("BRUIN_CLOUD_API_KEY", "")
+
+	args := append([]string{"query", "--config-file", configPath, "--connection", "warehouse", "--query", "SELECT 1", "--output", "json"}, extraArgs...)
+	cmd := Query()
+	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+	err := cmd.Run(t.Context(), args)
+	return authorization, err
+}
+
+func TestCloudQueryRequiresConnectionSetID(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	bruinToken := "      bruin:\n        - name: agent-cloud-cli-token\n          api_token: yml-token\n"
+	authorization, err := runCloudQuery(t, writeCloudQueryConfig(t, bruinToken), "--cloud-connection-set-id", "0")
+	require.Error(t, err)
+	assert.Empty(t, authorization, "no request should be sent without a connection set id")
+}
+
+func TestCloudQueryAPIKey(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	bruinToken := "      bruin:\n        - name: agent-cloud-cli-token\n          api_token: yml-token\n"
+
+	tests := []struct {
+		name          string
+		bruin         string
+		args          []string
+		authorization string
+	}{
+		{name: "falls back to the bruin connection in .bruin.yml", bruin: bruinToken, authorization: "Bearer yml-token"},
+		{name: "the flag wins over .bruin.yml", bruin: bruinToken, args: []string{"--cloud-api-key", "flag-token"}, authorization: "Bearer flag-token"},
+		{name: "fails without any key"},
+		{name: "does not send the token to a different Cloud API", bruin: bruinToken + "          api_url: https://other.example.com\n"},
+	}
+
+	for _, tt := range tests { //nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			authorization, err := runCloudQuery(t, writeCloudQueryConfig(t, tt.bruin), tt.args...)
+			if tt.authorization == "" {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.authorization, authorization)
+		})
+	}
 }

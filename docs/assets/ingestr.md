@@ -85,6 +85,9 @@ parameters:
   flush_records: integer
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
   cdc: "true"|"false"
+  cdc_delete_behavior: soft | hard
+  cdc_snapshot_mode: auto | never
+  cdc_start_lsn: string
   cdc_mode: stream | batch # deprecated, use stream instead
   cdc_sql_capture: cdc | change_tracking
   cdc_publication: string
@@ -116,7 +119,7 @@ parameters:
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
 | `version` | No | _n/a_ | Selects the version of ingestr to install and use. Valid options are bare family markers such as `v1` or `v0`, or a full version pin such as `v1.0.71`. |
 | `materialization` | No | `--incremental-*`, `--partition-by`, `--cluster-by` | Preferred way to define destination write behavior. Supports `type: table` with `create+replace`, `append`, `merge`, `delete+insert`, and `truncate+insert`. |
-| `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. |
+| `destination` | Unless `connection` or `destination_connection` is set | _n/a_ | Logical destination type used for default connection inference. When `connection` and `destination_connection` are omitted, Bruin uses this value to choose the pipeline default destination connection. When omitted, Bruin infers it from the type of the destination connection, e.g. `bigquery` for a `google_cloud_platform` connection. A `destination` that is set, including one from the pipeline's `default.parameters`, is used as is. |
 | `destination_connection` | No | _n/a_ | Named destination connection to use when `connection` is omitted. This overrides default connection inference from `destination`. |
 | `destination_table` | No | `--dest-table` | Destination table identifier passed to Ingestr. Defaults to the asset `name`. Set this when the destination table needs characters that are not allowed in an asset name, such as the `?key=value` parameters a CleverTap destination expects. |
 | `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`, or `truncate+insert`) to Ingestr. Prefer `materialization.strategy` for new assets. |
@@ -136,7 +139,7 @@ parameters:
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
 | `sql_exclude_columns` | No | `--sql-exclude-columns` | List of columns to skip during extraction. |
 | `no_inference` | No | `--no-inference` | Uses `columns` as the source schema for schema-less sources instead of inferring types. |
-| `full_refresh` | No | `--full-refresh` | Runs this asset in full-refresh mode on every run. The run-level `--full-refresh` flag still applies to all assets. |
+| `full_refresh` | No | `--full-refresh` | Requests a full refresh. For streaming CDC assets, refreshes once before continuing replication. The run-level `--full-refresh` flag still applies to all assets. |
 | `mask` | No | `--mask` | Adds a column masking rule such as `email:hash`. |
 | `pipelines_dir` | No | `--pipelines-dir` | Directory where Ingestr stores pipeline metadata. |
 | `staging_bucket` | No | `--staging-bucket` | Overrides the staging bucket that Ingestr uses for intermediate files. |
@@ -147,6 +150,9 @@ parameters:
 | `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. CDC assets can set `cdc_stream_flush_records` instead, which takes precedence. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 | `cdc` | No | source URI scheme | Enables Bruin's CDC URI handling for PostgreSQL, MySQL/MariaDB, Vitess, PlanetScale, MongoDB, and SQL Server (log-based CDC and Change Tracking) sources when set to `"true"`. CDC assets must use `merge`; Bruin sets it automatically when omitted and rejects other strategies. |
+| `cdc_delete_behavior` | No | `--cdc-delete-behavior` | How CDC merges apply source deletes in batch and streaming assets: `soft` (default) retains rows with `_cdc_deleted = true`; `hard` removes them. Requires `cdc: true` and ingestr v1.1.77 or later. Hard deletes require a supported source and destination with destination-managed CDC state; see [PostgreSQL delete behavior](../platforms/postgres.md#delete-behavior) and the [ingestr CDC guide](https://getbruin.com/docs/ingestr/getting-started/cdc.html#deletes). |
+| `cdc_snapshot_mode` | No | `--cdc-snapshot-mode` | PostgreSQL CDC snapshot policy: `auto` permits snapshots and backfills; `never` prohibits them and full refresh. Omission inherits the saved policy; new connectors default to `auto`. Requires ingestr v1.1.78 or later. See [CDC without snapshots](../platforms/postgres.md#cdc-without-snapshots). |
+| `cdc_start_lsn` | No | `--cdc-start-lsn` | Nonzero PostgreSQL LSN for bootstrapping preloaded destination tables. Requires `cdc_snapshot_mode: never` and ingestr v1.1.78 or later. Remove after bootstrap succeeds; interrupted bootstrap can retry the same boundary. See [CDC without snapshots](../platforms/postgres.md#cdc-without-snapshots) for baseline and replication-slot requirements. |
 | `cdc_mode` | No | `--stream` flag | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true`; `cdc_mode: batch` is the default (omit it). |
 | `cdc_sql_capture` | No | source URI scheme | SQL Server capture mechanism, either `cdc` (log-based, `mssql+cdc`; default) or `change_tracking` (`mssql+ct`). |
 | `cdc_publication` | No | source URI query | PostgreSQL publication name. |
@@ -225,6 +231,8 @@ For `truncate+insert`, ingestr truncates the target table before loading new row
 
 Each source-specific ingestion page in this documentation lists that source's supported tables with primary keys, incremental keys, and default incremental strategies. The upstream ingestr docs remain the source of truth for destination-specific strategy limits.
 
+For PostgreSQL or MySQL CDC into StarRocks, see [StarRocks CDC replication](/ingestion/starrocks#cdc-replication) for batch and streaming examples, destination naming, and requirements.
+
 ### Column metadata
 
 Define columns on the asset to enrich the metadata passed to Ingestr. Columns flagged as `primary_key: true` are translated into repeated `--primary-key` flags, columns with `mask` are translated into repeated `--mask` flags, and date-typed incremental keys automatically surface through `--columns`. See [Column metadata](./columns.md) for the syntax.
@@ -259,13 +267,14 @@ Pipeline run options propagate to ingestr automatically:
 
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
 * Running with `--full-refresh`, or setting `parameters.full_refresh: true` on the asset, adds the `--full-refresh` flag to Ingestr.
-* For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated, and does not pass `--full-refresh`.
+* For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated. A full refresh rebuilds the selected destination tables before continuing with live changes.
+* `--refresh-id` supplies a stable identifier for the current run's streaming full-refresh request. It requires both streaming and full refresh to be enabled; `refresh_restricted: true` prevents that refresh. The identifier is supplied only through the command line.
 
 ## Streaming assets
 
 Some ingestr sources can ingest **continuously** and never finish on their own:
 
-* CDC sources (PostgreSQL, Vitess, PlanetScale) with `cdc: true` and `stream: true`.
+* CDC sources (such as PostgreSQL, MySQL, Vitess, and PlanetScale) with `cdc: true` and `stream: true`, using a destination that supports the source's CDC requirements.
 * Message-broker sources (Kafka, Kinesis) with `stream: true`.
 
 A continuous asset does not fit a normal batch `bruin run` (which expects every asset to complete), so Bruin keeps streaming assets out of ordinary runs and gives them a dedicated run mode.
@@ -278,9 +287,39 @@ bruin run --stream assets/my_stream.asset.yml
 
 * The run targets exactly one streaming asset and keeps it running in the foreground until you stop it with `Ctrl+C` (`SIGINT`/`SIGTERM`). Ingestr flushes buffered records and advances its offset before exiting, so the next run resumes cleanly.
 * A normal `bruin run <pipeline>` skips streaming assets and prints a notice; downstream assets read whatever the stream has landed so far.
-* `--stream` runs only the main task — column/custom checks and metadata push do not run for a stream. It cannot be combined with `--downstream`, `--continue`, `--modified`, `--selector`, `--interactive`, `--sensor-mode`, or `--full-refresh`.
+* `--stream` runs only the main task — column/custom checks and metadata push do not run for a stream. It cannot be combined with `--downstream`, `--continue`, `--modified`, `--selector`, `--interactive`, or `--sensor-mode`.
 * Resume state (replication offset) is managed by ingestr in the destination's staging namespace. For CDC assets it is keyed by `cdc_state_id`. Bruin does not store offsets.
 * For CDC assets, merge applies updates and deletes correctly only when the source table has a usable primary key / replica identity. For PostgreSQL, an unconsumed replication slot retains WAL on the source, so monitor replication lag via `cdc_stream_metrics_addr` (`/debug/vars`). See [PostgreSQL CDC](../platforms/postgres.md#cdc-change-data-capture).
+
+### Refreshing a stream
+
+For CDC connectors and destinations that support streaming full refresh, start a new process with:
+
+```bash
+bruin run --stream --full-refresh --refresh-id refresh-2026-10-18 assets/my_stream.asset.yml
+```
+
+Use the same identifier when restarting or retrying that request. Ingestr records its progress durably, so a completed request resumes replication without refreshing again. Use a new identifier to request another refresh. Without an identifier, `--full-refresh` requests a new refresh on every invocation.
+
+An asset can enable full refresh with `parameters.full_refresh: true`:
+
+```yaml
+parameters:
+  source_connection: source_db
+  source_table: public.orders
+  destination: postgres
+  cdc: true
+  stream: true
+  full_refresh: true
+```
+
+Supply the refresh identifier when starting each run:
+
+```bash
+bruin run --stream --refresh-id refresh-2026-10-18 assets/my_stream.asset.yml
+```
+
+The selected ingestr version must support `--full-refresh --stream` and `--refresh-id`. Ingestr validates connector and destination support. Refresh replaces the tables selected by the asset; it does not remove destination tables from earlier source selections or destination configurations.
 
 ## Examples
 

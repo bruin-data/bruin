@@ -13,7 +13,7 @@ Bruin supports Iceberg as a **destination** for [Ingestr assets](/assets/ingestr
 |---|---|
 | `glue`, `sqlite`, `postgres`, `rest`, `hive`, `hadoop`, `sql`, `r2` | `s3`, `gcs`, `local` |
 
-Table data is written to AWS S3 or any S3-compatible store (MinIO, Cloudflare R2, GCS interop), to Google Cloud Storage natively, or to the local filesystem.
+Table data is written to AWS S3 (including S3 Tables) or any S3-compatible store (MinIO, Cloudflare R2, GCS interop), to Google Cloud Storage natively, or to the local filesystem.
 
 ## Step 1: Add a connection to .bruin.yml
 
@@ -81,6 +81,42 @@ Each catalog type takes different fields. Use the matching `catalog:` block belo
 
 > [!TIP]
 > R2 Data Catalog is a managed Iceberg REST catalog. It vends the S3 storage credentials through the catalog, so **no `storage` block is needed** — the account id and bucket build the connection.
+
+**AWS S3 Tables**
+
+S3 Tables manages where each table's files live, so you don't set a warehouse path. Connect through Glue with the table bucket's catalog id:
+
+```yaml
+          catalog:
+            type: glue
+            catalog_id: "123456789012:s3tablescatalog/my-table-bucket"   # <account_id>:s3tablescatalog/<table bucket>
+            region: "us-east-1"
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"
+```
+
+Or through the S3 Tables REST endpoint, with the table bucket ARN as the storage `path`:
+
+```yaml
+          catalog:
+            type: rest
+            host: "s3tables.us-east-1.amazonaws.com/iceberg"
+            rest_use_ssl: true
+          storage:
+            path: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-table-bucket"
+            region: "us-east-1"
+            auth:
+              access_key: "${AWS_ACCESS_KEY_ID}"
+              secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          properties:
+            rest.sigv4-enabled: "true"
+            rest.signing-name: "s3tables"
+            rest.signing-region: "us-east-1"
+```
+
+> [!TIP]
+> The Glue route enforces Lake Formation permissions: without Create Table, Alter and Drop on the namespace, writes fail with `Insufficient Lake Formation permission(s)`. Merge and other staged strategies also write to a `bruin_staging` namespace in the same table bucket, so grant the same permissions there.
 
 **Hive**
 ```yaml

@@ -469,6 +469,8 @@ func newSnowflakeDBFromConnection(connection *config.SnowflakeConnection) (*snow
 	return snowflake.NewDB(&snowflake.Config{
 		ReadOnly:   connection.ReadOnly,
 		Account:    connection.Account,
+		Host:       connection.Host,
+		Port:       connection.Port,
 		Username:   connection.Username,
 		Password:   connection.Password,
 		Region:     connection.Region,
@@ -571,6 +573,7 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		SecretAccessKey: connection.SecretKey,
 		SessionToken:    connection.SessionToken,
 		Database:        connection.Database,
+		Endpoint:        connection.EndpointURL,
 	})
 	m.availableConnections[connection.Name] = m.Athena[connection.Name]
 	m.AllConnectionDetails[connection.Name] = connection
@@ -1721,6 +1724,14 @@ func (m *Manager) AddAnthropicConnectionFromConfig(connection *config.AnthropicC
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
+	return nil
+}
+
+func (m *Manager) AddAPIKeyConnectionFromConfig(connection *config.APIKeyConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.availableConnections[connection.Name] = connection
+	m.AllConnectionDetails[connection.Name] = connection
 	return nil
 }
 
@@ -3865,6 +3876,7 @@ func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection)
 		Domain:   connection.Domain,
 		Email:    connection.Email,
 		APIToken: connection.APIToken,
+		CloudID:  connection.CloudID,
 	})
 	if err != nil {
 		return err
@@ -4368,6 +4380,7 @@ func (m *Manager) AddStarRocksConnectionFromConfig(connection *config.StarRocksC
 		Catalog:        connection.Catalog,
 		SSL:            connection.SSL,
 		HTTPPort:       connection.HTTPPort,
+		HTTPScheme:     connection.HTTPScheme,
 		ReplicationNum: connection.ReplicationNum,
 	})
 	if err != nil {
@@ -4604,6 +4617,11 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.SurveyMonkey, connectionManager.AddSurveyMonkeyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Typeform, connectionManager.AddTypeformConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OpenAI, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OpenCode, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OpenRouter, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Google, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Typesafe, connectionManager.AddAPIKeyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Intercom, connectionManager.AddIntercomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)

@@ -79,6 +79,7 @@ print(f"Processing {pipeline_name} for {start_date} to {end_date}")
 | `full_refresh` | `BRUIN_FULL_REFRESH` (`"1"` when true, `""` when false) |
 | `commit_hash` | `BRUIN_COMMIT_HASH` |
 | `schema_prefix` | `BRUIN_SCHEMA_PREFIX` |
+| - | `BRUIN_ENVIRONMENT` (the selected environment name, e.g. `default`) |
 | `this` | `BRUIN_THIS` |
 | - | `BRUIN_ASSET` (same as `BRUIN_THIS`) |
 

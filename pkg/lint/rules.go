@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/helpers"
+	"github.com/bruin-data/bruin/pkg/inference"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -268,7 +269,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		return issues, nil
 	}
 
-	requiredKeys := []string{"source_connection", "source_table", "destination"}
+	requiredKeys := []string{"source_connection", "source_table"}
 	for _, key := range requiredKeys {
 		if asset.Parameters == nil {
 			issues = append(issues, &Issue{
@@ -290,9 +291,30 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	destination, _ := asset.Parameters.GetString("destination")
+	if destination == "" {
+		connectionName := asset.Connection
+		if connectionName == "" {
+			connectionName, _ = asset.Parameters.GetString("destination_connection")
+		}
+
+		description := "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter"
+		if connectionName != "" {
+			// validate and run infer `destination` from the connection before linting, so it is
+			// only still empty when the connection could not be resolved to a destination.
+			description = fmt.Sprintf("Could not determine the destination platform from connection '%s': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter", connectionName)
+		}
+
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: description,
+		})
+
+		return issues, nil
+	}
+
 	effectiveStrategy := ""
 	if value, exists := asset.Parameters.GetString("incremental_strategy"); exists && value != "" {
-		destination, _ := asset.Parameters.GetString("destination")
 		switch {
 		case python.ReverseETLDestinationSupportsStrategy(destination, value):
 			effectiveStrategy = value
@@ -339,6 +361,26 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
+		})
+	}
+	if _, exists := asset.Parameters["cdc_delete_behavior"]; exists {
+		behavior, _ := asset.Parameters.GetString("cdc_delete_behavior")
+		if behavior != "soft" && behavior != "hard" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Invalid 'cdc_delete_behavior' value: must be 'soft' or 'hard'",
+			})
+		} else if cdc, _ := asset.Parameters.GetString("cdc"); cdc != "true" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "'cdc_delete_behavior' requires 'cdc: true'",
+			})
+		}
+	}
+	if err := python.ValidateCDCSnapshotParameters(asset, false); err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: err.Error(),
 		})
 	}
 	if capture, exists := asset.Parameters.GetString("cdc_sql_capture"); exists && capture != "cdc" && capture != "change_tracking" {
@@ -1515,6 +1557,12 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 	}
 
+	if asset.Type == pipeline.AssetTypeInference {
+		if err := inference.ValidateAsset(asset); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+		return issues, nil
+	}
 	if asset.Type == pipeline.AssetTypePython || asset.Type == pipeline.AssetTypeIngestr {
 		return issues, nil
 	}
@@ -2119,6 +2167,28 @@ func EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset(ctx context.Conte
 	}
 
 	return issues, nil
+}
+
+// ValidateInferenceCheckPlatform rejects quality checks on inference assets whose
+// connection platform cannot run them, so `bruin validate` catches what the run
+// would otherwise reject. Connections whose type is unknown are left to other rules.
+func ValidateInferenceCheckPlatform(connections python.ConnectionTypeGetter) AssetValidator {
+	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if asset.Type != pipeline.AssetTypeInference || asset.CheckCount() == 0 {
+			return nil, nil
+		}
+
+		connectionType := connections.GetConnectionType(asset.Connection)
+		if connectionType == "" {
+			return nil, nil
+		}
+
+		var issues []*Issue
+		if err := inference.ValidateQualityCheckPlatform(asset, connectionType); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+		return issues, nil
+	}
 }
 
 // ValidateCustomCheckQueryDryRun validates CustomCheck.Query using a dry-run against the DB.

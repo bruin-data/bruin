@@ -149,6 +149,32 @@ func (c *APIClient) ListProjects(ctx context.Context) ([]Project, error) {
 	return projects, err
 }
 
+// CreateProjectInput connects a Git repository as a project; without GitToken it uses the GitHub App.
+type CreateProjectInput struct {
+	Name       string `json:"name"`
+	RepoURL    string `json:"repo_url"`
+	RepoBranch string `json:"repo_branch,omitempty"`
+	GitToken   string `json:"git_token,omitempty"`
+	Provider   string `json:"provider,omitempty"`
+	DoNotParse bool   `json:"do_not_parse"`
+}
+
+type CreateProjectResult struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	RepoURL    string `json:"repo_url"`
+	RepoBranch string `json:"repo_branch"`
+	Provider   string `json:"provider"`
+}
+
+func (c *APIClient) CreateProject(ctx context.Context, input CreateProjectInput) (*CreateProjectResult, error) {
+	var result CreateProjectResult
+	if err := c.doRequest(ctx, http.MethodPost, "/projects", input, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // --- Pipelines ---
 
 func (c *APIClient) ListPipelines(ctx context.Context) ([]Pipeline, error) {
@@ -578,24 +604,24 @@ func (c *APIClient) AddAgentConnection(ctx context.Context, agentID int, connTyp
 	return resp.Connections, err
 }
 
-// AgentQueryResult is the columnar result of running a query against one of an
-// agent's connections via the cloud query endpoint.
-type AgentQueryResult struct {
+// ConnectionSetQueryResult is the columnar result of running a query against a
+// connection in a connection set via the cloud query endpoint.
+type ConnectionSetQueryResult struct {
 	Columns     []string        `json:"columns"`
 	ColumnTypes []string        `json:"column_types"`
 	Rows        [][]interface{} `json:"rows"`
 	RenderedSQL string          `json:"rendered_sql"`
 }
 
-// RunAgentQuery runs a read-only SQL query against the named connection from the
-// agent's dev-env secret, server-side via the query service, and returns the
+// RunConnectionSetQuery runs a read-only SQL query against the named connection
+// in the connection set, server-side via the query service, and returns the
 // columnar result. The SQL is sent verbatim — cloud query mode does not accept
 // template variables. A non-2xx response (e.g. a query error or a non-read-only
 // statement) surfaces as an *APIError.
-func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, query string) (*AgentQueryResult, error) {
+func (c *APIClient) RunConnectionSetQuery(ctx context.Context, connectionSetID int, connection, query string) (*ConnectionSetQueryResult, error) {
 	body := map[string]any{"connection": connection, "query": query}
 	var raw json.RawMessage
-	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/query", agentID), body, &raw); err != nil {
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/connection-sets/%d/query", connectionSetID), body, &raw); err != nil {
 		return nil, err
 	}
 
@@ -603,7 +629,7 @@ func (c *APIClient) RunAgentQuery(ctx context.Context, agentID int, connection, 
 	// (default decoding would round them to float64).
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
-	var result AgentQueryResult
+	var result ConnectionSetQueryResult
 	if err := dec.Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to parse query result: %w", err)
 	}
@@ -710,6 +736,30 @@ func (c *APIClient) GetAgentMessageStatus(ctx context.Context, agentID, threadID
 	return &resp.Data, nil
 }
 
+// SteerAgentMessage sends a follow-up into a running message. id is an optional
+// UUID that makes retries idempotent; the server generates one when empty.
+func (c *APIClient) SteerAgentMessage(ctx context.Context, agentID, threadID, messagePairID int, message, id string) (*AgentSteer, error) {
+	body := map[string]any{"message": message}
+	if id != "" {
+		body["id"] = id
+	}
+	var result AgentSteer
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/threads/%d/messages/%d/steer", agentID, threadID, messagePairID), body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *APIClient) StopAgentMessage(ctx context.Context, agentID, threadID, messagePairID int) (*StopAgentMessageResponse, error) {
+	var result StopAgentMessageResponse
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/threads/%d/messages/%d/stop", agentID, threadID, messagePairID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, offset int, archived bool) ([]AgentThread, error) {
 	params := url.Values{}
 	if limit > 0 {
@@ -799,6 +849,12 @@ func (c *APIClient) ExportThread(ctx context.Context, agentID, threadID int) (js
 }
 
 func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, error) {
+	messages, _, err := c.ListAgentMessagesWithTotal(ctx, agentID, threadID, limit, offset)
+	return messages, err
+}
+
+// ListAgentMessagesWithTotal also returns the thread's total message count.
+func (c *APIClient) ListAgentMessagesWithTotal(ctx context.Context, agentID, threadID int, limit, offset int) ([]AgentMessage, int, error) {
 	params := url.Values{}
 	if limit > 0 {
 		params.Set("limit", strconv.Itoa(limit))
@@ -811,10 +867,11 @@ func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int
 		path += "?" + params.Encode()
 	}
 	var resp struct {
-		Messages []AgentMessage `json:"messages"`
+		Messages   []AgentMessage `json:"messages"`
+		TotalCount int            `json:"total_count"`
 	}
 	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
-	return resp.Messages, err
+	return resp.Messages, resp.TotalCount, err
 }
 
 // --- Connections ---
@@ -1017,10 +1074,69 @@ func (c *APIClient) UpdateDashboard(ctx context.Context, dashboardID int, fields
 	return &result, nil
 }
 
+// ApplyDashboardFilters updates the dashboard's active filter selection. The
+// response lists only the filters that were applied.
+func (c *APIClient) ApplyDashboardFilters(ctx context.Context, dashboardID int, parameters map[string]json.RawMessage) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/dashboards/%d/filters", dashboardID), map[string]any{
+		"parameters": parameters,
+	}, &result)
+	return result, err
+}
+
 // DeleteDashboard deletes a dashboard so it stops appearing (soft-deleted
 // server-side, mirroring the UI). Requires an owner or team admin.
 func (c *APIClient) DeleteDashboard(ctx context.Context, dashboardID int) error {
 	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/dashboards/%d", dashboardID), nil, nil)
+}
+
+// ListSemanticLayers returns the team's semantic layers (metadata only, no state).
+func (c *APIClient) ListSemanticLayers(ctx context.Context) ([]SemanticLayer, error) {
+	var resp struct {
+		SemanticLayers []SemanticLayer `json:"semantic_layers"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/semantic-layers", nil, &resp)
+	return resp.SemanticLayers, err
+}
+
+// GetSemanticLayer returns a single semantic layer including its model definition.
+func (c *APIClient) GetSemanticLayer(ctx context.Context, id int) (*SemanticLayer, error) {
+	var result SemanticLayer
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/semantic-layers/%d", id), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateSemanticLayer creates a semantic layer from a name and optional model
+// definition. Empty state is omitted so the server stores none.
+func (c *APIClient) CreateSemanticLayer(ctx context.Context, name string, state map[string]any) (*SemanticLayer, error) {
+	body := map[string]any{"name": name}
+	if state != nil {
+		body["state"] = state
+	}
+	var result SemanticLayer
+	err := c.doRequest(ctx, http.MethodPost, "/semantic-layers", body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateSemanticLayer applies a partial update. Only the fields present change.
+func (c *APIClient) UpdateSemanticLayer(ctx context.Context, id int, fields map[string]any) (*SemanticLayer, error) {
+	var result SemanticLayer
+	err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/semantic-layers/%d", id), fields, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteSemanticLayer permanently deletes a semantic layer. Requires an owner or team admin.
+func (c *APIClient) DeleteSemanticLayer(ctx context.Context, id int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/semantic-layers/%d", id), nil, nil)
 }
 
 // PublishDashboard promotes a dashboard's pending draft to the live state (create/update
@@ -1053,6 +1169,25 @@ func (c *APIClient) GetDashboardVersion(ctx context.Context, dashboardID, versio
 		return nil, err
 	}
 	return &result, nil
+}
+
+// ListDashboardNotes returns the dashboard's notes API response.
+func (c *APIClient) ListDashboardNotes(ctx context.Context, dashboardID int) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/dashboards/%d/notes", dashboardID), nil, &result)
+	return result, err
+}
+
+// CreateDashboardNote requires a user-scoped token; the server enforces token
+// ownership, dashboard access, and model/dimension validation.
+func (c *APIClient) CreateDashboardNote(ctx context.Context, dashboardID int, fields map[string]any) (json.RawMessage, error) {
+	var result struct {
+		Note json.RawMessage `json:"note"`
+	}
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/dashboards/%d/notes", dashboardID), fields, &result); err != nil {
+		return nil, err
+	}
+	return result.Note, nil
 }
 
 func (c *APIClient) ListScheduledAgents(ctx context.Context) ([]ScheduledAgent, error) {
@@ -1106,6 +1241,17 @@ func (c *APIClient) DeleteScheduledAgent(ctx context.Context, scheduledAgentID i
 func (c *APIClient) TriggerScheduledAgent(ctx context.Context, scheduledAgentID int) (*ScheduledAgentExecution, error) {
 	var result ScheduledAgentExecution
 	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/scheduled-agents/%d/trigger", scheduledAgentID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ResetScheduledAgentThread makes a same-thread scheduled agent's next run start
+// a new thread instead of continuing the current one.
+func (c *APIClient) ResetScheduledAgentThread(ctx context.Context, scheduledAgentID int) (*ScheduledAgent, error) {
+	var result ScheduledAgent
+	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/scheduled-agents/%d/reset-thread", scheduledAgentID), nil, &result)
 	if err != nil {
 		return nil, err
 	}

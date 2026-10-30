@@ -101,6 +101,21 @@ FROM analytics.events
 WHERE event_name = 'install'
 ```
 
+### `dremio.source`
+
+Defines an existing Dremio table or view for metadata and lineage without executing it.
+
+```yaml
+name: analytics.events
+type: dremio.source
+description: Events managed outside Bruin
+columns:
+  - name: user_id
+    type: BIGINT
+  - name: event_name
+    type: VARCHAR
+```
+
 ### `dremio.sensor.query`
 
 Checks if a query returns any results, running on an interval until the query returns any results.

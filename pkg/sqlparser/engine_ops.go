@@ -169,12 +169,19 @@ func sortStrings(s []string) {
 	}
 }
 
-// preserveTSQLInferredAliasCase mirrors rename._preserve_tsql_inferred_alias_case.
+// preserveTSQLInferredAliasCase mirrors rename._preserve_tsql_inferred_alias_case, except that it keeps user-written aliases.
 func preserveTSQLInferredAliasCase(q *sqlengine.Expr) {
+	userAliases := make(map[*sqlengine.Expr]struct{})
+	for alias := range q.FindAll(sqlengine.KAlias) {
+		userAliases[alias] = struct{}{}
+	}
 	for _, node := range q.FindAllList(sqlengine.KCTE, sqlengine.KSubquery) {
 		sqlengine.QualifyDerivedTableOutputsTSQL(node)
 	}
 	for alias := range q.FindAll(sqlengine.KAlias) {
+		if _, ok := userAliases[alias]; ok {
+			continue
+		}
 		aliasIdent := alias.ArgE("alias")
 		if !aliasIdent.IsA(sqlengine.KIdentifier) {
 			continue
@@ -470,6 +477,27 @@ var readOnlyForbiddenKinds = []sqlengine.Kind{
 }
 
 func isReadOnlyQuery(query, dialectName string) map[string]any {
+	return checkReadOnlyQuery(query, dialectName, nil)
+}
+
+// blockedFunctions allows every function call except the listed names; nil keeps the strict policy.
+type blockedFunctions []string
+
+func (b blockedFunctions) blocks(name string) bool {
+	name = strings.ToLower(name)
+	for _, blocked := range b {
+		if prefix, ok := strings.CutSuffix(blocked, "*"); ok {
+			if strings.HasPrefix(name, prefix) {
+				return true
+			}
+		} else if name == blocked {
+			return true
+		}
+	}
+	return false
+}
+
+func checkReadOnlyQuery(query, dialectName string, blocked blockedFunctions) map[string]any {
 	if strings.Contains(query, "\x00") {
 		return map[string]any{"is_read_only": false, "error": ""}
 	}
@@ -489,6 +517,15 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 			}
 		}
 	}
+	if blocked != nil {
+		toks, err := d.Tokenize(query)
+		if err != nil {
+			return map[string]any{"is_read_only": false, "error": err.Error()}
+		}
+		if hasUnicodeEscapePrefix(toks) {
+			return map[string]any{"is_read_only": false, "error": ""}
+		}
+	}
 	parsed, err := d.Parse(query, nil)
 	if err != nil {
 		return map[string]any{"is_read_only": false, "error": err.Error()}
@@ -503,7 +540,7 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 		return map[string]any{"is_read_only": false, "error": "cannot parse empty query"}
 	}
 	for _, s := range stmts {
-		ok, err := isReadOnlyStatement(s, d, dialectName)
+		ok, err := isReadOnlyStatement(s, d, dialectName, blocked)
 		if err != nil {
 			return map[string]any{"is_read_only": false, "error": err.Error()}
 		}
@@ -514,8 +551,19 @@ func isReadOnlyQuery(query, dialectName string) map[string]any {
 	return map[string]any{"is_read_only": true, "error": ""}
 }
 
-func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName string) (bool, error) {
-	if stmt.IsA(sqlengine.KCommand) && dialectName == dialectSnowflake {
+// hasUnicodeEscapePrefix reports a U& prefix, which PostgreSQL decodes into names the parser cannot match.
+func hasUnicodeEscapePrefix(toks []*sqlengine.Token) bool {
+	for i := 0; i+2 < len(toks); i++ {
+		if toks[i].Type == sqlengine.TK_VAR && strings.EqualFold(toks[i].Text, "u") &&
+			toks[i+1].Type == sqlengine.TK_AMP && toks[i].End+1 == toks[i+1].Start && toks[i+1].End+1 == toks[i+2].Start {
+			return true
+		}
+	}
+	return false
+}
+
+func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName string, blocked blockedFunctions) (bool, error) {
+	if stmt.IsA(sqlengine.KCommand) && (dialectName == dialectSnowflake || blocked != nil) {
 		if pyUpper(stmt.Name()) != "EXPLAIN" || !stmt.Expression().IsA(sqlengine.KLiteral) {
 			return false, nil
 		}
@@ -526,7 +574,7 @@ func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName
 		if len(explained) != 1 || !explained[0].IsA(sqlengine.KQuery) {
 			return false, nil
 		}
-		return isReadOnlyStatement(explained[0], d, dialectName)
+		return isReadOnlyStatement(explained[0], d, dialectName, blocked)
 	}
 	if !stmt.IsA(readOnlyRootKinds...) {
 		return false, nil
@@ -535,7 +583,11 @@ func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName
 		if node.IsA(readOnlyForbiddenKinds...) {
 			return false, nil
 		}
-		if dialectName != dialectSnowflake && node.IsA(sqlengine.KAnonymous) {
+		if blocked != nil {
+			if node.IsA(sqlengine.KAnonymous) && blocked.blocks(node.Name()) {
+				return false, nil
+			}
+		} else if dialectName != dialectSnowflake && node.IsA(sqlengine.KAnonymous) {
 			return false, nil
 		}
 		if node.IsA(sqlengine.KDynamicIdentifier) && node.Arg("expressions") != nil {
@@ -544,7 +596,7 @@ func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName
 		if node.IsA(sqlengine.KColumn) && pyUpper(node.Name()) == "NEXTVAL" {
 			return false, nil
 		}
-		if dialectName != dialectSnowflake && node.IsA(sqlengine.KFunc) && node.Parent().IsA(sqlengine.KDot) {
+		if blocked == nil && dialectName != dialectSnowflake && node.IsA(sqlengine.KFunc) && node.Parent().IsA(sqlengine.KDot) {
 			return false, nil
 		}
 	}

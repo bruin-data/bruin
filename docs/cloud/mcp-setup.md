@@ -77,6 +77,8 @@ The Claude Desktop and Web apps connect to Bruin Cloud as a **custom connector**
 
 Claude returns to the connectors list showing **Connected**, and the Bruin Cloud tools become available in chat. The connection is scoped to the team you selected and limited by your current permissions on that team; access tokens are short-lived and refresh automatically.
 
+To manage connected OAuth apps, open the user menu in Bruin Cloud and select **Profile → OAuth Apps**. Select **Revoke access** to disconnect an app from the listed team. Reconnecting requires authorization again.
+
 ## Codex CLI
 
 Edit your Codex configuration file at `~/.codex/config.toml`:

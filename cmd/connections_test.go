@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"path"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -909,4 +913,64 @@ func TestConnectionsCommand_ListConnections(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestListConnections_VaultBackend drives the command against a Vault-shaped server, including the BRUIN_VAULT_HOST base path.
+func TestListConnections_VaultBackend(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		assert.True(t, strings.HasPrefix(r.URL.Path, "/api/vault/v1/secret/"),
+			"unexpected path %q", r.URL.Path)
+
+		if r.URL.Query().Get("list") == "true" {
+			assert.Contains(t, r.URL.Path, "/metadata/clients/acme")
+			_, _ = w.Write([]byte(`{"data":{"keys":["analytics","prod-db"]}}`))
+			return
+		}
+
+		name := path.Base(r.URL.Path)
+		body := fmt.Sprintf(
+			`{"data":{"data":{"type":"generic","details":{"value":"secret-%s"}},"metadata":{"version":1}}}`,
+			name,
+		)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	t.Setenv("BRUIN_VAULT_HOST", srv.URL+"/api/vault/")
+	t.Setenv("BRUIN_VAULT_TOKEN", "test-token")
+	t.Setenv("BRUIN_VAULT_PATH", "clients/acme")
+	t.Setenv("BRUIN_VAULT_MOUNT_PATH", "secret")
+
+	ctx := context.WithValue(context.Background(), config.SecretsBackendContextKey, "vault")
+
+	cfg, err := loadConfigFromSecretsBackend(ctx, "")
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	env, ok := cfg.Environments["default"]
+	require.True(t, ok)
+	require.Equal(
+		t,
+		map[string]string{"analytics": "generic", "prod-db": "generic"},
+		env.Connections.ConnectionsSummaryList(),
+	)
+
+	r := ConnectionsCommand{}
+	require.NoError(t, r.ListConnections(ctx, ".", "json", "", "", false))
+
+	// Run the full command from a directory without .git: the vault backend must
+	// not trigger local config discovery (which requires a git repo).
+	t.Chdir(t.TempDir())
+
+	app := &cli.Command{
+		Name:   "bruin",
+		Flags:  []cli.Flag{SecretsBackendFlag()},
+		Before: WithSecretsBackendContext,
+		Commands: []*cli.Command{
+			Connections(),
+		},
+	}
+	require.NoError(t, app.Run(context.Background(),
+		[]string{"bruin", "--secrets-backend", "vault", "connections", "list", "-o", "json"}))
 }

@@ -3,6 +3,7 @@ package lineage
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -39,6 +40,38 @@ func SetupSQLParser() error {
 		SQLParser = sqlParser
 	}
 	return nil
+}
+
+func TestColumnLineageRepositoryTemplates(t *testing.T) {
+	t.Parallel()
+	extractor := NewLineageExtractor(SQLParser)
+	for _, column := range []string{"first_column", "second_column"} {
+		t.Run(column, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "query.sql"), []byte("SELECT 1 AS "+column), 0o600))
+			asset := &pipeline.Asset{
+				Name: "test",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: `{% include 'query.sql' %}`,
+				},
+			}
+			pipe := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}
+			pipe.DefinitionFile.Path = filepath.Join(root, "pipeline.yml")
+			issues := extractor.ColumnLineage(pipe, asset, make(map[string]bool))
+			require.Empty(t, issues.Issues)
+			require.Len(t, asset.Columns, 1)
+			require.Equal(t, column, asset.Columns[0].Name)
+
+			// A later pipeline without a checkout must not inherit the previous scope.
+			pipe.DefinitionFile.Path = ""
+			issues = extractor.ColumnLineage(pipe, asset, make(map[string]bool))
+			require.Len(t, issues.Issues, 1)
+			require.Contains(t, issues.Issues[0].Description, "requires a repository root")
+		})
+	}
 }
 
 func TestParseLineageRecursively(t *testing.T) { //nolint

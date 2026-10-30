@@ -11,8 +11,8 @@ bruin run [FLAGS] [path to the pipeline/asset]
 |------|------|---------|-------------|
 | `--downstream` | bool | false | Run all downstream assets as well |
 | `--workers` | int | 16 | Number of workers to run assets in parallel |
-| `--start-date` | str | Beginning of yesterday | Start date range (YYYY-MM-DD format) |
-| `--end-date` | str | End of yesterday | End date range (YYYY-MM-DD format) |
+| `--start-date` | str | Beginning of the previous UTC day | Start date range (YYYY-MM-DD format) |
+| `--end-date` | str | End of the previous UTC day | End date range (YYYY-MM-DD format) |
 | `--environment` | str | - | The environment to use |
 | `--push-metadata` | bool | false | Push metadata to destination database (BigQuery) |
 | `--force` | bool | false | Skip confirmation in production |

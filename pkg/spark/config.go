@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 )
 
@@ -96,8 +97,12 @@ func (c Config) ToOptions() (map[string]string, error) {
 		return nil, err
 	}
 
+	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	if err != nil {
+		return nil, err
+	}
 	options := make(map[string]string, len(c.Options)+4)
-	options["driver"] = dbcDriverName
+	options["driver"] = driverPath
 	options["uri"] = c.URI
 	if c.Catalog != "" {
 		options[optionCatalog] = c.Catalog

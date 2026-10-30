@@ -88,7 +88,6 @@ require (
 
 require (
 	cel.dev/expr v0.25.2 // indirect
-	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.18.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
@@ -111,7 +110,6 @@ require (
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/apache/thrift v0.24.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/aws/aws-sdk-go v1.55.6 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.31 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.21 // indirect
@@ -288,7 +286,9 @@ require (
 )
 
 require (
+	cloud.google.com/go v0.123.0
 	github.com/99designs/keyring v1.2.2
+	github.com/aws/aws-sdk-go v1.55.6
 	github.com/bruin-data/bruin/semantic-engine v0.0.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/gofrs/flock v0.13.0

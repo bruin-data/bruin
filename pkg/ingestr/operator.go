@@ -141,6 +141,50 @@ func ensureFabricEngineSupport(engine resolvedEngine, uris ...string) error {
 	return nil
 }
 
+func ensureStarRocksEngineSupport(engine resolvedEngine, uris ...string) error {
+	for _, uri := range uris {
+		if !strings.HasPrefix(uri, "starrocks://") {
+			continue
+		}
+		parsed, err := url.Parse(uri)
+		if err != nil {
+			return errors.Wrap(err, "invalid StarRocks URI")
+		}
+		if strings.TrimSpace(parsed.Query().Get("http_scheme")) != "" && semver.Compare("v"+engine.ingestrVersion, "v1.1.78") < 0 {
+			return fmt.Errorf("starrocks http_scheme requires ingestr 1.1.78 or newer, but parameters.version resolved to %s", engine.ingestrVersion)
+		}
+	}
+	return nil
+}
+
+func appendCDCSnapshotParameters(ctx context.Context, args []string, engine resolvedEngine, asset *pipeline.Asset, sourceURI string) ([]string, error) {
+	_, hasMode := asset.Parameters["cdc_snapshot_mode"]
+	_, hasLSN := asset.Parameters["cdc_start_lsn"]
+	if !hasMode && !hasLSN {
+		return args, nil
+	}
+	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if err := python.ValidateCDCSnapshotParameters(asset, runFullRefresh); err != nil {
+		return nil, err
+	}
+	if !strings.HasPrefix(sourceURI, "postgres+cdc://") && !strings.HasPrefix(sourceURI, "postgresql+cdc://") {
+		return nil, errors.New("cdc_snapshot_mode and cdc_start_lsn are only supported for PostgreSQL CDC sources")
+	}
+	if semver.Compare("v"+engine.ingestrVersion, "v1.1.78") < 0 {
+		return nil, fmt.Errorf("cdc_snapshot_mode and cdc_start_lsn require ingestr 1.1.78 or newer, but parameters.version resolved to %s", engine.ingestrVersion)
+	}
+	// An omitted mode inherits ingestr's saved policy; do not send a default.
+	if hasMode {
+		mode, _ := asset.Parameters.GetString("cdc_snapshot_mode")
+		args = append(args, "--cdc-snapshot-mode", mode)
+	}
+	if hasLSN {
+		lsn, _ := asset.Parameters.GetString("cdc_start_lsn")
+		args = append(args, "--cdc-start-lsn", lsn)
+	}
+	return args, nil
+}
+
 // applyIngestrEngine stashes the resolved version on the context so the runner
 // installs the requested release.
 func applyIngestrEngine(ctx context.Context, engine resolvedEngine) context.Context {
@@ -213,6 +257,20 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	engine, err := resolveIngestrEngine(asset)
 	if err != nil {
 		return err
+	}
+
+	deleteBehavior, _ := asset.Parameters.GetString("cdc_delete_behavior")
+	_, hasDeleteBehavior := asset.Parameters["cdc_delete_behavior"]
+	if hasDeleteBehavior {
+		if deleteBehavior != "soft" && deleteBehavior != "hard" {
+			return errors.New("invalid cdc_delete_behavior: must be \"soft\" or \"hard\"")
+		}
+		if !isCDCAsset(asset) {
+			return errors.New("cdc_delete_behavior requires cdc: true")
+		}
+		if semver.Compare("v"+engine.ingestrVersion, "v1.1.77") < 0 {
+			return fmt.Errorf("cdc_delete_behavior requires ingestr 1.1.77 or newer, but parameters.version resolved to %s", engine.ingestrVersion)
+		}
 	}
 
 	// Source connection
@@ -404,6 +462,15 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"log",
 	)
 
+	if hasDeleteBehavior {
+		baseArgs = append(baseArgs, "--cdc-delete-behavior", deleteBehavior)
+	}
+
+	baseArgs, err = appendCDCSnapshotParameters(ctx, baseArgs, engine, asset, sourceURI)
+	if err != nil {
+		return err
+	}
+
 	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
 	// and rejects --metrics-addr unless --stream is set as well, so only emit it
 	// for a streaming asset.
@@ -434,17 +501,21 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
+	var duckDBPaths []string
 	if strings.HasPrefix(destURI, "duckdb://") {
-		duck.LockDatabase(destURI)
-		defer duck.UnlockDatabase(destURI)
+		duckDBPaths = append(duckDBPaths, destURI)
 	}
 
-	if strings.HasPrefix(sourceURI, "duckdb://") && sourceURI != destURI {
-		duck.LockDatabase(sourceURI)
-		defer duck.UnlockDatabase(sourceURI)
+	if strings.HasPrefix(sourceURI, "duckdb://") {
+		duckDBPaths = append(duckDBPaths, sourceURI)
 	}
+	unlockDuckDB := duck.LockDatabases(duckDBPaths...)
+	defer unlockDuckDB()
 
 	if err := ensureFabricEngineSupport(engine, sourceURI, destURI); err != nil {
+		return err
+	}
+	if err := ensureStarRocksEngineSupport(engine, sourceURI, destURI); err != nil {
 		return err
 	}
 	ctx = applyIngestrEngine(ctx, engine)
@@ -882,11 +953,19 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err := ensureFabricEngineSupport(engine, destURI); err != nil {
 		return err
 	}
+	if err := ensureStarRocksEngineSupport(engine, destURI); err != nil {
+		return err
+	}
 	ctx = applyIngestrEngine(ctx, engine)
 
 	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 	if err != nil {
 		return err
+	}
+
+	if strings.HasPrefix(destURI, "duckdb://") {
+		unlockDuckDB := duck.LockDatabases(destURI)
+		defer unlockDuckDB()
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)

@@ -1,6 +1,7 @@
 package python
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestruri"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
@@ -44,15 +46,27 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.1.62"
+	IngestrVersionV1 = "1.1.78"
 	sqlfluffVersion  = "3.4.1"
 )
 
-func ingestrEnvVars() map[string]string {
-	return map[string]string{
+func ingestrEnvVars() (map[string]string, error) {
+	env := map[string]string{
 		"INGESTR_DISABLE_TELEMETRY": "true",
 		"PYTHONUNBUFFERED":          "1",
 	}
+	if os.Getenv("ADBC_DRIVER_PATH") != "" {
+		return env, nil
+	}
+	// ingestr installs its own ADBC drivers; keep them out of a read-only HOME.
+	dir, err := user.ADBCDriverDir()
+	if err != nil {
+		return nil, err
+	}
+	if dir != "" {
+		env["ADBC_DRIVER_PATH"] = dir
+	}
+	return env, nil
 }
 
 type streamingContextKey struct{}
@@ -286,7 +300,13 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 		EnvVars: execCtx.envVariables,
 	}
 
-	return u.Cmd.Run(ctx, execCtx.repo, noDependencyCommand)
+	return u.runAssetScript(ctx, execCtx.repo, noDependencyCommand)
+}
+
+func (u *UvPythonRunner) runAssetScript(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
+	resume := duck.SuspendConnectionReuse(ctx)
+	defer resume()
+	return u.Cmd.Run(ctx, repo, command)
 }
 
 // lockPyprojectDeps runs `uv lock` in the project directory to ensure uv.lock is up to date.
@@ -326,7 +346,7 @@ func (u *UvPythonRunner) runWithPyproject(ctx context.Context, execCtx *executio
 		EnvVars: execCtx.envVariables,
 	}
 
-	return u.Cmd.Run(ctx, projectRepo, command)
+	return u.runAssetScript(ctx, projectRepo, command)
 }
 
 // calculateModuleFromProjectRoot calculates the module path relative to the project root.
@@ -432,7 +452,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		flags = append(flags, tempPyScript.Name())
 	}
 
-	err = u.Cmd.Run(ctx, runRepo, &CommandInstance{
+	err = u.runAssetScript(ctx, runRepo, &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
@@ -509,10 +529,8 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	extraPackages = AddExtraPackages(destURI, "", extraPackages)
 
 	if strings.HasPrefix(destURI, "duckdb://") {
-		if dbURIGetter, ok := u.conn.GetConnection(destConnectionName).(interface{ GetDBConnectionURI() string }); ok {
-			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
-			defer duck.UnlockDatabase(dbURIGetter.GetDBConnectionURI())
-		}
+		duck.LockDatabase(destURI)
+		defer duck.UnlockDatabase(destURI)
 	}
 
 	ingestrCtx := ctx
@@ -585,10 +603,14 @@ func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args
 		if err != nil {
 			return nil, err
 		}
+		envVars, err := ingestrEnvVars()
+		if err != nil {
+			return nil, err
+		}
 		return &CommandInstance{
 			Name:    binaryFullPath,
 			Args:    u.uvIngestrRunCmd(ctx, extraPackages, args),
-			EnvVars: ingestrEnvVars(),
+			EnvVars: envVars,
 		}, nil
 	}
 
@@ -600,10 +622,14 @@ func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args
 	if err != nil {
 		return nil, err
 	}
+	envVars, err := ingestrEnvVars()
+	if err != nil {
+		return nil, err
+	}
 	return &CommandInstance{
 		Name:    binaryFullPath,
 		Args:    args,
-		EnvVars: ingestrEnvVars(),
+		EnvVars: envVars,
 	}, nil
 }
 
@@ -642,20 +668,32 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(p) >= t.maxBytes {
+	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
-		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
+		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)
 		t.truncated = true
 		return len(p), nil
 	}
 	t.data = append(t.data, p...)
 	if len(t.data) > t.maxBytes {
-		excess := len(t.data) - t.maxBytes
-		copy(t.data, t.data[excess:])
-		t.data = t.data[:t.maxBytes]
+		cut := nextLineStart(t.data, len(t.data)-t.maxBytes)
+		t.data = t.data[:copy(t.data, t.data[cut:])]
 		t.truncated = true
 	}
 	return len(p), nil
+}
+
+// nextLineStart moves a cut that lands mid-line to the start of the next line,
+// so the kept tail never begins with part of a secret the log masker could not
+// recognize.
+func nextLineStart(b []byte, cut int) int {
+	if b[cut-1] == '\n' {
+		return cut
+	}
+	if i := bytes.IndexByte(b[cut:], '\n'); i >= 0 {
+		return cut + i + 1
+	}
+	return len(b)
 }
 
 func (t *tailBuffer) flushTo(w io.Writer) {
@@ -950,7 +988,7 @@ func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) er
 	return cmdRunner.Run(ctx, repo, cmd)
 }
 
-var rendererFs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+var rendererFs = afero.NewOsFs()
 
 type PyprojectToml struct {
 	Tool struct {

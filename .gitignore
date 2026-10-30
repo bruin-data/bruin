@@ -172,6 +172,7 @@ logs/queries
 # Local partitioned backfill state
 logs/backfills/
 
-# Authenticated build input; generated automatically, never maintained in Git.
-/pkg/python/ingestr_hashes.json
+# Authenticated build input; real hashes are generated at build time and
+# overwrite the committed placeholder below. The placeholder stays tracked so
+# that `go:embed` resolves for downstream module consumers.
 /pkg/python/ingestr_hashes.json.tmp

@@ -4,8 +4,10 @@ The `clean` command is used to remove temporary artifacts related to Bruin.
 
 It currently:
 
-- cleans the cached virtualenv directories inside `~/.bruin` directory
+- clears Bruin's runtime home (`BRUIN_HOME` when set, otherwise `~/.bruin`), including cached virtual environments and downloaded tools
 - removes the `logs` directory from the project root
+
+Use a dedicated directory for `BRUIN_HOME`: `clean` removes its contents. Cleaning does not delete the original files left in legacy locations by migration, and the old `~/.bruin` contents are not copied back on the next run.
 
 ## Usage
 

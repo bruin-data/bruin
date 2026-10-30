@@ -14,6 +14,7 @@ type Config struct {
 	SecretAccessKey string
 	SessionToken    string
 	Database        string
+	Endpoint        string
 }
 
 func (c *Config) ToDBConnectionURI() (string, error) {
@@ -44,6 +45,9 @@ func (c *Config) GetIngestrURI() string {
 	q.Set("region_name", c.Region)
 	if c.SessionToken != "" {
 		q.Set("session_token", c.SessionToken)
+	}
+	if c.Endpoint != "" {
+		q.Set("endpoint_url", c.Endpoint)
 	}
 	return "athena://?" + q.Encode()
 }

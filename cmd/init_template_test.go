@@ -2059,11 +2059,12 @@ func academySQLAdvancedRowCounts(snapshots map[string]academyTableSnapshot) map[
 	return counts
 }
 
+// Drains rows instead of QueryRow: DuckDB ADBC leaks the DB handle (and file lock) on an undrained stream.
 func academySQLAdvancedQueryInt(t *testing.T, db *sql.DB, query string) int {
 	t.Helper()
-	var value int
-	require.NoError(t, db.QueryRowContext(t.Context(), query).Scan(&value))
-	return value
+	values := academySQLAdvancedQueryInts(t, db, query)
+	require.Len(t, values, 1)
+	return values[0]
 }
 
 func academySQLAdvancedQueryInts(t *testing.T, db *sql.DB, query string) []int {
@@ -2071,11 +2072,17 @@ func academySQLAdvancedQueryInts(t *testing.T, db *sql.DB, query string) []int {
 	rows, err := db.QueryContext(t.Context(), query)
 	require.NoError(t, err)
 	defer rows.Close()
+	columns, err := rows.Columns()
+	require.NoError(t, err)
 	var values []int
 	for rows.Next() {
-		var first, second int
-		require.NoError(t, rows.Scan(&first, &second))
-		values = append(values, first, second)
+		row := make([]int, len(columns))
+		dest := make([]any, len(columns))
+		for i := range row {
+			dest[i] = &row[i]
+		}
+		require.NoError(t, rows.Scan(dest...))
+		values = append(values, row...)
 	}
 	require.NoError(t, rows.Err())
 	return values

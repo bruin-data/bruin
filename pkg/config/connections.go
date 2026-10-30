@@ -205,6 +205,7 @@ type AthenaConnection struct { //nolint:recvcheck
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Profile            string `yaml:"profile,omitempty" json:"profile,omitempty" mapstructure:"profile"`
+	EndpointURL        string `yaml:"endpoint_url,omitempty" json:"endpoint_url,omitempty" mapstructure:"endpoint_url"`
 
 	regionSetFromProfile bool
 }
@@ -266,6 +267,10 @@ func (c AthenaConnection) MarshalYAML() (interface{}, error) {
 
 	if c.Region != "" && !c.regionSetFromProfile {
 		m["region"] = c.Region
+	}
+
+	if c.EndpointURL != "" {
+		m["endpoint_url"] = c.EndpointURL
 	}
 
 	if c.Profile != "" {
@@ -594,6 +599,8 @@ type SnowflakeConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	CloudRouting       `yaml:",inline" mapstructure:",squash"`
 	Account            string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
+	Host               string `yaml:"host,omitempty" json:"host,omitempty" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
 	Password           string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password" sensitive:"true"`
 	Region             string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
@@ -633,6 +640,12 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"private_key": c.PrivateKey,
 		"token":       c.Token,
 	}
+	if c.Host != "" {
+		payload["host"] = c.Host
+	}
+	if c.Port != 0 {
+		payload["port"] = c.Port
+	}
 	if c.ReadOnly {
 		payload["read_only"] = true
 	}
@@ -667,6 +680,20 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "account"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Account},
+		)
+	}
+	if c.Host != "" {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "host"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Host},
+		)
+	}
+	if c.Port != 0 {
+		node.Content = append(
+			node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "port"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(c.Port)},
 		)
 	}
 	if c.Username != "" {
@@ -923,6 +950,19 @@ type AnthropicConnection struct {
 
 func (c AnthropicConnection) GetName() string {
 	return c.Name
+}
+
+func (c AnthropicConnection) GetAPIKey() string {
+	return c.APIKey
+}
+
+type APIKeyConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c APIKeyConnection) GetAPIKey() string {
+	return c.APIKey
 }
 
 type FacebookAdsConnection struct {
@@ -2068,6 +2108,7 @@ type StarRocksConnection struct {
 	Catalog            string `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
 	SSL                string `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
 	HTTPPort           int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
+	HTTPScheme         string `yaml:"http_scheme,omitempty" json:"http_scheme,omitempty" mapstructure:"http_scheme"`
 	ReplicationNum     int    `yaml:"replication_num,omitempty" json:"replication_num,omitempty" mapstructure:"replication_num"`
 }
 
@@ -2296,6 +2337,7 @@ type JiraConnection struct {
 	Domain             string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
 	Email              string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
 	APIToken           string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token" sensitive:"true"`
+	CloudID            string `yaml:"cloud_id,omitempty" json:"cloud_id,omitempty" mapstructure:"cloud_id"`
 }
 
 func (c JiraConnection) GetName() string {

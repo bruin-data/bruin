@@ -32,6 +32,10 @@ func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset
 		env["BRUIN_SCHEMA_PREFIX"] = ""
 	}
 
+	if environmentName, ok := ctx.Value(config.EnvironmentNameContextKey).(string); ok {
+		env["BRUIN_ENVIRONMENT"] = environmentName
+	}
+
 	env, err = envInjectVariables(env, p.Variables.Value(), p.Variables.SchemaMap())
 	if err != nil {
 		return nil, err
@@ -71,7 +75,9 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
 
-	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, &executionDate, p.Name, runID, fullRefresh, p.Commit), nil
+	environmentName, _ := ctx.Value(config.EnvironmentNameContextKey).(string)
+
+	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, &executionDate, p.Name, runID, fullRefresh, p.Commit, environmentName), nil
 }
 
 func envInjectVariables(env map[string]string, variables map[string]any, schema map[string]any) (map[string]string, error) {

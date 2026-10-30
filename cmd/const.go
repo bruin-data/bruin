@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
 )
@@ -60,6 +61,10 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 			return nil, fmt.Errorf("error creating renderer for asset %s: %w", a.Name, err)
 		}
 		for key, value := range a.Parameters {
+			// Inference context and instructions are rendered once per input row by the operator.
+			if a.Type == pipeline.AssetTypeInference && (key == "context" || key == "instructions") {
+				continue
+			}
 			renderedValue, err := renderParameterValue(renderer, value)
 			if err != nil {
 				return nil, fmt.Errorf("error rendering parameter %q: %w", key, err)
@@ -161,6 +166,44 @@ func renderPipelineHooks(ctx context.Context, p *pipeline.Pipeline, renderer jin
 	}
 
 	return nil
+}
+
+// pythonImageMutator runs every Python asset on the given image, e.g. python:3.12, instead of
+// its own. The image picks the Python version, so it must name one that is available.
+func pythonImageMutator(image string) (pipeline.AssetMutator, error) {
+	version, ok := strings.CutPrefix(image, "python:")
+	if !ok || !python.AvailablePythonVersions[version] {
+		return nil, fmt.Errorf("invalid Python image %q, expected python:<version> with one of the versions %s", image, strings.Join(python.SortedPythonVersions, ", "))
+	}
+
+	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
+		if a.Type == pipeline.AssetTypePython {
+			a.Image = image
+		}
+		return a, nil
+	}, nil
+}
+
+// ingestrDestinationBuilder infers the `destination` of ingestr assets that omit it, and of every
+// inference asset, from the type of the connection they write to, so code that keys off
+// `destination` keeps working. It runs on the
+// fully built pipeline because variant rendering, which resolves templated connections, comes after
+// the asset mutators.
+type ingestrDestinationBuilder struct {
+	inner interface {
+		CreatePipelineFromPath(ctx context.Context, path string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error)
+	}
+	connections python.ConnectionTypeGetter
+}
+
+func (b *ingestrDestinationBuilder) CreatePipelineFromPath(ctx context.Context, path string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error) {
+	p, err := b.inner.CreatePipelineFromPath(ctx, path, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	python.InferIngestrDestinations(p, b.connections)
+	return p, nil
 }
 
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {

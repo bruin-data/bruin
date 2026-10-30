@@ -135,6 +135,24 @@ func TestRenderAssetParamsMutatorPreservesStructuredParameters(t *testing.T) {
 	}, asset.Parameters["string_map"])
 }
 
+func TestRenderInferenceRowTemplatesAreDeferred(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Type: pipeline.AssetTypeInference,
+		Parameters: pipeline.ParameterMap{
+			"context":      "Ticket: {{ row.body }}",
+			"instructions": "Use {{ row.locale }}",
+			"input_query":  "SELECT '{{ value }}' AS body",
+		},
+	}
+	mutator := renderAssetParamsMutator(jinja.NewRenderer(jinja.Context{"value": "ticket"}))
+	_, err := mutator(t.Context(), asset, &pipeline.Pipeline{})
+	require.NoError(t, err)
+	assert.Equal(t, "Ticket: {{ row.body }}", asset.Parameters["context"])
+	assert.Equal(t, "Use {{ row.locale }}", asset.Parameters["instructions"])
+	assert.Equal(t, "SELECT 'ticket' AS body", asset.Parameters["input_query"])
+}
+
 func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
 	t.Parallel()
 
@@ -214,4 +232,30 @@ func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, `no such variable "nope"`)
 	})
+}
+
+func TestPythonImageMutator(t *testing.T) {
+	t.Parallel()
+
+	mutator, err := pythonImageMutator("python:3.12")
+	require.NoError(t, err)
+
+	pythonAsset := &pipeline.Asset{Name: "py", Type: pipeline.AssetTypePython, Image: "python:3.11"}
+	mutated, err := mutator(t.Context(), pythonAsset, &pipeline.Pipeline{})
+	require.NoError(t, err)
+	assert.Equal(t, "python:3.12", mutated.Image)
+
+	sqlAsset := &pipeline.Asset{Name: "sql", Type: pipeline.AssetTypeBigqueryQuery}
+	mutated, err = mutator(t.Context(), sqlAsset, &pipeline.Pipeline{})
+	require.NoError(t, err)
+	assert.Empty(t, mutated.Image)
+}
+
+func TestPythonImageMutatorRejectsUnknownImages(t *testing.T) {
+	t.Parallel()
+
+	for _, image := range []string{"3.12", "python:3.12-slim", "python:2.7", "node:20"} {
+		_, err := pythonImageMutator(image)
+		require.Error(t, err, image)
+	}
 }

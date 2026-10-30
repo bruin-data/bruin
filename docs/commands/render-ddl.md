@@ -22,8 +22,8 @@ bruin render-ddl [flags] [path to asset definition]
 
 | Flag | Alias | Description |
 |------|-------|-------------|
-| `--start-date` | | Start date in `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` format. Used for Jinja rendering. Defaults to the beginning of yesterday. Can also be set with `BRUIN_START_DATE`. |
-| `--end-date` | | End date in the same formats as `--start-date`. Defaults to the end of yesterday. Can also be set with `BRUIN_END_DATE`. |
+| `--start-date` | | Start date in `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` format. Used for Jinja rendering. Defaults to the beginning of the previous UTC day. Can also be set with `BRUIN_START_DATE`. |
+| `--end-date` | | End date in the same formats as `--start-date`. Defaults to the end of the previous UTC day. Can also be set with `BRUIN_END_DATE`. |
 | `--apply-interval-modifiers` | | Apply [interval modifiers](/assets/interval-modifiers) to the start and end dates. |
 | `--output [format]` | `-o` | Output format. Set to `json` to print `{"query": "..."}`. Defaults to plain SQL. |
 | `--config-file` | | The path to the `.bruin.yml` file. Only read for Athena assets, to pick up the connection's `query_results_path`. Defaults to `.bruin.yml` at the Git repository root. Can also be set with `BRUIN_CONFIG_FILE`. |

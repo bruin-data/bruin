@@ -275,9 +275,31 @@ The `tab` must match a tab used by a row. Saving the dashboard YAML with a filte
 
 ## Notes
 
-Notes add human context to dashboard data. A note can apply to the whole dashboard, a widget, a table row, or a chart point, depending on the dimensions selected when it is created. Use the **Notes** button in the dashboard toolbar to browse and filter all notes, or use a note icon on a widget to work with notes in that widget's context.
+Notes add human context to dashboard data. A note contains a message and can optionally include dimension values that define its scope.
 
-Before users can write a note, its reusable definition must exist in the dashboard YAML. Define notes at the top level and reference their IDs from the widgets where they should be available:
+Open **Notes** from the dashboard toolbar to view existing notes and create a new one. The workspace lists the available scope dimensions on the left and the notes and message composer on the right. Selected values are added to the note when it is sent.
+
+### Note dimensions
+
+The available dimensions depend on the dashboard's data sources:
+
+- On a semantic dashboard, Cloud lists dimensions from the dashboard model, widget-level model overrides, and their joined models. Dimensions are grouped by model in the note workspace. Editors can also use model contexts introduced by the current draft.
+- On a dashboard without a semantic model, Cloud uses the published dashboard filters and preserves their input types and available values. New or changed filters become available to notes after the dashboard is published.
+- If the dashboard has neither a semantic model nor filters, users can still create a general note without dimension scope.
+
+Tables and charts can also prefill note scope from their data. Start note capture and select a table row, bar, or chart point to copy the values that map to available note dimensions. The picker is shown only when the widget contains at least one value that can be mapped unambiguously.
+
+### Where notes appear
+
+A scoped note appears on a widget only when one result row or chart point contains and matches **every** non-empty dimension saved on the note. Selecting a note from the dashboard workspace scrolls to the first matching widget and briefly highlights all matching occurrences.
+
+A general note without dimension scope remains in the dashboard Notes workspace instead of appearing on every widget.
+
+Semantic notes belong to the team and semantic model rather than one dashboard. A note created against the `orders` model, for example, is available on other dashboards in the same team that use `orders`. Notes without a semantic model remain local to the dashboard where they were created.
+
+### Optional note types
+
+Define a note type only when authors need a reusable named scope with fixed dimensions or requirements such as mandatory or multiple values. Dashboard-level types use the top-level `notes` list:
 
 ```yaml
 name: Revenue overview
@@ -307,14 +329,14 @@ rows:
         name: Revenue by region
         type: table
         query: revenue_by_region
-        notes:
-          - revenue_context
-          - channel_context
+        notes: [revenue_context]
 ```
 
-Each definition has a unique `id` and a `dimensions` list. Dimension values are optional and single-select by default. Set `required: true` when a value must be selected, and `multiselect: true` when the note may target multiple values (not supported for `boolean` or `date-range`). A dimension can set a `type` of `select`, `date-range`, `date`, `number`, `boolean`, or `text`; it defaults to `text`. A `select` reads its values from the same-named dimension in the dashboard's `model`, so a dashboard without a `model` can't use `select`. Note content is written in the dashboard UI.
+Each type has a unique `id` and a `dimensions` list. Dimension values are optional and single-value by default. Set `required: true` when authors must select a value and `multiselect: true` when a dimension can contain several values. A dimension can set `type` to `select`, `date`, `number`, `boolean`, or `text`; it defaults to `select`.
 
-Widgets can also reference note definitions from their resolved [semantic model](/core-concepts/semantic-layer). Define the reusable note alongside the model's dimensions and metrics:
+A widget's `notes` list controls which typed notes can be created from that widget. It does not permanently attach an existing note to the widget. Untyped notes do not require this list.
+
+Semantic models can also declare optional note types alongside their dimensions and metrics:
 
 ```yaml
 # semantic/sales.yml
@@ -336,13 +358,12 @@ notes:
   - id: region_note
     dimensions:
       - name: region
-        type: select
         required: true
 ```
 
-For a semantic-model note, `type` is optional and defaults to `text`, and each dimension `name` is resolved like a semantic-query dimension. An unqualified name first matches a dimension on the note's model, then a uniquely matching dimension reachable through a safe join. Use `join_name.dimension` or `model_name.dimension` to select a joined dimension explicitly; ambiguous or unknown names fail dashboard validation for widgets that reference the note. The note reuses the semantic dimension's metadata and can add note-specific `required` or `multiselect` behavior (`multiselect` isn't supported for `boolean` or `date-range`).
+Each semantic note dimension is resolved against the model and its joins. Use `join_name.dimension` or `model_name.dimension` when a joined dimension needs to be explicit. The note reuses the semantic dimension's metadata and can add note-specific `required` or `multiselect` behavior.
 
-Then reference its ID from a widget that resolves to that model:
+Reference the type from a widget that resolves to the same model:
 
 ```yaml
 name: Sales overview
@@ -359,9 +380,7 @@ rows:
         notes: [region_note]
 ```
 
-The model is resolved from the named query, widget, or dashboard-level `model`. Without a resolved model, only dashboard-level note definitions are available.
-
-Dashboard changes are saved as a draft. After adding or changing a note definition, publish the dashboard before trying to create notes with it.
+The model is resolved from the named query, widget, or dashboard-level `model`. New or changed YAML note types become available after the dashboard is published. Untyped notes do not require a dashboard publish step.
 
 ## Threads and chat history
 

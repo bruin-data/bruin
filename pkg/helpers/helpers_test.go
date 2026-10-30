@@ -85,6 +85,25 @@ func TestGetIngestrDestinationType(t *testing.T) {
 	}
 }
 
+func TestGetIngestrCheckType(t *testing.T) {
+	t.Parallel()
+
+	onelake := &pipeline.Asset{Parameters: pipeline.ParameterMap{"destination": "onelake"}}
+	_, err := GetIngestrDestinationType(onelake)
+	require.Error(t, err)
+
+	assetType, err := GetIngestrCheckType(onelake)
+	require.NoError(t, err)
+	assert.Equal(t, pipeline.AssetTypeFabricQuery, assetType)
+
+	assetType, err = GetIngestrCheckType(&pipeline.Asset{Parameters: pipeline.ParameterMap{"destination": "postgres"}})
+	require.NoError(t, err)
+	assert.Equal(t, pipeline.AssetTypePostgresQuery, assetType)
+
+	_, err = GetIngestrCheckType(&pipeline.Asset{Parameters: pipeline.ParameterMap{"destination": "sqlite"}})
+	require.Error(t, err)
+}
+
 func TestWriteJSONToFile(t *testing.T) {
 	t.Parallel()
 

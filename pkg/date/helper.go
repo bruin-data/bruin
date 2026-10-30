@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// StartOfYesterdayUTC returns midnight at the start of the previous UTC calendar day.
+func StartOfYesterdayUTC(now time.Time) time.Time {
+	yesterday := now.UTC().AddDate(0, 0, -1)
+	return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 func ParseTime(input string) (time.Time, error) {
 	t, _, err := ParseTimeWithFormat(input)
 	return t, err

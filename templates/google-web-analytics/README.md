@@ -496,7 +496,7 @@ bruin run --start-date 2026-06-01 --end-date 2026-06-30 my-search-pipeline
 ```
 
 Local runs take their window from `--start-date` and `--end-date`, which both
-default to yesterday. `start_date` in `pipeline.yml` is the anchor Bruin Cloud uses
+default to the previous UTC day. `start_date` in `pipeline.yml` is the anchor Bruin Cloud uses
 for scheduled backfills — set it to the day your exports began.
 
 ## Extend it

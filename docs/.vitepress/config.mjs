@@ -133,6 +133,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Configure Agents", link: "/cloud/ai-agents/configure"},
                             {text: "Chat with Agents", link: "/cloud/ai-agents/chat"},
                             {text: "Scheduled Agents", link: "/cloud/ai-agents/scheduled"},
+                            {text: "Query API for Your Own Agent", link: "/cloud/ai-agents/query-api"},
                             {text: "Databricks OAuth", link: "/cloud/ai-agents/databricks-oauth"},
                             {text: "Snowflake OAuth", link: "/cloud/ai-agents/snowflake-oauth"},
                             {
@@ -208,6 +209,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "SQL", link: "/assets/sql"},
                             {text: "Seed", link: "/assets/seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
+                            {text: "Inference", link: "/assets/inference"},
                             {text: "Python", link: "/assets/python", items: [
                                 {text: "Python SDK", link: "/assets/python-sdk"},
                             ]},
@@ -296,6 +298,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Amplitude", link: "/ingestion/amplitude"},
                                     {text: "Anthropic", link: "/ingestion/anthropic"},
                                     {text: "Allium", link: "/ingestion/allium"},
+                                    {text: "AllRatesToday", link: "/ingestion/allratestoday"},
                                     {text: "API-Football", link: "/ingestion/api-football"},
                                     {text: "Apple Ads", link: "/ingestion/apple-ads"},
                                     {text: "AppStore", link: "/ingestion/appstore"},

@@ -90,6 +90,8 @@ jobs:
           commit-message: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
           title: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
           body: "Automated update of ingestr to v${{ steps.check.outputs.version }}"
+          # Keep regenerated real hashes out of the commit; only the version bump.
+          add-paths: pkg/python/uv.go
           delete-branch: true
           labels: automated-update
 

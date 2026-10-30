@@ -8,6 +8,9 @@ import (
 type Config map[scheduler.TaskInstanceType]Operator
 
 var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
+	pipeline.AssetTypeInference: {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 	pipeline.AssetTypeBigqueryQuery: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
@@ -51,6 +54,12 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeMsSQLSource: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+	},
+	pipeline.AssetTypeFabricSource: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
@@ -602,6 +611,12 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeDremioQuery: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+	},
+	pipeline.AssetTypeDremioSource: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},

@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -167,18 +168,18 @@ func Query() *cli.Command {
 				// Deprecated: prefer marking the connection with `use_cloud: true` in
 				// .bruin.yml. Kept working but hidden so it is not surfaced to users or
 				// agents. Forces cloud routing regardless of the connection config:
-				// uses --connection against the agent's connections, ignores .bruin.yml,
+				// uses --connection against the connection set, ignores .bruin.yml,
 				// and does not apply --var.
 				Hidden:  true,
 				Sources: cli.EnvVars("BRUIN_CLOUD_QUERY"),
 			},
 			&cli.IntFlag{
-				Name: "cloud-agent-id",
+				Name: "cloud-connection-set-id",
 				// Hidden: supplied by the Bruin Cloud sandbox environment via
-				// BRUIN_CLOUD_AGENT_ID; not surfaced to users or agents.
+				// BRUIN_CLOUD_CONNECTION_SET_ID; not surfaced to users or agents.
 				Hidden:  true,
-				Usage:   "Bruin Cloud agent id whose connections back the query when the connection runs in the cloud",
-				Sources: cli.EnvVars("BRUIN_CLOUD_AGENT_ID"),
+				Usage:   "Bruin Cloud connection set id whose connections back the query when the connection runs in the cloud",
+				Sources: cli.EnvVars("BRUIN_CLOUD_CONNECTION_SET_ID"),
 			},
 			&cli.StringFlag{
 				Name: "cloud-api-key",
@@ -496,18 +497,18 @@ func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFla
 	}
 }
 
-// cloudQuerier runs queries against an agent's connection through the Bruin Cloud
-// API. It implements schemaQuerier so the rest of the query command (output,
+// cloudQuerier runs queries against a connection in a connection set through the
+// Bruin Cloud API. It implements schemaQuerier so the rest of the query command (output,
 // export, query-log) works unchanged.
 type cloudQuerier struct {
-	client         *bruincloud.APIClient
-	agentID        int
-	connectionName string
-	limit          int64
+	client          *bruincloud.APIClient
+	connectionSetID int
+	connectionName  string
+	limit           int64
 }
 
 func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
-	res, err := q.client.RunAgentQuery(ctx, q.agentID, q.connectionName, qq.Query)
+	res, err := q.client.RunConnectionSetQuery(ctx, q.connectionSetID, q.connectionName, qq.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -538,9 +539,10 @@ func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*
 // through the Bruin Cloud query service. It is used both when the connection is
 // marked use_cloud: true and when the hidden --cloud flag forces cloud routing.
 // The SQL is sent verbatim: cloud query mode does not accept template variables
-// (--var is ignored), so there is nothing to render or interpolate. The agent id
-// and API key come from --cloud-agent-id / --cloud-api-key (or their env vars).
-func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, string, *ppInfo, error) {
+// (--var is ignored), so there is nothing to render or interpolate. The connection
+// set id and API key come from --cloud-connection-set-id / --cloud-api-key (or
+// their env vars).
+func prepareCloudQueryExecution(c *cli.Command, cm *config.Config) (string, interface{}, string, string, *ppInfo, error) {
 	if hasSemanticQueryFlags(c) {
 		return "", nil, "", "", nil, errors.New("semantic queries are not supported in cloud query mode")
 	}
@@ -551,28 +553,48 @@ func prepareCloudQueryExecution(c *cli.Command) (string, interface{}, string, st
 		return "", nil, "", "", nil, errors.New("cloud query mode requires both --connection and --query")
 	}
 
-	apiKey := c.String("cloud-api-key")
-	if apiKey == "" {
-		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud API key (--cloud-api-key or BRUIN_CLOUD_API_KEY)")
+	apiKey, err := cloudQueryAPIKey(c, cm)
+	if err != nil {
+		return "", nil, "", "", nil, err
 	}
 
-	agentID := c.Int("cloud-agent-id")
-	if agentID <= 0 {
-		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud agent id (--cloud-agent-id or BRUIN_CLOUD_AGENT_ID)")
+	connectionSetID := c.Int("cloud-connection-set-id")
+	if connectionSetID <= 0 {
+		return "", nil, "", "", nil, errors.New("cloud query mode requires a Bruin Cloud connection set id (--cloud-connection-set-id or BRUIN_CLOUD_CONNECTION_SET_ID)")
 	}
 
 	querier := &cloudQuerier{
-		client:         bruincloud.NewAPIClient(apiKey),
-		agentID:        agentID,
-		connectionName: connectionName,
-		limit:          c.Int64("limit"),
+		client:          bruincloud.NewAPIClient(apiKey),
+		connectionSetID: connectionSetID,
+		connectionName:  connectionName,
+		limit:           c.Int64("limit"),
 	}
 	return connectionName, querier, queryStr, "", nil, nil
 }
 
+// cloudQueryAPIKey falls back to the bruin connection in .bruin.yml, like the cloud commands do.
+func cloudQueryAPIKey(c *cli.Command, cm *config.Config) (string, error) {
+	if apiKey := c.String("cloud-api-key"); apiKey != "" {
+		return apiKey, nil
+	}
+	if cm != nil {
+		ref, err := cm.ResolveCloudConnection()
+		if err != nil {
+			return "", err
+		}
+		if ref != nil {
+			if err := cloudauth.CheckDestination(ref.Connection.APIURL, cloudauth.APIURL()); err != nil {
+				return "", err
+			}
+			return ref.Connection.APIToken, nil
+		}
+	}
+	return "", errors.New("cloud query mode requires a Bruin Cloud API key (--cloud-api-key, BRUIN_CLOUD_API_KEY, or a bruin connection in .bruin.yml)")
+}
+
 func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, string, *ppInfo, error) {
 	if c.Bool("cloud") {
-		return prepareCloudQueryExecution(c)
+		return prepareCloudQueryExecution(c, nil)
 	}
 
 	assetPath := c.String("asset")
@@ -602,12 +624,12 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		// A connection marked use_cloud: true routes through the Bruin Cloud query
 		// service. Detect it before building the connection manager, since a
 		// cloud-only connection may omit local credentials.
-		useCloud, err := connectionUsesCloud(fs, env, connectionName, c.String("config-file"))
+		cm, useCloud, err := connectionUsesCloud(fs, env, connectionName, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
 		if useCloud {
-			return prepareCloudQueryExecution(c)
+			return prepareCloudQueryExecution(c, cm)
 		}
 
 		conn, connType, err := getConnectionAndTypeFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
@@ -828,16 +850,9 @@ func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, 
 }
 
 func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
-	semanticRoot := ""
-	if configFilePath != "" {
-		semanticRoot = filepath.Dir(configFilePath)
-	}
-	if semanticRoot == "" {
-		repoRoot, err := git.FindRepoFromPath(inputPath)
-		if err != nil {
-			return nil, "", err
-		}
-		semanticRoot = repoRoot.Path
+	semanticRoot, err := semanticRootDir(fs, configFilePath, inputPath)
+	if err != nil {
+		return nil, "", err
 	}
 
 	semanticPath := filepath.Join(semanticRoot, "semantic")
@@ -846,6 +861,43 @@ func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[
 		return nil, semanticPath, err
 	}
 	return models, semanticPath, nil
+}
+
+// semanticRootDir returns the directory whose semantic/ folder holds the
+// models: the config file's directory, unless the config lives outside the
+// input's git repo (e.g. one .bruin.yml shared by several cloned repos) and
+// that repo has its own semantic/ folder.
+func semanticRootDir(fs afero.Fs, configFilePath, inputPath string) (string, error) {
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if configFilePath == "" {
+		if err != nil {
+			return "", err
+		}
+		return repoRoot.Path, nil
+	}
+
+	configDir := filepath.Dir(configFilePath)
+	if err == nil && !isWithinDir(repoRoot.Path, configDir) {
+		if info, statErr := fs.Stat(filepath.Join(repoRoot.Path, "semantic")); statErr == nil && info.IsDir() {
+			return repoRoot.Path, nil
+		}
+	}
+	return configDir, nil
+}
+
+func isWithinDir(parent, path string) bool {
+	rel, err := filepath.Rel(resolvePath(parent), resolvePath(path))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func resolvePath(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
@@ -1063,18 +1115,18 @@ func loadQueryConfig(fs afero.Fs, env string, configFilePath string) (*config.Co
 // credentials and would otherwise fail credential validation. A missing config
 // or unknown connection is not an error here: the caller falls through to the
 // local path, which produces the appropriate not-found error.
-func connectionUsesCloud(fs afero.Fs, env string, connectionName string, configFilePath string) (bool, error) {
+func connectionUsesCloud(fs afero.Fs, env string, connectionName string, configFilePath string) (*config.Config, bool, error) {
 	cm, _, err := loadQueryConfig(fs, env, configFilePath)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if cm.SelectedEnvironment == nil || cm.SelectedEnvironment.Connections == nil {
-		return false, nil
+		return cm, false, nil
 	}
 	if cc, ok := cm.SelectedEnvironment.Connections.GetConnection(connectionName).(interface{ IsCloud() bool }); ok {
-		return cc.IsCloud(), nil
+		return cm, cc.IsCloud(), nil
 	}
-	return false, nil
+	return cm, false, nil
 }
 
 func getConnectionAndTypeFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, string, error) {

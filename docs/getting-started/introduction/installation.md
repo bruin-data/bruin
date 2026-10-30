@@ -43,6 +43,27 @@ wget -qO- https://getbruin.com/install/cli | sh
 > [!IMPORTANT]
 > If you are on Windows, make sure to run the command in the [Git Bash](https://git-scm.com/downloads/win) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) terminal.
 
+### Bruin home directory
+
+Set the global `BRUIN_HOME` environment variable to a writable, dedicated directory to relocate Bruin's runtime tools and state. This is useful when your user home is read-only or unavailable:
+
+```shell
+export BRUIN_HOME=/work/bruin-home
+bruin run ./my-pipeline
+```
+
+In PowerShell, use `$env:BRUIN_HOME = 'D:\bruin-home'`.
+
+- Bruin stores uv, ingestr, virtual environments, R caches, and telemetry state there instead of `~/.bruin`.
+- DuckDB and Spark ADBC drivers are installed and loaded from `$BRUIN_HOME/adbc`.
+- uv's package cache, managed Python installations, and tools use this directory too. Explicit `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, `UV_TOOL_DIR`, and `UV_TOOL_BIN_DIR` settings take precedence. Existing uv-managed caches outside `~/.bruin` are not copied.
+
+On first use, Bruin copies existing files from `~/.bruin`, preserving file permissions and symlinks without deleting the originals or replacing destination files. Existing ADBC drivers are copied from the platform's user ADBC directory when needed (typically `~/.config/adbc/drivers` on Linux); their manifests are updated to point to the new location. This is a one-time migration, not ongoing synchronization. Automatic migration covers the legacy locations, not another custom `BRUIN_HOME`.
+
+Use an absolute path for consistent behavior across projects. Relative paths resolve from the current working directory. Leave `BRUIN_HOME` unset or empty to keep the default locations. The variable does not relocate the Bruin CLI executable, project `.bruin.yml` files, project logs, Cloud login configuration, or third-party tools' own storage such as DuckDB extensions.
+
+`bruin clean` clears the selected Bruin home, so do not point it at a directory containing unrelated files.
+
 ## Bruin VSCode Extension
 
 1. **Open Visual Studio Code**: Launch VS Code on your computer.

@@ -15,7 +15,7 @@ bruin cloud login
 bruin cloud projects list
 ```
 
-Outside a Bruin project, or to sign in across projects, use `bruin cloud login --global`.
+In a Git repository, login offers to create `.bruin.yml` if it is missing. Outside a Git repository, or to sign in across projects, use `bruin cloud login --global`.
 
 For CI or an existing API token, set `BRUIN_CLOUD_API_KEY` or pass `--api-key`:
 
@@ -24,7 +24,7 @@ export BRUIN_CLOUD_API_KEY="your-api-key-here"
 bruin cloud projects list
 ```
 
-Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
+Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin cloud auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
 
 To save an existing token for a repository, add a `bruin` connection to its `.bruin.yml`:
 
@@ -46,7 +46,7 @@ bruin cloud projects list
 
 ## Global Flags
 
-These flags are available on Cloud API subcommands. `cloud login` has its own [login options](./login#options).
+These flags are available on Cloud API subcommands. `cloud login` and `cloud logout` have their own flags; see [login options](./login#options) and [Sign out](./login#sign-out).
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
@@ -65,6 +65,39 @@ bruin cloud login
 ```
 
 See the [login instructions](./login) for repository and global login options.
+
+### `logout`
+
+Choose a repository or global login to sign out of:
+
+```bash
+bruin cloud logout
+```
+
+Use a flag to skip the selection menu:
+
+```bash
+bruin cloud logout --repo
+bruin cloud logout --global
+```
+
+By default, logout only removes the local login. To also revoke the token in Bruin Cloud, run:
+
+```bash
+bruin cloud logout --revoke
+```
+
+The selection menu still opens. Bruin reports token revocation and local login removal separately. Other copies of the revoked token also stop working. If revocation fails, the local login is kept. See [Sign out](./login#sign-out) for details.
+
+### `auth status`
+
+Show the active credential source, repository connection, and default team without printing the token:
+
+```bash
+bruin cloud auth status
+```
+
+Use `--api-key` or `--team` to inspect an explicit override. This checks local credentials; Cloud validates the token and permissions when an API command runs.
 
 ### `teams`
 
@@ -156,6 +189,36 @@ bruin cloud projects list
 | analytics-prod     | ...  | active |
 +--------------------+------+--------+
 ```
+
+#### `projects create`
+
+Connect a Git repository as a new project. Your Bruin Cloud API token needs the `team:update` permission, or `project:create` for the GitHub App.
+
+**GitHub, through the Bruin GitHub App.** Without `--git-token`, Bruin Cloud connects a GitHub repository through your own GitHub App access, so connect GitHub to Bruin Cloud and install the Bruin GitHub app on the repository's owner first. This needs a personal Bruin Cloud API token, not a team token. Unset `BRUIN_CLOUD_GIT_TOKEN` if you exported it. The branch defaults to the repository's default branch.
+
+```bash
+bruin cloud projects create --name analytics --repo-url acme/analytics
+```
+
+**Any provider, with a personal access token.** The token needs read access to the repository.
+
+```bash
+export BRUIN_CLOUD_GIT_TOKEN="ghp_..."
+bruin cloud projects create --name analytics --repo-url https://github.com/acme/analytics --branch main
+```
+
+| Flag | Description |
+|------|-------------|
+| `--name` | Project name (required) |
+| `--repo-url` | Repository URL (required). Without `--git-token` it can also be an SSH URL or `owner/name` |
+| `--branch` | Branch to track. Defaults to the repository's default branch, or `main` with `--git-token` |
+| `--git-token` | Personal access token. Prefer the `BRUIN_CLOUD_GIT_TOKEN` environment variable so the token stays out of your shell history. Omit it to use the Bruin GitHub App |
+| `--provider` | `github`, `gitlab` or `bitbucket`. Inferred for github.com, gitlab.com and bitbucket.org URLs; required for self-hosted Git with `--git-token`. Without `--git-token` only `github` is accepted |
+| `--do-not-parse` | Create the project without parsing its pipelines |
+
+Through the GitHub App, the command fails if GitHub isn't connected to Bruin Cloud, the connection expired, or none of your GitHub App installations can reach the repository. The error message says which.
+
+The command prints the new project ID, which you can pass to other commands as `--project-id`.
 
 ---
 
@@ -718,6 +781,39 @@ bruin cloud agents status \
   --message-id <message-id>
 ```
 
+#### `steer`
+
+Send a follow-up into a message the agent is still working on, so it changes course without waiting for the reply:
+
+```bash
+bruin cloud agents steer \
+  --agent-id <agent-id> \
+  --thread-id <thread-id> \
+  --message "Only look at EU customers"
+```
+
+- `--message-id` picks the message to steer; without it, the command steers the thread's running message.
+- `--agent-id` and `--thread-id` default to `BRUIN_CLOUD_AGENT_ID` and `BRUIN_THREAD_ID`, which are set inside Bruin Cloud agent runs.
+- `--steer-id` takes a UUID to make retries safe: repeating it returns the saved steer instead of steering twice.
+
+The API token needs the `agent:message:send` permission, plus `agent:message:status` when `--message-id` is omitted. If the message isn't running or its agent can't be steered, the command fails and suggests sending a normal message with `bruin cloud agents send` instead.
+
+#### `stop`
+
+Stop a pending or processing agent message:
+
+```bash
+bruin cloud agents stop \
+  --agent-id <agent-id> \
+  --thread-id <thread-id>
+```
+
+- `--message-id` picks a specific message; without it, the command finds the thread's latest pending or processing message, including across paginated history. It fails if there is no message to stop.
+- `--agent-id` and `--thread-id` default to `BRUIN_CLOUD_AGENT_ID` and `BRUIN_THREAD_ID`, which are set inside Bruin Cloud agent runs.
+- `--output json` returns `agent_id`, `thread_id`, `message_id`, and the status returned by the API.
+
+The API token needs the `agent:message:send` permission, plus `agent:message:status` when `--message-id` is omitted. Active messages become `silenced`; stopping a message that has already settled returns its existing status unchanged. The stop request is asynchronous, so acceptance does not confirm that the underlying turn has finished shutting down.
+
 #### `threads`
 
 List an agent's threads (active by default; pass `--archived` for archived ones):
@@ -922,6 +1018,53 @@ bruin cloud dashboards get --dashboard-id 42 --state published
 bruin cloud dashboards get --dashboard-id 42 --output json
 ```
 
+#### `notes list`
+
+List notes for a dashboard. Both note commands require `--dashboard-id` and support the standard `--team`, `--api-key`, and `--output` flags.
+
+```bash
+bruin cloud dashboards notes list --dashboard-id 123
+bruin cloud dashboards notes list --dashboard-id 123 --output json
+```
+
+Plain output shows each note's model, saved dimension values in the Scope column, content, author, and creation time. It then lists the names accepted by `notes create`: each model used by the dashboard or its widgets with its dimensions (the dashboard's model is marked `(default)`), and, when the dashboard has no model of its own, the filters notes accept without `--model`.
+
+JSON output includes `notes`, `definitions`, `dashboard_model`, `model_contexts`, and `filters`, preserving all note details such as authors, timestamps, and edit/delete permissions. `model_contexts` maps each model name to its dimensions; `filters` lists the dashboard filters.
+
+#### `notes create`
+
+Create a note with required `--content`. Creation requires a **user-scoped token** with the `dashboard:update` ability; team-owned tokens cannot create notes. With `--model`, the CLI first checks the model name against the dashboard; tokens without `dashboard:list` skip this check and rely on server-side validation. Notes cannot be created on dashboards defined in code (DAC).
+
+```bash
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --content "Revenue excludes refunds."
+
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --content "US campaign launched." \
+  --dimensions '{"country":"US"}'
+
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --content "North American revenue increased after the campaign." \
+  --model orders \
+  --dimensions '{"country":["US","CA"],"created_at":["2026-10-20"]}' \
+  --output json
+
+bruin cloud dashboards notes create \
+  --dashboard-id 123 \
+  --model payments \
+  --content "Card payment context." \
+  --dimensions '{"method":"card"}'
+```
+
+`--model` and `--dimensions` are optional. Notes use the dashboard's model by default. Use `--model` to choose another model used by the dashboard or one of its widgets.
+
+Use `--dimensions` to attach context as a JSON object. Values are non-empty strings or numbers, or lists of them for model dimensions and multi-select filters. Booleans are accepted only for boolean dashboard filters, and date filters take `YYYY-MM-DD`. Dimension names must belong to the note's model: the `--model` value, or the dashboard's model when `--model` is omitted. On a dashboard without a model, use its filter names instead. Run `notes list` to see the available models, dimensions, and filters. With `--model`, an unknown model name produces an error listing the available models; Cloud rejects unknown dimension names.
+
+Notes associated with a model are shared across dashboards using that model within the same team.
+
 #### `versions`
 
 List a dashboard's version history — each snapshot's id, kind (draft/published),
@@ -1078,6 +1221,19 @@ bruin cloud dashboards update --dashboard-id 42 --folder "Finance"
 bruin cloud dashboards update --dashboard-id 42 --folder none
 ```
 
+#### `apply-filters`
+
+Update your dashboard filters and refresh charts automatically.
+
+```bash
+bruin cloud dashboards apply-filters --dashboard-id 42 \
+  --parameters '{"period":{"start":"2026-10-19","end":"2026-10-23"},"regions":["Europe"]}'
+```
+
+`--parameters` takes a JSON object mapping the filter names to change to their values: strings for date/text/single-select, numbers or booleans, string arrays for multi-select (`[]` means all), and `{"start":"YYYY-MM-DD","end":"YYYY-MM-DD"}` for date ranges. Names the dashboard doesn't declare are skipped and listed as a warning (`ignored` in JSON output). If none are recognized, the command fails.
+
+Updates are scoped to your user and dashboard and work in View and Edit mode. Supports the standard `--team`, `--api-key`, and `--output json` flags. Use a user-scoped token.
+
 #### `publish`
 
 Publish a dashboard's pending draft so it goes live — the same as clicking Publish in the Bruin Cloud UI. `create` and `update` only ever write the draft, so this is how a dashboard built or edited from the CLI becomes visible to the team. Requires edit rights on the dashboard; errors if there is no draft to publish, and repo (DAC) dashboards are published from the repo.
@@ -1092,6 +1248,55 @@ Delete a dashboard so it stops appearing. Requires manage-access (the dashboard 
 
 ```bash
 bruin cloud dashboards delete --dashboard-id 42
+```
+
+---
+
+### `semantic-layers`
+
+Manage the semantic layers in your Bruin Cloud team.
+
+#### `list`
+
+List the team's semantic layers (id, name, last updated):
+
+```bash
+bruin cloud semantic-layers list
+bruin cloud semantic-layers list --output json
+```
+
+#### `get`
+
+Get a single semantic layer including its definition:
+
+```bash
+bruin cloud semantic-layers get --semantic-layer-id 3
+bruin cloud semantic-layers get --semantic-layer-id 3 --output json
+```
+
+#### `create`
+
+Create a semantic layer from a name and a model definition (YAML or JSON). Names are unique within the team.
+
+```bash
+bruin cloud semantic-layers create --name sales --state-file model.yaml
+```
+
+#### `update`
+
+Update a semantic layer's name and/or definition. Only the flags you pass change; `--state`/`--state-file` replaces the whole definition.
+
+```bash
+bruin cloud semantic-layers update --semantic-layer-id 3 --name sales_v2
+bruin cloud semantic-layers update --semantic-layer-id 3 --state-file model.yaml
+```
+
+#### `delete`
+
+Delete a semantic layer:
+
+```bash
+bruin cloud semantic-layers delete --semantic-layer-id 3
 ```
 
 ---
@@ -1130,12 +1335,27 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --cron "0 8 * * 1"
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.yaml
 ```
 
+`--same-thread` (`same_thread` in the plan) makes every run continue one thread, so the agent sees its earlier runs. A new thread starts after 30 runs, after a failed run, or when the agent or owner changes; runs started by someone other than the owner get their own thread.
+
+```bash
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --same-thread
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --same-thread=false
+```
+
 #### `trigger`
 
 Run a scheduled agent now, off its schedule — the "Run now" action. The schedule is untouched (the next scheduled run still fires as planned). Refused while a run is already in progress. Prints the execution and thread ids.
 
 ```bash
 bruin cloud scheduled-agents trigger --scheduled-agent-id 42
+```
+
+#### `reset-thread`
+
+Make a same-thread scheduled agent's next run start a new thread. The previous thread is kept.
+
+```bash
+bruin cloud scheduled-agents reset-thread --scheduled-agent-id 42
 ```
 
 #### `delete`

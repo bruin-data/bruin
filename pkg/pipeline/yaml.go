@@ -49,11 +49,17 @@ type UpstreamMode int
 const (
 	UpstreamModeFull UpstreamMode = iota
 	UpstreamModeSymbolic
+	// UpstreamModeLast, UpstreamModeFirst and UpstreamModeAny only change how a
+	// cross-pipeline dependency is evaluated by the orchestrator; locally they
+	// behave like UpstreamModeFull.
+	UpstreamModeLast
+	UpstreamModeFirst
+	UpstreamModeAny
 )
 
 func (m *UpstreamMode) IsValid() bool {
 	switch *m {
-	case UpstreamModeFull, UpstreamModeSymbolic:
+	case UpstreamModeFull, UpstreamModeSymbolic, UpstreamModeLast, UpstreamModeFirst, UpstreamModeAny:
 		return true
 	default:
 		return false
@@ -66,6 +72,12 @@ func (m *UpstreamMode) String() string {
 		return "full"
 	case UpstreamModeSymbolic:
 		return "symbolic"
+	case UpstreamModeLast:
+		return "last"
+	case UpstreamModeFirst:
+		return "first"
+	case UpstreamModeAny:
+		return "any"
 	default:
 		return "full" // default to full mode for safety
 	}
@@ -90,6 +102,12 @@ func MarshalUpstreamMode(s string) UpstreamMode {
 		return UpstreamModeFull
 	case "symbolic":
 		return UpstreamModeSymbolic
+	case "last":
+		return UpstreamModeLast
+	case "first":
+		return UpstreamModeFirst
+	case "any":
+		return UpstreamModeAny
 	default:
 		return UpstreamModeFull // default to full mode for safety
 	}
@@ -145,7 +163,9 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	mode, foundMode := us["mode"]
 	upstreamMode := UpstreamModeFull
 	if foundMode {
-		upstreamMode = MarshalUpstreamMode(mode.(string))
+		if modeString, ok := mode.(string); ok {
+			upstreamMode = MarshalUpstreamMode(modeString)
+		}
 	}
 
 	if foundColumns {
@@ -287,6 +307,7 @@ type columnForeignKey struct {
 }
 
 type column struct {
+	Inference     *ColumnInference  `yaml:"inference"`
 	Extends       string            `yaml:"extends"`
 	Name          string            `yaml:"name"`
 	SourceColumn  string            `yaml:"source_column"`
@@ -585,6 +606,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		}
 
 		columns[index] = Column{
+			Inference:       column.Inference,
 			Name:            column.Name,
 			SourceColumn:    column.SourceColumn,
 			Type:            strings.TrimSpace(column.Type),

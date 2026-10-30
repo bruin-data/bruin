@@ -193,8 +193,26 @@ type AgentMessage struct {
 	AgentLogs         json.RawMessage `json:"agent_logs"`
 	QueryLogs         json.RawMessage `json:"query_logs"`
 	OutputAttachments json.RawMessage `json:"output_attachments"`
-	CreatedAt         string          `json:"created_at"`
-	UpdatedAt         string          `json:"updated_at"`
+	// Steerable is true while the turn is running on an agent that accepts steers.
+	Steerable bool         `json:"steerable"`
+	Steers    []AgentSteer `json:"steers,omitempty"`
+	CreatedAt string       `json:"created_at"`
+	UpdatedAt string       `json:"updated_at"`
+}
+
+// AgentSteer is a follow-up sent into a running message.
+type AgentSteer struct {
+	ID        string  `json:"id"`
+	Message   string  `json:"message"`
+	Status    string  `json:"status"`
+	Reason    *string `json:"reason"`
+	CreatedAt string  `json:"created_at"`
+}
+
+type StopAgentMessageResponse struct {
+	ThreadID      int    `json:"thread_id"`
+	MessagePairID int    `json:"message_pair_id"`
+	Status        string `json:"status"`
 }
 
 // PipelineValidationError represents a pipeline validation error.
@@ -350,6 +368,29 @@ type Dashboard struct {
 	IsPublished *bool           `json:"is_published,omitempty"`
 }
 
+type DashboardNote struct {
+	ID            int             `json:"id"`
+	DashboardID   *int            `json:"dashboard_id"`
+	SemanticModel *string         `json:"semantic_model"`
+	Dimensions    json.RawMessage `json:"dimensions"`
+	Content       string          `json:"content"`
+	Author        *string         `json:"author"`
+	CreatedBy     *int            `json:"created_by"`
+	CreatedAt     string          `json:"created_at"`
+}
+
+// DashboardNoteModelContext lists the dimensions a note can reference for one semantic model.
+type DashboardNoteModelContext struct {
+	Name       string                   `json:"name"`
+	Dimensions []DashboardNoteDimension `json:"dimensions"`
+}
+
+// DashboardNoteDimension is a model dimension or dashboard filter usable in note dimensions.
+type DashboardNoteDimension struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 // DashboardFolder groups dashboards within a team. Folders can nest: ParentID is
 // the enclosing folder (nil at the top level) and Path is the full "A / B" path.
 type DashboardFolder struct {
@@ -358,6 +399,15 @@ type DashboardFolder struct {
 	ParentID       *int   `json:"parent_id,omitempty"`
 	Path           string `json:"path,omitempty"`
 	DashboardCount int    `json:"dashboard_count"`
+}
+
+// SemanticLayer is a team semantic model. State (the semantic.Model definition)
+// is only present on a single get.
+type SemanticLayer struct {
+	ID        int             `json:"id"`
+	Name      string          `json:"name"`
+	UpdatedAt *string         `json:"updated_at"`
+	State     json.RawMessage `json:"state,omitempty"`
 }
 
 // DashboardVersion is one version-history snapshot's metadata (no state blob).
@@ -404,6 +454,8 @@ type ScheduledAgent struct {
 	OutputFormatting  *string                        `json:"output_formatting"`
 	VerifiedSqls      json.RawMessage                `json:"verified_sqls,omitempty"`
 	Memory            json.RawMessage                `json:"memory,omitempty"`
+	SameThread        *bool                          `json:"same_thread"`
+	ExecutionThreadID *int                           `json:"execution_thread_id"`
 	MonitorsDashboard json.RawMessage                `json:"monitors_dashboard,omitempty"`
 	RecentExecutions  json.RawMessage                `json:"recent_executions,omitempty"`
 	// Not omitempty: [] means no channels, null means an older server.

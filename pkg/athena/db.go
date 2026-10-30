@@ -2,6 +2,7 @@ package athena
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -33,6 +34,11 @@ func (db *DB) GetResultsLocation() string {
 }
 
 func (db *DB) GetIngestrURI() (string, error) {
+	if db.config.Endpoint != "" {
+		if _, err := db.config.validateEndpoint(); err != nil {
+			return "", err
+		}
+	}
 	return db.config.GetIngestrURI(), nil
 }
 
@@ -164,6 +170,15 @@ func (db *DB) initializeDB(ctx context.Context) error {
 	defer db.mutex.Unlock()
 
 	if db.conn != nil {
+		return nil
+	}
+
+	if db.config.Endpoint != "" {
+		connector, err := newEndpointConnector(db.config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create Athena client for custom endpoint")
+		}
+		db.conn = sqlx.NewDb(sql.OpenDB(connector), drv.DriverName)
 		return nil
 	}
 

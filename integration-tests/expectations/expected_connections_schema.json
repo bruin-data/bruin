@@ -71,6 +71,25 @@
         "api_key"
       ]
     },
+    "APIKeyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AbraFlexiConnection": {
       "properties": {
         "name": {
@@ -439,6 +458,9 @@
           "type": "string"
         },
         "profile": {
+          "type": "string"
+        },
+        "endpoint_url": {
           "type": "string"
         }
       },
@@ -1135,6 +1157,36 @@
         "anthropic": {
           "items": {
             "$ref": "#/$defs/AnthropicConnection"
+          },
+          "type": "array"
+        },
+        "openai": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "opencode": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "openrouter": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "google": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
+          },
+          "type": "array"
+        },
+        "typesafe": {
+          "items": {
+            "$ref": "#/$defs/APIKeyConnection"
           },
           "type": "array"
         },
@@ -3570,6 +3622,9 @@
         },
         "api_token": {
           "type": "string"
+        },
+        "cloud_id": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -5322,6 +5377,12 @@
         "account": {
           "type": "string"
         },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
         "username": {
           "type": "string"
         },
@@ -5541,6 +5602,9 @@
         },
         "http_port": {
           "type": "integer"
+        },
+        "http_scheme": {
+          "type": "string"
         },
         "replication_num": {
           "type": "integer"

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 const defaultPort = 9030
@@ -17,7 +18,8 @@ type Config struct {
 	Database       string // Optional - default database for unqualified table names
 	Catalog        string // Optional - external lakehouse catalog (Iceberg/Hudi/Hive/...)
 	SSL            string // Optional - "true" or "skip-verify" to enable TLS
-	HTTPPort       int    // Optional - FE HTTP port for Stream Load when used as a destination
+	HTTPPort       int    // Optional - FE HTTP or HTTPS port for Stream Load when used as a destination
+	HTTPScheme     string // Optional - "http" (default) or "https" for Stream Load
 	ReplicationNum int    // Optional - replica count for tables created as a destination
 }
 
@@ -58,6 +60,9 @@ func (c Config) GetIngestrURI() string {
 	// Destination-only params; the source ignores them.
 	if c.HTTPPort != 0 {
 		query.Set("http_port", strconv.Itoa(c.HTTPPort))
+	}
+	if scheme := strings.ToLower(strings.TrimSpace(c.HTTPScheme)); scheme != "" {
+		query.Set("http_scheme", scheme)
 	}
 	if c.ReplicationNum != 0 {
 		query.Set("replication_num", strconv.Itoa(c.ReplicationNum))

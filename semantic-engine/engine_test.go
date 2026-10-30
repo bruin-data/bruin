@@ -543,6 +543,29 @@ func TestLoadFile_RejectsInvalidNoteDimensionConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadFile_PreservesDateRangeNoteDimension(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "orders.yml")
+	body := "name: orders\nsource:\n  table: orders\ndimensions:\n  - {name: created_at, type: time}\nnotes:\n  - id: period\n    dimensions:\n      - {name: created_at, type: date-range, required: true}\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	model, err := LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if model.Dimensions[0].Type != "time" {
+		t.Fatal("a date-range note must not change the semantic dimension type")
+	}
+	encoded, err := json.Marshal(model.Notes[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"id":"period","dimensions":[{"name":"created_at","type":"date-range","required":true}]}`; string(encoded) != want {
+		t.Fatalf("unexpected note JSON: %s", encoded)
+	}
+}
+
 func TestLoadFile_RejectsDuplicateNoteIdentifiers(t *testing.T) {
 	t.Parallel()
 
@@ -1224,6 +1247,15 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 			want: `note "rollout": dimension "active": multiselect is not supported for type boolean`,
 		},
 		{
+			name: "note date-range dimension with multiselect",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Notes:  []Note{{ID: "rollout", Dimensions: []NoteDimension{{Name: "region", Type: "date-range", Multiselect: true}}}},
+			},
+			want: `note "rollout": dimension "region": multiselect is not supported for type date-range`,
+		},
+		{
 			name: "duplicate name across dim and metric",
 			model: Model{
 				Name:   "m",
@@ -1658,7 +1690,7 @@ func TestEngine_ValidateNote(t *testing.T) {
 		Name:       "customers",
 		Source:     Source{Table: "customers"},
 		PrimaryKey: "customer_id",
-		Dimensions: []Dimension{{Name: "country", Type: "string"}, {Name: "region", Type: "string"}},
+		Dimensions: []Dimension{{Name: "country", Type: "string"}, {Name: "region", Type: "string"}, {Name: "created_at", Type: "time"}},
 	}
 	stores := &Model{
 		Name:       "stores",
@@ -1668,13 +1700,22 @@ func TestEngine_ValidateNote(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		joins []Join
-		note  string
-		extra string
-		want  string
+		name     string
+		joins    []Join
+		note     string
+		extra    string
+		want     string
+		noteType string
 	}{
 		{name: "local dimension", note: "status"},
+		{name: "date range on local time", note: "created_at", noteType: "date-range"},
+		{
+			name: "date range on joined time", note: "customers.created_at", noteType: "date-range",
+			joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		},
+		{name: "date range rejects string", note: "status", noteType: "date-range", want: `note "context": dimension "status": date-range requires a time dimension`},
+		{name: "date range rejects number", note: "amount", noteType: "date-range", want: `note "context": dimension "amount": date-range requires a time dimension`},
+		{name: "date range rejects boolean", note: "active", noteType: "date-range", want: `note "context": dimension "active": date-range requires a time dimension`},
 		{
 			name:  "qualified joined dimension",
 			joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
@@ -1713,12 +1754,16 @@ func TestEngine_ValidateNote(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
+			noteType := test.noteType
+			if noteType == "" {
+				noteType = "select"
+			}
 			orders := &Model{
 				Name:       "orders",
 				Source:     Source{Table: "orders"},
 				Joins:      test.joins,
-				Dimensions: []Dimension{{Name: "status", Type: "string"}},
-				Notes:      []Note{{ID: "context", Dimensions: []NoteDimension{{Name: test.note, Type: "select"}}}},
+				Dimensions: []Dimension{{Name: "status", Type: "string"}, {Name: "created_at", Type: "time"}, {Name: "amount", Type: "number"}, {Name: "active", Type: "boolean"}},
+				Notes:      []Note{{ID: "context", Dimensions: []NoteDimension{{Name: test.note, Type: noteType}}}},
 			}
 			if test.extra != "" {
 				orders.Notes[0].Dimensions = append(orders.Notes[0].Dimensions, NoteDimension{Name: test.extra, Type: "select"})

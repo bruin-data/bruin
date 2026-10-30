@@ -90,6 +90,68 @@ func TestLoginExistingConnectionDoesNotAuthorize(t *testing.T) { //nolint:parall
 	assert.NotContains(t, output.String(), "original-token")
 }
 
+//nolint:paralleltest
+func TestLoginInWorktree(t *testing.T) {
+	for _, symlink := range []bool{false, true} {
+		name := "directory"
+		if symlink {
+			name = "symlink"
+		}
+		t.Run(name, func(t *testing.T) {
+			repo := loginTestRepo(t, "")
+			require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "Initial commit").Run())
+			worktree := filepath.Join(t.TempDir(), "worktree")
+			require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", repo, "worktree", "add", "--detach", worktree).Run())
+			for _, pipeline := range []string{"first/pipeline.yml", "second/pipeline.yaml"} {
+				path := filepath.Join(worktree, pipeline)
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+				require.NoError(t, os.WriteFile(path, []byte("name: test\n"), 0o600))
+			}
+			root := worktree
+			if symlink {
+				root = filepath.Join(t.TempDir(), "workspace")
+				require.NoError(t, os.Symlink(worktree, root))
+			}
+			for _, dir := range []string{root, filepath.Join(root, "first"), filepath.Join(root, "second")} {
+				t.Chdir(dir)
+				path, err := repoLoginConfigPath()
+				require.NoError(t, err)
+				require.Equal(t, filepath.Join(root, ".bruin.yml"), path)
+			}
+			t.Chdir(root)
+			var output bytes.Buffer
+			deps := loginDependencies{
+				interactive: func() bool { return true },
+				globalStore: func() (cloudauth.Store, error) {
+					t.Fatal("must offer repository login for a worktree")
+					return cloudauth.Store{}, nil
+				},
+				authorize: func(_ context.Context, target string, _ bool, _ io.Writer) (*cloudauth.Credential, error) {
+					assert.Equal(t, "repo", target)
+					return &cloudauth.Credential{Token: "worktree-token", APIURL: cloudauth.DefaultAPIURL}, nil
+				},
+			}
+			command := loginCommand(deps)
+			command.Reader = strings.NewReader("\r")
+			command.Writer = &output
+			require.NoError(t, command.Run(t.Context(), []string{"login"}))
+			assert.NotContains(t, output.String(), "No Bruin project found")
+			assert.FileExists(t, filepath.Join(worktree, ".bruin.yml"))
+			assert.NoFileExists(t, filepath.Join(repo, ".bruin.yml"))
+			for _, dir := range []string{root, filepath.Join(root, "first"), filepath.Join(root, "second")} {
+				t.Chdir(dir)
+				auth, err := resolveCloudAuthWithStore(&cli.Command{}, func() (*cloudauth.Credential, error) {
+					t.Fatal("must prefer the worktree login over the global login")
+					return nil, nil
+				})
+				require.NoError(t, err)
+				assert.Equal(t, "repo", auth.source)
+				assert.Equal(t, "worktree-token", auth.token)
+			}
+		})
+	}
+}
+
 func TestLoginCreatesConnection(t *testing.T) { //nolint:paralleltest
 	dir := loginTestRepo(t, "")
 	var output bytes.Buffer
@@ -99,8 +161,6 @@ func TestLoginCreatesConnection(t *testing.T) { //nolint:paralleltest
 		assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
 		return &cloudauth.Credential{Token: "new-token", TokenID: "123", APIURL: cloudauth.DefaultAPIURL, DefaultTeam: "acme"}, nil
 	}}
-	require.ErrorContains(t, loginCommand(deps).Run(t.Context(), []string{"login", "--repo"}), "--repo requires a Bruin project")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: test\n"), 0o600))
 	command := loginCommand(deps)
 	command.Writer = &output
 	require.NoError(t, command.Run(t.Context(), []string{"login", "--repo", "--no-browser"}))
@@ -113,7 +173,7 @@ func TestLoginCreatesConnection(t *testing.T) { //nolint:paralleltest
 }
 
 //nolint:paralleltest
-func TestLoginProjectDetection(t *testing.T) {
+func TestLoginRepositoryDetection(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		config   string
@@ -124,8 +184,8 @@ func TestLoginProjectDetection(t *testing.T) {
 		{name: "config only", config: loginExistingConfig, found: true},
 		{name: "root pipeline yml", pipeline: "pipeline.yml", found: true},
 		{name: "nested pipeline yaml", pipeline: "pipelines/example/pipeline.yaml", found: true},
-		{name: "plain git repository"},
-		{name: "ignored dependency pipeline", pipeline: "node_modules/example/pipeline.yml"},
+		{name: "plain git repository", found: true},
+		{name: "ignored dependency pipeline", pipeline: "node_modules/example/pipeline.yml", found: true},
 		{name: "outside git repository", noGit: true, pipeline: "pipeline.yml"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -217,45 +277,160 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	require.ErrorIs(t, err, globalErr)
 }
 
-func TestLogoutRemovesRepositoryConnection(t *testing.T) { //nolint:paralleltest
-	dir := loginTestRepo(t, loginExistingConfig)
-	var output bytes.Buffer
-	command := Logout()
-	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"logout", "--repo"}))
-	cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
-	require.NoError(t, err)
-	assert.Empty(t, cm.CloudConnections())
-	assert.NotContains(t, output.String(), "original-token")
+//nolint:paralleltest
+func TestAuthStatusDoesNotPrintToken(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		source string
+	}{
+		{name: "repository", source: "repo"},
+		{name: "explicit token", args: []string{"--api-key", "flag-token"}, source: "flag or environment"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			loginTestRepo(t, loginExistingConfig)
+			var output bytes.Buffer
+			isDebug := false
+			command := &cli.Command{Name: "bruin", Writer: &output, Commands: []*cli.Command{Cloud(&isDebug)}}
+			args := append([]string{"bruin", "cloud", "auth", "status", "--team", "selected-team"}, tc.args...)
+			require.NoError(t, command.Run(t.Context(), args))
+			assert.Contains(t, output.String(), "Credential source: "+tc.source)
+			assert.Contains(t, output.String(), "Default team: selected-team")
+			if tc.source == "repo" {
+				assert.Contains(t, output.String(), "Connection: default/cloud")
+			}
+			assert.NotContains(t, output.String(), "original-token")
+			assert.NotContains(t, output.String(), "flag-token")
+		})
+	}
 }
 
-func TestAuthStatusDoesNotPrintToken(t *testing.T) { //nolint:paralleltest
-	loginTestRepo(t, loginExistingConfig)
-	var output bytes.Buffer
-	command := Auth()
-	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"auth", "status"}))
-	assert.Contains(t, output.String(), "repo")
-	assert.Contains(t, output.String(), "default/cloud")
-	assert.NotContains(t, output.String(), "original-token")
+//nolint:paralleltest
+func TestLoginDestinationWithoutProjectConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		input     string
+		target    string
+		denied    bool
+		wantError string
+	}{
+		{name: "create repository config", input: "\r", target: "repo"},
+		{name: "choose global", input: "\x1b[B\r", target: "global"},
+		{name: "cancel", input: "\x03", wantError: "login cancelled"},
+		{name: "denied", input: "\r", target: "repo", denied: true, wantError: "denied"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := loginTestRepo(t, "")
+			nested := filepath.Join(dir, "nested")
+			require.NoError(t, os.Mkdir(nested, 0o700))
+			t.Chdir(nested)
+			secrets := keyring.NewArrayKeyring(nil)
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			authorizations := 0
+			deps := loginDependencies{
+				interactive: func() bool { return true },
+				globalStore: func() (cloudauth.Store, error) {
+					require.Equal(t, "global", tc.target)
+					return store, nil
+				},
+				authorize: func(_ context.Context, target string, _ bool, _ io.Writer) (*cloudauth.Credential, error) {
+					authorizations++
+					assert.Equal(t, tc.target, target)
+					assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
+					if tc.denied {
+						return nil, errors.New("denied")
+					}
+					return &cloudauth.Credential{Token: "selected-login-token", TokenID: "1", APIURL: cloudauth.DefaultAPIURL}, nil
+				},
+			}
+			var output bytes.Buffer
+			command := loginCommand(deps)
+			command.Reader = strings.NewReader(tc.input)
+			command.Writer = &output
+			err := command.Run(t.Context(), []string{"login"})
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+			if tc.target == "" {
+				assert.Zero(t, authorizations)
+			} else {
+				assert.Equal(t, 1, authorizations)
+			}
+			assert.NotContains(t, output.String(), "using global login")
+			assert.NotContains(t, output.String(), "selected-login-token")
+			assert.NoFileExists(t, filepath.Join(nested, ".bruin.yml"))
+			if tc.target == "repo" && !tc.denied {
+				assert.Contains(t, output.String(), "This repository (create .bruin.yml)")
+				cm, err := config.LoadFromFileOrEnv(afero.NewOsFs(), filepath.Join(dir, ".bruin.yml"))
+				require.NoError(t, err)
+				require.Len(t, cm.CloudConnections(), 1)
+				assert.Equal(t, "selected-login-token", cm.CloudConnections()[0].Connection.APIToken)
+				require.NoError(t, exec.CommandContext(t.Context(), "git", "-C", dir, "check-ignore", "-q", ".bruin.yml").Run())
+			} else {
+				assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
+				assert.NoFileExists(t, filepath.Join(dir, ".gitignore"))
+			}
+			if tc.target == "global" {
+				credential, err := store.Read(cloudauth.DefaultAPIURL)
+				require.NoError(t, err)
+				assert.Equal(t, "selected-login-token", credential.Token)
+			} else {
+				assert.NoFileExists(t, store.Path)
+			}
+		})
+	}
 }
 
-func TestGlobalLoginOutsideBruinProject(t *testing.T) { //nolint:paralleltest
-	dir := loginTestRepo(t, "")
-	secrets := keyring.NewArrayKeyring(nil)
-	store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
-	deps := loginDependencies{interactive: func() bool { return true }, globalStore: func() (cloudauth.Store, error) { return store, nil }, authorize: func(_ context.Context, target string, _ bool, _ io.Writer) (*cloudauth.Credential, error) {
-		assert.Equal(t, "global", target)
-		return &cloudauth.Credential{Token: "global-private-token", TokenID: "1", APIURL: cloudauth.DefaultAPIURL}, nil
-	}}
-	var output bytes.Buffer
-	command := loginCommand(deps)
-	command.Reader = strings.NewReader("")
-	command.Writer = &output
-	require.NoError(t, command.Run(t.Context(), []string{"login"}))
-	assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
-	assert.NotContains(t, output.String(), "global-private-token")
-	credential, err := store.Read(cloudauth.DefaultAPIURL)
-	require.NoError(t, err)
-	assert.Equal(t, "global-private-token", credential.Token)
+//nolint:paralleltest
+func TestLoginOutsideRepository(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		wantError string
+	}{
+		{name: "automatic", wantError: "no Git repository found"},
+		{name: "repository", args: []string{"--repo"}, wantError: "--repo requires a Git repository"},
+		{name: "explicit global", args: []string{"--global"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := loginTestRepo(t, "")
+			require.NoError(t, os.RemoveAll(filepath.Join(dir, ".git")))
+			secrets := keyring.NewArrayKeyring(nil)
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			authorizations := 0
+			deps := loginDependencies{
+				interactive: func() bool { return true },
+				globalStore: func() (cloudauth.Store, error) {
+					require.Empty(t, tc.wantError)
+					return store, nil
+				},
+				authorize: func(_ context.Context, target string, _ bool, _ io.Writer) (*cloudauth.Credential, error) {
+					authorizations++
+					assert.Equal(t, "global", target)
+					return &cloudauth.Credential{Token: "global-private-token", TokenID: "1", APIURL: cloudauth.DefaultAPIURL}, nil
+				},
+			}
+			var output bytes.Buffer
+			command := loginCommand(deps)
+			command.Writer = &output
+			err := command.Run(t.Context(), append([]string{"login"}, tc.args...))
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				assert.Contains(t, err.Error(), "--global")
+				assert.Zero(t, authorizations)
+				assert.NoFileExists(t, store.Path)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, 1, authorizations)
+				credential, err := store.Read(cloudauth.DefaultAPIURL)
+				require.NoError(t, err)
+				assert.Equal(t, "global-private-token", credential.Token)
+			}
+			assert.NoFileExists(t, filepath.Join(dir, ".bruin.yml"))
+			assert.NotContains(t, output.String(), "using global login")
+			assert.NotContains(t, output.String(), "global-private-token")
+		})
+	}
 }

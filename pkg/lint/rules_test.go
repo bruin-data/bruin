@@ -2452,7 +2452,7 @@ func TestValidateSensorTimeout(t *testing.T) {
 func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table, destination"
+	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table"
 	tests := []struct {
 		name           string
 		asset          *pipeline.Asset
@@ -2510,6 +2510,58 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				},
 			},
 			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset without destination or connection",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+				},
+			},
+			wantErrMessage: "Ingestr assets require either a `destination` parameter or a connection to write to, set via `connection` or the `destination_connection` parameter",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "connection whose destination was inferred",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+					"destination":       "bigquery",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "connection whose destination could not be inferred",
+			asset: &pipeline.Asset{
+				Type:       pipeline.AssetTypeIngestr,
+				Connection: "bigquery-prod",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "source_connection",
+					"source_table":      "source_table",
+				},
+			},
+			wantErrMessage: "Could not determine the destination platform from connection 'bigquery-prod': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "destination_connection whose destination could not be inferred",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: pipeline.ParameterMap{
+					"source_connection":      "source_connection",
+					"source_table":           "source_table",
+					"destination_connection": "pg-prod",
+				},
+			},
+			wantErrMessage: "Could not determine the destination platform from connection 'pg-prod': it is not defined in the selected environment or its type is not a supported ingestr destination. Set the `destination` parameter",
 			wantErr:        assert.NoError,
 		},
 		{
@@ -3131,6 +3183,204 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			} else {
 				assert.Equal(t, []*Issue{}, got)
 			}
+		})
+	}
+}
+
+func TestEnsureIngestrAssetCDCDeleteBehavior(t *testing.T) {
+	t.Parallel()
+
+	const invalidBehavior = "Invalid 'cdc_delete_behavior' value: must be 'soft' or 'hard'"
+	const requiresCDC = "'cdc_delete_behavior' requires 'cdc: true'"
+	tests := []struct {
+		name       string
+		parameters pipeline.ParameterMap
+		wantIssue  string
+	}{
+		{
+			name:       "unset behavior in batch CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true"},
+		},
+		{
+			name:       "unset behavior in streaming CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true"},
+		},
+		{
+			name:       "soft deletes in batch CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": "soft"},
+		},
+		{
+			name:       "hard deletes in batch CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "stream": "false", "cdc_delete_behavior": "hard"},
+		},
+		{
+			name:       "soft deletes in streaming CDC",
+			parameters: pipeline.ParameterMap{"cdc": "true", "stream": "true", "cdc_delete_behavior": "soft"},
+		},
+		{
+			name:       "hard deletes in streaming CDC with YAML booleans",
+			parameters: pipeline.ParameterMap{"cdc": true, "stream": true, "cdc_delete_behavior": "hard"},
+		},
+		{
+			name:       "invalid behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": "ignore"},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "empty behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": ""},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "boolean behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": true},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "numeric behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": 1},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "null behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": nil},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "list behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": []string{"soft"}},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "map behavior",
+			parameters: pipeline.ParameterMap{"cdc": "true", "cdc_delete_behavior": map[string]string{"mode": "soft"}},
+			wantIssue:  invalidBehavior,
+		},
+		{
+			name:       "CDC disabled",
+			parameters: pipeline.ParameterMap{"cdc": "false", "cdc_delete_behavior": "soft"},
+			wantIssue:  requiresCDC,
+		},
+		{
+			name:       "CDC unset",
+			parameters: pipeline.ParameterMap{"cdc_delete_behavior": "hard"},
+			wantIssue:  requiresCDC,
+		},
+		{
+			name:       "streaming without CDC",
+			parameters: pipeline.ParameterMap{"stream": "true", "cdc_delete_behavior": "hard"},
+			wantIssue:  requiresCDC,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tt.parameters["source_connection"] = "postgres"
+			tt.parameters["source_table"] = "public.users"
+			tt.parameters["destination"] = "bigquery"
+			asset := &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: tt.parameters}
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}
+
+			issues, err := EnsureIngestrAssetIsValidForASingleAsset(t.Context(), p, asset)
+			require.NoError(t, err)
+			if tt.wantIssue == "" {
+				assert.Empty(t, issues)
+				return
+			}
+
+			require.Len(t, issues, 1)
+			assert.Equal(t, tt.wantIssue, issues[0].Description)
+		})
+	}
+}
+
+func TestEnsureIngestrAssetCDCSnapshotParameters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		parameters        pipeline.ParameterMap
+		refreshRestricted bool
+		wantIssue         string
+	}{
+		{
+			name:       "batch bootstrap without declared primary keys",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "cdc_start_lsn": "0/16B6C50", "incremental_strategy": "merge"},
+		},
+		{
+			name:       "streaming bootstrap",
+			parameters: pipeline.ParameterMap{"stream": true, "cdc_snapshot_mode": "never", "cdc_start_lsn": "0/16B6C50"},
+		},
+		{
+			name:       "automatic snapshots",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "auto"},
+		},
+		{
+			name:       "empty mode is invalid",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": ""},
+			wantIssue:  "invalid cdc_snapshot_mode: must be \"auto\" or \"never\"",
+		},
+		{
+			name:       "snapshot options require CDC",
+			parameters: pipeline.ParameterMap{"cdc": false, "cdc_snapshot_mode": "auto"},
+			wantIssue:  "cdc_snapshot_mode and cdc_start_lsn require cdc: true",
+		},
+		{
+			name:       "zero LSN is invalid",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "cdc_start_lsn": "0/0"},
+			wantIssue:  "invalid cdc_start_lsn: must be a nonzero PostgreSQL LSN in X/Y hexadecimal format with at most 8 digits per part",
+		},
+		{
+			name:       "bootstrap requires explicit snapshot policy",
+			parameters: pipeline.ParameterMap{"cdc_start_lsn": "0/16B6C50"},
+			wantIssue:  "cdc_start_lsn requires cdc_snapshot_mode: never",
+		},
+		{
+			name:       "snapshot free mode requires slot",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "cdc_slot": ""},
+			wantIssue:  "cdc_snapshot_mode: never requires a nonempty cdc_slot",
+		},
+		{
+			name:       "snapshot free mode rejects wildcard tables",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "source_table": "*"},
+			wantIssue:  "cdc_snapshot_mode: never requires explicit, nonempty source_table names without wildcards",
+		},
+		{
+			name:       "snapshot free mode rejects full refresh",
+			parameters: pipeline.ParameterMap{"cdc_snapshot_mode": "never", "full_refresh": true},
+			wantIssue:  "cdc_snapshot_mode: never cannot be used with full refresh",
+		},
+		{
+			name:              "refresh restriction prevents full refresh conflict",
+			parameters:        pipeline.ParameterMap{"cdc_snapshot_mode": "never", "full_refresh": true},
+			refreshRestricted: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parameters := pipeline.ParameterMap{
+				"cdc":               true,
+				"cdc_slot":          "bruin_slot",
+				"source_connection": "postgres",
+				"source_table":      "public.users",
+				"destination":       "bigquery",
+			}
+			for key, value := range tt.parameters {
+				parameters[key] = value
+			}
+			asset := &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Parameters: parameters, RefreshRestricted: &tt.refreshRestricted}
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{asset}}
+			issues, err := EnsureIngestrAssetIsValidForASingleAsset(t.Context(), p, asset)
+			require.NoError(t, err)
+			if tt.wantIssue == "" {
+				assert.Empty(t, issues)
+				return
+			}
+			require.Len(t, issues, 1)
+			assert.Equal(t, tt.wantIssue, issues[0].Description)
 		})
 	}
 }
@@ -6930,4 +7180,42 @@ func TestEnsureTimeIntervalIsValidForAssetWithPipelineMacros(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, issues)
+}
+
+type staticConnectionTypes map[string]string
+
+func (s staticConnectionTypes) GetConnectionType(name string) string { return s[name] }
+
+func TestValidateInferenceCheckPlatform(t *testing.T) {
+	t.Parallel()
+
+	validator := ValidateInferenceCheckPlatform(staticConnectionTypes{"wh": "duckdb", "my": "mysql"})
+	newAsset := func(connection string, checks bool) *pipeline.Asset {
+		asset := &pipeline.Asset{Name: "enriched", Type: pipeline.AssetTypeInference, Connection: connection}
+		if checks {
+			asset.Columns = []pipeline.Column{{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}}}
+		}
+		return asset
+	}
+
+	tests := []struct {
+		name       string
+		asset      *pipeline.Asset
+		wantIssues int
+	}{
+		{name: "supported platform", asset: newAsset("wh", true)},
+		{name: "unsupported platform", asset: newAsset("my", true), wantIssues: 1},
+		{name: "unsupported platform without checks", asset: newAsset("my", false)},
+		{name: "unknown connection is left to other rules", asset: newAsset("missing", true)},
+		{name: "non-inference asset", asset: &pipeline.Asset{Type: pipeline.AssetTypeIngestr, Connection: "my", CustomChecks: []pipeline.CustomCheck{{Name: "c"}}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := validator(t.Context(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Len(t, issues, tt.wantIssues)
+		})
+	}
 }

@@ -27,6 +27,7 @@ To connect to Jira, you need to add a configuration item to the connections sect
 * `domain`: is your Jira domain (e.g., company.atlassian.net).
 * `email`: is the email address used for authentication with the Jira API.
 * `api_token`: is the API token for authentication (required for Jira Cloud).
+* `cloud_id` (optional): is your Atlassian site's cloud ID. Only needed for service accounts, and detected automatically when it's not set.
 
 For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/jira.html#authentication).
 

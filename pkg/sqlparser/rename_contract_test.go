@@ -93,7 +93,10 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 		// ExtractSelect, a different operation, has the case-preservation hook).
 		{"inferred column case", "fabric", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS mixedcase FROM fixture AS orders) SELECT * FROM a"},
 		{"inferred column case", "tsql", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS MixedCase FROM fixture AS orders) SELECT * FROM a"},
-		{"explicit alias case override", "tsql", "SELECT MixedCase AS mixedcase FROM dbo.t", map[string]string{}, "SELECT MixedCase AS MixedCase FROM dbo.t"},
+		{"explicit alias case is kept", "tsql", "SELECT MixedCase AS mixedcase FROM dbo.t", map[string]string{}, "SELECT MixedCase AS mixedcase FROM dbo.t"},
+		{"explicit alias case is kept in derived table", "tsql", "WITH a AS (SELECT LEASE_CYCLE AS lease_cycle, MixedCase FROM t) SELECT * FROM a", map[string]string{}, "WITH a AS (SELECT LEASE_CYCLE AS lease_cycle, MixedCase AS MixedCase FROM t) SELECT * FROM a"},
+		{"explicit alias case is kept with prefixed schema", "tsql", "SELECT LEASE_CYCLE as lease_cycle, CAST(ID AS BIGINT) AS cast_id FROM lh_bronze.schema.table", map[string]string{"lh_bronze.schema.table": "prefix_schema.table"}, "SELECT LEASE_CYCLE AS lease_cycle, CAST(ID AS BIGINT) AS cast_id FROM lh_bronze.prefix_schema.table"},
+		{"inferred subquery column case", "tsql", "WITH src AS (SELECT CAST(1 AS INT) AS BIN), base AS (SELECT id FROM dbo.numbers), result AS (SELECT base.id FROM base LEFT JOIN (SELECT DISTINCT BIN FROM src) AS lmt ON base.id = lmt.BIN WHERE lmt.BIN IS NULL) SELECT id FROM result", map[string]string{"dbo.numbers": "repro_dbo.numbers"}, "WITH src AS (SELECT CAST(1 AS INTEGER) AS BIN), base AS (SELECT id AS id FROM repro_dbo.numbers), result AS (SELECT base.id AS id FROM base LEFT JOIN (SELECT DISTINCT BIN AS BIN FROM src) AS lmt ON base.id = lmt.BIN WHERE lmt.BIN IS NULL) SELECT id FROM result"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dialect+"/"+tc.name, func(t *testing.T) {

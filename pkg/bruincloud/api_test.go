@@ -2,6 +2,7 @@ package bruincloud
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -216,6 +217,47 @@ func TestListProjects(t *testing.T) {
 	require.Len(t, projects, 1)
 	assert.Equal(t, "test-project", projects[0].Name)
 	assert.Equal(t, "main", projects[0].Repo.Branch)
+}
+
+func TestCreateProject(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/projects", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, map[string]any{
+			"name":         "analytics",
+			"repo_url":     "https://github.com/acme/analytics",
+			"repo_branch":  "main",
+			"git_token":    "ghp_secret",
+			"provider":     "github",
+			"do_not_parse": true,
+		}, readJSON(t, r))
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, map[string]any{
+			"id":          "01jabc",
+			"name":        "analytics",
+			"repo_url":    "https://github.com/acme/analytics",
+			"repo_branch": "main",
+			"provider":    "github",
+		})
+	})
+
+	project, err := client.CreateProject(t.Context(), CreateProjectInput{
+		Name:       "analytics",
+		RepoURL:    "https://github.com/acme/analytics",
+		RepoBranch: "main",
+		GitToken:   "ghp_secret",
+		Provider:   "github",
+		DoNotParse: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &CreateProjectResult{
+		ID:         "01jabc",
+		Name:       "analytics",
+		RepoURL:    "https://github.com/acme/analytics",
+		RepoBranch: "main",
+		Provider:   "github",
+	}, project)
 }
 
 func TestListPipelines(t *testing.T) {
@@ -1154,6 +1196,94 @@ func TestGetAgentMessageStatus(t *testing.T) {
 	assert.Equal(t, "completed", msg.Status)
 }
 
+func TestSteerAgentMessage(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/1/threads/10/messages/100/steer", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, map[string]any{"message": "focus on EU", "id": "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f"}, body)
+
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, map[string]any{"id": "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f", "message": "focus on EU", "status": "accepted", "reason": nil, "created_at": "2026-10-22T10:00:00+00:00"})
+	})
+
+	steer, err := client.SteerAgentMessage(t.Context(), 1, 10, 100, "focus on EU", "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f")
+	require.NoError(t, err)
+	assert.Equal(t, "5f0c6b1e-8f7a-4c1e-9d2b-3a4b5c6d7e8f", steer.ID)
+	assert.Equal(t, "accepted", steer.Status)
+	assert.Nil(t, steer.Reason)
+}
+
+func TestSteerAgentMessageOmitsEmptyID(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		_, hasID := body["id"]
+		assert.False(t, hasID) // the server generates one
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, map[string]any{"id": "generated", "status": "pending"})
+	})
+
+	steer, err := client.SteerAgentMessage(t.Context(), 1, 10, 100, "focus on EU", "")
+	require.NoError(t, err)
+	assert.Equal(t, "generated", steer.ID)
+}
+
+func TestSteerAgentMessageNotSteerable(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"This message is not running or its agent cannot be steered; send a new message instead","error":"not_steerable"}`))
+	})
+
+	_, err := client.SteerAgentMessage(t.Context(), 1, 10, 100, "focus on EU", "")
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.StatusCode)
+	assert.Equal(t, "not_steerable", apiErr.Code)
+}
+
+func TestStopAgentMessage(t *testing.T) {
+	t.Parallel()
+	for _, status := range []string{"silenced", "completed", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			t.Parallel()
+			client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/agents/1/threads/10/messages/100/stop", r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.Empty(t, body)
+				w.WriteHeader(http.StatusAccepted)
+				writeJSON(t, w, map[string]any{"thread_id": 10, "message_pair_id": 100, "status": status})
+			})
+
+			result, err := client.StopAgentMessage(t.Context(), 1, 10, 100)
+			require.NoError(t, err)
+			assert.Equal(t, &StopAgentMessageResponse{ThreadID: 10, MessagePairID: 100, Status: status}, result)
+		})
+	}
+}
+
+func TestStopAgentMessageError(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(t, w, map[string]any{"message": "Message not found", "error": "not_found"})
+	})
+
+	result, err := client.StopAgentMessage(t.Context(), 1, 10, 100)
+	require.Nil(t, result)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
+	assert.Equal(t, "not_found", apiErr.Code)
+}
+
 func TestListInstances(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1690,6 +1820,22 @@ func TestTriggerScheduledAgent(t *testing.T) {
 	assert.Equal(t, 99, execution.ThreadID)
 }
 
+func TestResetScheduledAgentThread(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/scheduled-agents/11/reset-thread", r.URL.Path)
+
+		writeJSON(t, w, map[string]any{"id": 11, "same_thread": true, "execution_thread_id": nil})
+	})
+
+	run, err := client.ResetScheduledAgentThread(t.Context(), 11)
+	require.NoError(t, err)
+	require.NotNil(t, run.SameThread)
+	assert.True(t, *run.SameThread)
+	assert.Nil(t, run.ExecutionThreadID)
+}
+
 func TestDeleteScheduledAgent(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1948,7 +2094,7 @@ func TestDeleteRunState(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRunAgentQuery_Success(t *testing.T) {
+func TestRunConnectionSetQuery_Success(t *testing.T) {
 	t.Parallel()
 	var gotPath, gotMethod string
 	var gotBody map[string]any
@@ -1964,11 +2110,11 @@ func TestRunAgentQuery_Success(t *testing.T) {
 		})
 	})
 
-	res, err := client.RunAgentQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
+	res, err := client.RunConnectionSetQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
 	require.NoError(t, err)
 
 	assert.Equal(t, http.MethodPost, gotMethod)
-	assert.Equal(t, "/agents/42/query", gotPath)
+	assert.Equal(t, "/connection-sets/42/query", gotPath)
 	assert.Equal(t, "warehouse_prod", gotBody["connection"])
 	assert.Equal(t, "SELECT 1 AS n", gotBody["query"])
 	// Cloud query mode never sends template variables.
@@ -1981,7 +2127,7 @@ func TestRunAgentQuery_Success(t *testing.T) {
 	assert.Equal(t, "SELECT 1 AS n", res.RenderedSQL)
 }
 
-func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
+func TestRunConnectionSetQuery_SurfacesAPIError(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
@@ -1991,7 +2137,7 @@ func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
 		})
 	})
 
-	_, err := client.RunAgentQuery(t.Context(), 42, "conn", "DROP TABLE users")
+	_, err := client.RunConnectionSetQuery(t.Context(), 42, "conn", "DROP TABLE users")
 	require.Error(t, err)
 
 	var apiErr *APIError
@@ -2001,15 +2147,114 @@ func TestRunAgentQuery_SurfacesAPIError(t *testing.T) {
 	assert.Contains(t, apiErr.Message, "read-only")
 }
 
-func TestRunAgentQuery_PreservesLargeIntegerPrecision(t *testing.T) {
+func TestRunConnectionSetQuery_PreservesLargeIntegerPrecision(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		// 2^53+1 cannot be represented as float64; default decoding would round it.
 		_, _ = w.Write([]byte(`{"columns":["id"],"rows":[[9007199254740993]]}`))
 	})
 
-	res, err := client.RunAgentQuery(t.Context(), 1, "c", "SELECT id")
+	res, err := client.RunConnectionSetQuery(t.Context(), 1, "c", "SELECT id")
 	require.NoError(t, err)
 	require.Len(t, res.Rows, 1)
 	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])
+}
+
+func TestListSemanticLayers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/semantic-layers", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"semantic_layers": []map[string]any{
+				{"id": 3, "name": "sales", "updated_at": "2026-07-06T10:00:00+00:00"},
+			},
+		})
+	})
+
+	layers, err := client.ListSemanticLayers(t.Context())
+	require.NoError(t, err)
+	require.Len(t, layers, 1)
+	assert.Equal(t, "sales", layers[0].Name)
+	require.NotNil(t, layers[0].UpdatedAt)
+	assert.Equal(t, "2026-07-06T10:00:00+00:00", *layers[0].UpdatedAt)
+}
+
+func TestGetSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/semantic-layers/3", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{
+			"id": 3, "name": "sales", "state": map[string]any{"name": "sales", "source": map[string]any{"table": "raw.sales"}},
+		})
+	})
+
+	layer, err := client.GetSemanticLayer(t.Context(), 3)
+	require.NoError(t, err)
+	assert.Equal(t, 3, layer.ID)
+	assert.JSONEq(t, `{"name":"sales","source":{"table":"raw.sales"}}`, string(layer.State))
+}
+
+func TestCreateSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/semantic-layers", r.URL.Path)
+
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sales", body["name"])
+		assert.NotNil(t, body["state"])
+
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales"})
+	})
+
+	layer, err := client.CreateSemanticLayer(t.Context(), "sales", map[string]any{"source": map[string]any{"table": "raw.sales"}})
+	require.NoError(t, err)
+	assert.Equal(t, 9, layer.ID)
+	assert.Equal(t, "sales", layer.Name)
+}
+
+func TestCreateSemanticLayerOmitsStateWhenNil(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "sales", body["name"])
+		_, hasState := body["state"]
+		assert.False(t, hasState)
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales"})
+	})
+
+	_, err := client.CreateSemanticLayer(t.Context(), "sales", nil)
+	require.NoError(t, err)
+}
+
+func TestUpdateSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPatch, r.Method)
+		assert.Equal(t, "/semantic-layers/9", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, SemanticLayer{ID: 9, Name: "sales_v2"})
+	})
+
+	layer, err := client.UpdateSemanticLayer(t.Context(), 9, map[string]any{"name": "sales_v2"})
+	require.NoError(t, err)
+	assert.Equal(t, "sales_v2", layer.Name)
+}
+
+func TestDeleteSemanticLayer(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/semantic-layers/9", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	require.NoError(t, client.DeleteSemanticLayer(t.Context(), 9))
 }

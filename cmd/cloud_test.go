@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -316,13 +317,15 @@ func TestCloudCommand_NoTeamHeaderWhenUnset(t *testing.T) { //nolint:paralleltes
 	assert.False(t, present, "no X-Bruin-Team header should be sent when neither --team nor a default is set")
 }
 
-func TestTeamErrorHint(t *testing.T) {
+func TestAPIErrorHint(t *testing.T) {
 	t.Parallel()
 
-	assert.Contains(t, teamErrorHint(&bruincloud.APIError{Code: "team_required", StatusCode: 409}), "set-team")
-	assert.Contains(t, teamErrorHint(&bruincloud.APIError{Code: "team_not_in_scope", StatusCode: 403}), "unset-team")
-	assert.Empty(t, teamErrorHint(&bruincloud.APIError{Code: "something_else", StatusCode: 400}))
-	assert.Empty(t, teamErrorHint(errors.New("plain error")))
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "team_required", StatusCode: 409}), "set-team")
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "team_not_in_scope", StatusCode: 403}), "unset-team")
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "reconnect_required", StatusCode: 409}), "--git-token")
+	assert.Contains(t, apiErrorHint(&bruincloud.APIError{Code: "repo_not_accessible", StatusCode: 422}), "GitHub App")
+	assert.Empty(t, apiErrorHint(&bruincloud.APIError{Code: "something_else", StatusCode: 400}))
+	assert.Empty(t, apiErrorHint(errors.New("plain error")))
 }
 
 func TestCloudCommand_Help(t *testing.T) {
@@ -331,13 +334,15 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 19)
+	assert.Len(t, cmd.Commands, 22)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
 	assert.Contains(t, subNames, "login")
+	assert.Contains(t, subNames, "logout")
+	assert.Contains(t, subNames, "auth")
 	assert.Contains(t, subNames, "teams")
 	assert.Contains(t, subNames, "cost")
 	assert.Contains(t, subNames, "projects")
@@ -352,6 +357,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "connection-sets")
 	assert.Contains(t, subNames, "dashboards")
 	assert.Contains(t, subNames, "notification-rules")
+	assert.Contains(t, subNames, "semantic-layers")
 	assert.Contains(t, subNames, "scheduled-agents")
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
@@ -404,21 +410,21 @@ func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
 		for _, sub := range c.Commands {
 			// "cloud config" manages the default team itself and doesn't act on a
 			// team, so its commands intentionally omit --team.
-			if sub.Name == "config" || sub.Name == "login" {
+			if sub.Name == "config" || sub.Name == "login" || sub.Name == "logout" {
 				continue
 			}
 			// Every runnable command (a leaf, or a parent like "agents
 			// connections" that has its own action) must carry --team.
 			if sub.Action != nil || len(sub.Commands) == 0 {
-				has := false
+				teamFlags := 0
 				for _, f := range sub.Flags {
 					for _, n := range f.Names() {
 						if n == "team" {
-							has = true
+							teamFlags++
 						}
 					}
 				}
-				assert.Truef(t, has, "cloud command %q should have --team", sub.Name)
+				assert.Equalf(t, 1, teamFlags, "cloud command %q should have exactly one --team", sub.Name)
 				checked++
 			}
 			if len(sub.Commands) > 0 {
@@ -436,8 +442,135 @@ func TestCloudProjectsCommand_Help(t *testing.T) {
 	cmd := CloudProjects()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "projects", cmd.Name)
-	require.Len(t, cmd.Commands, 1)
+	require.Len(t, cmd.Commands, 2)
 	assert.Equal(t, "list", cmd.Commands[0].Name)
+	assert.Equal(t, "create", cmd.Commands[1].Name)
+}
+
+func TestResolveGitProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		provider string
+		repoURL  string
+		want     string
+		wantErr  bool
+	}{
+		{name: "github inferred", repoURL: "https://github.com/acme/repo", want: "github"},
+		{name: "gitlab inferred with www", repoURL: "https://www.gitlab.com/acme/repo.git", want: "gitlab"},
+		{name: "bitbucket inferred", repoURL: "https://bitbucket.org/acme/repo", want: "bitbucket"},
+		{name: "explicit wins for self-hosted", provider: "gitlab", repoURL: "https://git.acme.internal/repo", want: "gitlab"},
+		{name: "self-hosted without provider", repoURL: "https://git.acme.internal/repo", wantErr: true},
+		{name: "unknown provider", provider: "gitea", repoURL: "https://github.com/acme/repo", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := resolveGitProvider(tt.provider, tt.repoURL)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCloudProjectsCreate_SendsRequest(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	var gotMethod, gotPath string
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"01jabc","name":"analytics","repo_url":"https://github.com/acme/analytics","repo_branch":"main","provider":"github"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Setenv("BRUIN_CLOUD_GIT_TOKEN", "ghp_secret")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	cmd := cloudProjectsCreate()
+	require.NoError(t, cmd.Run(t.Context(), []string{
+		"create", "--api-key", "test-key", "--name", "analytics",
+		"--repo-url", "https://github.com/acme/analytics", "--output", "json",
+	}))
+
+	assert.Equal(t, http.MethodPost, gotMethod)
+	assert.Equal(t, "/projects", gotPath)
+	assert.Equal(t, map[string]any{
+		"name":         "analytics",
+		"repo_url":     "https://github.com/acme/analytics",
+		"repo_branch":  "main",
+		"git_token":    "ghp_secret",
+		"provider":     "github",
+		"do_not_parse": false,
+	}, gotBody)
+}
+
+func TestCloudProjectsCreate_GithubAppWithoutToken(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"01jabc","name":"analytics","repo_url":"https://github.com/acme/analytics.git","repo_branch":"develop","provider":"github"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Setenv("BRUIN_CLOUD_GIT_TOKEN", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	cmd := cloudProjectsCreate()
+	require.NoError(t, cmd.Run(t.Context(), []string{
+		"create", "--api-key", "test-key", "--name", "analytics",
+		"--repo-url", "acme/analytics", "--output", "json",
+	}))
+
+	assert.Equal(t, map[string]any{
+		"name":         "analytics",
+		"repo_url":     "acme/analytics",
+		"do_not_parse": false,
+	}, gotBody)
+}
+
+func TestCreateProjectInput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		repoURL  string
+		branch   string
+		token    string
+		provider string
+		want     bruincloud.CreateProjectInput
+		wantErr  bool
+	}{
+		{name: "github app keeps branch empty", repoURL: "acme/repo", want: bruincloud.CreateProjectInput{RepoURL: "acme/repo"}},
+		{name: "github app with branch", repoURL: "git@github.com:acme/repo.git", branch: "dev", provider: "github", want: bruincloud.CreateProjectInput{RepoURL: "git@github.com:acme/repo.git", RepoBranch: "dev"}},
+		{name: "github app rejects other providers", repoURL: "https://gitlab.com/acme/repo", provider: "gitlab", wantErr: true},
+		{name: "token defaults branch to main", repoURL: "https://gitlab.com/acme/repo", token: "glpat", want: bruincloud.CreateProjectInput{RepoURL: "https://gitlab.com/acme/repo", RepoBranch: "main", GitToken: "glpat", Provider: "gitlab"}},
+		{name: "token needs a known provider", repoURL: "https://git.acme.internal/repo", token: "pat", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := createProjectInput("", tt.repoURL, tt.branch, tt.token, tt.provider, false)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestCloudPipelinesCommand_Help(t *testing.T) {
@@ -577,7 +710,7 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	cmd := CloudAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "agents", cmd.Name)
-	require.Len(t, cmd.Commands, 19)
+	require.Len(t, cmd.Commands, 21)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -592,6 +725,8 @@ func TestCloudAgentsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "clear-memory")
 	assert.Contains(t, subNames, "export-thread")
 	assert.Contains(t, subNames, "request-connection")
+	assert.Contains(t, subNames, "steer")
+	assert.Contains(t, subNames, "stop")
 }
 
 // runRequestConnection runs "cloud agents request-connection" against a stub
@@ -660,6 +795,326 @@ func TestCloudAgentsRequestConnection_HasNoIDFlagsToOverrideTheRunBinding(t *tes
 	assert.Empty(t, path, "the API must not be called")
 }
 
+func runSteer(t *testing.T, handler http.HandlerFunc, args ...string) (string, error) {
+	t.Helper()
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_API_KEY", "test-key")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	return runCloudCLI(t, append([]string{"agents", "steer"}, args...)...)
+}
+
+func setRunEnv(t *testing.T, agentID, threadID string) {
+	t.Helper()
+	for k, v := range map[string]string{"BRUIN_CLOUD_AGENT_ID": agentID, "BRUIN_THREAD_ID": threadID} {
+		t.Setenv(k, v)
+		if v == "" {
+			require.NoError(t, os.Unsetenv(k))
+		}
+	}
+}
+
+func TestCloudAgentsSteer_ExplicitIDs(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "1", "2")
+
+	var body map[string]any
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/agents/7/threads/42/messages/99/steer", r.URL.Path)
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"id":"abc","message":"focus on EU","status":"accepted","reason":null,"created_at":"2026-10-22T10:00:00+00:00"}`))
+	}, "--agent-id", "7", "--thread-id", "42", "--message-id", "99", "--message", "focus on EU", "--steer-id", "abc")
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"message": "focus on EU", "id": "abc"}, body)
+	assert.Contains(t, out, "Steered message 99 in thread 42")
+}
+
+func TestCloudAgentsSteer_DefaultsToRunningMessageFromEnv(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	// 150 messages: the running one is on the last page, and an older steerable
+	// one on the first page must be ignored.
+	messages := make([]bruincloud.AgentMessage, 150)
+	for i := range messages {
+		messages[i] = bruincloud.AgentMessage{ID: i + 1, Status: "completed"}
+	}
+	messages[9].Steerable = true
+	messages[148].Steerable = true
+
+	var offsets []string
+	var steeredPath string
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			assert.Equal(t, "/agents/7/threads/42/messages", r.URL.Path)
+			assert.Equal(t, "100", r.URL.Query().Get("limit"))
+			offsets = append(offsets, r.URL.Query().Get("offset"))
+			offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+			_ = json.NewEncoder(w).Encode(map[string]any{"messages": messages[offset:min(offset+100, len(messages))], "total_count": len(messages)})
+			return
+		}
+		steeredPath = r.URL.Path
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"id":"abc","status":"accepted"}`))
+	}, "--message", "focus on EU", "--output", "json")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"", "50"}, offsets)
+	assert.Equal(t, "/agents/7/threads/42/messages/149/steer", steeredPath)
+
+	var resp struct {
+		MessageID int                   `json:"message_id"`
+		Steer     bruincloud.AgentSteer `json:"steer"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &resp))
+	assert.Equal(t, 149, resp.MessageID)
+	assert.Equal(t, "abc", resp.Steer.ID)
+}
+
+func TestCloudAgentsSteer_NoRunningMessage(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	steered := false
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			steered = true
+		}
+		_, _ = w.Write([]byte(`{"messages":[{"id":1,"status":"completed","steerable":false}]}`))
+	}, "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.False(t, steered)
+	assert.Contains(t, out, "thread 42 has no running message to steer")
+	assert.Contains(t, out, "bruin cloud agents send --agent-id 7 --thread-id 42")
+}
+
+func TestCloudAgentsSteer_ConflictPointsToSend(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "", "")
+
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"This message is not running or its agent cannot be steered; send a new message instead","error":"not_steerable"}`))
+	}, "--agent-id", "7", "--thread-id", "42", "--message-id", "99", "--message", "focus on EU", "--output", "json")
+
+	require.Error(t, err)
+	var resp map[string]string
+	require.NoError(t, json.Unmarshal([]byte(out), &resp))
+	assert.Contains(t, resp["error"], "not running or its agent cannot be steered")
+	assert.Contains(t, resp["error"], "bruin cloud agents send --agent-id 7 --thread-id 42")
+}
+
+func TestCloudAgentsSteer_OtherErrorsHaveNoSendHint(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	out, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Message not found","error":"not_found"}`))
+	}, "--message-id", "99", "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.Contains(t, out, "Message not found")
+	assert.NotContains(t, out, "agents send")
+}
+
+func TestCloudAgentsSteer_RejectsNonPositiveMessageID(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "7", "42")
+
+	called := false
+	_, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}, "--message-id", "0", "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.False(t, called)
+}
+
+func TestCloudAgentsSteer_RequiresAgentAndThread(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	setRunEnv(t, "", "")
+
+	called := false
+	_, err := runSteer(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}, "--message", "focus on EU")
+
+	require.Error(t, err)
+	assert.False(t, called, "the API must not be called without an agent and thread")
+}
+
+func runStop(t *testing.T, handler http.HandlerFunc, args ...string) (string, error) {
+	t.Helper()
+
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_API_KEY", "test-key")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	return runCloudCLI(t, append([]string{"agents", "stop"}, args...)...)
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_ExplicitIDs(t *testing.T) {
+	for _, status := range []string{"silenced", "completed", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			setRunEnv(t, "1", "2")
+			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/agents/7/threads/42/messages/99/stop", r.URL.Path)
+				assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+				w.WriteHeader(http.StatusAccepted)
+				_ = json.NewEncoder(w).Encode(map[string]any{"thread_id": 42, "message_pair_id": 99, "status": status})
+			}, "--agent-id", "7", "--thread-id", "42", "--message-id", "99")
+
+			require.NoError(t, err)
+			assert.Contains(t, out, "Stop request accepted for message 99 in thread 42 (status: "+status+")")
+		})
+	}
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_DefaultsToActiveMessageFromEnv(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		messageCount int
+		messageID    int
+		status       string
+		offsets      []string
+	}{
+		{name: "pending", messageCount: 3, messageID: 2, status: "pending", offsets: []string{""}},
+		{name: "processing on last page", messageCount: 250, messageID: 249, status: "processing", offsets: []string{"", "150"}},
+		{name: "processing on middle page", messageCount: 250, messageID: 149, status: "processing", offsets: []string{"", "150", "50"}},
+		{name: "pending on first page", messageCount: 250, messageID: 49, status: "pending", offsets: []string{"", "150", "50"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRunEnv(t, "7", "42")
+			messages := make([]bruincloud.AgentMessage, tc.messageCount)
+			for i := range messages {
+				messages[i] = bruincloud.AgentMessage{ID: i + 1, Status: "completed"}
+			}
+			messages[0].Status = "processing"
+			messages[tc.messageID-1].Status = tc.status
+			messages[len(messages)-1].Steerable = true
+
+			var offsets []string
+			var stoppedPath string
+			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					assert.Equal(t, "/agents/7/threads/42/messages", r.URL.Path)
+					assert.Equal(t, "100", r.URL.Query().Get("limit"))
+					offsets = append(offsets, r.URL.Query().Get("offset"))
+					offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+					_ = json.NewEncoder(w).Encode(map[string]any{"messages": messages[offset:min(offset+100, len(messages))], "total_count": len(messages)})
+					return
+				}
+				assert.Equal(t, http.MethodPost, r.Method)
+				stoppedPath = r.URL.Path
+				w.WriteHeader(http.StatusAccepted)
+				_ = json.NewEncoder(w).Encode(map[string]any{"thread_id": 42, "message_pair_id": tc.messageID, "status": "silenced"})
+			}, "--output", "json")
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.offsets, offsets)
+			assert.Equal(t, "/agents/7/threads/42/messages/"+strconv.Itoa(tc.messageID)+"/stop", stoppedPath)
+			assert.JSONEq(t, `{"agent_id":7,"thread_id":42,"message_id":`+strconv.Itoa(tc.messageID)+`,"status":"silenced"}`, out)
+		})
+	}
+}
+
+func TestCloudAgentsStop_NoActiveMessage(t *testing.T) { //nolint:paralleltest
+	setRunEnv(t, "7", "42")
+	stopped := false
+	out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			stopped = true
+		}
+		_, _ = w.Write([]byte(`{"messages":[{"id":1,"status":"completed"},{"id":2,"status":"failed"},{"id":3,"status":"silenced"}]}`))
+	}, "--output", "json")
+
+	require.Error(t, err)
+	assert.False(t, stopped)
+	var resp map[string]string
+	require.NoError(t, json.Unmarshal([]byte(out), &resp))
+	assert.Contains(t, resp["error"], "thread 42 has no pending or processing message to stop")
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_APIErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		statusCode int
+		message    string
+		lastPage   bool
+	}{
+		{name: "stop", args: []string{"--message-id", "99"}, statusCode: http.StatusNotFound, message: "Message not found"},
+		{name: "list", statusCode: http.StatusForbidden, message: "Missing permission"},
+		{name: "last page", statusCode: http.StatusForbidden, message: "Missing permission", lastPage: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRunEnv(t, "7", "42")
+			calls := 0
+			out, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if len(tc.args) == 0 {
+					assert.Equal(t, http.MethodGet, r.Method)
+				}
+				if tc.lastPage && calls == 1 {
+					_, _ = w.Write([]byte(`{"messages":[],"total_count":150}`))
+					return
+				}
+				w.WriteHeader(tc.statusCode)
+				_ = json.NewEncoder(w).Encode(map[string]any{"message": tc.message})
+			}, append(tc.args, "--output", "json")...)
+
+			require.Error(t, err)
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal([]byte(out), &resp))
+			assert.Contains(t, resp["error"], tc.message)
+			if tc.lastPage {
+				assert.Equal(t, 2, calls)
+			} else {
+				assert.Equal(t, 1, calls)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest
+func TestCloudAgentsStop_InvalidIDs(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		agentID  string
+		threadID string
+		args     []string
+	}{
+		{name: "missing IDs"},
+		{name: "missing thread", agentID: "7"},
+		{name: "negative agent", agentID: "-1", threadID: "42"},
+		{name: "zero thread", agentID: "7", threadID: "0"},
+		{name: "zero message", agentID: "7", threadID: "42", args: []string{"--message-id", "0"}},
+		{name: "negative message", agentID: "7", threadID: "42", args: []string{"--message-id", "-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRunEnv(t, tc.agentID, tc.threadID)
+			called := false
+			_, err := runStop(t, func(w http.ResponseWriter, r *http.Request) {
+				called = true
+			}, tc.args...)
+
+			require.Error(t, err)
+			assert.False(t, called)
+		})
+	}
+}
+
 func TestCloudAgentsThreadsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := cloudAgentsThreads()
@@ -684,7 +1139,7 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	cmd := CloudDashboards()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "dashboards", cmd.Name)
-	require.Len(t, cmd.Commands, 9)
+	require.Len(t, cmd.Commands, 11)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -699,6 +1154,165 @@ func TestCloudDashboardsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "publish")
 	assert.Contains(t, subNames, "delete")
 	assert.Contains(t, subNames, "folders")
+	assert.Contains(t, subNames, "notes")
+	assert.Contains(t, subNames, "apply-filters")
+}
+
+func TestCloudDashboardsApplyFilters(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	const parameters = `{"period":{"start":"2026-10-19","end":"2026-10-23"},"regions":[],"limit":5,"active":true,"country":"TR"}`
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+
+	for _, tc := range []struct {
+		name       string
+		parameters string
+		args       []string
+		status     int
+		wantError  bool
+	}{
+		{name: "applies filters", parameters: parameters, status: http.StatusOK},
+		{name: "forbidden", parameters: parameters, status: http.StatusForbidden, wantError: true},
+		{name: "invalid filter", parameters: parameters, status: http.StatusUnprocessableEntity, wantError: true},
+		{name: "zero dashboard", parameters: parameters, args: []string{"--dashboard-id", "0"}, wantError: true},
+		{name: "negative dashboard", parameters: parameters, args: []string{"--dashboard-id", "-1"}, wantError: true},
+		{name: "null", parameters: "null", wantError: true},
+		{name: "empty object", parameters: "{}", wantError: true},
+		{name: "array", parameters: "[]", wantError: true},
+		{name: "malformed JSON", parameters: "{", wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/dashboards/42/filters", r.URL.Path)
+				assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+				var body map[string]any
+				assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				expected := `{"parameters":` + parameters + `}`
+				encoded, err := json.Marshal(body)
+				assert.NoError(t, err)
+				assert.JSONEq(t, expected, string(encoded))
+				w.WriteHeader(tc.status)
+				if tc.status == http.StatusOK {
+					_, _ = w.Write([]byte(`{"parameters":` + parameters + `}`))
+				} else {
+					_, _ = w.Write([]byte(`{"message":"Cannot apply filters"}`))
+				}
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+			command := CloudDashboards()
+			command.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			args := []string{"dashboards", "apply-filters", "--api-key", "test-key", "--dashboard-id", "42", "--parameters", tc.parameters, "--output", "json"}
+			err := runCLI(t.Context(), command, append(args, tc.args...))
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.status != 0, called)
+		})
+	}
+}
+
+func TestCloudDashboardsApplyFilters_ReportsIgnoredFilters(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Contains(t, string(body), `"limit":9007199254740993`)
+		_, _ = w.Write([]byte(`{"parameters":{"period":"2026-10-23"}}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	args := []string{"dashboards", "apply-filters", "--api-key", "test-key", "--dashboard-id", "42", "--parameters", `{"period":"2026-10-23","regoins":["Europe"],"limit":9007199254740993}`}
+	out, err := runCloudCLI(t, append(args, "--output", "json")...)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"parameters":{"period":"2026-10-23"},"ignored":["limit","regoins"]}`, out)
+
+	out, err = runCloudCLI(t, args...)
+	require.NoError(t, err)
+	assert.Contains(t, out, "Ignored filters not declared on the dashboard: limit, regoins")
+}
+
+func TestCloudSemanticLayersCreateUpdate(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	yamlFile := filepath.Join(t.TempDir(), "model.yaml")
+	require.NoError(t, os.WriteFile(yamlFile, []byte("source:\n  table: raw.sales\n"), 0o600))
+	missingFile := filepath.Join(t.TempDir(), "missing.yaml")
+
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		wantMethod string
+		wantPath   string
+		wantBody   string
+		wantError  bool
+	}{
+		{
+			name:       "create with JSON state",
+			args:       []string{"create", "--name", "sales", "--state", `{"source":{"table":"raw.sales"}}`},
+			wantMethod: http.MethodPost,
+			wantPath:   "/semantic-layers",
+			wantBody:   `{"name":"sales","state":{"source":{"table":"raw.sales"}}}`,
+		},
+		{
+			name:       "create with YAML file",
+			args:       []string{"create", "--name", "sales", "--state-file", yamlFile},
+			wantMethod: http.MethodPost,
+			wantPath:   "/semantic-layers",
+			wantBody:   `{"name":"sales","state":{"source":{"table":"raw.sales"}}}`,
+		},
+		{
+			name:       "update name only omits state",
+			args:       []string{"update", "--semantic-layer-id", "3", "--name", "sales_v2"},
+			wantMethod: http.MethodPatch,
+			wantPath:   "/semantic-layers/3",
+			wantBody:   `{"name":"sales_v2"}`,
+		},
+		{
+			name:       "update state only omits name",
+			args:       []string{"update", "--semantic-layer-id", "3", "--state-file", yamlFile},
+			wantMethod: http.MethodPatch,
+			wantPath:   "/semantic-layers/3",
+			wantBody:   `{"state":{"source":{"table":"raw.sales"}}}`,
+		},
+		{name: "both state flags", args: []string{"create", "--name", "sales", "--state", "{}", "--state-file", yamlFile}, wantError: true},
+		{name: "unreadable state file", args: []string{"create", "--name", "sales", "--state-file", missingFile}, wantError: true},
+		{name: "state not an object", args: []string{"create", "--name", "sales", "--state", "[]"}, wantError: true},
+		{name: "update with nothing", args: []string{"update", "--semantic-layer-id", "3"}, wantError: true},
+		{name: "update non-positive id", args: []string{"update", "--semantic-layer-id", "0", "--name", "x"}, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.Equal(t, tc.wantMethod, r.Method)
+				assert.Equal(t, tc.wantPath, r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.JSONEq(t, tc.wantBody, string(body))
+				_, _ = w.Write([]byte(`{"id":3,"name":"sales"}`))
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+			command := CloudSemanticLayers()
+			command.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			args := append([]string{"semantic-layers"}, tc.args...)
+			err := runCLI(t.Context(), command, append(args, "--api-key", "test-key", "--output", "json"))
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, !tc.wantError, called)
+		})
+	}
 }
 
 // cliRunMu serializes cli.Command.Run: urfave/cli's ensureHelp resets the
@@ -834,12 +1448,13 @@ func TestCloudScheduledAgentsCommand_Help(t *testing.T) {
 	cmd := CloudScheduledAgents()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "scheduled-agents", cmd.Name)
-	require.Len(t, cmd.Commands, 8)
+	require.Len(t, cmd.Commands, 9)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
 		subNames[i] = sub.Name
 	}
+	assert.Contains(t, subNames, "reset-thread")
 	assert.Contains(t, subNames, "list")
 	assert.Contains(t, subNames, "get")
 	assert.Contains(t, subNames, "create")
@@ -1294,4 +1909,29 @@ func TestPrintFolderTree(t *testing.T) {
 	var empty bytes.Buffer
 	printFolderTree(&empty, nil)
 	assert.Empty(t, empty.String())
+}
+
+func TestScheduledAgentPlanSameThreadFlag(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		args []string
+		want any
+	}{
+		{[]string{"plan", "--same-thread"}, true},
+		{[]string{"plan", "--same-thread=false"}, false},
+		{[]string{"plan"}, nil},
+	} {
+		var fields map[string]any
+		cmd := &cli.Command{
+			Name:  "plan",
+			Flags: scheduledAgentPlanFlags(),
+			Action: func(_ context.Context, c *cli.Command) error {
+				var err error
+				fields, err = buildScheduledAgentFields(c)
+				return err
+			},
+		}
+		require.NoError(t, runCLI(t.Context(), cmd, tc.args))
+		assert.Equal(t, tc.want, fields["same_thread"], tc.args)
+	}
 }

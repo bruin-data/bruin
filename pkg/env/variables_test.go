@@ -78,6 +78,29 @@ func TestSetupVariables(t *testing.T) {
 			},
 		},
 		{
+			name: "with interval modifiers and selected environment",
+			setupCtx: func() context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, "production")
+				return ctx
+			},
+			asset: &pipeline.Asset{
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{Days: 1},
+				},
+			},
+			expectedEnv: map[string]string{
+				"BRUIN_START_DATE":  "2024-01-02",
+				"BRUIN_ENVIRONMENT": "production",
+				"BRUIN_PIPELINE":    "test-pipeline",
+			},
+		},
+		{
 			name: "with hours modifier",
 			setupCtx: func() context.Context {
 				ctx := t.Context()
@@ -325,6 +348,19 @@ func TestSetupVariables(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "dev_", result["BRUIN_SCHEMA_PREFIX"])
+	})
+
+	t.Run("BRUIN_ENVIRONMENT is set from environment name in context", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
+		ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, "production")
+
+		result, err := env.SetupVariables(ctx, &pipeline.Pipeline{Name: "test-pipeline"}, &pipeline.Asset{}, map[string]string{})
+		require.NoError(t, err)
+
+		assert.Equal(t, "production", result["BRUIN_ENVIRONMENT"])
 	})
 
 	t.Run("BRUIN_FULL_REFRESH is set from asset parameters", func(t *testing.T) {

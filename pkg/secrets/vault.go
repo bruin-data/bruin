@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -187,6 +188,7 @@ func validateVaultAddress(address string) error {
 
 type kvV2Reader interface {
 	KvV2Read(ctx context.Context, path string, options ...vault.RequestOption) (*vault.Response[schema.KvV2ReadResponse], error)
+	KvV2List(ctx context.Context, path string, options ...vault.RequestOption) (*vault.Response[schema.StandardListResponse], error)
 }
 
 type Client struct {
@@ -218,7 +220,44 @@ func newVaultAPIClient(host string, clientConfig vaultClientConfig) (*vault.Clie
 		return nil, err
 	}
 
+	// The SDK resolves absolute request paths against the base address, discarding its path prefix; re-prepend it.
+	if decoded, escaped := basePathPrefix(host); decoded != "" {
+		if err := client.SetRequestCallbacks(prependBasePathCallback(decoded, escaped)); err != nil {
+			return nil, errors.Wrap(err, "failed to configure Vault base path")
+		}
+	}
+
 	return client, nil
+}
+
+// basePathPrefix returns the decoded and escaped path prefix of an http(s) Vault host.
+func basePathPrefix(host string) (decoded, escaped string) {
+	parsed, err := url.Parse(host)
+	if err != nil {
+		return "", ""
+	}
+	// Unix socket addresses encode the socket path, not an HTTP base path.
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", ""
+	}
+	decoded = strings.TrimRight(parsed.Path, "/")
+	if decoded == "" {
+		return "", ""
+	}
+	return decoded, strings.TrimRight(parsed.EscapedPath(), "/")
+}
+
+type basePathAppliedKey struct{}
+
+func prependBasePathCallback(decoded, escaped string) vault.RequestCallback {
+	return func(req *http.Request) {
+		if req == nil || req.URL == nil || req.Context().Value(basePathAppliedKey{}) != nil {
+			return
+		}
+		req.URL.RawPath = escaped + req.URL.EscapedPath()
+		req.URL.Path = decoded + req.URL.Path
+		*req = *req.WithContext(context.WithValue(req.Context(), basePathAppliedKey{}, struct{}{}))
+	}
 }
 
 func vaultRetryBackoff(minimum, maximum time.Duration, attempt int, response *http.Response) time.Duration {
@@ -318,7 +357,7 @@ func newClient(ctx context.Context, client kvV2Reader, mountPath string, logger 
 func (c *Client) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -360,7 +399,7 @@ func (c *Client) GetConnectionDetails(name string) any {
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
-		c.logger.Errorf("%v", err)
+		logLookupFailure(c.logger, err)
 		return nil
 	}
 
@@ -381,6 +420,46 @@ func (c *Client) GetConnectionType(name string) string {
 		return ""
 	}
 	return manager.GetConnectionType(name)
+}
+
+// ListConnections returns the names of the connections stored under the configured Vault path.
+func (c *Client) ListConnections() ([]string, error) {
+	requestTimeout := c.requestTimeout
+	if requestTimeout <= 0 {
+		requestTimeout = defaultVaultRequestTimeout
+	}
+	baseContext := context.Background()
+	if c.contextProvider != nil {
+		if providedContext := c.contextProvider(); providedContext != nil {
+			baseContext = providedContext
+		}
+	}
+	ctx, cancelFunc := context.WithTimeout(baseContext, requestTimeout)
+	defer cancelFunc()
+
+	res, err := c.client.KvV2List(ctx, c.path, vault.WithMountPath(c.mountPath))
+	if err != nil {
+		var respErr *vault.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+			return nil, errors.Errorf("no secrets found under Vault path '%s'", c.path)
+		}
+		return nil, sanitizedVaultError(err, fmt.Sprintf("failed to list secrets under Vault path '%s'", c.path))
+	}
+	if res == nil {
+		return nil, errors.Errorf("failed to list secrets under Vault path '%s': Vault returned an empty response", c.path)
+	}
+
+	names := make([]string, 0, len(res.Data.Keys))
+	for _, key := range res.Data.Keys {
+		// KV v2 marks child folders with a trailing slash; keep only leaf keys.
+		if strings.HasSuffix(key, "/") || strings.TrimSpace(key) == "" {
+			continue
+		}
+		names = append(names, key)
+	}
+	sort.Strings(names)
+
+	return names, nil
 }
 
 func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
@@ -430,6 +509,34 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 }
 
 func (c *Client) fetchVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
+	connections, err := c.readConnections(name)
+	if err != nil {
+		return nil, err
+	}
+
+	environment := config.Environment{
+		Connections: connections,
+	}
+
+	cfg := config.Config{
+		Environments: map[string]config.Environment{
+			"default": environment,
+		},
+		SelectedEnvironmentName: "default",
+		SelectedEnvironment:     &environment,
+		DefaultEnvironmentName:  "default",
+	}
+
+	manager, errs := connection.NewManagerFromConfig(&cfg)
+	if len(errs) > 0 {
+		return nil, errors.Wrapf(errs[0], "failed to configure connection '%s'", name)
+	}
+
+	return manager, nil
+}
+
+// readConnections reads the Vault secret for name as a one-entry config.Connections.
+func (c *Client) readConnections(name string) (*config.Connections, error) {
 	requestTimeout := c.requestTimeout
 	if requestTimeout <= 0 {
 		requestTimeout = defaultVaultRequestTimeout
@@ -448,7 +555,7 @@ func (c *Client) fetchVaultManager(name string) (config.ConnectionAndDetailsGett
 	if err != nil {
 		var respErr *vault.ResponseError
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
-			return nil, errors.Errorf("secret '%s' not found in Vault", name)
+			return nil, newSecretNotFoundError("secret '%s' not found in Vault", name)
 		}
 		return nil, sanitizedVaultError(err, fmt.Sprintf("failed to read secret '%s' from Vault", name))
 	}
@@ -479,30 +586,32 @@ func (c *Client) fetchVaultManager(name string) (config.ConnectionAndDetailsGett
 	}
 
 	var connections config.Connections
-
 	if err := json.Unmarshal(serialized, &connections); err != nil {
 		return nil, errors.Wrapf(err, "failed to parse secret '%s' configuration", name)
 	}
 
-	environment := config.Environment{
-		Connections: &connections,
+	return &connections, nil
+}
+
+// GetConnectionsConfig lists every connection under the configured Vault path and merges them into one config.Connections.
+func (c *Client) GetConnectionsConfig() (*config.Connections, error) {
+	names, err := c.ListConnections()
+	if err != nil {
+		return nil, err
 	}
 
-	config := config.Config{
-		Environments: map[string]config.Environment{
-			"default": environment,
-		},
-		SelectedEnvironmentName: "default",
-		SelectedEnvironment:     &environment,
-		DefaultEnvironmentName:  "default",
+	aggregate := &config.Connections{}
+	for _, name := range names {
+		connections, err := c.readConnections(name)
+		if err != nil {
+			return nil, err
+		}
+		if err := aggregate.MergeFrom(connections); err != nil {
+			return nil, errors.Wrapf(err, "failed to merge connection '%s'", name)
+		}
 	}
 
-	manager, errs := connection.NewManagerFromConfig(&config)
-	if len(errs) > 0 {
-		return nil, errors.Wrapf(errs[0], "failed to configure connection '%s'", name)
-	}
-
-	return manager, nil
+	return aggregate, nil
 }
 
 func sanitizedVaultError(err error, message string) error {

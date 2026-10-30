@@ -81,4 +81,4 @@ Use these as the `source_table` parameter in the asset configuration.
 5. Copy the **Access Token** from the Credentials section.
 
 > [!NOTE]
-> For EU accounts, use the [EU Developer Portal](https://developer.eu.surveymonkey.com/apps/) and set `region: eu`. For CA accounts, use the [CA Developer Portal](https://developer.ca.surveymonkey.com/apps/) and set `region: ca`.
+> For EU accounts, use the [EU Developer Portal](https://developer.eu.surveymonkey.com/apps/) and set `region: eu`. For CA accounts, use the [CA Developer Portal](https://developer.surveymonkey.ca/apps/) and set `region: ca`.
