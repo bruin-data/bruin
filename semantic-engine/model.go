@@ -53,9 +53,9 @@ func (s Source) Relation(alias string) string {
 		return s.Table
 	}
 	if alias == "" {
-		return "(" + query + ")"
+		return "(" + query + "\n)"
 	}
-	return "(" + query + ") AS " + quoteAlias(alias)
+	return "(" + query + "\n) AS " + quoteAlias(alias)
 }
 
 // quoteAlias renders a model name as a SQL alias. Names that are plain,

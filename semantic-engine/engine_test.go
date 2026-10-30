@@ -260,7 +260,7 @@ func TestLoadFile_AcceptsQuerySource(t *testing.T) {
 	if model.Source.Table != "" {
 		t.Fatalf("expected empty source.table, got %q", model.Source.Table)
 	}
-	want := "(select * from analytics.orders\nwhere deleted_at is null) AS orders"
+	want := "(select * from analytics.orders\nwhere deleted_at is null\n) AS orders"
 	if got := model.SourceRelation(); got != want {
 		t.Fatalf("SourceRelation() = %q, want %q", got, want)
 	}
@@ -335,7 +335,7 @@ func TestGenerateSQL_QuerySource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateSQL: %v", err)
 	}
-	expectContains(t, sql, "FROM (select * from analytics.orders where deleted_at is null) AS orders")
+	expectContains(t, sql, "FROM (select * from analytics.orders where deleted_at is null\n) AS orders")
 }
 
 func TestGenerateSQL_ParenthesizedTableSource(t *testing.T) {
@@ -359,7 +359,7 @@ func TestSourceDryRunSQL(t *testing.T) {
 	t.Parallel()
 
 	querySource := Source{Query: "select 1 as id;"}
-	if got := querySource.DryRunSQL("orders"); got != "SELECT * FROM (select 1 as id) AS orders" {
+	if got := querySource.DryRunSQL("orders"); got != "SELECT * FROM (select 1 as id\n) AS orders" {
 		t.Fatalf("query DryRunSQL = %q", got)
 	}
 
@@ -377,17 +377,29 @@ func TestSourceRelation_QuotesUnsafeAliases(t *testing.T) {
 		alias string
 		want  string
 	}{
-		{alias: "orders", want: "(select 1 as id) AS orders"},
-		{alias: "order-items", want: `(select 1 as id) AS "order-items"`},
-		{alias: "sales model", want: `(select 1 as id) AS "sales model"`},
-		{alias: "order", want: `(select 1 as id) AS "order"`},
-		{alias: `we"ird`, want: `(select 1 as id) AS "we""ird"`},
+		{alias: "orders", want: "(select 1 as id\n) AS orders"},
+		{alias: "order-items", want: "(select 1 as id\n) AS \"order-items\""},
+		{alias: "sales model", want: "(select 1 as id\n) AS \"sales model\""},
+		{alias: "order", want: "(select 1 as id\n) AS \"order\""},
+		{alias: `we"ird`, want: "(select 1 as id\n) AS \"we\"\"ird\""},
 	}
 
 	for _, tc := range cases {
 		if got := querySource.Relation(tc.alias); got != tc.want {
 			t.Fatalf("Relation(%q) = %q, want %q", tc.alias, got, tc.want)
 		}
+	}
+}
+
+func TestSourceRelation_TrailingLineComment(t *testing.T) {
+	t.Parallel()
+
+	source := Source{Query: "select 1 -- keep this note"}
+	if got := source.Relation("orders"); got != "(select 1 -- keep this note\n) AS orders" {
+		t.Fatalf("Relation() = %q", got)
+	}
+	if got := source.Relation(""); got != "(select 1 -- keep this note\n)" {
+		t.Fatalf("Relation() = %q", got)
 	}
 }
 

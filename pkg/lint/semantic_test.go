@@ -296,7 +296,7 @@ metrics:
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 		require.Len(t, validator.queries, 2)
-		assert.Contains(t, validator.queries, "SELECT * FROM (select * from analytics.orders where deleted_at is null) AS filtered_orders")
+		assert.Contains(t, validator.queries, "SELECT * FROM (select * from analytics.orders where deleted_at is null\n) AS filtered_orders")
 		assert.Contains(t, validator.queries[0]+validator.queries[1], "SELECT * FROM (")
 		assert.Contains(t, validator.queries[0]+validator.queries[1], ") as paren_orders")
 	})
