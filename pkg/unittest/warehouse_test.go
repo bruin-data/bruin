@@ -7,6 +7,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // fakeRewriter stands in for the SQL parser: RenameTables does a naive textual
@@ -229,4 +230,64 @@ func TestBuildWarehouseQuery_FreezesWhenExecutionTimeSet(t *testing.T) {
 		pipeline.UnitTest{Inputs: []pipeline.UnitTestInput{orders}}, nil)
 	require.NoError(t, err)
 	require.Empty(t, f2.gotFreezeTime)
+}
+
+func TestBuildWarehouseQuery_FixtureTimestampLiterals(t *testing.T) {
+	t.Parallel()
+
+	const (
+		written  = "2026-10-09T11:00:00Z"
+		noZone   = "'2026-10-09 11:00:00'"
+		dateOnly = "'2026-10-09'"
+	)
+
+	tests := []struct {
+		name    string
+		dialect string
+		typ     string
+		value   string
+		want    string
+	}{
+		{"duckdb TIMESTAMPTZ keeps Z", "duckdb", "TIMESTAMPTZ", written, "CAST('2026-10-09T11:00:00Z' AS TIMESTAMPTZ) AS ts"},
+		{"duckdb long type name keeps an offset", "duckdb", "timestamp with time zone", "2026-10-09T11:00:00+01:00", "CAST('2026-10-09T11:00:00+01:00' AS timestamp with time zone) AS ts"},
+		{"duckdb keeps a zero offset", "duckdb", "TIMESTAMPTZ", "2026-10-09T11:00:00+00:00", "CAST('2026-10-09T11:00:00Z' AS TIMESTAMPTZ) AS ts"},
+		{"duckdb keeps fractional seconds with a zone", "duckdb", "TIMESTAMPTZ", "2026-10-09T11:00:00.25Z", "CAST('2026-10-09T11:00:00.25Z' AS TIMESTAMPTZ) AS ts"},
+		{"duckdb midnight with a zone is not a date", "duckdb", "TIMESTAMPTZ", "2026-10-09T00:00:00Z", "CAST('2026-10-09T00:00:00Z' AS TIMESTAMPTZ) AS ts"},
+		{"duckdb undeclared column keeps Z", "duckdb", "", written, "'2026-10-09T11:00:00Z' AS ts"},
+		{"duckdb no zone is unchanged", "duckdb", "TIMESTAMPTZ", "2026-10-09 11:00:00", "CAST(" + noZone + " AS TIMESTAMPTZ) AS ts"},
+		{"duckdb date is unchanged", "duckdb", "TIMESTAMPTZ", "2026-10-09", "CAST(" + dateOnly + " AS TIMESTAMPTZ) AS ts"},
+		{"duckdb undeclared no zone is unchanged", "duckdb", "", "2026-10-09 11:00:00", noZone + " AS ts"},
+		{"duckdb undeclared date is unchanged", "duckdb", "", "2026-10-09", dateOnly + " AS ts"},
+		{"duckdb TIMESTAMP stays zone-less", "duckdb", "TIMESTAMP", written, "CAST(" + noZone + " AS TIMESTAMP) AS ts"},
+		{"duckdb DATE stays a date", "duckdb", "DATE", "2026-10-09T00:00:00Z", "CAST(" + dateOnly + " AS DATE) AS ts"},
+		{"bigquery TIMESTAMP stays zone-less", "bigquery", "TIMESTAMP", written, "CAST(" + noZone + " AS TIMESTAMP) AS ts"},
+		{"bigquery DATE stays a date", "bigquery", "DATE", "2026-10-09T00:00:00Z", "CAST(" + dateOnly + " AS DATE) AS ts"},
+		{"other dialects stay zone-less", "snowflake", "TIMESTAMP_TZ", written, "CAST(" + noZone + " AS TIMESTAMP_TZ) AS ts"},
+		{"a quoted value goes as written", "bigquery", "DATETIME", `"2026-10-09T11:00:00Z"`, "CAST('2026-10-09T11:00:00Z' AS DATETIME) AS ts"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var input pipeline.UnitTestInput
+			require.NoError(t, yaml.Unmarshal([]byte("asset: analytics.events\nrows:\n  - ts: "+tt.value+"\n  - ts: "+tt.value+"\n"), &input))
+
+			var schemas map[string][]pipeline.Column
+			if tt.typ != "" {
+				schemas = map[string][]pipeline.Column{"analytics.events": {{Name: "ts", Type: tt.typ}}}
+			}
+			f := &fakeRewriter{used: []string{"analytics.events"}}
+			_, err := BuildWarehouseQuery(f, tt.dialect, "SELECT ts FROM analytics.events",
+				pipeline.UnitTest{Inputs: []pipeline.UnitTestInput{input}}, schemas)
+			require.NoError(t, err)
+
+			require.Len(t, f.gotCTEs, 1)
+			first, later, ok := strings.Cut(f.gotCTEs[0].Query, " UNION ALL SELECT ")
+			require.True(t, ok)
+			require.Equal(t, "SELECT "+tt.want, first)
+			// Later rows carry the same literal, without the CAST and the alias.
+			require.Contains(t, tt.want, later)
+		})
+	}
 }

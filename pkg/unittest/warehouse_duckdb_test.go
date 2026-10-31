@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -249,5 +250,97 @@ func TestBuildWarehouseQuery_RunsOnDuckDB(t *testing.T) {
 		res := run(t, sql)
 		require.Len(t, res.Rows, 1)
 		require.Contains(t, fmt.Sprint(res.Rows[0][0]), "2023-01-01 12:05:03")
+	})
+}
+
+// TestFixtureTimestamps_IgnoreSessionTimezone runs a fixture under several
+// session timezones. Each query opens its own connection, so the SET has to run
+// in the same batch. The zone-less rows follow the session on purpose, which
+// proves that the SET took effect.
+func TestFixtureTimestamps_IgnoreSessionTimezone(t *testing.T) {
+	t.Parallel()
+
+	parser, err := sqlparser.NewSQLParser(false)
+	require.NoError(t, err)
+	require.NoError(t, parser.Start())
+	defer parser.Close()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(`
+name: analytics.seen
+type: duckdb.sql
+unit_tests:
+  - name: seen
+    inputs:
+      - asset: analytics.events
+        rows:
+          - {id: 1, seen_at: 2026-10-09T11:00:00Z}
+          - {id: 2, seen_at: 2026-10-09T12:00:00+01:00}
+          - {id: 3, seen_at: 2026-10-09T00:00:00Z}
+          - {id: 4, seen_at: 2026-10-09 11:00:00}
+          - {id: 5, seen_at: 2026-10-09}
+`))
+	require.NoError(t, err)
+	test := task.UnitTests[0]
+
+	// epochs runs sql with the given session timezone and returns its one column.
+	epochs := func(t *testing.T, zone, sql string) []float64 {
+		t.Helper()
+		conn, err := duck.NewEphemeralConnection(duck.Config{Path: filepath.Join(t.TempDir(), "ut.duckdb")})
+		require.NoError(t, err)
+		rows, err := conn.QueryContext(context.Background(), fmt.Sprintf("SET TimeZone = '%s'; %s", zone, sql))
+		require.NoError(t, err)
+		defer rows.Close()
+
+		var got []float64
+		for rows.Next() {
+			var v float64
+			require.NoError(t, rows.Scan(&v))
+			got = append(got, v)
+		}
+		require.NoError(t, rows.Err())
+		return got
+	}
+
+	const assetSQL = "SELECT epoch(CAST(seen_at AS TIMESTAMPTZ)) AS seen FROM analytics.events ORDER BY id"
+	schemas := map[string]map[string][]pipeline.Column{
+		"declared":   {"analytics.events": {{Name: "id", Type: "BIGINT"}, {Name: "seen_at", Type: "TIMESTAMPTZ"}}},
+		"undeclared": nil,
+	}
+
+	for _, zone := range []string{"UTC", "Europe/London", "Asia/Tokyo"} {
+		for name, schema := range schemas {
+			t.Run(zone+" "+name, func(t *testing.T) {
+				t.Parallel()
+				loc, err := time.LoadLocation(zone)
+				require.NoError(t, err)
+				sql, err := unittest.BuildWarehouseQuery(parser, "duckdb", assetSQL, test, schema)
+				require.NoError(t, err)
+
+				require.Equal(t, []float64{
+					float64(time.Date(2026, 10, 9, 11, 0, 0, 0, time.UTC).Unix()),
+					float64(time.Date(2026, 10, 9, 11, 0, 0, 0, time.UTC).Unix()),
+					float64(time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC).Unix()),
+					float64(time.Date(2026, 10, 9, 11, 0, 0, 0, loc).Unix()),
+					float64(time.Date(2026, 10, 9, 0, 0, 0, 0, loc).Unix()),
+				}, epochs(t, zone, sql))
+			})
+		}
+	}
+
+	t.Run("a zoned value in an undeclared column still matches its expectation", func(t *testing.T) {
+		t.Parallel()
+		sql, err := unittest.BuildWarehouseQuery(parser, "duckdb",
+			"SELECT seen_at FROM analytics.events WHERE id = 2", test, nil)
+		require.NoError(t, err)
+		client, err := duck.NewClient(duck.Config{Path: filepath.Join(t.TempDir(), "ut.duckdb")})
+		require.NoError(t, err)
+		res, err := client.SelectWithSchema(context.Background(), &query.Query{Query: sql})
+		require.NoError(t, err)
+
+		expected := pipeline.UnitTestExpected{Rows: []map[string]interface{}{
+			{"seen_at": time.Date(2026, 10, 9, 11, 0, 0, 0, time.UTC)},
+		}}
+		got := unittest.CompareResult(expected, res.Columns, res.Rows)
+		require.True(t, got.Passed, got.Message)
 	})
 }

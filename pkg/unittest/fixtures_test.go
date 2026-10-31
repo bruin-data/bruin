@@ -53,7 +53,7 @@ func TestResolveFixtures(t *testing.T) {
 
 	t.Run("an explicit input overrides a fixture for the same asset", func(t *testing.T) {
 		t.Parallel()
-		ownRows := []map[string]interface{}{{"id": 42, "status": "refunded"}}
+		ownRows := pipeline.FixtureRows{{"id": 42, "status": "refunded"}}
 		test := pipeline.UnitTest{
 			Inputs:   []pipeline.UnitTestInput{{Asset: "analytics.orders", Rows: ownRows}},
 			Fixtures: []string{"base_orders"},
