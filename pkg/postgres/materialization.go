@@ -1519,11 +1519,6 @@ FROM %s AS source
 WHERE NOT EXISTS (
   SELECT 1 FROM %s AS target 
   WHERE %s AND target._is_current = TRUE
-)
-OR EXISTS (
-  SELECT 1 FROM %s AS target
-  WHERE %s AND target._is_current = FALSE 
-  AND target._valid_until = source.%s
 );
 
 DROP TABLE %s;
@@ -1544,9 +1539,6 @@ COMMIT;`,
 		tempTableName,
 		QuoteIdentifier(asset.Name),
 		onCondition,
-		QuoteIdentifier(asset.Name),
-		onCondition,
-		quotedIncrementalKey,
 		tempTableName,
 	)
 
