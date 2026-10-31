@@ -1896,6 +1896,14 @@ type DB2Connection struct {
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port               string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
 	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema             string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	SSL                bool   `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
+	Timeout            int    `yaml:"timeout,omitempty" json:"timeout,omitempty" mapstructure:"timeout"`
+	// Platform forces which Db2 catalog dialect ingestr uses to read table
+	// metadata. ingestr auto-detects LUW/z/OS/IBM i from the server's DRDA
+	// handshake, so this is only needed if that detection needs overriding
+	// (e.g. "ibmi" for DB2 for i / iSeries).
+	Platform string `yaml:"platform,omitempty" json:"platform,omitempty" mapstructure:"platform"`
 }
 
 func (c DB2Connection) GetName() string {

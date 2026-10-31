@@ -837,6 +837,10 @@ func TestLoadFromFile(t *testing.T) {
 					Host:               "host-123",
 					Port:               "1234",
 					Database:           "dbname-123",
+					Schema:             "schema-123",
+					SSL:                true,
+					Timeout:            15,
+					Platform:           "ibmi",
 				},
 			},
 			Oracle: []OracleConnection{

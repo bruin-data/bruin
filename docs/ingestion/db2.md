@@ -29,6 +29,20 @@ To connect to DB2, you need to add a configuration item to the connections secti
 - `host`: The host address of the database server
 - `port`: The port number the database server is listening
 - `database`: the name of the database to connect to
+- `schema` (optional): the default schema to use for unqualified table names. Defaults to the username, uppercased.
+- `ssl` (optional): set to `true` to connect over TLS.
+- `timeout` (optional): connection/read timeout in seconds. Defaults to 30.
+- `platform` (optional): forces which Db2 catalog dialect is used to read table metadata (`luw`, `zos`, or `ibmi`). ingestr auto-detects this from the server during the connection handshake, so it's only needed if that detection needs overriding.
+
+Bruin connects to Db2 using ingestr's native implementation of the DRDA wire protocol — the same protocol all Db2 platforms speak — so this works against Db2 for Linux/Unix/Windows, Db2 for z/OS, and **Db2 for i (iSeries/AS400)** without any additional JDBC driver or JVM.
+
+### Connecting to Db2 for i (iSeries/AS400)
+
+The same connection type works for Db2 for i, which many ERP systems (including Infor Signature) store their data in:
+
+- `database` must be the **relational database name** the IBM i system is registered under in its relational database directory (`WRKRDBDIRE` on the host), not an arbitrary label. This is often the system's own name.
+- `source_table` should reference `LIBRARY.FILE`, where "library" is the IBM i equivalent of a schema and "file" is a physical file exposed as a table, e.g. `MYLIB.MYFILE`.
+- The platform is auto-detected, so `platform: "ibmi"` is normally unnecessary. Set it explicitly only if detection picks the wrong catalog dialect.
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -51,6 +65,22 @@ parameters:
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the DB2 connection defined in .bruin.yml.
 - `source_table`: The name of the data table in DB2 that you want to ingest.
+
+#### Example: ingesting a Signature (Db2 for i) table
+
+```yaml
+name: public.ar_customers
+type: ingestr
+connection: neon
+
+parameters:
+  source_connection: signature
+  source_table: 'MYLIB.MYFILE'
+
+  destination: postgres
+```
+
+Here `signature` is a `db2` connection in `.bruin.yml` pointed at the IBM i LPAR that hosts Signature, and `MYLIB.MYFILE` is a library/file pair from the Signature data dictionary.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
