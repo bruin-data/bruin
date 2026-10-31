@@ -2,6 +2,8 @@ module github.com/bruin-data/bruin
 
 go 1.25.13
 
+godebug multipathtcp=0
+
 tool (
 	github.com/daixiang0/gci
 	mvdan.cc/gofumpt
