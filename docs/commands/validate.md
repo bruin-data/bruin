@@ -31,6 +31,12 @@ Defaults to the current directory (".") if not provided.
 | `--exclude-paths`        |            | Excludes the given paths from the folders that are searched during validation. |
 | `--full-refresh`         |            | Validate with full refresh mode enabled.                                     |
 
+### Variable Schema Warnings
+
+Pipeline validation checks [custom variable schemas and values](../variables/custom.md) as warnings, including with `--fast`. Each variable is checked independently, and values from `--var` or `--variant` are checked in place of the declared defaults. These warnings do not change the exit status or block `bruin run`. Missing variable defaults remain errors, as before.
+
+Legacy `int` types and unquoted YAML `null` types are normalized only for this check; runtime values and exported schemas are unchanged. Variables with `$ref` schemas are skipped with a warning, without resolving local, file, or network references. Use `--exclude-warnings` to skip these checks.
+
 ### Dry-run Validation
 
 One of the beneficial features of the `validate` command is the ability to perform a dry-run validation on the destination data platform. This means, effectively Bruin runs a dry-run version of the query to ensure that the query is valid and can be executed on the destination data platform. This gives a very strong peace of mind in terms of the accuracy of the queries from a syntactical and semantical perspective, and also ensures that the query can be executed on the destination data platform.
