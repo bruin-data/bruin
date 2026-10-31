@@ -22,6 +22,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -43,6 +44,8 @@ const (
 	outputFormatPlain = "plain"
 )
 
+// ppInfo holds what the query command resolved for its input. Pipeline and
+// Asset are nil in direct query mode (--connection and --query).
 type ppInfo struct {
 	Pipeline *pipeline.Pipeline
 	Asset    *pipeline.Asset
@@ -213,8 +216,13 @@ func Query() *cli.Command {
 			// of which resolve to a *cloudQuerier here.
 			_, cloudMode := conn.(*cloudQuerier)
 
+			schemaPrefix := ""
+			if pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment != nil {
+				schemaPrefix = pipelineInfo.Config.SelectedEnvironment.SchemaPrefix
+			}
+
 			var parser *sqlparser.SQLParser
-			needsParser := !cloudMode && (c.IsSet("limit") || (pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != ""))
+			needsParser := !cloudMode && (c.IsSet("limit") || schemaPrefix != "")
 
 			if needsParser {
 				parser, err = sqlparser.NewSQLParser(false)
@@ -229,9 +237,8 @@ func Query() *cli.Command {
 				}
 			}
 
-			// Apply schema prefix if configured
-			if pipelineInfo != nil && pipelineInfo.Config.SelectedEnvironment.SchemaPrefix != "" && parser != nil {
-				queryStr, err = applySchemaPrefix(ctx, queryStr, dialect, parser, pipelineInfo, conn)
+			if schemaPrefix != "" && parser != nil {
+				queryStr, err = applySchemaPrefix(ctx, queryStr, dialect, schemaPrefix, c.String("semantic-model") != "", parser, connName, conn)
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to apply schema prefix"))
 				}
@@ -636,17 +643,23 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
+		if cm.SelectedEnvironment != nil {
+			renderer.SetContextValue("schema_prefix", cm.SelectedEnvironment.SchemaPrefix)
+		}
 		queryStr, err = extractQuery(queryStr, extractor)
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		return connectionName, conn, queryStr, sqlparser.ConnectionTypeToDialect(connType), nil, nil
+		return connectionName, conn, queryStr, sqlparser.ConnectionTypeToDialect(connType), &ppInfo{Config: cm}, nil
 	}
 
 	if queryStr != "" {
 		pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, errors.Wrap(err, "failed to get pipeline info")
+		}
+		if err := selectQueryEnvironment(pipelineInfo, env); err != nil {
+			return "", nil, "", "", nil, err
 		}
 		fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
@@ -688,6 +701,9 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 	pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 	if err != nil {
 		return "", nil, "", "", nil, errors.Wrap(err, "failed to get pipeline info")
+	}
+	if err := selectQueryEnvironment(pipelineInfo, env); err != nil {
+		return "", nil, "", "", nil, err
 	}
 
 	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
@@ -1164,12 +1180,22 @@ func extractQuery(content string, extractor query.QueryExtractor) (string, error
 	return queries[0].Query, nil
 }
 
+// selectQueryEnvironment switches to the --environment given to the query
+// command. It has to run before the query is rendered, since the environment
+// sets the schema_prefix Jinja variable.
+func selectQueryEnvironment(pipelineInfo *ppInfo, env string) error {
+	if env == "" {
+		return nil
+	}
+	if err := pipelineInfo.Config.SelectEnvironment(env); err != nil {
+		return errors.Wrapf(err, "failed to use the environment '%s'", env)
+	}
+	return nil
+}
+
 func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo *ppInfo, env string) (string, interface{}, error) {
-	if env != "" {
-		err := pipelineInfo.Config.SelectEnvironment(env)
-		if err != nil {
-			return "", nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
-		}
+	if err := selectQueryEnvironment(pipelineInfo, env); err != nil {
+		return "", nil, err
 	}
 
 	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, pipelineInfo.Config.Path())
@@ -1595,22 +1621,26 @@ func writeCSVFile(path string, columns []string, rows [][]interface{}) error {
 	return nil
 }
 
-func applySchemaPrefix(_ context.Context, queryStr, dialect string, parser *sqlparser.SQLParser, pipelineInfo *ppInfo, conn interface{}) (string, error) {
+// applySchemaPrefix points the query at the selected environment's
+// schema_prefix. SQL queries follow `bruin run`: a schema.table reference is
+// rewritten only when the prefixed table exists on the connection. Semantic
+// queries prefix every reference, matching `bruin semantic check`.
+func applySchemaPrefix(ctx context.Context, queryStr, dialect, schemaPrefix string, semanticQuery bool, parser *sqlparser.SQLParser, connName string, conn interface{}) (string, error) {
 	if dialect == "" {
 		// If no dialect, we can't rewrite the query
 		return queryStr, nil
 	}
 
-	env := pipelineInfo.Config.SelectedEnvironment
-	if env.SchemaPrefix == "" {
-		return queryStr, nil
+	if semanticQuery {
+		return prefixTableSchemas(queryStr, dialect, schemaPrefix, parser)
 	}
 
-	// Check if connection supports getting database summary for schema validation
-	// Note: This could be extended in the future to validate table existence
-	_ = conn
-
-	return prefixTableSchemas(queryStr, dialect, env.SchemaPrefix, parser)
+	modifier := &devenv.DevEnvQueryModifier{Dialect: dialect, Parser: parser}
+	q, err := modifier.ModifyForConnection(ctx, schemaPrefix, connName, conn, &query.Query{Query: queryStr})
+	if err != nil {
+		return "", err
+	}
+	return q.Query, nil
 }
 
 // prefixTableSchemas rewrites every schema.table reference in the query to

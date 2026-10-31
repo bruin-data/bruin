@@ -38,14 +38,10 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 		return q, nil
 	}
 
-	assetName := a.Name
-	assetNameParts := strings.Split(assetName, ".")
+	assetNameParts := strings.Split(a.Name, ".")
 	if len(assetNameParts) != 2 && len(assetNameParts) != 3 {
 		return q, nil
 	}
-
-	var wg sync.WaitGroup
-	var usedTables []string
 
 	connName, err := p.GetConnectionNameForAsset(a)
 	if err != nil {
@@ -57,12 +53,42 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 		return nil, config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
-	dbFetcherConn, ok := conn.(interface {
-		GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
-	})
+	dbFetcherConn, ok := conn.(databaseSummaryFetcher)
 	if !ok {
 		return nil, fmt.Errorf("the asset type '%s' does not support developer environments, please create an issue if you'd like that", a.Type)
 	}
+
+	return d.rewrite(ctx, env.SchemaPrefix, connName, dbFetcherConn, a.Name, q)
+}
+
+// ModifyForConnection rewrites a query that does not belong to an asset, such as
+// an ad-hoc `bruin query`, the same way Modify does: each schema.table reference
+// is pointed at the prefixed schema when that table exists there.
+func (d *DevEnvQueryModifier) ModifyForConnection(ctx context.Context, schemaPrefix, connName string, conn any, q *query.Query) (*query.Query, error) {
+	if schemaPrefix == "" {
+		return q, nil
+	}
+
+	dbFetcherConn, ok := conn.(databaseSummaryFetcher)
+	if !ok {
+		return nil, fmt.Errorf("the connection '%s' does not support developer environments, please create an issue if you'd like that", connName)
+	}
+
+	return d.rewrite(ctx, schemaPrefix, connName, dbFetcherConn, "", q)
+}
+
+type databaseSummaryFetcher interface {
+	GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
+}
+
+// rewrite renames the tables used by q to their prefixed copies. assetName is
+// the already-prefixed name of the asset that owns the query, or empty when
+// there is none.
+func (d *DevEnvQueryModifier) rewrite(ctx context.Context, schemaPrefix, connName string, dbFetcherConn databaseSummaryFetcher, assetName string, q *query.Query) (*query.Query, error) {
+	var err error
+	var wg sync.WaitGroup
+	var usedTables []string
+	conn := any(dbFetcherConn)
 
 	var usedTablesError error
 	wg.Add(1)
@@ -112,7 +138,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 		if len(parts) != 3 || strings.EqualFold(parts[0], dbSummary.Name) {
 			continue
 		}
-		devSchema := env.SchemaPrefix + parts[1]
+		devSchema := schemaPrefix + parts[1]
 		if d.databaseSummaryTableExists(dbSummary, parts[0], devSchema, parts[2]) {
 			continue
 		}
@@ -139,14 +165,8 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	// we modify the asset names globally outside of this function.
 	// this means if for some case the asset query queries itself, it would be cool if we handle that as well.
 	// this conditional tries to do that.
-	assetSchemaIndex := len(assetNameParts) - 2
-	if strings.HasPrefix(assetNameParts[assetSchemaIndex], env.SchemaPrefix) {
-		originalAssetNameParts := append([]string(nil), assetNameParts...)
-		originalAssetNameParts[assetSchemaIndex] = strings.TrimPrefix(
-			originalAssetNameParts[assetSchemaIndex],
-			env.SchemaPrefix,
-		)
-		renameMapping[strings.Join(originalAssetNameParts, ".")] = assetName
+	if original, ok := UnprefixedName(assetName, schemaPrefix); ok {
+		renameMapping[original] = assetName
 	}
 
 	for _, tableReference := range usedTables {
@@ -157,7 +177,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 			// schema.table -> dev_schema.table
 			schema := parts[0]
 			table := parts[1]
-			devSchema := env.SchemaPrefix + schema
+			devSchema := schemaPrefix + schema
 			devTable := fmt.Sprintf("%s.%s", devSchema, table)
 
 			if d.databaseSummaryTableExists(dbSummary, dbSummary.Name, devSchema, table) {
@@ -169,7 +189,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 			schema := parts[1]
 			table := parts[2]
 
-			devSchema := env.SchemaPrefix + schema
+			devSchema := schemaPrefix + schema
 			devTable := fmt.Sprintf("%s.%s.%s", database, devSchema, table)
 
 			tableExists := d.databaseSummaryTableExists(dbSummary, database, devSchema, table)
@@ -200,6 +220,23 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	}
 
 	return q, nil
+}
+
+// UnprefixedName returns the name an asset had before its schema was prefixed,
+// e.g. "mart.table1" for "dev_mart.table1". It reports false when the name is not
+// a schema.table or catalog.schema.table name with a prefixed schema.
+func UnprefixedName(assetName, schemaPrefix string) (string, bool) {
+	parts := strings.Split(assetName, ".")
+	if schemaPrefix == "" || (len(parts) != 2 && len(parts) != 3) {
+		return "", false
+	}
+
+	schemaIndex := len(parts) - 2
+	if !strings.HasPrefix(parts[schemaIndex], schemaPrefix) {
+		return "", false
+	}
+	parts[schemaIndex] = strings.TrimPrefix(parts[schemaIndex], schemaPrefix)
+	return strings.Join(parts, "."), true
 }
 
 func (d *DevEnvQueryModifier) databaseSummaryTableExists(

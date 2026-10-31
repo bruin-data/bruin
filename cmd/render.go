@@ -8,6 +8,7 @@ import (
 	"os"
 	path2 "path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/doris"
 	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
@@ -90,6 +92,11 @@ func Render() *cli.Command {
 			&cli.BoolFlag{
 				Name:  "raw-query",
 				Usage: "output only the raw query",
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"e", "env"},
+				Usage:   "the environment to render for, which also applies its schema_prefix",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -203,13 +210,29 @@ func Render() *cli.Command {
 				}
 			}
 
+			environment := c.String("environment")
 			cm, err := loadRenderConfig(fs, inputPath, c.String("config-file"), false)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to load the config file:")
 				return cli.Exit("", 1)
 			}
-			if cm != nil {
+			if environment != "" {
+				if cm == nil {
+					printError(errors.New("no .bruin.yml file found"), c.String("output"), fmt.Sprintf("Failed to use the environment '%s'", environment))
+					return cli.Exit("", 1)
+				}
+				if err := cm.SelectEnvironment(environment); err != nil {
+					printError(err, c.String("output"), fmt.Sprintf("Failed to use the environment '%s'", environment))
+					return cli.Exit("", 1)
+				}
+			}
+			schemaPrefix := ""
+			if cm != nil && cm.SelectedEnvironment != nil {
 				applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, asset)
+				// Same as `bruin run`: the asset is built under the prefixed schema.
+				schemaPrefix = cm.SelectedEnvironment.SchemaPrefix
+				asset.PrefixSchema(schemaPrefix)
+				asset.PrefixUpstreams(schemaPrefix)
 			}
 			clickHouseCluster, err := clickHouseClusterForRender(cm, pl, asset)
 			if err != nil {
@@ -249,6 +272,9 @@ func Render() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+			if cm != nil && cm.SelectedEnvironment != nil {
+				runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
+			}
 
 			// Load macros from the pipeline's macros directory
 			macroContent, err := jinja.LoadMacros(pipelineBuilderFs, pl.MacrosPath)
@@ -270,9 +296,14 @@ func Render() *cli.Command {
 			// Hoisting only parses when the SQL contains DECLARE. On failure,
 			// hook wrapping preserves the original SQL.
 			var hoister pipeline.DeclareHoister
+			var tableRenamer tableRenamer
 			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
 				defer p.Close()
 				hoister = p
+				tableRenamer = p
+			} else if schemaPrefix != "" {
+				printError(parserErr, c.String("output"), "Failed to initialize the SQL parser for the schema prefix")
+				return cli.Exit("", 1)
 			}
 
 			r := RenderCommand{
@@ -280,7 +311,9 @@ func Render() *cli.Command {
 					Fs:       fs,
 					Renderer: forAsset,
 				},
-				hoister: hoister,
+				hoister:      hoister,
+				tableRenamer: tableRenamer,
+				schemaPrefix: schemaPrefix,
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeDorisQuery:              doris.NewMaterializer(fullRefresh),
@@ -411,11 +444,20 @@ type taskCreator interface {
 	CreateAssetFromFile(path string, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error)
 }
 
+type tableRenamer interface {
+	UsedTables(sql, dialect string) ([]string, error)
+	RenameTables(sql, dialect string, tableMapping map[string]string) (string, error)
+}
+
 type RenderCommand struct {
 	extractor     queryExtractor
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
 	hoister       pipeline.DeclareHoister
+	tableRenamer  tableRenamer
+	// schemaPrefix is the selected environment's schema_prefix; the asset name
+	// is expected to carry it already.
+	schemaPrefix string
 
 	output   string
 	writer   io.Writer
@@ -481,6 +523,14 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 		}
 	}
 
+	if !isQuerySensorAsset(task.Type) {
+		qq.Query, err = r.renameSelfReferences(task, qq.Query)
+		if err != nil {
+			r.printErrorOrJsonf("Failed to apply the schema prefix: %v\n", err.Error())
+			return cli.Exit("", 1)
+		}
+	}
+
 	if hasMaterializer && r.output != "json" {
 		qq.Query = highlightCode(qq.Query, "sql")
 	}
@@ -503,6 +553,35 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	}
 
 	return err
+}
+
+// renameSelfReferences points references to the asset's own table at its
+// prefixed name, as `bruin run` does. Other tables are left alone: run only
+// prefixes those when the prefixed table exists, which render cannot check
+// without connecting to the database.
+func (r *RenderCommand) renameSelfReferences(task *pipeline.Asset, sql string) (string, error) {
+	original, ok := devenv.UnprefixedName(task.Name, r.schemaPrefix)
+	if !ok || r.tableRenamer == nil {
+		return sql, nil
+	}
+	dialect, err := sqlparser.AssetTypeToDialect(task.Type)
+	if err != nil {
+		return sql, nil //nolint:nilerr // assets without a SQL dialect are rendered as-is
+	}
+
+	usedTables, err := r.tableRenamer.UsedTables(sql, dialect)
+	if err != nil {
+		return "", err
+	}
+	// Match the name exactly, as `bruin run` does: whether MART.events and
+	// mart.events are the same table depends on the dialect and on quoting,
+	// which UsedTables does not report. Renaming regenerates the SQL, so skip
+	// it when there is nothing to rename.
+	if !slices.Contains(usedTables, original) {
+		return sql, nil
+	}
+
+	return r.tableRenamer.RenameTables(sql, dialect, map[string]string{original: task.Name})
 }
 
 func isQuerySensorAsset(assetType pipeline.AssetType) bool {
