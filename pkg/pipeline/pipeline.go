@@ -1139,6 +1139,7 @@ type CustomCheck struct {
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
 	Retries       *int            `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+	Line          int             `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 // UnitTest pins an asset's transformation logic by running it against mocked
