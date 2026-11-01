@@ -127,7 +127,7 @@ bruin ai enhance assets/orders.sql --environment production
 Override the default AI model:
 
 ```bash
-bruin ai enhance assets/orders.sql --model claude-opus-4-20250514
+bruin ai enhance assets/orders.sql --model claude-opus-5-5
 ```
 
 ### Use an Alternative Provider
