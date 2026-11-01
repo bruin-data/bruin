@@ -713,12 +713,16 @@ func (c *APIClient) SetAgentMcpServers(ctx context.Context, agentID int, servers
 	return c.UpdateAgent(ctx, agentID, map[string]any{"mcp_integrations": servers})
 }
 
-func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int) (json.RawMessage, error) {
+// SendAgentMessage posts a message; outputSchema (new threads only) makes the agent answer with matching structured_output.
+func (c *APIClient) SendAgentMessage(ctx context.Context, agentID int, message string, threadID *int, outputSchema json.RawMessage) (json.RawMessage, error) {
 	body := map[string]any{
 		"message": message,
 	}
 	if threadID != nil {
 		body["thread_id"] = *threadID
+	}
+	if len(outputSchema) > 0 {
+		body["output_schema"] = outputSchema
 	}
 	var result json.RawMessage
 	err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/messages", agentID), body, &result)
