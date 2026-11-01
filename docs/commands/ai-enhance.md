@@ -236,8 +236,8 @@ The AI uses column naming conventions to infer appropriate checks:
 
 | Provider | Default Model | Flag |
 |----------|--------------|------|
-| Claude Code | `claude-sonnet-4-20250514` | `--claude` (default) |
-| OpenCode | `anthropic/claude-sonnet-4-20250514` | `--opencode` |
+| Claude Code | `claude-sonnet-5-5` | `--claude` (default) |
+| OpenCode | `anthropic/claude-sonnet-5-5` | `--opencode` |
 | Codex | `gpt-5-codex` | `--codex` |
 
 ### API Key Configuration
