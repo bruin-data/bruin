@@ -79,7 +79,11 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 	}
 
-	if ctx.Value(pipeline.RunConfigStartDate) != nil {
+	cdc, _ := asset.Parameters.GetString("cdc")
+	chunked, _ := asset.Parameters.GetString("cdc_snapshot_chunked")
+	// Chunked CDC copies complete tables, so scheduler intervals cannot filter it.
+	chunkedCDC := cdc == "true" && chunked == "true"
+	if !chunkedCDC && ctx.Value(pipeline.RunConfigStartDate) != nil {
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
 			// If full-refresh and asset has a start_date, use that instead
@@ -102,7 +106,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	// In streaming mode --interval-end would truncate the live tail, so only bound
 	// the initial snapshot with --interval-start and leave the stream open-ended.
 	streaming := isStreamingParams(asset.Parameters)
-	if !streaming && ctx.Value(pipeline.RunConfigEndDate) != nil {
+	if !chunkedCDC && !streaming && ctx.Value(pipeline.RunConfigEndDate) != nil {
 		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 		if okParse {
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)

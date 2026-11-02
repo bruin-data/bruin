@@ -206,6 +206,12 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | `cdc_delete_behavior` | No | `soft` (default) retains deleted rows with `_cdc_deleted = true`; `hard` removes them from the destination. Applies to batch and streaming CDC. Requires ingestr v1.1.77 or later; see [Delete behavior](#delete-behavior) |
 | `cdc_snapshot_mode` | No | `auto` allows snapshots and backfills; `never` prohibits them. Omission inherits the saved policy; new connectors default to `auto`. Requires ingestr v1.1.78 or later; see [CDC without snapshots](#cdc-without-snapshots) |
 | `cdc_start_lsn` | No | Nonzero PostgreSQL LSN for bootstrapping preloaded destination tables with `cdc_snapshot_mode: never`. Remove after successful bootstrap. Requires ingestr v1.1.78 or later |
+| `cdc_snapshot_chunked` | No | Enables resumable snapshots in short transactions; defaults to `false`. Requires ingestr v1.1.81 or later. See [Large initial snapshots](#large-initial-snapshots) |
+| `cdc_snapshot_execution` | No | `serial` (default) copies all selected tables before replaying retained WAL; `parallel` decodes changes while copying chunks |
+| `cdc_snapshot_chunk_size` | No | Positive maximum row count per chunk; defaults to `10000` |
+| `cdc_snapshot_chunk_timeout` | No | Positive duration per chunk, including temporary replication-slot creation; defaults to `30s` |
+| `cdc_wal_staging` | No | `inmemory` (default) or `destination`. Destination staging requires `cdc_snapshot_execution: parallel` |
+| `cdc_wal_buffer_bytes` | No | Positive decoded-event buffering threshold in bytes; defaults to `67108864` (64 MiB). Does not bound total process memory or retained source WAL |
 | `stream` | No | Set to `true` for continuous (real-time) streaming. Omit for batch replication (read up to the current WAL position and exit) |
 | `cdc_mode` | No | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true` |
 | `cdc_publication` | No | Name of the PostgreSQL publication to use |
@@ -232,6 +238,64 @@ The setting requires ingestr v1.1.77 or later and applies to tables with a usabl
 Switching an existing asset from `soft` to `hard` leaves previously written tombstones in place until their keys change again. To remove them, rebuild the destination with `bruin run --full-refresh`; for a streaming asset, use [streaming full refresh](../assets/ingestr.md#refreshing-a-stream).
 
 Full refresh is unavailable for connectors using `cdc_snapshot_mode: never`; remove existing tombstones explicitly if you change their delete behavior.
+
+### Large initial snapshots
+
+With ingestr v1.1.81 or later, set `cdc_snapshot_chunked: true` to copy large PostgreSQL tables in key-range chunks, each in a separate transaction. The source transaction closes before waiting for destination writes. Completed chunks have durable checkpoints, so an interrupted first bootstrap can resume without copying them again. Chunking is off by default; omitting the parameter keeps the existing snapshot behavior.
+
+Choose how changes are processed during the initial copy:
+
+| `cdc_snapshot_execution` | Initial copy and catch-up | Pending changes |
+| --- | --- | --- |
+| `serial` (default) | Copy every selected table in chunks, then decode and apply retained WAL | PostgreSQL retains WAL from the initial boundary throughout copying; no concurrent decoder runs during that phase |
+| `parallel` | Decode changes while copying chunks and catch up after each chunk | Decoded events are staged in memory or in the destination |
+
+This asset uses serial execution and the default chunk settings:
+
+```yaml
+name: public.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.orders
+  destination: bigquery
+  cdc: true
+  cdc_snapshot_chunked: true
+  cdc_snapshot_execution: serial
+  cdc_snapshot_chunk_size: 10000
+  cdc_snapshot_chunk_timeout: 30s
+  cdc_wal_staging: inmemory
+  cdc_wal_buffer_bytes: 67108864
+```
+
+Run it with `bruin run assets/public.orders.asset.yml` to snapshot, catch up, and exit. Add `stream: true` and run `bruin run --stream assets/public.orders.asset.yml` to continue replicating changes after catch-up. Single-table and multi-table selections are supported. Bruin uses `merge` for CDC assets and omits run interval bounds for chunked snapshots because they read complete selected tables.
+
+For parallel execution, keep `cdc_wal_staging: inmemory` to buffer decoded events in the process, or set these parameters on the asset to persist pending events in the destination:
+
+```yaml
+cdc_snapshot_execution: parallel
+cdc_wal_staging: destination
+```
+
+Serial execution requires `cdc_wal_staging: inmemory`. It does not collect decoded events while copying; the source retains WAL instead. Combining serial execution with destination staging is rejected.
+
+All execution and staging choices save chunk cursors and recovery metadata in the destination's managed `cdc_snapshot_wal` table. Parallel execution with destination staging also stores pending logical change events there, not PostgreSQL WAL segment files. Preserve this table and the connector's other managed CDC state across restarts.
+
+Short transactions limit the snapshot horizon held on the source, but do not limit WAL retention. Serial execution needs enough source disk space for WAL retained throughout copying, then advances its checkpoint through catch-up. Parallel execution with memory staging also retains WAL needed for recovery; destination staging trades extra destination writes and storage for durable pending events. The memory budget is a buffering threshold, not a limit on total process memory or source WAL size. A table is certified complete only after its required catch-up finishes.
+
+Requirements and recovery:
+
+- Use PostgreSQL 14 or newer, or 16 or newer when reading from a standby. The source needs a spare replication slot and replication connection for temporary chunk snapshots.
+- Every selected table needs non-null keys backed by a compatible unique B-tree index. Composite keys are supported. For tables containing text, binary, JSON, array, decimal, or unknown column types, set `REPLICA IDENTITY FULL` before bootstrapping, for example `ALTER TABLE public.orders REPLICA IDENTITY FULL`.
+- The destination must support CDC merges, truncation, and managed CDC state. Chunked snapshots use checkpointed merges for batch and full-refresh runs.
+- Chunk size, timeout, and memory budget must be positive. An expired chunk fails safely and can be retried on the next run.
+- Do not combine chunking with `cdc_snapshot_mode: never`, `cdc_start_lsn`, `sql_limit`, `sql_exclude_columns`, an incremental key or predicate, asset-level interval bounds, or `extract_partition_by`.
+- Keep the slot, table selection, staging namespace, execution mode, and WAL staging mode unchanged when resuming. Changing them requires a new baseline with `bruin run --full-refresh`; streaming assets use [streaming full refresh](../assets/ingestr.md#refreshing-a-stream).
+- Schema changes, replaced destinations, and source `TRUNCATE` during an unfinished bootstrap stop the run. Establish a new baseline with full refresh. After bootstrap, ordinary CDC truncate handling applies.
+
+See the [ingestr large-snapshot guide](https://getbruin.com/docs/ingestr/supported-sources/postgres.html#large-initial-snapshots) for detailed index and recovery requirements.
 
 ### CDC without snapshots
 
