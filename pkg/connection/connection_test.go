@@ -1490,3 +1490,34 @@ func TestSnowflakeReadOnlyConnection(t *testing.T) {
 	_, err = db.GetIngestrURI()
 	require.ErrorContains(t, err, "read-only")
 }
+
+func TestValidateDuckDBQuack(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		conn    config.DuckDBConnection
+		wantErr string
+	}{
+		{name: "local file", conn: config.DuckDBConnection{Path: "a.db", ReadOnly: true}},
+		{name: "quack", conn: config.DuckDBConnection{Quack: true, Host: "localhost", Port: 9494, Token: "abc", DisableSSL: true}},
+		{name: "host without quack", conn: config.DuckDBConnection{Path: "a.db", Host: "localhost"}, wantErr: "only be used with quack: true"},
+		{name: "token without quack", conn: config.DuckDBConnection{Path: "a.db", Token: "abc"}, wantErr: "only be used with quack: true"},
+		{name: "disable_ssl without quack", conn: config.DuckDBConnection{Path: "a.db", DisableSSL: true}, wantErr: "only be used with quack: true"},
+		{name: "quack without host", conn: config.DuckDBConnection{Quack: true, Token: "abc"}, wantErr: "host and token are required"},
+		{name: "quack without token", conn: config.DuckDBConnection{Quack: true, Host: "localhost"}, wantErr: "host and token are required"},
+		{name: "quack with path", conn: config.DuckDBConnection{Quack: true, Host: "localhost", Token: "abc", Path: "a.db"}, wantErr: "cannot be used with quack: true"},
+		{name: "quack with lakehouse", conn: config.DuckDBConnection{Quack: true, Host: "localhost", Token: "abc", Lakehouse: &config.LakehouseConfig{}}, wantErr: "cannot be used with quack: true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateDuckDBQuack(&tt.conn)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}

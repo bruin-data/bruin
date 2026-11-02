@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"math/rand/v2"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -159,7 +160,20 @@ func databaseLockFor(path string) *databaseLock {
 	return lock.(*databaseLock)
 }
 
+// isQuackURI reports whether the URI points at a Quack server, which serves
+// many clients at once and so needs no local lock.
+func isQuackURI(path string) bool {
+	if !strings.HasPrefix(path, "duckdb://") {
+		return false
+	}
+	u, err := url.Parse(path)
+	return err == nil && u.Query().Get("quack") == "true"
+}
+
 func LockDatabase(path string) {
+	if isQuackURI(path) {
+		return
+	}
 	lock := databaseLockFor(path)
 	lock.Lock()
 	lock.gate.RLock()
@@ -168,15 +182,21 @@ func LockDatabase(path string) {
 }
 
 func UnlockDatabase(path string) {
+	if isQuackURI(path) {
+		return
+	}
 	databaseLockFor(path).Unlock()
 }
 
 // LockDatabases acquires source/destination files once, in a consistent order,
 // including when different URIs refer to the same file.
 func LockDatabases(paths ...string) func() {
-	keys := make([]string, len(paths))
-	for i, path := range paths {
-		keys[i] = databaseLockKey(path)
+	keys := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if isQuackURI(path) {
+			continue
+		}
+		keys = append(keys, databaseLockKey(path))
 	}
 	slices.Sort(keys)
 	keys = slices.Compact(keys)
