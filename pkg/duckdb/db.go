@@ -146,6 +146,11 @@ type connection interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) Row
 }
 
+// streamingConnection reads results lazily; the rows hold the connection until they are closed.
+type streamingConnection interface {
+	QueryStreamContext(ctx context.Context, query string, args ...any) (Rows, error)
+}
+
 // sqlxWrapper wraps *sqlx.DB to implement the connection interface.
 // This is needed because *sqlx.DB returns *sql.Rows but our interface returns Rows.
 type sqlxWrapper struct {
@@ -302,6 +307,10 @@ func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRun
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
+	return query.CollectRows(ctx, c, queryObject)
+}
+
+func (c *Client) StreamWithSchema(ctx context.Context, queryObject *query.Query, h query.RowHandler) (*query.QueryResult, error) {
 	if !query.IsLikelyResultQuery(queryObject.String()) {
 		execResult, err := c.connection.ExecContext(ctx, queryObject.String())
 		if err != nil {
@@ -325,7 +334,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 		}, nil
 	}
 
-	rows, err := c.connection.QueryContext(ctx, queryObject.String())
+	queryRows := c.connection.QueryContext
+	if streaming, ok := c.connection.(streamingConnection); ok {
+		queryRows = streaming.QueryStreamContext
+	}
+	rows, err := queryRows(ctx, queryObject.String())
 	if err != nil {
 		return nil, err
 	}
@@ -358,6 +371,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 		typeStrings[i] = normalizeTypeName(ct.DatabaseTypeName())
 	}
 	result.ColumnTypes = typeStrings
+	if err := h.Schema(result.Columns, result.ColumnTypes); err != nil {
+		return nil, err
+	}
 
 	for rows.Next() {
 		columns := make([]interface{}, len(cols))
@@ -376,7 +392,13 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 			columns[i] = c.convertValueWithType(val, columnTypes[i])
 		}
 
-		result.Rows = append(result.Rows, columns)
+		if err := h.Row(columns); err != nil {
+			return nil, err
+		}
+	}
+	// Streamed batches are read during Next, so a failed read only shows up here.
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil

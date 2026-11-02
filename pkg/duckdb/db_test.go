@@ -108,6 +108,46 @@ func TestDB_Select(t *testing.T) {
 	}
 }
 
+func TestDB_StreamWithSchemaStopsOnRowError(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	mock.ExpectQuery("SELECT id FROM users").
+		WillReturnRows(
+			sqlmock.NewRowsWithColumnDefinition(
+				sqlmock.NewColumn("id").OfType("BIGINT", int64(1)),
+			).AddRow(1).AddRow(2),
+		)
+
+	db := Client{connection: newSqlxWrapper(sqlx.NewDb(mockDB, "sqlmock")), config: Config{Path: "some/path.db"}}
+	h := &failingRowHandler{}
+	_, err = db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id FROM users"}, h)
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Equal(t, []string{"id"}, h.columns, "schema should arrive before the first row")
+	assert.Equal(t, [][]interface{}{{int64(1)}}, h.rows)
+}
+
+type failingRowHandler struct {
+	columns []string
+	rows    [][]interface{}
+}
+
+func (h *failingRowHandler) Schema(columns, _ []string) error {
+	h.columns = columns
+	return nil
+}
+
+func (h *failingRowHandler) Row(row []interface{}) error {
+	if h.columns == nil {
+		return errors.New("row arrived before schema")
+	}
+	h.rows = append(h.rows, row)
+	return assert.AnError
+}
+
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
