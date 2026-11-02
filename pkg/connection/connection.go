@@ -2195,7 +2195,27 @@ func (m *Manager) AddRabbitMQConnectionFromConfig(connection *config.RabbitMQCon
 	return nil
 }
 
+func validateDuckDBQuack(connection *config.DuckDBConnection) error {
+	if !connection.Quack {
+		if connection.Host != "" || connection.Port != 0 || connection.Token != "" || connection.DisableSSL {
+			return errors.New("host, port, token and disable_ssl can only be used with quack: true")
+		}
+		return nil
+	}
+	if connection.Host == "" || connection.Token == "" {
+		return errors.New("host and token are required when quack is true")
+	}
+	if connection.Path != "" || connection.ReadOnly || connection.Lakehouse != nil {
+		return errors.New("path, read_only and lakehouse cannot be used with quack: true")
+	}
+	return nil
+}
+
 func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnection) error {
+	if err := validateDuckDBQuack(connection); err != nil {
+		return err
+	}
+
 	m.mutex.Lock()
 	if m.DuckDB == nil {
 		m.DuckDB = make(map[string]*duck.Client)
