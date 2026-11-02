@@ -1,6 +1,7 @@
 package ingestr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,7 +18,7 @@ func appendCDCChunkedSnapshotParameters(args []string, engine resolvedEngine, as
 		return nil, err
 	}
 	if !strings.HasPrefix(sourceURI, "postgres+cdc://") && !strings.HasPrefix(sourceURI, "postgresql+cdc://") {
-		return nil, fmt.Errorf("chunked CDC snapshot parameters are only supported for PostgreSQL CDC sources")
+		return nil, errors.New("chunked CDC snapshot parameters are only supported for PostgreSQL CDC sources")
 	}
 	if semver.Compare("v"+engine.ingestrVersion, "v1.1.81") < 0 {
 		return nil, fmt.Errorf("chunked CDC snapshot parameters require ingestr 1.1.81 or newer, but parameters.version resolved to %s", engine.ingestrVersion)
