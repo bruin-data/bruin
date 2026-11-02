@@ -88,6 +88,12 @@ parameters:
   cdc_delete_behavior: soft | hard
   cdc_snapshot_mode: auto | never
   cdc_start_lsn: string
+  cdc_snapshot_chunked: true|false
+  cdc_snapshot_execution: serial | parallel
+  cdc_snapshot_chunk_size: integer
+  cdc_snapshot_chunk_timeout: string
+  cdc_wal_staging: inmemory | destination
+  cdc_wal_buffer_bytes: integer
   cdc_mode: stream | batch # deprecated, use stream instead
   cdc_sql_capture: cdc | change_tracking
   cdc_publication: string
@@ -153,6 +159,12 @@ parameters:
 | `cdc_delete_behavior` | No | `--cdc-delete-behavior` | How CDC merges apply source deletes in batch and streaming assets: `soft` (default) retains rows with `_cdc_deleted = true`; `hard` removes them. Requires `cdc: true` and ingestr v1.1.77 or later. Hard deletes require a supported source and destination with destination-managed CDC state; see [PostgreSQL delete behavior](../platforms/postgres.md#delete-behavior) and the [ingestr CDC guide](https://getbruin.com/docs/ingestr/getting-started/cdc.html#deletes). |
 | `cdc_snapshot_mode` | No | `--cdc-snapshot-mode` | PostgreSQL CDC snapshot policy: `auto` permits snapshots and backfills; `never` prohibits them and full refresh. Omission inherits the saved policy; new connectors default to `auto`. Requires ingestr v1.1.78 or later. See [CDC without snapshots](../platforms/postgres.md#cdc-without-snapshots). |
 | `cdc_start_lsn` | No | `--cdc-start-lsn` | Nonzero PostgreSQL LSN for bootstrapping preloaded destination tables. Requires `cdc_snapshot_mode: never` and ingestr v1.1.78 or later. Remove after bootstrap succeeds; interrupted bootstrap can retry the same boundary. See [CDC without snapshots](../platforms/postgres.md#cdc-without-snapshots) for baseline and replication-slot requirements. |
+| `cdc_snapshot_chunked` | No | `--cdc-snapshot-chunked` | Enables resumable PostgreSQL CDC snapshots in short transactions. Defaults to `false`; requires `cdc: true` and ingestr v1.1.81 or later. Works for batch and streaming assets. See [Large initial snapshots](../platforms/postgres.md#large-initial-snapshots). |
+| `cdc_snapshot_execution` | No | `--cdc-snapshot-execution` | Chunked snapshot execution: `serial` (default) copies all tables before applying retained WAL; `parallel` decodes changes while copying chunks. |
+| `cdc_snapshot_chunk_size` | No | `--cdc-snapshot-chunk-size` | Maximum rows per snapshot chunk. Must be positive; defaults to `10000`. |
+| `cdc_snapshot_chunk_timeout` | No | `--cdc-snapshot-chunk-timeout` | Positive duration for each chunk, including temporary replication-slot creation. Defaults to `30s`. |
+| `cdc_wal_staging` | No | `--cdc-wal-staging` | Pending decoded-event storage: `inmemory` (default) or `destination`. Destination staging requires `cdc_snapshot_execution: parallel`. Serial execution retains pending changes in source WAL. |
+| `cdc_wal_buffer_bytes` | No | `--cdc-wal-buffer-bytes` | Positive memory buffering threshold for pending decoded events. Defaults to `67108864` (64 MiB); does not bound total process memory or retained PostgreSQL WAL. |
 | `cdc_mode` | No | `--stream` flag | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true`; `cdc_mode: batch` is the default (omit it). |
 | `cdc_sql_capture` | No | source URI scheme | SQL Server capture mechanism, either `cdc` (log-based, `mssql+cdc`; default) or `change_tracking` (`mssql+ct`). |
 | `cdc_publication` | No | source URI query | PostgreSQL publication name. |
@@ -265,7 +277,7 @@ The incremental key must be returned by the query. For incremental runs, include
 
 Pipeline run options propagate to ingestr automatically:
 
-* When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
+* When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled). For `cdc_snapshot_chunked: true`, Bruin omits both bounds because the snapshot copies complete selected tables.
 * Running with `--full-refresh`, or setting `parameters.full_refresh: true` on the asset, adds the `--full-refresh` flag to Ingestr.
 * For a streaming asset (`stream: true`), Bruin omits `--interval-end` so the live tail is not truncated. A full refresh rebuilds the selected destination tables before continuing with live changes.
 * `--refresh-id` supplies a stable identifier for the current run's streaming full-refresh request. It requires both streaming and full refresh to be enabled; `refresh_restricted: true` prevents that refresh. The identifier is supplied only through the command line.
