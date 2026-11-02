@@ -575,3 +575,12 @@ func BenchmarkConnectionReuse(b *testing.B) {
 		})
 	}
 }
+
+func TestQuackConnectionRejectsSQL(t *testing.T) {
+	t.Parallel()
+	conn, err := NewEphemeralConnection(Config{Quack: true, Host: "localhost", Token: "abc"})
+	require.NoError(t, err)
+
+	_, err = conn.ExecContext(t.Context(), "SELECT 1")
+	require.ErrorContains(t, err, "only be used by ingestr assets")
+}

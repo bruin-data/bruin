@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -227,6 +228,9 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 //
 //nolint:ireturn
 func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
+	if cfg, ok := e.config.(Config); ok && cfg.HasQuack() {
+		return nil, nil, errors.New("connections with quack: true can only be used by ingestr assets; SQL assets and quality checks do not support Quack yet")
+	}
 	opts := e.databaseOptions()
 	driverPath, err := user.ADBCDriverPath(dbcDriverName)
 	if err != nil {
