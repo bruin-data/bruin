@@ -34,3 +34,27 @@ func TestConfig_ReadOnly_DoesNotAffectURI(t *testing.T) {
 	assert.Equal(t, "/some/path/db.duckdb", c.ToDBConnectionURI())
 	assert.Equal(t, "duckdb:////some/path/db.duckdb", c.GetIngestrURI())
 }
+
+func TestConfig_QuackIngestrURI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		c    Config
+		want string
+	}{
+		{"host and port", Config{Quack: true, Host: "localhost", Port: 9494, Token: "abc"}, "duckdb://:abc@localhost:9494?quack=true"},
+		{"default port", Config{Quack: true, Host: "my-server.com", Token: "abc"}, "duckdb://:abc@my-server.com?quack=true"},
+		{"disable ssl", Config{Quack: true, Host: "10.0.0.5", Port: 9494, Token: "abc", DisableSSL: true}, "duckdb://:abc@10.0.0.5:9494?disable_ssl=true&quack=true"},
+		{"special characters in token", Config{Quack: true, Host: "localhost", Token: "a@b:c/d"}, "duckdb://:a%40b%3Ac%2Fd@localhost?quack=true"},
+		{"ipv6", Config{Quack: true, Host: "::1", Port: 9494, Token: "abc"}, "duckdb://:abc@[::1]:9494?quack=true"},
+		{"quack wins over path", Config{Path: "/tmp/a.db", Quack: true, Host: "localhost", Token: "abc"}, "duckdb://:abc@localhost?quack=true"},
+		{"host without quack is ignored", Config{Path: "/tmp/a.db", Host: "localhost", Token: "abc"}, "duckdb:////tmp/a.db"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.c.GetIngestrURI())
+		})
+	}
+}
