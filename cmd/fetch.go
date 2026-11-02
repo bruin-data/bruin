@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -1722,63 +1722,163 @@ type QueryLogOptions struct {
 }
 
 func saveQueryLog(queryStr string, connName string, result *query.QueryResult, queryErr error, opts QueryLogOptions) error {
+	log := openQueryLog(queryStr, connName, opts)
+	if queryErr == nil && result != nil {
+		log.writeColumns(result.Columns)
+		for _, row := range result.Rows {
+			log.writeRow(row)
+		}
+	}
+	return log.finish(queryErr)
+}
+
+// queryLogWriter writes a per-query log row by row, so logging never holds a copy of the result.
+// A write error stops the log but not the query; finish reports it.
+type queryLogWriter struct {
+	file     *os.File
+	w        *bufio.Writer
+	path     string
+	logDir   string
+	fields   int
+	rowsOpen bool
+	err      error
+}
+
+func openQueryLog(queryStr string, connName string, opts QueryLogOptions) *queryLogWriter {
+	l := &queryLogWriter{}
 	basePath := opts.Asset
 	if basePath == "" {
 		basePath = "."
 	}
 	repoRoot, err := git.FindRepoFromPath(basePath)
 	if err != nil {
-		return errors.Wrap(err, "failed to find repo root")
+		l.err = errors.Wrap(err, "failed to find repo root")
+		return l
 	}
 
-	logDir := filepath.Join(repoRoot.Path, "logs/queries")
+	l.logDir = filepath.Join(repoRoot.Path, "logs/queries")
+	if err := git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/queries"); err != nil {
+		l.err = errors.Wrap(err, "failed to add logs/queries to .gitignore")
+		return l
+	}
+	if err := os.MkdirAll(l.logDir, 0o755); err != nil {
+		l.err = errors.Wrap(err, "failed to create logs/queries directory")
+		return l
+	}
 
-	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/queries")
+	l.path = filepath.Join(l.logDir, fmt.Sprintf("query_%d.json", time.Now().UnixMilli()))
+	// Rows go to a .tmp file that finish renames, so the aggregated log never reads a partial log.
+	file, err := os.OpenFile(l.path+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
-		return errors.Wrap(err, "failed to add logs/queries to .gitignore")
+		l.err = errors.Wrap(err, "failed to create query log file")
+		return l
 	}
+	l.file = file
+	l.w = bufio.NewWriter(file)
 
-	err = os.MkdirAll(logDir, 0o755)
+	l.write("{")
+	l.field("query", queryStr)
+	l.field("query_start_timestamp", opts.QueryStartTimestamp)
+	l.field("connection", connName)
+	if opts.Asset != "" {
+		l.field("asset", opts.Asset)
+	}
+	if opts.Environment != "" {
+		l.field("environment", opts.Environment)
+	}
+	if opts.Limit != 0 {
+		l.field("limit", opts.Limit)
+	}
+	if opts.Timeout != 0 {
+		l.field("timeout", opts.Timeout)
+	}
+	if opts.Description != "" {
+		l.field("description", opts.Description)
+	}
+	return l
+}
+
+func (l *queryLogWriter) write(s string) {
+	if l.err != nil {
+		return
+	}
+	if _, err := l.w.WriteString(s); err != nil {
+		l.err = errors.Wrap(err, "failed to write query log file")
+	}
+}
+
+func (l *queryLogWriter) field(key string, value any) {
+	if l.err != nil {
+		return
+	}
+	data, err := json.Marshal(value)
 	if err != nil {
-		return errors.Wrap(err, "failed to create logs/queries directory")
+		l.err = errors.Wrapf(err, "failed to marshal query log %s", key)
+		return
 	}
-
-	timestamp := time.Now()
-	logFileName := fmt.Sprintf("query_%d.json", timestamp.UnixMilli())
-	logPath := filepath.Join(logDir, logFileName)
-
-	logEntry := QueryLog{
-		Query:               queryStr,
-		QueryStartTimestamp: opts.QueryStartTimestamp,
-		Timestamp:           timestamp,
-		Connection:          connName,
-		Success:             queryErr == nil,
-		Asset:               opts.Asset,
-		Environment:         opts.Environment,
-		Limit:               opts.Limit,
-		Timeout:             opts.Timeout,
-		Description:         opts.Description,
+	if l.fields > 0 {
+		l.write(",")
 	}
+	l.fields++
+	l.write("\n  \"" + key + "\": " + string(data))
+}
 
+func (l *queryLogWriter) writeColumns(columns []string) {
+	if len(columns) > 0 {
+		l.field("columns", columns)
+	}
+}
+
+func (l *queryLogWriter) writeRow(row []interface{}) {
+	if l.err != nil {
+		return
+	}
+	data, err := json.Marshal(formatQueryRowForJSON(row))
+	if err != nil {
+		l.err = errors.Wrap(err, "failed to marshal query log row")
+		return
+	}
+	if l.rowsOpen {
+		l.write(",\n    ")
+	} else {
+		l.rowsOpen = true
+		l.write(",\n  \"rows\": [\n    ")
+	}
+	l.write(string(data))
+}
+
+// finish completes the log with the query outcome and refreshes the aggregated log.
+func (l *queryLogWriter) finish(queryErr error) error {
+	if l.rowsOpen {
+		l.write("\n  ]")
+	}
+	l.field("timestamp", time.Now())
+	l.field("success", queryErr == nil)
 	if queryErr != nil {
-		logEntry.Error = queryErr.Error()
-	} else if result != nil {
-		logEntry.Columns = result.Columns
-		logEntry.Rows = formatQueryRowsForJSON(result.Rows)
+		l.field("error", queryErr.Error())
 	}
+	l.write("\n}\n")
 
-	jsonData, err := json.MarshalIndent(logEntry, "", "  ")
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal query log to JSON")
+	if l.file != nil {
+		if l.err == nil {
+			l.err = errors.Wrap(l.w.Flush(), "failed to write query log file")
+		}
+		if err := l.file.Close(); err != nil && l.err == nil {
+			l.err = errors.Wrap(err, "failed to close query log file")
+		}
+		if l.err == nil {
+			l.err = errors.Wrap(os.Rename(l.path+".tmp", l.path), "failed to finalize query log file")
+		}
+		if l.err != nil {
+			_ = os.Remove(l.path + ".tmp")
+		}
 	}
-
-	err = os.WriteFile(logPath, jsonData, 0o600)
-	if err != nil {
-		return errors.Wrap(err, "failed to write query log file")
+	if l.err != nil {
+		return l.err
 	}
 
 	if targetPath := os.Getenv(aggregatedQueryLogPathEnv); targetPath != "" {
-		if aggErr := writeAggregatedQueryLog(logDir, targetPath); aggErr != nil {
+		if aggErr := writeAggregatedQueryLog(l.logDir, targetPath); aggErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to update aggregated query log: %v\n", aggErr)
 		}
 	}
@@ -1828,20 +1928,9 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 			continue
 		}
 
-		data, readErr := os.ReadFile(filePath)
+		entryLog, readErr := readQueryLogPreview(filePath)
 		if readErr != nil {
 			continue
-		}
-
-		// UseNumber so integers beyond 2^53 keep full precision through aggregation.
-		dec := json.NewDecoder(bytes.NewReader(data))
-		dec.UseNumber()
-		var entryLog QueryLog
-		if err := dec.Decode(&entryLog); err != nil {
-			continue
-		}
-		if len(entryLog.Rows) > aggregatedQueryLogMaxRows {
-			entryLog.Rows = entryLog.Rows[:aggregatedQueryLogMaxRows]
 		}
 		logs = append(logs, entryLog)
 	}
@@ -1881,6 +1970,68 @@ func writeAggregatedQueryLog(logDir, targetPath string) error {
 	return nil
 }
 
+// readQueryLogPreview decodes a per-query log with only its first aggregatedQueryLogMaxRows rows.
+// Later rows are skipped one at a time, so a large log is never loaded whole.
+func readQueryLogPreview(path string) (QueryLog, error) {
+	var entry QueryLog
+	file, err := os.Open(path)
+	if err != nil {
+		return entry, err
+	}
+	defer file.Close()
+
+	// UseNumber so integers beyond 2^53 keep full precision through aggregation.
+	dec := json.NewDecoder(file)
+	dec.UseNumber()
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return entry, errors.New("query log is not a JSON object")
+	}
+
+	fields := map[string]json.RawMessage{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return entry, err
+		}
+		key, _ := tok.(string)
+		if key != "rows" {
+			var value json.RawMessage
+			if err := dec.Decode(&value); err != nil {
+				return entry, err
+			}
+			fields[key] = value
+			continue
+		}
+
+		if tok, err := dec.Token(); err != nil || tok != json.Delim('[') {
+			return entry, errors.New("query log rows are not a JSON array")
+		}
+		for dec.More() {
+			if len(entry.Rows) < aggregatedQueryLogMaxRows {
+				var row []interface{}
+				if err := dec.Decode(&row); err != nil {
+					return entry, err
+				}
+				entry.Rows = append(entry.Rows, row)
+				continue
+			}
+			var skipped json.RawMessage
+			if err := dec.Decode(&skipped); err != nil {
+				return entry, err
+			}
+		}
+		if _, err := dec.Token(); err != nil {
+			return entry, err
+		}
+	}
+
+	metadata, err := json.Marshal(fields)
+	if err != nil {
+		return entry, err
+	}
+	return entry, json.Unmarshal(metadata, &entry)
+}
+
 func formatQueryCellForDisplay(cell interface{}) interface{} {
 	switch v := cell.(type) {
 	case *big.Rat:
@@ -1911,14 +2062,18 @@ func formatQueryCellForJSON(cell interface{}) interface{} {
 func formatQueryRowsForJSON(rows [][]interface{}) [][]interface{} {
 	formattedRows := make([][]interface{}, len(rows))
 	for rowIdx, row := range rows {
-		formattedRow := make([]interface{}, len(row))
-		for colIdx, cell := range row {
-			formattedRow[colIdx] = formatQueryCellForJSON(cell)
-		}
-		formattedRows[rowIdx] = formattedRow
+		formattedRows[rowIdx] = formatQueryRowForJSON(row)
 	}
 
 	return formattedRows
+}
+
+func formatQueryRowForJSON(row []interface{}) []interface{} {
+	formattedRow := make([]interface{}, len(row))
+	for colIdx, cell := range row {
+		formattedRow[colIdx] = formatQueryCellForJSON(cell)
+	}
+	return formattedRow
 }
 
 func formatBigRatAsDecimal(rat *big.Rat) string {
