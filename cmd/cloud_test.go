@@ -1935,3 +1935,130 @@ func TestScheduledAgentPlanSameThreadFlag(t *testing.T) {
 		assert.Equal(t, tc.want, fields["same_thread"], tc.args)
 	}
 }
+
+func TestCloudOutputSchemaFlags(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	t.Setenv("BRUIN_THREAD_ID", "")
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Setenv("BRUIN_MESSAGE_PAIR_ID", "")
+	schema := `{"type":"object","properties":{"meta":{"type":"object","properties":{},"required":[],"additionalProperties":false}},"required":["meta"],"additionalProperties":false,"$defs":{}}`
+	schemaFile := filepath.Join(t.TempDir(), "schema.json")
+	require.NoError(t, os.WriteFile(schemaFile, []byte("{\n  \"type\": \"object\",\n  \"properties\": {}\n}\n"), 0o600))
+
+	for _, tc := range []struct {
+		name       string
+		command    func() *cli.Command
+		args       []string
+		wantMethod string
+		wantPath   string
+		wantBody   string
+		wantError  bool
+	}{
+		{
+			name:       "send with inline schema",
+			command:    CloudAgents,
+			args:       []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--output-schema", schema},
+			wantMethod: http.MethodPost,
+			wantPath:   "/agents/7/messages",
+			wantBody:   `{"message":"hi","output_schema":` + schema + `}`,
+		},
+		{
+			name:       "send with schema file",
+			command:    CloudAgents,
+			args:       []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--output-schema-file", schemaFile},
+			wantMethod: http.MethodPost,
+			wantPath:   "/agents/7/messages",
+			wantBody:   `{"message":"hi","output_schema":{"type":"object","properties":{}}}`,
+		},
+		{name: "send schema with thread", command: CloudAgents, args: []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--thread-id", "3", "--output-schema", schema}, wantError: true},
+		{name: "send both schema flags", command: CloudAgents, args: []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--output-schema", schema, "--output-schema-file", schemaFile}, wantError: true},
+		{name: "send non-object schema", command: CloudAgents, args: []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--output-schema", "[1]"}, wantError: true},
+		{name: "send null schema", command: CloudAgents, args: []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--output-schema", "null"}, wantError: true},
+		{name: "send YAML schema", command: CloudAgents, args: []string{"agents", "send", "--agent-id", "7", "--message", "hi", "--output-schema", "type: object"}, wantError: true},
+		{
+			name:       "scheduled create with schema",
+			command:    CloudScheduledAgents,
+			args:       []string{"scheduled-agents", "create", "--agent-id", "7", "--title", "Daily", "--output-schema", schema},
+			wantMethod: http.MethodPost,
+			wantPath:   "/scheduled-agents",
+			wantBody:   `{"agent_id":7,"title":"Daily","output_schema":` + schema + `}`,
+		},
+		{
+			name:       "scheduled update with only schema",
+			command:    CloudScheduledAgents,
+			args:       []string{"scheduled-agents", "update", "--scheduled-agent-id", "42", "--output-schema-file", schemaFile},
+			wantMethod: http.MethodPatch,
+			wantPath:   "/scheduled-agents/42",
+			wantBody:   `{"output_schema":{"type":"object","properties":{}}}`,
+		},
+		{
+			name:       "scheduled update clears schema",
+			command:    CloudScheduledAgents,
+			args:       []string{"scheduled-agents", "update", "--scheduled-agent-id", "42", "--clear-output-schema"},
+			wantMethod: http.MethodPatch,
+			wantPath:   "/scheduled-agents/42",
+			wantBody:   `{"output_schema":null}`,
+		},
+		{name: "scheduled update clear with schema", command: CloudScheduledAgents, args: []string{"scheduled-agents", "update", "--scheduled-agent-id", "42", "--clear-output-schema", "--output-schema", schema}, wantError: true},
+		{name: "scheduled create non-object schema", command: CloudScheduledAgents, args: []string{"scheduled-agents", "create", "--agent-id", "7", "--output-schema", "[1]"}, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.Equal(t, tc.wantMethod, r.Method)
+				assert.Equal(t, tc.wantPath, r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.JSONEq(t, tc.wantBody, string(body))
+				_, _ = w.Write([]byte(`{"id":42,"thread_id":1,"message_id":2}`))
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+			command := tc.command()
+			command.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			err := runCLI(t.Context(), command, append(tc.args, "--api-key", "test-key", "--output", "json"))
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, !tc.wantError, called)
+		})
+	}
+}
+
+func TestScheduledAgentPlanRejectsOutputSchemaInState(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Name:  "plan",
+		Flags: scheduledAgentPlanFlags(),
+		Action: func(_ context.Context, c *cli.Command) error {
+			_, err := buildScheduledAgentFields(c)
+			return err
+		},
+	}
+	err := runCLI(t.Context(), cmd, []string{"plan", "--state", `{"output_schema":{"type":"object"}}`})
+	require.ErrorContains(t, err, "output_schema is not a plan field")
+}
+
+func TestOutputSchemaFromFlagsCompacts(t *testing.T) {
+	t.Parallel()
+	schemaFile := filepath.Join(t.TempDir(), "schema.json")
+	require.NoError(t, os.WriteFile(schemaFile, []byte("{\n  \"type\": \"object\",\n  \"properties\": {}\n}\n"), 0o600))
+
+	var got json.RawMessage
+	cmd := &cli.Command{
+		Name:  "plan",
+		Flags: scheduledAgentPlanFlags(),
+		Action: func(_ context.Context, c *cli.Command) error {
+			var err error
+			got, err = outputSchemaFromFlags(c)
+			return err
+		},
+	}
+	require.NoError(t, runCLI(t.Context(), cmd, []string{"plan", "--output-schema-file", schemaFile}))
+	assert.JSONEq(t, `{"type":"object","properties":{}}`, string(got))
+	assert.NotContains(t, string(got), " ")
+	assert.NotContains(t, string(got), "\n")
+}

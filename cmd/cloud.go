@@ -3282,7 +3282,7 @@ func cloudAgentsSend() *cli.Command {
 	return &cli.Command{
 		Name:  "send",
 		Usage: "Send a message to an agent",
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{
@@ -3299,10 +3299,20 @@ func cloudAgentsSend() *cli.Command {
 				Name:  "thread-id",
 				Usage: "thread ID (optional, creates new thread if omitted)",
 			},
-		},
+		}, outputSchemaFlags("only for a new thread (without --thread-id); the agent's final answer will match this schema and be returned as structured_output")...),
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 			output := c.String("output")
+
+			outputSchema, err := outputSchemaFromFlags(c)
+			if err != nil {
+				printError(err, output, "Invalid output schema")
+				return cli.Exit("", 1)
+			}
+			if outputSchema != nil && c.IsSet("thread-id") {
+				printError(errors.New("--output-schema can only be set when starting a new thread; drop --thread-id"), output, "Invalid output schema")
+				return cli.Exit("", 1)
+			}
 
 			client, err := newCloudClient(c)
 			if err != nil {
@@ -3316,7 +3326,7 @@ func cloudAgentsSend() *cli.Command {
 				threadID = &tid
 			}
 
-			result, err := client.SendAgentMessage(ctx, c.Int("agent-id"), c.String("message"), threadID)
+			result, err := client.SendAgentMessage(ctx, c.Int("agent-id"), c.String("message"), threadID, outputSchema)
 			if err != nil {
 				printError(err, output, "Failed to send message")
 				return cli.Exit("", 1)
@@ -3395,6 +3405,14 @@ func cloudAgentsStatus() *cli.Command {
 			infoPrinter.Printf("Message %d\n", msg.ID)
 			fmt.Printf("  Status:    %s\n", msg.Status)
 			fmt.Printf("  Output:    %s\n", outputMsg)
+			if hasJSONValue(msg.StructuredOutput) {
+				var indented bytes.Buffer
+				if json.Indent(&indented, msg.StructuredOutput, "  ", "  ") != nil {
+					indented.Reset()
+					indented.Write(msg.StructuredOutput)
+				}
+				fmt.Printf("  Structured output:\n  %s\n", indented.String())
+			}
 			fmt.Printf("  Created:   %s\n", msg.CreatedAt)
 			fmt.Printf("  Updated:   %s\n", msg.UpdatedAt)
 			return nil
@@ -6754,6 +6772,10 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 				Name:  "active",
 				Usage: "activate (true) or pause (false) the scheduled agent; activating needs a schedule",
 			},
+			&cli.BoolFlag{
+				Name:  "clear-output-schema",
+				Usage: "remove the output schema so runs return plain text again",
+			},
 		),
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -6767,8 +6789,15 @@ func cloudScheduledAgentsUpdate() *cli.Command {
 			if c.IsSet("active") {
 				fields["is_active"] = c.Bool("active")
 			}
+			if c.Bool("clear-output-schema") {
+				if c.IsSet("output-schema") || c.IsSet("output-schema-file") {
+					printError(errors.New("pass only one of --clear-output-schema, --output-schema or --output-schema-file"), output, "Invalid output schema")
+					return cli.Exit("", 1)
+				}
+				fields["output_schema"] = nil
+			}
 			if len(fields) == 0 {
-				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --same-thread, --active or --state-file)"), output, "Nothing to update")
+				printError(errors.New("provide at least one field to update (e.g. --title, --cron, --instructions, --same-thread, --active, --output-schema or --state-file)"), output, "Nothing to update")
 				return cli.Exit("", 1)
 			}
 
@@ -6923,7 +6952,7 @@ func cloudScheduledAgentsDelete() *cli.Command {
 
 // scheduledAgentPlanFlags are the plan flags shared by create and update.
 func scheduledAgentPlanFlags() []cli.Flag {
-	return []cli.Flag{
+	return append([]cli.Flag{
 		apiKeyFlag(),
 		outputFlag(),
 		&cli.StringFlag{Name: "title", Usage: "the run title"},
@@ -6935,7 +6964,53 @@ func scheduledAgentPlanFlags() []cli.Flag {
 		&cli.BoolFlag{Name: "same-thread", Usage: "continue one thread across runs (true) or start a new thread each run (false)"},
 		&cli.StringFlag{Name: "state", Usage: "the full plan as a JSON or YAML object string"},
 		&cli.StringFlag{Name: "state-file", Usage: "path to a file with the full plan as JSON or YAML"},
+	}, outputSchemaFlags("each run's final answer will match this schema and be returned as structured_output")...)
+}
+
+// outputSchemaFlags are the inline/file JSON Schema flags for structured output.
+func outputSchemaFlags(usage string) []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "output-schema", Usage: "JSON Schema object for a structured answer, " + usage},
+		&cli.StringFlag{Name: "output-schema-file", Usage: "path to a JSON Schema file (alternative to --output-schema)"},
 	}
+}
+
+// outputSchemaFromFlags returns the compacted schema, or nil when neither flag is set.
+// JSON only: YAML would coerce enum values like yes/no/on.
+func outputSchemaFromFlags(c *cli.Command) (json.RawMessage, error) {
+	if c.IsSet("output-schema") && c.IsSet("output-schema-file") {
+		return nil, errors.New("pass only one of --output-schema or --output-schema-file")
+	}
+	if !c.IsSet("output-schema") && !c.IsSet("output-schema-file") {
+		return nil, nil
+	}
+
+	raw := []byte(c.String("output-schema"))
+	if c.IsSet("output-schema-file") {
+		data, err := os.ReadFile(c.String("output-schema-file"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --output-schema-file: %w", err)
+		}
+		raw = data
+	}
+
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, fmt.Errorf("--output-schema must be a JSON object: %w", err)
+	}
+	if schema == nil {
+		return nil, errors.New("--output-schema must be a JSON object")
+	}
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, raw); err != nil {
+		return nil, fmt.Errorf("--output-schema must be a JSON object: %w", err)
+	}
+	return compact.Bytes(), nil
+}
+
+// hasJSONValue reports whether raw holds a value other than JSON null.
+func hasJSONValue(raw json.RawMessage) bool {
+	return len(raw) > 0 && string(raw) != "null"
 }
 
 // messagePairIDFromEnv reads BRUIN_MESSAGE_PAIR_ID; false when unset, non-numeric or non-positive.
@@ -6983,6 +7058,9 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	if _, exists := fields["pipeline_trigger"]; exists {
 		return nil, errors.New("pipeline_trigger is not a plan field; use bruin cloud scheduled-agents pipeline-trigger set or delete")
 	}
+	if _, exists := fields["output_schema"]; exists {
+		return nil, errors.New("output_schema is not a plan field; use --output-schema or --output-schema-file")
+	}
 	if _, exists := fields["notification_integrations"]; exists {
 		return nil, errors.New("notification_integrations is not a plan field; the user sets channels under Notifications on the scheduled agent page")
 	}
@@ -7001,6 +7079,13 @@ func buildScheduledAgentFields(c *cli.Command) (map[string]any, error) {
 	}
 	if c.IsSet("same-thread") {
 		fields["same_thread"] = c.Bool("same-thread")
+	}
+	outputSchema, err := outputSchemaFromFlags(c)
+	if err != nil {
+		return nil, err
+	}
+	if outputSchema != nil {
+		fields["output_schema"] = outputSchema
 	}
 	// --cron / --timezone are shorthand for the nested schedule object.
 	if c.IsSet("cron") || c.IsSet("timezone") {
@@ -7039,6 +7124,9 @@ func printScheduledAgent(run *bruincloud.ScheduledAgent) {
 	}
 	if len(run.NotificationIntegrations) > 0 {
 		fmt.Printf("  Notify:    %s\n", notificationChannels(run.NotificationIntegrations))
+	}
+	if hasJSONValue(run.OutputSchema) {
+		fmt.Printf("  Output schema: %s\n", run.OutputSchema)
 	}
 	if run.Instructions != nil && *run.Instructions != "" {
 		fmt.Printf("  Instructions:\n%s\n", *run.Instructions)

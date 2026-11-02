@@ -1186,14 +1186,13 @@ func TestGetAgentMessageStatus(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/agents/1/threads/10/messages/100", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
-		writeJSON(t, w, map[string]any{
-			"data": AgentMessage{ID: 100, Status: "completed", CreatedAt: "2026-01-01", UpdatedAt: "2026-01-02"},
-		})
+		_, _ = w.Write([]byte(`{"data":{"id":100,"status":"completed","structured_output":{"total":3},"created_at":"2026-01-01","updated_at":"2026-01-02"}}`))
 	})
 
 	msg, err := client.GetAgentMessageStatus(t.Context(), 1, 10, 100)
 	require.NoError(t, err)
 	assert.Equal(t, "completed", msg.Status)
+	assert.JSONEq(t, `{"total":3}`, string(msg.StructuredOutput))
 }
 
 func TestSteerAgentMessage(t *testing.T) {
@@ -1372,14 +1371,31 @@ func TestSendAgentMessage(t *testing.T) {
 
 		body := readJSON(t, r)
 		assert.Equal(t, "hello", body["message"])
+		assert.NotContains(t, body, "output_schema")
 
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"thread_id":10,"message_id":100}`))
 	})
 
-	result, err := client.SendAgentMessage(t.Context(), 1, "hello", nil)
+	result, err := client.SendAgentMessage(t.Context(), 1, "hello", nil, nil)
 	require.NoError(t, err)
 	assert.Contains(t, string(result), "thread_id")
+}
+
+func TestSendAgentMessage_WithOutputSchema(t *testing.T) {
+	t.Parallel()
+	schema := `{"type":"object","properties":{"meta":{}},"required":["meta"],"additionalProperties":false}`
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"message":"hello","output_schema":`+schema+`}`, string(raw))
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"thread_id":10,"message_id":100}`))
+	})
+
+	_, err := client.SendAgentMessage(t.Context(), 1, "hello", nil, json.RawMessage(schema))
+	require.NoError(t, err)
 }
 
 func TestSendAgentMessage_WithThreadID(t *testing.T) {
@@ -1394,7 +1410,7 @@ func TestSendAgentMessage_WithThreadID(t *testing.T) {
 	})
 
 	threadID := 10
-	result, err := client.SendAgentMessage(t.Context(), 1, "hello", &threadID)
+	result, err := client.SendAgentMessage(t.Context(), 1, "hello", &threadID, nil)
 	require.NoError(t, err)
 	assert.Contains(t, string(result), "message_id")
 }
