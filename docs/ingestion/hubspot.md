@@ -141,6 +141,8 @@ or with associations to other objects:
 custom:<custom_object_name>:<associations>
 ```
 
+Custom objects load incrementally the same way as the built-in objects: primary key `hs_object_id`, incremental key `hs_lastmodifieddate`, strategy `merge`. Each run fetches only the records created or updated in the run's interval.
+
 ### Parameters
 
 - `custom_object_name`: The name of your custom object in HubSpot (can be either singular or plural form)
