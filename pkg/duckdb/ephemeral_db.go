@@ -31,8 +31,10 @@ type EphemeralConnection struct {
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
-	if err := EnsureADBCDriverInstalled(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
+	if cfg, ok := c.(Config); !ok || !cfg.HasQuack() {
+		if err := EnsureADBCDriverInstalled(context.Background()); err != nil {
+			return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
+		}
 	}
 
 	lock := databaseLockFor(c.ToDBConnectionURI())
