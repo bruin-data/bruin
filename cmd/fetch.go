@@ -1295,11 +1295,19 @@ func shouldOutputExecutionSummary(result *query.QueryResult) bool {
 }
 
 func printQueryExecutionSummary(summary *query.QueryExecutionSummary) {
-	fmt.Println("Statement executed successfully")
+	_ = writeQueryExecutionSummary(os.Stdout, summary)
+}
 
-	for _, row := range queryExecutionSummaryRows(summary) {
-		fmt.Printf("%s: %s\n", row[0], row[1])
+func writeQueryExecutionSummary(w io.Writer, summary *query.QueryExecutionSummary) error {
+	if _, err := fmt.Fprintln(w, "Statement executed successfully"); err != nil {
+		return err
 	}
+	for _, row := range queryExecutionSummaryRows(summary) {
+		if _, err := fmt.Fprintf(w, "%s: %s\n", row[0], row[1]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeExecutionSummaryCSV(writer *csv.Writer, summary *query.QueryExecutionSummary) error {
