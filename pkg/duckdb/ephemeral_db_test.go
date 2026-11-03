@@ -668,3 +668,14 @@ func (h *countingRowHandler) Row(_ []interface{}) error {
 	h.rows++
 	return nil
 }
+
+func TestQuackSupportsDriverVersion(t *testing.T) {
+	t.Parallel()
+
+	require.False(t, quackSupportsDriverVersion("v1.5.2"))
+	require.False(t, quackSupportsDriverVersion("v1.4.3"))
+	require.False(t, quackSupportsDriverVersion(""))
+	require.True(t, quackSupportsDriverVersion("v2.0.0"))
+	require.True(t, quackSupportsDriverVersion("v2.1.0-dev42"))
+	require.True(t, quackSupportsDriverVersion("v10.0.0"))
+}

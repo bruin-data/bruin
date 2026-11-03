@@ -1746,14 +1746,14 @@ func openQueryLog(queryStr string, connName string, opts QueryLogOptions) *query
 		return l
 	}
 
-	l.path = filepath.Join(l.logDir, fmt.Sprintf("query_%d.json", time.Now().UnixMilli()))
 	// Rows go to a .tmp file that finish renames, so the aggregated log never reads a partial log.
-	file, err := os.OpenFile(l.path+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	file, err := os.CreateTemp(l.logDir, fmt.Sprintf("query_%d_*.json.tmp", time.Now().UnixMilli()))
 	if err != nil {
 		l.err = errors.Wrap(err, "failed to create query log file")
 		return l
 	}
 	l.file = file
+	l.path = strings.TrimSuffix(file.Name(), ".tmp")
 	l.w = bufio.NewWriter(file)
 
 	l.write("{")
@@ -1983,7 +1983,15 @@ func readQueryLogPreview(path string) (QueryLog, error) {
 			continue
 		}
 
-		if tok, err := dec.Token(); err != nil || tok != json.Delim('[') {
+		tok, err = dec.Token()
+		if err != nil {
+			return entry, err
+		}
+		if tok == nil {
+			entry.Rows = nil
+			continue
+		}
+		if tok != json.Delim('[') {
 			return entry, errors.New("query log rows are not a JSON array")
 		}
 		for dec.More() {
@@ -2003,6 +2011,18 @@ func readQueryLogPreview(path string) (QueryLog, error) {
 		if _, err := dec.Token(); err != nil {
 			return entry, err
 		}
+	}
+
+	if tok, err := dec.Token(); err != nil {
+		return entry, err
+	} else if tok != json.Delim('}') {
+		return entry, errors.New("query log is missing its closing object delimiter")
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return entry, err
+		}
+		return entry, errors.New("query log contains trailing data")
 	}
 
 	metadata, err := json.Marshal(fields)

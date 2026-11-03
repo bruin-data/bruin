@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 	"github.com/bruin-data/bruin/pkg/user"
 )
@@ -111,6 +113,20 @@ func hasAttachmentStatement(sqlStr string) (bool, error) {
 //
 //nolint:ireturn
 func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc.Connection, func(), error) {
+	if cfg, ok := e.config.(Config); ok && cfg.HasQuack() {
+		// A Quack attachment interrupts its running query when another starts,
+		// so sessions cannot share one. The local side is in-memory, so each
+		// session gets its own attachment and needs no lock.
+		adb, conn, err := e.createADBC(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return conn, func() {
+			conn.Close()
+			adb.Close()
+		}, nil
+	}
+
 	scope := connectionReuse(ctx)
 	reuse := scope != nil && e.canReuseDatabase()
 	// A subprocess cannot access this process's in-memory database, so those
@@ -222,8 +238,8 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 	}, nil
 }
 
-// createADBC creates an ADBC database and connection, including lakehouse setup.
-// The caller must close both the connection and database when done.
+// createADBC creates an ADBC database and connection, including lakehouse and
+// Quack setup. The caller must close both the connection and database when done.
 //
 //nolint:ireturn
 func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
@@ -252,7 +268,71 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 		return nil, nil, err
 	}
 
+	if err := e.setupQuackADBC(ctx, conn); err != nil {
+		conn.Close()
+		adb.Close()
+		return nil, nil, err
+	}
+
 	return adb, conn, nil
+}
+
+func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Connection) error {
+	cfg, ok := e.config.(Config)
+	if !ok || !cfg.HasQuack() {
+		return nil
+	}
+
+	// Older drivers fail later with an opaque serialization error, so check first.
+	version, err := queryADBCString(ctx, conn, "SELECT library_version FROM pragma_version()")
+	if err != nil {
+		return fmt.Errorf("failed to read DuckDB ADBC driver version: %w", err)
+	}
+	if !quackSupportsDriverVersion(version) {
+		return fmt.Errorf("quack: true needs a DuckDB 2.0+ ADBC driver matching the server's release, but the installed driver is %s; install one with `dbc install duckdb=<server version>`", version)
+	}
+
+	for _, sqlStr := range cfg.quackAttachStatements() {
+		if err := execADBCStatement(ctx, conn, sqlStr); err != nil {
+			// DuckDB errors can echo the statement, which carries the token as a
+			// quoted SQL literal.
+			msg := mask.New([]string{cfg.Token}).Mask(err.Error())
+			return fmt.Errorf("failed to connect to Quack server at %s: %s", cfg.quackHost(), msg)
+		}
+	}
+	return nil
+}
+
+func quackSupportsDriverVersion(version string) bool {
+	major, _, _ := strings.Cut(strings.TrimPrefix(version, "v"), ".")
+	n, err := strconv.Atoi(major)
+	return err == nil && n >= 2
+}
+
+func queryADBCString(ctx context.Context, conn adbc.Connection, sqlStr string) (string, error) {
+	stmt, err := conn.NewStatement()
+	if err != nil {
+		return "", err
+	}
+	defer stmt.Close()
+
+	if err := stmt.SetSqlQuery(sqlStr); err != nil {
+		return "", err
+	}
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Release()
+
+	rows, err := bufferArrowReader(reader)
+	if err != nil {
+		return "", err
+	}
+	if len(rows.data) == 0 || len(rows.data[0]) == 0 {
+		return "", sql.ErrNoRows
+	}
+	return fmt.Sprint(rows.data[0][0]), nil
 }
 
 func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.Connection) error {

@@ -24,7 +24,7 @@ func streamTestRows() [][]interface{} {
 	}
 }
 
-func openTestQueryLog(t *testing.T) *queryLogWriter {
+func openStreamTestQueryLog(t *testing.T) *queryLogWriter {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
@@ -38,7 +38,7 @@ func openTestQueryLog(t *testing.T) *queryLogWriter {
 // streamTo feeds rows through a streamHandler the way a RowStreamer does and finishes the sink.
 func streamTo(t *testing.T, sink resultSink, result *query.QueryResult, rows [][]interface{}) *streamHandler {
 	t.Helper()
-	h := &streamHandler{sink: sink, log: openTestQueryLog(t)}
+	h := &streamHandler{sink: sink, log: openStreamTestQueryLog(t)}
 	for i, row := range rows {
 		if i == 0 {
 			require.NoError(t, h.Schema(result.Columns, result.ColumnTypes))
@@ -118,7 +118,7 @@ func TestJSONSinkAbortKeepsDocumentValid(t *testing.T) {
 
 	var got bytes.Buffer
 	sink := &jsonSink{w: bufio.NewWriter(&got), connName: "conn", queryStr: "SELECT 1"}
-	h := &streamHandler{sink: sink, log: openTestQueryLog(t)}
+	h := &streamHandler{sink: sink, log: openStreamTestQueryLog(t)}
 	require.NoError(t, h.Schema([]string{"id"}, []string{"INT64"}))
 	require.NoError(t, h.Row([]interface{}{int64(1)}))
 	require.Error(t, sink.abort(assert.AnError))
@@ -242,7 +242,7 @@ func TestExportSinkAbortRemovesFiles(t *testing.T) {
 
 	dir := t.TempDir()
 	sink := newExportSink("plain", dir, 2, 1700000000000)
-	h := &streamHandler{sink: sink, log: openTestQueryLog(t)}
+	h := &streamHandler{sink: sink, log: openStreamTestQueryLog(t)}
 	require.NoError(t, h.Schema([]string{"id"}, nil))
 	for i := range 5 {
 		require.NoError(t, h.Row([]interface{}{i}))
@@ -281,7 +281,7 @@ func TestStreamHandlerIgnoresQueryLogFailure(t *testing.T) {
 
 	var out bytes.Buffer
 	sink := newCSVSink(bufio.NewWriter(&out))
-	h := &streamHandler{sink: sink, log: openTestQueryLog(t)}
+	h := &streamHandler{sink: sink, log: openStreamTestQueryLog(t)}
 	// Closing the file underneath makes every later log write fail.
 	require.NoError(t, h.log.file.Close())
 

@@ -2,6 +2,9 @@ package duck
 
 import (
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLockSuccess(t *testing.T) {
@@ -71,5 +74,31 @@ func TestLockIndivisually(t *testing.T) {
 
 	if !m.TryLock(123) || !m.TryLock(456) {
 		t.Error("different locks affect each other")
+	}
+}
+
+func TestQuackURIsAreNotLocked(t *testing.T) {
+	t.Parallel()
+
+	uri := "duckdb://:abc@localhost:9494?quack=true"
+	assert.True(t, isQuackURI(uri))
+	assert.False(t, isQuackURI("duckdb:///tmp/a.db"))
+	assert.False(t, isQuackURI("duckdb://:abc@localhost:9494?quack=false"))
+
+	done := make(chan struct{})
+	go func() {
+		unlockFirst := LockDatabases(uri)
+		unlockSecond := LockDatabases(uri)
+		LockDatabase(uri)
+		UnlockDatabase(uri)
+		unlockSecond()
+		unlockFirst()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("concurrent Quack runs were serialized by the local lock")
 	}
 }

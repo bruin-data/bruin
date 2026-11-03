@@ -2392,6 +2392,20 @@
       ]
     },
     "DuckDBConnection": {
+      "anyOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "quack",
+            "host",
+            "token"
+          ]
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -2410,13 +2424,27 @@
         },
         "lakehouse": {
           "$ref": "#/$defs/LakehouseConfig"
+        },
+        "quack": {
+          "type": "boolean"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "disable_ssl": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "path"
+        "name"
       ]
     },
     "DuneConnection": {

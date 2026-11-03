@@ -470,6 +470,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if err != nil {
 		return err
 	}
+	baseArgs, err = appendCDCChunkedSnapshotParameters(baseArgs, engine, asset, sourceURI)
+	if err != nil {
+		return err
+	}
 
 	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
 	// and rejects --metrics-addr unless --stream is set as well, so only emit it
