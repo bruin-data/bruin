@@ -576,11 +576,13 @@ func BenchmarkConnectionReuse(b *testing.B) {
 	}
 }
 
-func TestQuackConnectionRejectsSQL(t *testing.T) {
+func TestQuackSupportsDriverVersion(t *testing.T) {
 	t.Parallel()
-	conn, err := NewEphemeralConnection(Config{Quack: true, Host: "localhost", Token: "abc"})
-	require.NoError(t, err)
 
-	_, err = conn.ExecContext(t.Context(), "SELECT 1")
-	require.ErrorContains(t, err, "only be used by ingestr assets")
+	require.False(t, quackSupportsDriverVersion("v1.5.2"))
+	require.False(t, quackSupportsDriverVersion("v1.4.3"))
+	require.False(t, quackSupportsDriverVersion(""))
+	require.True(t, quackSupportsDriverVersion("v2.0.0"))
+	require.True(t, quackSupportsDriverVersion("v2.1.0-dev42"))
+	require.True(t, quackSupportsDriverVersion("v10.0.0"))
 }

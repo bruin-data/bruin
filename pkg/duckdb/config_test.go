@@ -3,6 +3,7 @@ package duck
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,4 +58,33 @@ func TestConfig_QuackIngestrURI(t *testing.T) {
 			assert.Equal(t, tt.want, tt.c.GetIngestrURI())
 		})
 	}
+}
+
+func TestConfig_QuackAttachStatements(t *testing.T) {
+	t.Parallel()
+
+	c := Config{Quack: true, Host: "localhost", Port: 9494, Token: "a'b"}
+	assert.Equal(t, []string{
+		"INSTALL quack",
+		"LOAD quack",
+		"CREATE OR REPLACE SECRET bruin_quack (TYPE quack, TOKEN 'a''b', SCOPE 'quack:localhost:9494')",
+		"ATTACH 'quack:localhost:9494' AS quack_db",
+		"USE quack_db",
+	}, c.quackAttachStatements())
+
+	c = Config{Quack: true, Host: "::1", Token: "abc", DisableSSL: true}
+	assert.Contains(t, c.quackAttachStatements(), "ATTACH 'quack:[::1]' AS quack_db (DISABLE_SSL true)")
+}
+
+func TestConfig_QuackAttachStatementsMaskToken(t *testing.T) {
+	t.Parallel()
+
+	c := Config{Quack: true, Host: "localhost", Token: "to'ken"}
+	m := mask.New([]string{c.Token})
+	for _, stmt := range c.quackAttachStatements() {
+		masked := m.Mask(stmt)
+		assert.NotContains(t, masked, "to''ken")
+		assert.NotContains(t, masked, "to'ken")
+	}
+	assert.Contains(t, m.Mask(c.quackAttachStatements()[2]), "TOKEN '****'")
 }
