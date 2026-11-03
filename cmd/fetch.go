@@ -315,19 +315,24 @@ func Query() *cli.Command {
 					}
 				}
 
-				queryStart := time.Now()
-				result, queryErr := querier.SelectWithSchema(timeoutCtx, &q)
-
-				// Save query log (for both success and error cases)
 				inputPath := c.String("asset")
 				logOpts := QueryLogOptions{
-					QueryStartTimestamp: queryStart,
+					QueryStartTimestamp: time.Now(),
 					Asset:               inputPath,
 					Environment:         c.String("environment"),
 					Limit:               c.Int64("limit"),
 					Timeout:             c.Int("timeout"),
 					Description:         c.String("description"),
 				}
+
+				output := c.String("output")
+				if streamer, ok := querier.(query.RowStreamer); ok && (c.Bool("export") || output == outputFormatPlain || output == "csv" || output == "json") {
+					return runStreamedQuery(timeoutCtx, c, streamer, &q, connName, queryStr, logOpts)
+				}
+
+				result, queryErr := querier.SelectWithSchema(timeoutCtx, &q)
+
+				// Save query log (for both success and error cases)
 				if err := saveQueryLog(queryStr, connName, result, queryErr, logOpts); err != nil {
 					// Log the error but don't fail the command
 					fmt.Fprintf(os.Stderr, "Warning: failed to save query log: %v\n", err)
@@ -354,7 +359,6 @@ func Query() *cli.Command {
 					successMessage := "Results Successfully exported to " + resultsPath
 					return handleSuccess(c.String("output"), successMessage)
 				}
-				output := c.String("output")
 				switch output {
 				case outputFormatPlain:
 					if shouldOutputExecutionSummary(result) {
@@ -1245,13 +1249,17 @@ func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlpar
 }
 
 func printTable(columnNames []string, rows [][]interface{}) {
+	renderTable(os.Stdout, columnNames, rows)
+}
+
+func renderTable(w io.Writer, columnNames []string, rows [][]interface{}) {
 	if len(rows) == 0 {
-		fmt.Println("No data available")
+		fmt.Fprintln(w, "No data available")
 		return
 	}
 
 	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t.SetOutputMirror(w)
 
 	headers := make(table.Row, len(columnNames))
 	for i, colName := range columnNames {

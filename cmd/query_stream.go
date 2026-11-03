@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
@@ -22,6 +24,55 @@ type resultSink interface {
 	finish(result *query.QueryResult) error
 	// abort ends the output after err and returns the error the command should exit with.
 	abort(err error) error
+}
+
+// runStreamedQuery writes rows to stdout or the export files as they arrive, so memory stays flat regardless of result size.
+func runStreamedQuery(ctx context.Context, c *cli.Command, streamer query.RowStreamer, q *query.Query, connName, queryStr string, logOpts QueryLogOptions) error {
+	output := c.String("output")
+
+	var sink resultSink
+	var exports *exportSink
+	switch {
+	case c.Bool("export"):
+		exportsDir, err := prepareExportsDir(logOpts.Asset)
+		if err != nil {
+			return handleError(output, errors.Wrap(err, "failed to export results to CSV"))
+		}
+		exports = newExportSink(output, exportsDir, c.Int("split-rows"), time.Now().UnixMilli())
+		sink = exports
+	case output == "json":
+		sink = &jsonSink{w: bufio.NewWriter(os.Stdout), connName: connName, queryStr: queryStr}
+	case output == "csv":
+		sink = newCSVSink(bufio.NewWriter(os.Stdout))
+	default:
+		sink = &plainSink{w: bufio.NewWriter(os.Stdout)}
+	}
+
+	handler := &streamHandler{sink: sink, log: openQueryLog(queryStr, connName, logOpts)}
+	result, queryErr := streamer.StreamWithSchema(ctx, q, handler)
+
+	if logErr := handler.log.finish(queryErr); logErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to save query log: %v\n", logErr)
+	}
+
+	err := queryErr
+	switch {
+	case err != nil && handler.sinkErr == nil:
+		err = errors.Wrap(err, "query execution failed")
+	case err == nil:
+		err = sink.finish(result)
+	}
+
+	if err != nil {
+		return sink.abort(err)
+	}
+	if exports != nil {
+		if exports.splitRows > 0 {
+			return handleMultipleFilesSuccess(output, exports.paths)
+		}
+		return handleSuccess(output, "Results Successfully exported to "+exports.paths[0])
+	}
+	return nil
 }
 
 // streamHandler forwards a streamed result to a sink and writes every row to the query log.
@@ -105,6 +156,68 @@ func (s *csvSink) abort(err error) error {
 	_ = s.flush()
 	fmt.Fprintln(os.Stderr, "Error:", err.Error())
 	return cli.Exit("", 1)
+}
+
+// plainTableMaxRows is the largest result shown as a table; a table needs every row to size its columns.
+const plainTableMaxRows = 100
+
+// plainSink shows results of up to plainTableMaxRows rows as a table.
+// Larger results switch to CSV, so the remaining rows stream instead of being held for the table.
+type plainSink struct {
+	w       *bufio.Writer
+	columns []string
+	rows    [][]interface{}
+	csv     *csvSink
+}
+
+func (s *plainSink) writeHeader(columns, _ []string) error {
+	s.columns = columns
+	return nil
+}
+
+func (s *plainSink) writeRow(row []interface{}) error {
+	if s.csv != nil {
+		return s.csv.writeRow(row)
+	}
+	if len(s.rows) < plainTableMaxRows {
+		s.rows = append(s.rows, row)
+		return nil
+	}
+
+	s.csv = newCSVSink(s.w)
+	if err := s.csv.writeHeader(s.columns, nil); err != nil {
+		return err
+	}
+	for _, buffered := range append(s.rows, row) {
+		if err := s.csv.writeRow(buffered); err != nil {
+			return err
+		}
+	}
+	s.rows = nil
+	return nil
+}
+
+func (s *plainSink) finish(result *query.QueryResult) error {
+	if s.csv != nil {
+		return s.csv.finish(result)
+	}
+	if shouldOutputExecutionSummary(result) && len(s.rows) == 0 {
+		printQueryExecutionSummary(result.Execution)
+		return nil
+	}
+	columns := s.columns
+	if columns == nil {
+		columns = result.Columns
+	}
+	renderTable(s.w, columns, s.rows)
+	return s.w.Flush()
+}
+
+func (s *plainSink) abort(err error) error {
+	if s.csv != nil {
+		return s.csv.abort(err)
+	}
+	return handleError(outputFormatPlain, err)
 }
 
 // jsonSink writes the same document json.Marshal produces for the buffered output path.

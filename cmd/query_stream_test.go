@@ -300,3 +300,37 @@ func TestStreamHandlerIgnoresQueryLogFailure(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, entries, "a failed log should leave no file behind")
 }
+
+func TestPlainSinkSwitchesToCSVAfterMaxRows(t *testing.T) {
+	t.Parallel()
+
+	for _, n := range []int{plainTableMaxRows, plainTableMaxRows + 1} {
+		var out bytes.Buffer
+		rows := make([][]interface{}, n)
+		for i := range rows {
+			rows[i] = []interface{}{int64(i), fmt.Sprintf("v%d", i)}
+		}
+		streamTo(t, &plainSink{w: bufio.NewWriter(&out)}, &query.QueryResult{Columns: []string{"n", "s"}}, rows)
+
+		if n <= plainTableMaxRows {
+			assert.Contains(t, out.String(), "│ 99 │ v99 │", "up to the limit the result should be a table")
+			assert.NotContains(t, out.String(), "n,s")
+			continue
+		}
+		records, err := csv.NewReader(&out).ReadAll()
+		require.NoError(t, err, "above the limit the output should be CSV")
+		require.Len(t, records, n+1)
+		assert.Equal(t, []string{"n", "s"}, records[0])
+		assert.Equal(t, []string{"0", "v0"}, records[1], "buffered rows come first, in order")
+		assert.Equal(t, []string{"100", "v100"}, records[n])
+	}
+}
+
+func TestPlainSinkShowsEmptyResultAsTable(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	sink := &plainSink{w: bufio.NewWriter(&out)}
+	require.NoError(t, sink.finish(&query.QueryResult{Columns: []string{"n"}}))
+	assert.Equal(t, "No data available\n", out.String())
+}
