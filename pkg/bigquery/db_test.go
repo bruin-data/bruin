@@ -1233,6 +1233,126 @@ func TestDB_SelectWithSchema(t *testing.T) {
 	}
 }
 
+func TestDB_StreamWithSchema(t *testing.T) {
+	t.Parallel()
+
+	d, secondPageRequests := newPagedBqTestClient(t)
+	h := &recordingRowHandler{}
+	got, err := d.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id, name FROM users"}, h)
+	require.NoError(t, err)
+	assert.Equal(t, &query.QueryResult{Columns: []string{"id", "name"}, ColumnTypes: []string{"INTEGER", "STRING"}}, got)
+	assert.Equal(t, []string{"id", "name"}, h.columns)
+	assert.Equal(t, []string{"INTEGER", "STRING"}, h.columnTypes)
+	assert.Equal(t, [][]interface{}{{int64(1), "jane"}, {int64(2), "joe"}, {int64(3), "ann"}}, h.rows)
+	assert.Equal(t, int32(1), secondPageRequests.Load())
+}
+
+func TestDB_StreamWithSchemaStopsOnRowError(t *testing.T) {
+	t.Parallel()
+
+	d, secondPageRequests := newPagedBqTestClient(t)
+	h := &recordingRowHandler{rowErr: assert.AnError}
+	_, err := d.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id, name FROM users"}, h)
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Equal(t, []string{"id", "name"}, h.columns, "schema should arrive before the first row")
+	assert.Equal(t, [][]interface{}{{int64(1), "jane"}}, h.rows)
+	assert.Equal(t, int32(0), secondPageRequests.Load(), "later pages should not be fetched after the handler fails")
+}
+
+func newPagedBqTestClient(t *testing.T) (*Client, *atomic.Int32) {
+	t.Helper()
+
+	projectID := testProjectID
+	jobID := testJobID
+	secondPageRequests := &atomic.Int32{}
+	schema := &bigquery2.TableSchema{
+		Fields: []*bigquery2.TableFieldSchema{
+			{Name: "id", Type: "INTEGER"},
+			{Name: "name", Type: "STRING"},
+		},
+	}
+	row := func(id, name string) *bigquery2.TableRow {
+		return &bigquery2.TableRow{F: []*bigquery2.TableCell{{V: id}, {V: name}}}
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				Configuration: &bigquery2.JobConfiguration{
+					Query: &bigquery2.JobConfigurationQuery{Query: "SELECT id, name FROM users"},
+				},
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				Status:       &bigquery2.JobStatus{State: "DONE"},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)):
+			if r.URL.Query().Get("pageToken") == "page-2" {
+				secondPageRequests.Add(1)
+				writeBqTestJSON(t, w, &bigquery2.GetQueryResultsResponse{
+					JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+					JobComplete:  true,
+					Schema:       schema,
+					TotalRows:    3,
+					Rows:         []*bigquery2.TableRow{row("3", "ann")},
+				})
+				return
+			}
+			writeBqTestJSON(t, w, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{JobId: jobID, ProjectId: projectID, Location: "US"},
+				JobComplete:  true,
+				Schema:       schema,
+				TotalRows:    3,
+				PageToken:    "page-2",
+				Rows:         []*bigquery2.TableRow{row("1", "jane"), row("2", "joe")},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("unexpected request: " + r.Method + " " + r.RequestURI))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	return &Client{client: client}, secondPageRequests
+}
+
+type recordingRowHandler struct {
+	columns     []string
+	columnTypes []string
+	rows        [][]interface{}
+	rowErr      error
+}
+
+func (h *recordingRowHandler) Schema(columns, columnTypes []string) error {
+	h.columns = columns
+	h.columnTypes = columnTypes
+	return nil
+}
+
+func (h *recordingRowHandler) Row(row []interface{}) error {
+	if h.columns == nil {
+		return errors.New("row arrived before schema")
+	}
+	h.rows = append(h.rows, row)
+	return h.rowErr
+}
+
 func TestDB_SelectWithSchemaReturnsExecutionSummaryForNoResultStatement(t *testing.T) {
 	t.Parallel()
 
