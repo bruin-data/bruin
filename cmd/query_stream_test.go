@@ -39,10 +39,8 @@ func openStreamTestQueryLog(t *testing.T) *queryLogWriter {
 func streamTo(t *testing.T, sink resultSink, result *query.QueryResult, rows [][]interface{}) *streamHandler {
 	t.Helper()
 	h := &streamHandler{sink: sink, log: openStreamTestQueryLog(t)}
-	for i, row := range rows {
-		if i == 0 {
-			require.NoError(t, h.Schema(result.Columns, result.ColumnTypes))
-		}
+	require.NoError(t, h.Schema(result.Columns, result.ColumnTypes))
+	for _, row := range rows {
 		require.NoError(t, h.Row(row))
 	}
 	require.NoError(t, sink.finish(result))
@@ -156,10 +154,31 @@ func TestCSVSinkMatchesBufferedOutput(t *testing.T) {
 			want:   func(w *csv.Writer) { _ = w.Write([]string{"id"}) },
 		},
 		{
+			name:   "no columns or execution summary",
+			result: &query.QueryResult{Columns: []string{}},
+			want:   func(w *csv.Writer) { _ = w.Write([]string{}) },
+		},
+		{
 			name:   "execution summary",
 			result: &query.QueryResult{Execution: query.NewExecutionSummaryFromStatement("bigquery", "DELETE", &rowsAffected)},
 			want: func(w *csv.Writer) {
 				_ = writeExecutionSummaryCSV(w, query.NewExecutionSummaryFromStatement("bigquery", "DELETE", &rowsAffected))
+			},
+		},
+		{
+			name:   "ClickHouse CREATE TABLE summary after empty schema",
+			result: &query.QueryResult{Columns: []string{}, ColumnTypes: []string{}, Execution: query.NewExecutionSummaryFromStatement("clickhouse", "CREATE TABLE", nil)},
+			want: func(w *csv.Writer) {
+				_ = w.Write([]string{"metric", "value"})
+				_ = w.Write([]string{"Statement type", "CREATE TABLE"})
+			},
+		},
+		{
+			name:   "ClickHouse INSERT summary after empty schema",
+			result: &query.QueryResult{Columns: []string{}, ColumnTypes: []string{}, Execution: query.NewExecutionSummaryFromStatement("clickhouse", "INSERT", nil)},
+			want: func(w *csv.Writer) {
+				_ = w.Write([]string{"metric", "value"})
+				_ = w.Write([]string{"Statement type", "INSERT"})
 			},
 		},
 	}

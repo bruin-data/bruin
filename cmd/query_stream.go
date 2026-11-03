@@ -112,6 +112,10 @@ func newCSVSink(w *bufio.Writer) *csvSink {
 }
 
 func (s *csvSink) writeHeader(columns, _ []string) error {
+	// An empty schema may precede a statement summary, which arrives at finish.
+	if len(columns) == 0 {
+		return nil
+	}
 	s.started = true
 	if err := s.csv.Write(columns); err != nil {
 		return errors.Wrap(err, "failed to write CSV header")
@@ -133,8 +137,8 @@ func (s *csvSink) finish(result *query.QueryResult) error {
 			if err := writeExecutionSummaryCSV(s.csv, result.Execution); err != nil {
 				return err
 			}
-		} else if err := s.writeHeader(result.Columns, nil); err != nil {
-			return err
+		} else if err := s.csv.Write(result.Columns); err != nil {
+			return errors.Wrap(err, "failed to write CSV header")
 		}
 	}
 	return s.flush()
