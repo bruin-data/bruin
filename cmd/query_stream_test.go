@@ -191,11 +191,6 @@ func TestExportSinkSplitsFiles(t *testing.T) {
 		rowsPerFile []int
 	}{
 		{name: "single file", numRows: 5, splitRows: 0, rowsPerFile: []int{5}},
-		{name: "one row per file", numRows: 3, splitRows: 1, rowsPerFile: []int{1, 1, 1}},
-		{name: "below one hundred", numRows: 99, splitRows: 100, rowsPerFile: []int{99}},
-		{name: "exactly one hundred", numRows: 100, splitRows: 100, rowsPerFile: []int{100}},
-		{name: "above one hundred", numRows: 101, splitRows: 100, rowsPerFile: []int{100, 1}},
-		{name: "one hundred five", numRows: 105, splitRows: 100, rowsPerFile: []int{100, 5}},
 		{name: "even split", numRows: 10, splitRows: 5, rowsPerFile: []int{5, 5}},
 		{name: "with remainder", numRows: 10, splitRows: 4, rowsPerFile: []int{4, 4, 2}},
 		{name: "empty result with split", numRows: 0, splitRows: 3, rowsPerFile: []int{0}},

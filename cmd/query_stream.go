@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/query"
@@ -181,7 +180,7 @@ func (s *plainSink) writeRow(row []interface{}) error {
 		return s.csv.writeRow(row)
 	}
 	if len(s.rows) < plainTableMaxRows {
-		s.rows = append(s.rows, slices.Clone(row))
+		s.rows = append(s.rows, row)
 		return nil
 	}
 
@@ -203,10 +202,8 @@ func (s *plainSink) finish(result *query.QueryResult) error {
 		return s.csv.finish(result)
 	}
 	if shouldOutputExecutionSummary(result) && len(s.rows) == 0 {
-		if err := writeQueryExecutionSummary(s.w, result.Execution); err != nil {
-			return err
-		}
-		return s.w.Flush()
+		printQueryExecutionSummary(result.Execution)
+		return nil
 	}
 	columns := s.columns
 	if columns == nil {
@@ -219,10 +216,6 @@ func (s *plainSink) finish(result *query.QueryResult) error {
 func (s *plainSink) abort(err error) error {
 	if s.csv != nil {
 		return s.csv.abort(err)
-	}
-	if flushErr := s.w.Flush(); flushErr != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		return cli.Exit("", 1)
 	}
 	return handleError(outputFormatPlain, err)
 }
@@ -310,9 +303,7 @@ func (s *jsonSink) abort(err error) error {
 	if marshalErr != nil {
 		message = nil
 	}
-	if closeErr := s.close("error", message); closeErr != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v; failed to finish JSON output: %v\n", err, closeErr)
-	}
+	_ = s.close("error", message)
 	return cli.Exit("", 1)
 }
 
