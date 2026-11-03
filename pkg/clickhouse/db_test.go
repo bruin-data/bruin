@@ -29,6 +29,8 @@ type MockRows struct {
 	rows      [][]any
 	types     []MockColumnType
 	scanError error
+	readError error
+	closed    *bool
 }
 
 func (r MockRows) ColumnTypes() []driver.ColumnType {
@@ -65,8 +67,14 @@ func (r MockRows) Scan(dest ...any) error {
 func (r MockRows) ScanStruct(dest any) error { return nil }
 func (r MockRows) Totals(dest ...any) error  { return nil }
 func (r MockRows) Columns() []string         { return []string{"name", "age"} }
-func (r MockRows) Close() error              { return nil }
-func (r MockRows) Err() error                { return nil }
+func (r MockRows) Close() error {
+	if r.closed != nil {
+		*r.closed = true
+	}
+	return nil
+}
+
+func (r MockRows) Err() error { return r.readError }
 
 type MockConn struct {
 	mock.Mock
@@ -206,6 +214,92 @@ func TestClient_Select(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+type streamingHandler struct {
+	t           *testing.T
+	columns     []string
+	columnTypes []string
+	rows        [][]interface{}
+	schemaErr   error
+	rowErr      error
+}
+
+func (h *streamingHandler) Schema(columns, types []string) error {
+	require.Nil(h.t, h.columns, "schema must be sent once")
+	h.columns, h.columnTypes = columns, types
+	return h.schemaErr
+}
+
+func (h *streamingHandler) Row(row []interface{}) error {
+	require.NotNil(h.t, h.columns, "schema must precede rows")
+	h.rows = append(h.rows, row)
+	return h.rowErr
+}
+
+func TestClient_StreamWithSchema(t *testing.T) {
+	t.Parallel()
+	for _, outcome := range []string{"success", "empty", "schema error", "handler error", "read error", "exec"} {
+		t.Run(outcome, func(t *testing.T) {
+			t.Parallel()
+			conn := &MockConn{}
+			closed := false
+			rows := MockRows{
+				index: new(int), closed: &closed,
+				types: []MockColumnType{{ColumnName: "id", TypeName: "Int64"}, {ColumnName: "name", TypeName: "Nullable(String)"}},
+			}
+			if outcome != "empty" {
+				rows.rows = [][]any{{int64(7), "a,\"b\n"}, {int64(23), nil}}
+			}
+			h := &streamingHandler{t: t}
+			switch outcome {
+			case "schema error":
+				h.schemaErr = assert.AnError
+			case "handler error":
+				h.rowErr = assert.AnError
+			case "read error":
+				rows.rows = rows.rows[:1]
+				rows.readError = assert.AnError
+			}
+			sql := "SELECT id, name FROM users"
+			if outcome == "exec" {
+				sql = "CREATE TABLE users (id Int64)"
+				conn.On("Exec", mock.Anything, sql).Return(nil).Once()
+			} else {
+				conn.On("Query", mock.Anything, sql).Return(rows, nil).Once()
+			}
+			client := &Client{connection: conn}
+			result, err := client.StreamWithSchema(t.Context(), &query.Query{Query: sql}, h)
+			if outcome == "exec" {
+				require.NoError(t, err)
+				assert.Equal(t, []string{}, h.columns)
+				assert.Empty(t, h.rows)
+				assert.Equal(t, query.NewExecutionSummaryFromStatement("clickhouse", "CREATE TABLE", nil), result.Execution)
+			} else {
+				assert.True(t, closed)
+				assert.Equal(t, []string{"id", "name"}, h.columns)
+				assert.Equal(t, []string{"Int64", "Nullable(String)"}, h.columnTypes)
+				switch outcome {
+				case "success":
+					require.NoError(t, err)
+					assert.Equal(t, [][]interface{}{{int64(7), "a,\"b\n"}, {int64(23), nil}}, h.rows)
+				case "empty":
+					require.NoError(t, err)
+					assert.Empty(t, h.rows)
+				case "schema error":
+					require.ErrorIs(t, err, assert.AnError)
+					assert.Empty(t, h.rows)
+				default:
+					require.ErrorIs(t, err, assert.AnError)
+					assert.Equal(t, [][]interface{}{{int64(7), "a,\"b\n"}}, h.rows)
+				}
+			}
+			if err == nil {
+				assert.Nil(t, result.Rows)
+			}
+			conn.AssertExpectations(t)
 		})
 	}
 }

@@ -3,6 +3,10 @@
 [ClickHouse](https://clickhouse.com/) is a high-performance, column-oriented SQL database management system for online analytical processing.
 Bruin supports ClickHouse as both a source and a destination.
 
+The [query command](/commands/query) streams ClickHouse results to CSV, JSON, and export writers as rows are read, without collecting the entire result in Bruin's memory. No extra flag is required. Default `plain` output displays up to 100 rows as a table and switches to CSV for larger results. The driver may still buffer blocks internally.
+
+If reading or writing fails, the command stops with an error. CSV on stdout may be partial; JSON output includes an error, and incomplete export files are removed. Statements that do not return rows keep their execution summary.
+
 ## Connection
 
 To set up a ClickHouse connection, add a configuration item to `connections` in `.bruin.yml`:
