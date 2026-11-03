@@ -18,6 +18,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 	"github.com/bruin-data/bruin/pkg/user"
 )
@@ -293,11 +294,9 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 
 	for _, sqlStr := range cfg.quackAttachStatements() {
 		if err := execADBCStatement(ctx, conn, sqlStr); err != nil {
-			// DuckDB errors can echo the statement, which may carry the token.
-			msg := err.Error()
-			if cfg.Token != "" {
-				msg = strings.ReplaceAll(msg, cfg.Token, "***")
-			}
+			// DuckDB errors can echo the statement, which carries the token as a
+			// quoted SQL literal.
+			msg := mask.New([]string{cfg.Token}).Mask(err.Error())
 			return fmt.Errorf("failed to connect to Quack server at %s: %s", cfg.quackHost(), msg)
 		}
 	}

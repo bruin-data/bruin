@@ -3,6 +3,7 @@ package duck
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,4 +74,17 @@ func TestConfig_QuackAttachStatements(t *testing.T) {
 
 	c = Config{Quack: true, Host: "::1", Token: "abc", DisableSSL: true}
 	assert.Contains(t, c.quackAttachStatements(), "ATTACH 'quack:[::1]' AS quack_db (DISABLE_SSL true)")
+}
+
+func TestConfig_QuackAttachStatementsMaskToken(t *testing.T) {
+	t.Parallel()
+
+	c := Config{Quack: true, Host: "localhost", Token: "to'ken"}
+	m := mask.New([]string{c.Token})
+	for _, stmt := range c.quackAttachStatements() {
+		masked := m.Mask(stmt)
+		assert.NotContains(t, masked, "to''ken")
+		assert.NotContains(t, masked, "to'ken")
+	}
+	assert.Contains(t, m.Mask(c.quackAttachStatements()[2]), "TOKEN '****'")
 }
