@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery" //nolint:unused
 	"github.com/bruin-data/bruin/pkg/config"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/ingestr"
@@ -57,6 +58,7 @@ func Internal() *cli.Command {
 			IngestrSources(),
 			IngestrURI(),
 			LockAssetDependencies(),
+			InstallDuckDBDrivers(),
 		},
 	}
 }
@@ -1705,6 +1707,21 @@ func (l *LockDependenciesCommand) FindDependencyPath(inputPath string) (*LockDep
 		DependencyType:   depConfig.Type,
 		ProjectRoot:      depConfig.ProjectRoot,
 	}, nil
+}
+
+// InstallDuckDBDrivers installs the DuckDB drivers and the quack extension, so
+// images can include them instead of downloading them on every run.
+func InstallDuckDBDrivers() *cli.Command {
+	return &cli.Command{
+		Name:  "install-duckdb-drivers",
+		Usage: "install the DuckDB ADBC drivers and the quack extension",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			if err := duck.InstallDrivers(ctx); err != nil {
+				return cli.Exit(err.Error(), 1)
+			}
+			return nil
+		},
+	}
 }
 
 // LockAssetDependencies returns a CLI command that locks Python dependencies for an asset.

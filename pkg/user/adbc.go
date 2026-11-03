@@ -32,6 +32,24 @@ func ADBCDriverDir() (string, error) {
 	return filepath.Join(c.bruinHomeDir, "adbc"), nil
 }
 
+// VersionedADBCDriverDir returns a directory for a driver pinned separately from
+// the default one, under the same root. dbc symlinks each manifest into the
+// parent directory, so the extra level keeps that link out of the default
+// lookup, where it would shadow the default driver.
+func VersionedADBCDriverDir(group, name, version string) (string, error) {
+	base, err := ADBCDriverDir()
+	if err != nil {
+		return "", err
+	}
+	if base == "" {
+		base = config.ConfigUser.ConfigLocation()
+	}
+	if base == "" {
+		return "", fmt.Errorf("cannot locate a directory for the %s %s ADBC driver", group, name)
+	}
+	return filepath.Join(base, group, name+"-"+version), nil
+}
+
 // EnsureADBCDriverConfig relocates Bruin-managed drivers on first use. ConfigEnv
 // uses filesystem manifests on Windows too, rather than the user registry.
 func EnsureADBCDriverConfig(name string) (config.Config, error) {

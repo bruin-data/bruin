@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -61,7 +62,7 @@ func (f fakeIngestrConnection) GetIngestrURI() (string, error) {
 func Test_ingestrEnvVars_DisablesTelemetry(t *testing.T) {
 	t.Setenv("BRUIN_HOME", "")
 
-	env, err := ingestrEnvVars()
+	env, err := ingestrEnvVars(nil)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"INGESTR_DISABLE_TELEMETRY": "true",
@@ -74,12 +75,33 @@ func Test_ingestrEnvVars_BruinHome(t *testing.T) {
 	t.Setenv("BRUIN_HOME", home)
 
 	t.Setenv("ADBC_DRIVER_PATH", "")
-	env, err := ingestrEnvVars()
+	env, err := ingestrEnvVars(nil)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(home, "adbc"), env["ADBC_DRIVER_PATH"])
 
 	t.Setenv("ADBC_DRIVER_PATH", "/explicit-drivers")
-	env, err = ingestrEnvVars()
+	env, err = ingestrEnvVars(nil)
+	require.NoError(t, err)
+	assert.NotContains(t, env, "ADBC_DRIVER_PATH")
+}
+
+func Test_ingestrEnvVars_QuackSearchesQuackDriverFirst(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "bruin home")
+	t.Setenv("BRUIN_HOME", home)
+	t.Setenv("ADBC_DRIVER_PATH", "")
+	quackDir := filepath.Join(home, "adbc", "quack", "duckdb-"+duck.QuackDriverVersion)
+	args := []string{"ingest", "--source-uri", "duckdb:///tmp/a.db", "--dest-uri", "duckdb://:tok@localhost:9494?quack=true"}
+
+	env, err := ingestrEnvVars(args)
+	require.NoError(t, err)
+	assert.Equal(t, quackDir+string(os.PathListSeparator)+filepath.Join(home, "adbc"), env["ADBC_DRIVER_PATH"])
+
+	t.Setenv("ADBC_DRIVER_PATH", "/explicit-drivers")
+	env, err = ingestrEnvVars(args)
+	require.NoError(t, err)
+	assert.Equal(t, quackDir+string(os.PathListSeparator)+"/explicit-drivers", env["ADBC_DRIVER_PATH"])
+
+	env, err = ingestrEnvVars(args[:3])
 	require.NoError(t, err)
 	assert.NotContains(t, env, "ADBC_DRIVER_PATH")
 }

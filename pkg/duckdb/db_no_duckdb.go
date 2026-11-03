@@ -24,6 +24,11 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 	return errDuckDBNotSupported
 }
 
+// InstallDrivers returns an error in no-duckdb builds.
+func InstallDrivers(ctx context.Context) error {
+	return errDuckDBNotSupported
+}
+
 type Client struct {
 	connection    connection
 	config        DuckDBConfig

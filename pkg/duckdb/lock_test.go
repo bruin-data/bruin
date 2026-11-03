@@ -81,9 +81,9 @@ func TestQuackURIsAreNotLocked(t *testing.T) {
 	t.Parallel()
 
 	uri := "duckdb://:abc@localhost:9494?quack=true"
-	assert.True(t, isQuackURI(uri))
-	assert.False(t, isQuackURI("duckdb:///tmp/a.db"))
-	assert.False(t, isQuackURI("duckdb://:abc@localhost:9494?quack=false"))
+	assert.True(t, IsQuackURI(uri))
+	assert.False(t, IsQuackURI("duckdb:///tmp/a.db"))
+	assert.False(t, IsQuackURI("duckdb://:abc@localhost:9494?quack=false"))
 
 	done := make(chan struct{})
 	go func() {

@@ -32,7 +32,11 @@ type EphemeralConnection struct {
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
-	if err := EnsureADBCDriverInstalled(context.Background()); err != nil {
+	ensure := EnsureADBCDriverInstalled
+	if cfg, ok := c.(Config); ok && cfg.HasQuack() {
+		ensure = EnsureQuackADBCDriverInstalled
+	}
+	if err := ensure(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
 	}
 
@@ -244,7 +248,7 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 //nolint:ireturn
 func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	opts := e.databaseOptions()
-	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	driverPath, err := e.driverPath()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -277,6 +281,19 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 	return adb, conn, nil
 }
 
+// driverPath returns the manifest for the driver this connection needs: Quack
+// connections use their own DuckDB 2.0+ driver, everything else the default one.
+func (e *EphemeralConnection) driverPath() (string, error) {
+	if cfg, ok := e.config.(Config); ok && cfg.HasQuack() {
+		dir, err := QuackADBCDriverDir()
+		if err != nil {
+			return "", err
+		}
+		return quackDriverPath(dir), nil
+	}
+	return user.ADBCDriverPath(dbcDriverName)
+}
+
 func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Connection) error {
 	cfg, ok := e.config.(Config)
 	if !ok || !cfg.HasQuack() {
@@ -289,7 +306,7 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 		return fmt.Errorf("failed to read DuckDB ADBC driver version: %w", err)
 	}
 	if !quackSupportsDriverVersion(version) {
-		return fmt.Errorf("quack: true needs a DuckDB 2.0+ ADBC driver matching the server's release, but the installed driver is %s; install one with `dbc install duckdb=<server version>`", version)
+		return fmt.Errorf("quack: true needs a DuckDB 2.0+ ADBC driver, but the Quack driver installed by Bruin is %s", version)
 	}
 
 	for _, sqlStr := range cfg.quackAttachStatements() {

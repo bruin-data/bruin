@@ -586,3 +586,18 @@ func TestQuackSupportsDriverVersion(t *testing.T) {
 	require.True(t, quackSupportsDriverVersion("v2.1.0-dev42"))
 	require.True(t, quackSupportsDriverVersion("v10.0.0"))
 }
+
+func TestQuackConnectionsUseTheirOwnDriver(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "bruin home")
+	t.Setenv("BRUIN_HOME", home)
+
+	quack := &EphemeralConnection{config: Config{Quack: true, Host: "localhost", Token: "abc"}}
+	path, err := quack.driverPath()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(home, "adbc", "quack", "duckdb-"+QuackDriverVersion, "duckdb.toml"), path)
+
+	local := &EphemeralConnection{config: Config{Path: "a.db"}}
+	path, err = local.driverPath()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(home, "adbc", "duckdb.toml"), path)
+}

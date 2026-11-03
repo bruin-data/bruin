@@ -160,9 +160,9 @@ func databaseLockFor(path string) *databaseLock {
 	return lock.(*databaseLock)
 }
 
-// isQuackURI reports whether the URI points at a Quack server, which serves
+// IsQuackURI reports whether the URI points at a Quack server, which serves
 // many clients at once and so needs no local lock.
-func isQuackURI(path string) bool {
+func IsQuackURI(path string) bool {
 	if !strings.HasPrefix(path, "duckdb://") {
 		return false
 	}
@@ -171,7 +171,7 @@ func isQuackURI(path string) bool {
 }
 
 func LockDatabase(path string) {
-	if isQuackURI(path) {
+	if IsQuackURI(path) {
 		return
 	}
 	lock := databaseLockFor(path)
@@ -182,7 +182,7 @@ func LockDatabase(path string) {
 }
 
 func UnlockDatabase(path string) {
-	if isQuackURI(path) {
+	if IsQuackURI(path) {
 		return
 	}
 	databaseLockFor(path).Unlock()
@@ -193,7 +193,7 @@ func UnlockDatabase(path string) {
 func LockDatabases(paths ...string) func() {
 	keys := make([]string, 0, len(paths))
 	for _, path := range paths {
-		if isQuackURI(path) {
+		if IsQuackURI(path) {
 			continue
 		}
 		keys = append(keys, databaseLockKey(path))
