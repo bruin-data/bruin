@@ -1180,12 +1180,13 @@ func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
 	}
 	perQueryPath := filepath.Join(logDir, "query_1.json")
 	data, err := json.MarshalIndent(QueryLog{
-		Query:      "SELECT n FROM big",
-		Timestamp:  time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC),
-		Connection: "duckdb",
-		Success:    true,
-		Columns:    []string{"n"},
-		Rows:       rows,
+		Query:       "SELECT n FROM big",
+		Timestamp:   time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC),
+		Connection:  "duckdb",
+		Success:     true,
+		Columns:     []string{"n"},
+		Rows:        rows,
+		Description: "after rows",
 	}, "", "  ")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(perQueryPath, data, 0o600))
@@ -1201,12 +1202,80 @@ func TestWriteAggregatedQueryLogCapsRows(t *testing.T) {
 	assert.Len(t, got[0].Rows, aggregatedQueryLogMaxRows, "aggregate entry rows should be capped")
 	assert.InDelta(t, float64(0), got[0].Rows[0][0], 1e-9, "cap should keep the first rows in order")
 	assert.InDelta(t, float64(aggregatedQueryLogMaxRows-1), got[0].Rows[aggregatedQueryLogMaxRows-1][0], 1e-9)
+	assert.Equal(t, "after rows", got[0].Description, "fields after the skipped rows should be kept")
 
 	perQueryData, err := os.ReadFile(perQueryPath)
 	require.NoError(t, err)
 	var perQuery QueryLog
 	require.NoError(t, json.Unmarshal(perQueryData, &perQuery))
 	assert.Len(t, perQuery.Rows, 50, "per-query file should be untouched")
+}
+
+func TestSaveQueryLogKeepsAllRows(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".git"), 0o755))
+
+	rows := make([][]interface{}, aggregatedQueryLogMaxRows+30)
+	for i := range rows {
+		rows[i] = []interface{}{i, fmt.Sprintf("\"row\" <%d>", i)}
+	}
+	result := &query.QueryResult{Columns: []string{"n", "s"}, Rows: rows}
+	opts := QueryLogOptions{Asset: tmpDir, Environment: "dev", Limit: 5, Description: "desc"}
+	require.NoError(t, saveQueryLog("SELECT n", "conn", result, nil, opts))
+
+	logDir := filepath.Join(tmpDir, "logs", "queries")
+	entries, err := os.ReadDir(logDir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "only the finished log should remain")
+	require.Equal(t, ".json", filepath.Ext(entries[0].Name()))
+
+	data, err := os.ReadFile(filepath.Join(logDir, entries[0].Name()))
+	require.NoError(t, err)
+	var log QueryLog
+	require.NoError(t, json.Unmarshal(data, &log))
+	assert.Equal(t, "SELECT n", log.Query)
+	assert.Equal(t, "conn", log.Connection)
+	assert.Equal(t, "dev", log.Environment)
+	assert.Equal(t, int64(5), log.Limit)
+	assert.Equal(t, "desc", log.Description)
+	assert.True(t, log.Success)
+	assert.False(t, log.Timestamp.IsZero())
+	assert.Equal(t, []string{"n", "s"}, log.Columns)
+	require.Len(t, log.Rows, len(rows))
+	assert.Equal(t, []interface{}{float64(len(rows) - 1), fmt.Sprintf("\"row\" <%d>", len(rows)-1)}, log.Rows[len(rows)-1])
+
+	// The aggregate reads the streamed format, where the outcome follows the rows.
+	targetPath := filepath.Join(tmpDir, "aggregated.json")
+	require.NoError(t, writeAggregatedQueryLog(logDir, targetPath))
+	aggData, err := os.ReadFile(targetPath)
+	require.NoError(t, err)
+	var got []QueryLog
+	require.NoError(t, json.Unmarshal(aggData, &got))
+	require.Len(t, got, 1)
+	assert.Len(t, got[0].Rows, aggregatedQueryLogMaxRows)
+	assert.True(t, got[0].Success)
+	assert.True(t, log.Timestamp.Equal(got[0].Timestamp))
+}
+
+func TestSaveQueryLogRecordsError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".git"), 0o755))
+	require.NoError(t, saveQueryLog("SELECT boom", "conn", nil, assert.AnError, QueryLogOptions{Asset: tmpDir}))
+
+	paths, err := filepath.Glob(filepath.Join(tmpDir, "logs", "queries", "*.json"))
+	require.NoError(t, err)
+	require.Len(t, paths, 1)
+	data, err := os.ReadFile(paths[0])
+	require.NoError(t, err)
+	var log QueryLog
+	require.NoError(t, json.Unmarshal(data, &log))
+	assert.False(t, log.Success)
+	assert.Equal(t, assert.AnError.Error(), log.Error)
+	assert.Empty(t, log.Rows)
 }
 
 func TestCloudQuerierSelectWithSchema(t *testing.T) {
