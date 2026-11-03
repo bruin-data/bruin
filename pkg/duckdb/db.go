@@ -894,6 +894,11 @@ ORDER BY ordinal_position;
 // database cleanup for a run, not individual assets using this shared client.
 func (c *Client) Close() {}
 
+func (c *Client) HasQuack() bool {
+	cfg, ok := c.config.(Config)
+	return ok && cfg.HasQuack()
+}
+
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// DuckDB uses a catalog approach, we'll use the INFORMATION_SCHEMA
 	// First, let's get all schemas and tables with view definitions

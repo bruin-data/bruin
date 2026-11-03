@@ -56,6 +56,8 @@ func forms(secret string) []string {
 	add(unquote(strconv.Quote(secret)))
 	add(pythonJSONEscape(secret))
 	add(strings.ReplaceAll(secret, `\`, `\\`))
+	// SQL string literal: single quotes doubled, as in DuckDB secret statements.
+	add(strings.ReplaceAll(secret, `'`, `''`))
 	return out
 }
 

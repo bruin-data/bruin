@@ -4462,3 +4462,28 @@ func TestSnowflakeReadOnlySerialization(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadFromFileOrEnvLeavesQuackPathEmpty(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	yml := `default_environment: default
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: remote
+          quack: true
+          host: localhost
+          token: abc
+        - name: local
+          path: local.db
+`
+	require.NoError(t, afero.WriteFile(fs, testRepoConfigPath, []byte(yml), 0o644))
+
+	cfg, err := LoadFromFileOrEnv(fs, testRepoConfigPath)
+	require.NoError(t, err)
+	conns := cfg.Environments["default"].Connections.DuckDB
+	require.Len(t, conns, 2)
+	assert.Empty(t, conns[0].Path)
+	assert.True(t, filepath.IsAbs(conns[1].Path))
+}

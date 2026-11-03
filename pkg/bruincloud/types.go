@@ -193,6 +193,7 @@ type AgentMessage struct {
 	AgentLogs         json.RawMessage `json:"agent_logs"`
 	QueryLogs         json.RawMessage `json:"query_logs"`
 	OutputAttachments json.RawMessage `json:"output_attachments"`
+	StructuredOutput  json.RawMessage `json:"structured_output,omitempty"`
 	// Steerable is true while the turn is running on an agent that accepts steers.
 	Steerable bool         `json:"steerable"`
 	Steers    []AgentSteer `json:"steers,omitempty"`
@@ -457,6 +458,7 @@ type ScheduledAgent struct {
 	SameThread        *bool                          `json:"same_thread"`
 	ExecutionThreadID *int                           `json:"execution_thread_id"`
 	MonitorsDashboard json.RawMessage                `json:"monitors_dashboard,omitempty"`
+	OutputSchema      json.RawMessage                `json:"output_schema,omitempty"`
 	RecentExecutions  json.RawMessage                `json:"recent_executions,omitempty"`
 	// Not omitempty: [] means no channels, null means an older server.
 	NotificationIntegrations []ScheduledAgentNotification `json:"notification_integrations"`

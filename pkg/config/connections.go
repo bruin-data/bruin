@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -1117,6 +1118,20 @@ type DuckDBConnection struct {
 	Path               string           `yaml:"path,omitempty" json:"path" mapstructure:"path"`
 	ReadOnly           bool             `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 	Lakehouse          *LakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
+	Quack              bool             `yaml:"quack,omitempty" json:"quack,omitempty" mapstructure:"quack"`
+	Host               string           `yaml:"host,omitempty" json:"host,omitempty" mapstructure:"host"`
+	Port               int              `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Token              string           `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
+	DisableSSL         bool             `yaml:"disable_ssl,omitempty" json:"disable_ssl,omitempty" mapstructure:"disable_ssl"`
+}
+
+// JSONSchemaExtend requires a local path unless the connection points at a Quack server.
+func (DuckDBConnection) JSONSchemaExtend(s *jsonschema.Schema) {
+	s.Required = slices.DeleteFunc(s.Required, func(field string) bool { return field == "path" })
+	s.AnyOf = []*jsonschema.Schema{
+		{Required: []string{"path"}},
+		{Required: []string{"quack", "host", "token"}},
+	}
 }
 
 func (d DuckDBConnection) GetName() string {

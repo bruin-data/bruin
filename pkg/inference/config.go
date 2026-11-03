@@ -82,12 +82,22 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	fields := map[string]*string{
 		"provider": &c.provider, "model": &c.model, "context": &c.context,
 	}
-	if raw, exists := asset.Parameters["instructions"]; exists {
+	// instructions is an alias for system_prompt.
+	promptParameter := ""
+	for _, name := range []string{"system_prompt", "instructions"} {
+		raw, exists := asset.Parameters[name]
+		if !exists {
+			continue
+		}
+		if promptParameter != "" {
+			return nil, errors.New("inference accepts only one of parameters.system_prompt or parameters.instructions")
+		}
 		var ok bool
 		c.instructions, ok = raw.(string)
 		if !ok {
-			return nil, errors.New("inference instructions must be a string")
+			return nil, fmt.Errorf("inference %s must be a string", name)
 		}
+		promptParameter = name
 	}
 	for name, dest := range fields {
 		value, ok := asset.Parameters.GetString(name)
@@ -125,7 +135,7 @@ func readConfig(asset *pipeline.Asset) (*assetConfig, error) {
 	}
 	for name := range asset.Parameters {
 		switch name {
-		case "provider", "model", "context", "instructions", "input_query", "input_asset",
+		case "provider", "model", "context", "system_prompt", "instructions", "input_query", "input_asset",
 			"inference_connection", "max_rows", "max_output_tokens", "extract_parallelism", "cache", "force",
 			"destination": // inferred from the connection so checks run on the destination platform
 		default:

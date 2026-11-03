@@ -812,7 +812,8 @@ func TestMaskQuotedForms(t *testing.T) {
 	const pw = `Pa&ss\w0rd"x<y>Z`
 	const nonASCII = `pä\ss-wörd`
 	const emoji = "password😀"
-	r := New([]string{pw, nonASCII, emoji})
+	const sqlQuoted = "to'ken"
+	r := New([]string{pw, nonASCII, emoji, sqlQuoted})
 
 	tests := []struct{ name, in, want string }{
 		{"Go json.Marshal", `"password":"Pa\u0026ss\\w0rd\"x\u003cy\u003eZ"`, `"password":"****"`},
@@ -822,6 +823,7 @@ func TestMaskQuotedForms(t *testing.T) {
 		{"Python json.dumps, non-ASCII", `{"password": "p\u00e4\\ss-w\u00f6rd"}`, `{"password": "****"}`},
 		{"Python json.dumps, emoji", `{"password": "password\ud83d\ude00"}`, `{"password": "****"}`},
 		{"Go json.Marshal, non-ASCII", `"password":"pä\\ss-wörd"`, `"password":"****"`},
+		{"SQL string literal", `CREATE SECRET s (TYPE quack, TOKEN 'to''ken')`, `CREATE SECRET s (TYPE quack, TOKEN '****')`},
 	}
 	for _, tt := range tests {
 		if got := r.Mask(tt.in); got != tt.want {

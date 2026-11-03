@@ -770,6 +770,15 @@ bruin cloud agents send \
   --message "Tell me more about that failure"
 ```
 
+To get a structured answer, pass a JSON Schema with `--output-schema` (inline JSON) or `--output-schema-file` when starting a new thread (not with `--thread-id`). The agent's final answers in that thread match the schema and come back as `structured_output` in `agents status` and `agents messages --output json`. Only Claude and Codex agents support it; Codex requires every object to set `"additionalProperties": false` and list all its properties in `required`.
+
+```bash
+bruin cloud agents send \
+  --agent-id <agent-id> \
+  --message "How many pipelines failed today?" \
+  --output-schema '{"type":"object","properties":{"failed":{"type":"integer"}},"required":["failed"],"additionalProperties":false}'
+```
+
 #### `status`
 
 Check the status of a message (useful for async agent responses):
@@ -1340,6 +1349,13 @@ bruin cloud scheduled-agents update --scheduled-agent-id 42 --state-file ./plan.
 ```bash
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --same-thread
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --same-thread=false
+```
+
+`--output-schema` / `--output-schema-file` (on `create` and `update`) set a JSON Schema that each run's final answer matches, returned as `structured_output` (same agent support as `agents send`). `--clear-output-schema` removes it.
+
+```bash
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --output-schema-file ./schema.json
+bruin cloud scheduled-agents update --scheduled-agent-id 42 --clear-output-schema
 ```
 
 #### `trigger`
