@@ -16,7 +16,7 @@ Bruin supports using a local DuckDB database.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `path` | string | Yes | | Path to an existing or new DuckDB database file |
+| `path` | string | Yes, unless using [Quack](#remote-duckdb-server-quack) | | Path to an existing or new DuckDB database file |
 | `read_only` | boolean | No | `false` | Open the database in read-only mode, rejecting writes |
 
 > [!WARNING]
@@ -56,6 +56,34 @@ This is useful when you only need to read from a shared DuckDB database and want
 
 > [!NOTE]
 > Write operations (materializations, DDL) will fail on read-only connections. Only use this for connections that are exclusively used for reading.
+
+### Remote DuckDB server (Quack)
+
+Ingestr assets can read from and write to a remote DuckDB server started with the [Quack](https://duckdb.org/docs/current/core_extensions/quack) extension's `quack_serve`. Set `quack: true` with the server's host and token instead of `path`:
+
+```yaml
+    connections:
+      duckdb:
+        - name: "my_quack"
+          quack: true
+          host: "10.0.0.5"
+          port: 9494
+          token: "my_token"
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `quack` | boolean | Yes | `false` | Connect to a Quack server instead of a local file |
+| `host` | string | Yes | | Host of the Quack server |
+| `port` | integer | No | Quack's default | Port of the Quack server |
+| `token` | string | Yes | | Token the server was started with |
+| `disable_ssl` | boolean | No | `false` | Connect without TLS, for servers started with `disable_ssl=true` |
+
+`host`, `port`, `token` and `disable_ssl` are only accepted with `quack: true`, and a Quack connection cannot also set `path`, `read_only` or `lakehouse`.
+
+Quack requires DuckDB 2.0 or newer, and the server must run the same DuckDB release as the DuckDB ADBC driver used by Bruin and ingestr. Install a matching driver with `dbc install duckdb=<server version>`.
+
+A Quack connection can be used by ingestr assets, [quality checks](../quality/overview.md) and `bruin query`. Checks on an ingestr asset that writes to a Quack connection run on the server. `duckdb.sql` assets do not support Quack yet.
 
 ## Assets
 

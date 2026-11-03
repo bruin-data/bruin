@@ -140,16 +140,18 @@ func TestRenderInferenceRowTemplatesAreDeferred(t *testing.T) {
 	asset := &pipeline.Asset{
 		Type: pipeline.AssetTypeInference,
 		Parameters: pipeline.ParameterMap{
-			"context":      "Ticket: {{ row.body }}",
-			"instructions": "Use {{ row.locale }}",
-			"input_query":  "SELECT '{{ value }}' AS body",
+			"context":       "Ticket: {{ row.body }}",
+			"system_prompt": "Use {{ row.locale }}",
+			"instructions":  "Use {{ row.region }}",
+			"input_query":   "SELECT '{{ value }}' AS body",
 		},
 	}
 	mutator := renderAssetParamsMutator(jinja.NewRenderer(jinja.Context{"value": "ticket"}))
 	_, err := mutator(t.Context(), asset, &pipeline.Pipeline{})
 	require.NoError(t, err)
 	assert.Equal(t, "Ticket: {{ row.body }}", asset.Parameters["context"])
-	assert.Equal(t, "Use {{ row.locale }}", asset.Parameters["instructions"])
+	assert.Equal(t, "Use {{ row.locale }}", asset.Parameters["system_prompt"])
+	assert.Equal(t, "Use {{ row.region }}", asset.Parameters["instructions"])
 	assert.Equal(t, "SELECT 'ticket' AS body", asset.Parameters["input_query"])
 }
 

@@ -127,6 +127,10 @@ parameters:
   destination: postgres
 ```
 
+## Incremental Loading
+
+CRM object tables, including [custom objects](#custom-objects), load incrementally on `hs_lastmodifieddate` (`lastmodifieddate` for `contacts`) and are merged on `hs_object_id`. Each run fetches only the records created or updated between the run's start and end dates. Built-in tables also include every archived (deleted) record on each run, marked with `_archived_at`, regardless of the dates.
+
 ## Custom Objects
 
 HubSpot allows you to create custom objects to store unique business data that's not covered by the standard objects. ingestr supports ingesting data from custom objects using the following format:
@@ -140,6 +144,8 @@ or with associations to other objects:
 ```plaintext
 custom:<custom_object_name>:<associations>
 ```
+
+Custom objects load incrementally the same way as the built-in objects: primary key `hs_object_id`, incremental key `hs_lastmodifieddate`, strategy `merge`. See [Incremental Loading](#incremental-loading).
 
 ### Parameters
 

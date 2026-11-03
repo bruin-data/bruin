@@ -115,6 +115,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a duckdb connection", connName)
 	}
 
+	if q, ok := rawConn.(interface{ HasQuack() bool }); ok && q.HasQuack() {
+		return errors.Errorf("connection '%s' uses quack: true, which supports ingestr assets and quality checks but not duckdb.sql assets yet", connName)
+	}
+
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
 		err = conn.CreateSchemaIfNotExist(ctx, t)
 		if err != nil {
