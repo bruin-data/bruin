@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
 
 func TestConnectionDatabase(t *testing.T) {
@@ -390,4 +393,42 @@ fi
 			require.Equal(t, filepath.Join(home, "uv-cache")+"\n/explicit-python\n", string(contents))
 		})
 	}
+}
+
+func TestInternalRegistersInstallDuckDBDrivers(t *testing.T) {
+	t.Parallel()
+
+	names := make([]string, 0, len(Internal().Commands))
+	for _, c := range Internal().Commands {
+		names = append(names, c.Name)
+	}
+	require.Contains(t, names, "install-duckdb-drivers")
+}
+
+func TestInstallDuckDBDriversCommand(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+		called := false
+		cmd := installDuckDBDriversCommand(func(context.Context) error {
+			called = true
+			return nil
+		})
+		require.NoError(t, cmd.Run(t.Context(), []string{"install-duckdb-drivers"}))
+		require.True(t, called)
+	})
+
+	t.Run("install failure exits with code 1", func(t *testing.T) {
+		t.Parallel()
+		cmd := installDuckDBDriversCommand(func(context.Context) error {
+			return errors.New("download failed")
+		})
+		cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+		err := cmd.Run(t.Context(), []string{"install-duckdb-drivers"})
+		var exitErr cli.ExitCoder
+		require.ErrorAs(t, err, &exitErr)
+		require.Equal(t, 1, exitErr.ExitCode())
+		require.ErrorContains(t, err, "download failed")
+	})
 }

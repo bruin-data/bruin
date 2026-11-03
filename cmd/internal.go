@@ -1712,11 +1712,15 @@ func (l *LockDependenciesCommand) FindDependencyPath(inputPath string) (*LockDep
 // InstallDuckDBDrivers installs the DuckDB drivers and the quack extension, so
 // images can include them instead of downloading them on every run.
 func InstallDuckDBDrivers() *cli.Command {
+	return installDuckDBDriversCommand(duck.InstallDrivers)
+}
+
+func installDuckDBDriversCommand(install func(context.Context) error) *cli.Command {
 	return &cli.Command{
 		Name:  "install-duckdb-drivers",
 		Usage: "install the DuckDB ADBC drivers and the quack extension",
 		Action: func(ctx context.Context, c *cli.Command) error {
-			if err := duck.InstallDrivers(ctx); err != nil {
+			if err := install(ctx); err != nil {
 				return cli.Exit(err.Error(), 1)
 			}
 			return nil
