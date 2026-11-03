@@ -371,18 +371,8 @@ func Query() *cli.Command {
 						Execution *query.QueryExecutionSummary `json:"execution,omitempty"`
 					}
 
-					// Construct JSON response with structured columns
-					jsonCols := make([]map[string]string, len(result.Columns))
-					for i, colName := range result.Columns {
-						jsonCols[i] = map[string]string{
-							"name": colName,
-							"type": result.ColumnTypes[i],
-						}
-					}
-
-					// Prepare the final output struct
 					finalOutput := jsonResponse{
-						Columns:  jsonCols,
+						Columns:  queryJSONColumns(result),
 						Rows:     formatQueryRowsForJSON(result.Rows),
 						ConnName: connName,
 						Query:    queryStr,
@@ -408,15 +398,7 @@ func Query() *cli.Command {
 							return handleError(output, errors.Wrap(err, "failed to write CSV header"))
 						}
 						for _, row := range result.Rows {
-							rowStrings := make([]string, len(row))
-							for i, val := range row {
-								if val == nil {
-									rowStrings[i] = ""
-								} else {
-									rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
-								}
-							}
-							if err = writer.Write(rowStrings); err != nil {
+							if err = writer.Write(formatQueryRowForCSV(row)); err != nil {
 								return handleError(output, errors.Wrap(err, "failed to write CSV row"))
 							}
 						}
@@ -1289,6 +1271,17 @@ func printTable(columnNames []string, rows [][]interface{}) {
 	t.Render()
 }
 
+func queryJSONColumns(result *query.QueryResult) []map[string]string {
+	jsonCols := make([]map[string]string, len(result.Columns))
+	for i, colName := range result.Columns {
+		jsonCols[i] = map[string]string{
+			"name": colName,
+			"type": result.ColumnTypes[i],
+		}
+	}
+	return jsonCols
+}
+
 func shouldOutputExecutionSummary(result *query.QueryResult) bool {
 	return result != nil && result.Execution != nil && len(result.Rows) == 0
 }
@@ -1464,7 +1457,7 @@ func GetPipelineForQuery(ctx context.Context, inputPath string, fs afero.Fs, con
 	}, nil
 }
 
-func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, error) {
+func prepareExportsDir(inputPath string) (string, error) {
 	if inputPath == "" {
 		inputPath = "."
 	}
@@ -1472,62 +1465,37 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	if err != nil {
 		return "", err
 	}
-	resultName := fmt.Sprintf("query_result_%d.csv", time.Now().UnixMilli())
-	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
+
 	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
 	if err != nil {
 		return "", err
 	}
 
-	err = os.MkdirAll(filepath.Dir(resultsPath), 0o755)
+	exportsDir := filepath.Join(repoRoot.Path, "logs/exports")
+	err = os.MkdirAll(exportsDir, 0o755)
 	if err != nil {
 		return "", err
 	}
 
-	file, err := os.Create(resultsPath)
+	return exportsDir, nil
+}
+
+func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, error) {
+	exportsDir, err := prepareExportsDir(inputPath)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
 
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-	if err = writer.Write(results.Columns); err != nil {
+	resultsPath := filepath.Join(exportsDir, fmt.Sprintf("query_result_%d.csv", time.Now().UnixMilli()))
+	if err = writeCSVFile(resultsPath, results.Columns, results.Rows); err != nil {
 		return "", err
-	}
-	for _, row := range results.Rows {
-		rowStrings := make([]string, len(row))
-		for i, val := range row {
-			if val == nil {
-				rowStrings[i] = ""
-			} else {
-				rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
-			}
-		}
-		if err = writer.Write(rowStrings); err != nil {
-			return "", err
-		}
 	}
 
 	return resultsPath, nil
 }
 
 func exportResultsToMultipleCSV(results *query.QueryResult, inputPath string, splitRows int) ([]string, error) {
-	if inputPath == "" {
-		inputPath = "."
-	}
-	repoRoot, err := git.FindRepoFromPath(inputPath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
-	if err != nil {
-		return nil, err
-	}
-
-	exportsDir := filepath.Join(repoRoot.Path, "logs/exports")
-	err = os.MkdirAll(exportsDir, 0o755)
+	exportsDir, err := prepareExportsDir(inputPath)
 	if err != nil {
 		return nil, err
 	}
@@ -1580,20 +1548,23 @@ func writeCSVFile(path string, columns []string, rows [][]interface{}) error {
 	}
 
 	for _, row := range rows {
-		rowStrings := make([]string, len(row))
-		for i, val := range row {
-			if val == nil {
-				rowStrings[i] = ""
-			} else {
-				rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
-			}
-		}
-		if err = writer.Write(rowStrings); err != nil {
+		if err = writer.Write(formatQueryRowForCSV(row)); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	writer.Flush()
+	return writer.Error()
+}
+
+func formatQueryRowForCSV(row []interface{}) []string {
+	rowStrings := make([]string, len(row))
+	for i, val := range row {
+		if val != nil {
+			rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
+		}
+	}
+	return rowStrings
 }
 
 func applySchemaPrefix(_ context.Context, queryStr, dialect string, parser *sqlparser.SQLParser, pipelineInfo *ppInfo, conn interface{}) (string, error) {
