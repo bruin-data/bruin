@@ -150,7 +150,7 @@ func TestQueryLogWriterStreamsBeforeFinish(t *testing.T) {
 	assert.Equal(t, []any{json.Number("2"), "Ece"}, got.Rows[1])
 	info, err = os.Stat(log.path)
 	require.NoError(t, err)
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != osWindows {
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	}
 }
