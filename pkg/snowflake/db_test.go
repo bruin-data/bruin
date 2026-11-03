@@ -869,7 +869,7 @@ func TestDB_StreamWithSchemaCancelsBeforeClose(t *testing.T) {
 type cancelBeforeCloseConnector struct{ rows *cancelBeforeCloseRows }
 
 func (c cancelBeforeCloseConnector) Connect(context.Context) (driver.Conn, error) {
-	return cancelBeforeCloseConn{rows: c.rows}, nil
+	return cancelBeforeCloseConn(c), nil
 }
 
 func (c cancelBeforeCloseConnector) Driver() driver.Driver { return cancelBeforeCloseDriver{} }
@@ -893,13 +893,13 @@ func (cancelBeforeCloseConn) Begin() (driver.Tx, error) {
 func (cancelBeforeCloseConn) Close() error { return nil }
 
 func (c cancelBeforeCloseConn) QueryContext(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
-	c.rows.ctx = ctx
+	c.rows.contextErr = ctx.Err
 	return c.rows, nil
 }
 
 type cancelBeforeCloseRows struct {
-	ctx    context.Context
-	closed chan error
+	contextErr func() error
+	closed     chan error
 }
 
 func (*cancelBeforeCloseRows) Columns() []string { return []string{"id"} }
@@ -913,7 +913,7 @@ func (*cancelBeforeCloseRows) Next(dest []driver.Value) error {
 func (r *cancelBeforeCloseRows) Close() error {
 	// Record whether a draining driver would block here, without actually
 	// blocking: a regression must not strand database/sql's auto-close goroutine.
-	r.closed <- r.ctx.Err()
+	r.closed <- r.contextErr()
 	return nil
 }
 
