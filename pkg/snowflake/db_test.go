@@ -711,6 +711,131 @@ func TestDB_SelectWithSchema(t *testing.T) {
 	}
 }
 
+type streamHandler struct {
+	schema func([]string, []string) error
+	row    func([]interface{}) error
+}
+
+func (h streamHandler) Schema(columns, types []string) error {
+	return h.schema(columns, types)
+}
+
+func (h streamHandler) Row(row []interface{}) error {
+	return h.row(row)
+}
+
+func TestDB_StreamWithSchema(t *testing.T) {
+	t.Parallel()
+
+	for _, empty := range []bool{false, true} {
+		t.Run(fmt.Sprintf("empty=%v", empty), func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer mockDB.Close()
+			db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+			rows := sqlmock.NewRowsWithColumnDefinition(
+				sqlmock.NewColumn("ID").OfType("FIXED", int64(0)),
+				sqlmock.NewColumn("VALUE").OfType("TEXT", ""),
+			)
+			wantRows := [][]interface{}{}
+			if !empty {
+				rows.AddRow(int64(1), "first").AddRow(int64(2), nil)
+				wantRows = [][]interface{}{{int64(1), "first"}, {int64(2), nil}}
+			}
+			mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+			schemaCalls := 0
+			gotRows := [][]interface{}{}
+			result, err := db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM t"}, streamHandler{
+				schema: func(columns, types []string) error {
+					schemaCalls++
+					require.Empty(t, gotRows)
+					require.Equal(t, []string{"ID", "VALUE"}, columns)
+					require.Equal(t, []string{"FIXED", "TEXT"}, types)
+					return nil
+				},
+				row: func(row []interface{}) error {
+					require.Equal(t, 1, schemaCalls)
+					gotRows = append(gotRows, row)
+					return nil
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, 1, schemaCalls)
+			require.Equal(t, wantRows, gotRows)
+			require.Equal(t, &query.QueryResult{Columns: []string{"ID", "VALUE"}, ColumnTypes: []string{"FIXED", "TEXT"}}, result)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_StreamWithSchemaStopsWithoutRetry(t *testing.T) {
+	t.Parallel()
+
+	for _, stage := range []string{"schema", "row", "terminal"} {
+		t.Run(stage, func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer mockDB.Close()
+			retryCalls := 0
+			db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock"), retryDelay: func(int) time.Duration {
+				retryCalls++
+				return 0
+			}}
+			stopErr := errors.New("connection reset") // Retryable text must not replay callbacks.
+			rows := sqlmock.NewRows([]string{"ID"}).AddRow(1).AddRow(2)
+			if stage == "terminal" {
+				rows.RowError(1, stopErr)
+			}
+			mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+			schemaCalls, rowCalls := 0, 0
+			result, err := db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM t"}, streamHandler{
+				schema: func(_, _ []string) error {
+					schemaCalls++
+					if stage == "schema" {
+						return stopErr
+					}
+					return nil
+				},
+				row: func(_ []interface{}) error {
+					rowCalls++
+					if stage == "row" {
+						return stopErr
+					}
+					return nil
+				},
+			})
+			require.ErrorIs(t, err, stopErr)
+			require.Nil(t, result)
+			require.Equal(t, 1, schemaCalls)
+			if stage == "schema" {
+				require.Zero(t, rowCalls)
+			} else {
+				require.Equal(t, 1, rowCalls)
+			}
+			require.Zero(t, retryCalls)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_SelectWithSchemaRetriesWithoutPartialRows(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer mockDB.Close()
+	db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock"), retryDelay: func(int) time.Duration { return 0 }}
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"ID"}).
+		AddRow(1).AddRow(2).RowError(1, errors.New("connection reset"))).RowsWillBeClosed()
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"ID"}).AddRow(3)).RowsWillBeClosed()
+	result, err := db.SelectWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM t"})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{int64(3)}}, result.Rows)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
