@@ -2,6 +2,8 @@ package snowflake
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
@@ -818,6 +820,101 @@ func TestDB_StreamWithSchemaStopsWithoutRetry(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_StreamWithSchemaCancelsBeforeClose(t *testing.T) {
+	t.Parallel()
+	for _, stage := range []string{"schema", "row"} {
+		t.Run(stage, func(t *testing.T) {
+			t.Parallel()
+			rows := &cancelBeforeCloseRows{closed: make(chan error, 1)}
+			conn := sql.OpenDB(cancelBeforeCloseConnector{rows: rows})
+			defer conn.Close()
+			db := &DB{conn: sqlx.NewDb(conn, "test")}
+			schemaCalls, rowCalls := 0, 0
+			result, err := db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id FROM users"}, streamHandler{
+				schema: func(columns, _ []string) error {
+					schemaCalls++
+					require.Equal(t, []string{"id"}, columns)
+					if stage == "schema" {
+						return assert.AnError
+					}
+					return nil
+				},
+				row: func(row []interface{}) error {
+					rowCalls++
+					require.Equal(t, []interface{}{int64(1)}, row)
+					return assert.AnError
+				},
+			})
+			require.ErrorIs(t, err, assert.AnError)
+			require.Nil(t, result)
+			require.Equal(t, 1, schemaCalls)
+			if stage == "schema" {
+				require.Zero(t, rowCalls)
+			} else {
+				require.Equal(t, 1, rowCalls)
+			}
+			// database/sql may auto-close on cancellation before the explicit Close.
+			select {
+			case err := <-rows.closed:
+				require.ErrorIs(t, err, context.Canceled, "Close would drain uncanceled results")
+			case <-time.After(5 * time.Second):
+				t.Fatal("driver rows were not closed")
+			}
+		})
+	}
+}
+
+type cancelBeforeCloseConnector struct{ rows *cancelBeforeCloseRows }
+
+func (c cancelBeforeCloseConnector) Connect(context.Context) (driver.Conn, error) {
+	return cancelBeforeCloseConn{rows: c.rows}, nil
+}
+
+func (c cancelBeforeCloseConnector) Driver() driver.Driver { return cancelBeforeCloseDriver{} }
+
+type cancelBeforeCloseDriver struct{}
+
+func (cancelBeforeCloseDriver) Open(string) (driver.Conn, error) {
+	return nil, errors.New("use connector")
+}
+
+type cancelBeforeCloseConn struct{ rows *cancelBeforeCloseRows }
+
+func (cancelBeforeCloseConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not supported")
+}
+
+func (cancelBeforeCloseConn) Begin() (driver.Tx, error) {
+	return nil, errors.New("not supported")
+}
+
+func (cancelBeforeCloseConn) Close() error { return nil }
+
+func (c cancelBeforeCloseConn) QueryContext(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
+	c.rows.ctx = ctx
+	return c.rows, nil
+}
+
+type cancelBeforeCloseRows struct {
+	ctx    context.Context
+	closed chan error
+}
+
+func (*cancelBeforeCloseRows) Columns() []string { return []string{"id"} }
+
+func (*cancelBeforeCloseRows) Next(dest []driver.Value) error {
+	// Always leave unread results for Close, even after the first row callback.
+	dest[0] = int64(1)
+	return nil
+}
+
+func (r *cancelBeforeCloseRows) Close() error {
+	// Record whether a draining driver would block here, without actually
+	// blocking: a regression must not strand database/sql's auto-close goroutine.
+	r.closed <- r.ctx.Err()
+	return nil
 }
 
 func TestDB_SelectWithSchemaRetriesWithoutPartialRows(t *testing.T) {
