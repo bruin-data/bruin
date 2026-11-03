@@ -1384,13 +1384,17 @@ bruin cloud scheduled-agents delete --scheduled-agent-id 42
 
 #### `pipeline-trigger get` / `set` / `delete`
 
-Configure which pipeline's successful scheduled run triggers the agent. Triggers
-are stored as notification rules, separate from the plan. Setting one preserves
+Configure which pipelines' scheduled runs trigger the agent. Triggers are stored
+as notification rules, separate from the plan. Setting one preserves
 the agent's instructions, cron, and active/paused status.
 
 ```bash
 bruin cloud scheduled-agents pipeline-trigger set --scheduled-agent-id 42 \
   --project-id analytics --pipeline daily-etl
+bruin cloud scheduled-agents pipeline-trigger set --scheduled-agent-id 42 \
+  --project-id analytics --pipeline daily-etl --pipeline hourly-etl
+bruin cloud scheduled-agents pipeline-trigger set --scheduled-agent-id 42 \
+  --subscriptions-file ./subscriptions.json
 bruin cloud scheduled-agents pipeline-trigger get --scheduled-agent-id 42 --output json
 bruin cloud scheduled-agents update --scheduled-agent-id 42 --active=true
 bruin cloud scheduled-agents pipeline-trigger delete --scheduled-agent-id 42
@@ -1401,14 +1405,32 @@ For a new pipeline-only task, first `create` with instructions and no cron, then
 schedule to pipeline-only, set the pipeline trigger first, then remove the cron
 with `update --state '{"schedule":null}'`.
 
-Only successful **scheduled** pipeline runs trigger the task; manual runs,
-backfills, and failures do not. A cron can coexist with the pipeline trigger.
+With `--pipeline`, both successful and failed **scheduled** runs trigger the
+task; manual runs and backfills do not. The triggered run's prompt includes the
+event (`run_succeeded` or `run_failed`), so put outcome-specific handling in the
+instructions. A cron can coexist with the pipeline trigger.
+
+For other conditions, pass `--subscriptions-file` with a JSON array of
+notification subscriptions instead of `--pipeline`. This example triggers the
+agent only when a custom check fails:
+
+```json
+[{"event_types": ["asset_failed"], "selector": {"operator": "and", "children": [
+  {"field": "project.id", "operator": "equals", "value": "analytics"},
+  {"field": "step.type", "operator": "equals", "value": "custom_check"}
+]}}]
+```
+
+`set` replaces the existing trigger, including custom conditions configured in
+the Cloud UI, so run `get` first.
 Before deleting the last trigger of an active task, pause it with
 `update --active=false` or configure a cron. Otherwise the server rejects deletion.
 
 All three commands accept `--output json` and `--team`. JSON output is
-`{"pipeline_trigger":{"id":"daily-etl","project_id":"analytics"}}`, or
-`{"pipeline_trigger":null}` when no trigger remains. Reads require
+`{"pipeline_trigger":{"id":"daily-etl","project_id":"analytics"}}`,
+`{"pipeline_trigger":{"pipelines":[...]}}` or
+`{"pipeline_trigger":{"subscriptions":[...]}}`, or `{"pipeline_trigger":null}`
+when no trigger remains. Reads require
 `scheduled-agent:list`; setting/removing requires `scheduled-agent:manage` and
 access to the scheduled agent. Availability is controlled by the Cloud team;
 unavailable teams receive an API error.
