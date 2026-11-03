@@ -1057,3 +1057,107 @@ func TestUnprefixedName(t *testing.T) {
 		})
 	}
 }
+
+func TestRenameSelfReference(t *testing.T) {
+	t.Parallel()
+
+	const selfReferencing = "SELECT * FROM raw.events WHERE id > (SELECT max(id) FROM mart.events)"
+
+	tests := []struct {
+		name      string
+		assetName string
+		prefix    string
+		sql       string
+		setup     func(p *mockSQLParser)
+		want      string
+		wantErr   string
+	}{
+		{
+			name:      "self reference is pointed at the prefixed table",
+			assetName: "dev_mart.events",
+			prefix:    "dev_",
+			sql:       selfReferencing,
+			setup: func(p *mockSQLParser) {
+				p.On("UsedTables", selfReferencing, "bigquery").Return([]string{"raw.events", "mart.events"}, nil)
+				p.On("RenameTables", selfReferencing, "bigquery", map[string]string{"mart.events": "dev_mart.events"}).
+					Return("SELECT * FROM raw.events WHERE id > (SELECT MAX(id) FROM dev_mart.events)", nil)
+			},
+			want: "SELECT * FROM raw.events WHERE id > (SELECT MAX(id) FROM dev_mart.events)",
+		},
+		{
+			name:      "catalog qualified self reference",
+			assetName: "proj.dev_mart.events",
+			prefix:    "dev_",
+			sql:       "SELECT * FROM proj.mart.events",
+			setup: func(p *mockSQLParser) {
+				p.On("UsedTables", "SELECT * FROM proj.mart.events", "bigquery").Return([]string{"proj.mart.events"}, nil)
+				p.On("RenameTables", "SELECT * FROM proj.mart.events", "bigquery", map[string]string{"proj.mart.events": "proj.dev_mart.events"}).
+					Return("SELECT * FROM proj.dev_mart.events", nil)
+			},
+			want: "SELECT * FROM proj.dev_mart.events",
+		},
+		{
+			name:      "no self reference, SQL is not regenerated",
+			assetName: "dev_mart.events",
+			prefix:    "dev_",
+			sql:       "SELECT * FROM raw.events",
+			setup: func(p *mockSQLParser) {
+				p.On("UsedTables", "SELECT * FROM raw.events", "bigquery").Return([]string{"raw.events"}, nil)
+			},
+			want: "SELECT * FROM raw.events",
+		},
+		{
+			name:      "differently cased self reference is left as is, like Modify",
+			assetName: "dev_mart.events",
+			prefix:    "dev_",
+			sql:       "SELECT * FROM MART.events",
+			setup: func(p *mockSQLParser) {
+				p.On("UsedTables", "SELECT * FROM MART.events", "bigquery").Return([]string{"MART.events"}, nil)
+			},
+			want: "SELECT * FROM MART.events",
+		},
+		{
+			name:      "asset without a prefixed schema, parser is not used",
+			assetName: "mart.events",
+			prefix:    "dev_",
+			sql:       selfReferencing,
+			want:      selfReferencing,
+		},
+		{
+			name:      "no prefix, parser is not used",
+			assetName: "dev_mart.events",
+			sql:       selfReferencing,
+			want:      selfReferencing,
+		},
+		{
+			name:      "parser error is returned",
+			assetName: "dev_mart.events",
+			prefix:    "dev_",
+			sql:       selfReferencing,
+			setup: func(p *mockSQLParser) {
+				p.On("UsedTables", selfReferencing, "bigquery").Return([]string{}, errors.New("cannot parse"))
+			},
+			wantErr: "cannot parse",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			parser := new(mockSQLParser)
+			if tt.setup != nil {
+				tt.setup(parser)
+			}
+
+			got, err := RenameSelfReference(parser, "bigquery", tt.assetName, tt.prefix, tt.sql)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+			parser.AssertExpectations(t)
+		})
+	}
+}

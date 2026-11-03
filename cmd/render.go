@@ -8,7 +8,6 @@ import (
 	"os"
 	path2 "path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -296,7 +295,7 @@ func Render() *cli.Command {
 			// Hoisting only parses when the SQL contains DECLARE. On failure,
 			// hook wrapping preserves the original SQL.
 			var hoister pipeline.DeclareHoister
-			var tableRenamer tableRenamer
+			var tableRenamer devenv.TableRenamer
 			if p, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
 				defer p.Close()
 				hoister = p
@@ -444,17 +443,12 @@ type taskCreator interface {
 	CreateAssetFromFile(path string, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error)
 }
 
-type tableRenamer interface {
-	UsedTables(sql, dialect string) ([]string, error)
-	RenameTables(sql, dialect string, tableMapping map[string]string) (string, error)
-}
-
 type RenderCommand struct {
 	extractor     queryExtractor
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
 	hoister       pipeline.DeclareHoister
-	tableRenamer  tableRenamer
+	tableRenamer  devenv.TableRenamer
 	// schemaPrefix is the selected environment's schema_prefix; the asset name
 	// is expected to carry it already.
 	schemaPrefix string
@@ -555,13 +549,10 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	return err
 }
 
-// renameSelfReferences points references to the asset's own table at its
-// prefixed name, as `bruin run` does. Other tables are left alone: run only
-// prefixes those when the prefixed table exists, which render cannot check
-// without connecting to the database.
+// renameSelfReferences applies the schema prefix to the asset's references to
+// its own table. Assets without a SQL dialect are rendered as-is.
 func (r *RenderCommand) renameSelfReferences(task *pipeline.Asset, sql string) (string, error) {
-	original, ok := devenv.UnprefixedName(task.Name, r.schemaPrefix)
-	if !ok || r.tableRenamer == nil {
+	if r.schemaPrefix == "" || r.tableRenamer == nil {
 		return sql, nil
 	}
 	dialect, err := sqlparser.AssetTypeToDialect(task.Type)
@@ -569,19 +560,7 @@ func (r *RenderCommand) renameSelfReferences(task *pipeline.Asset, sql string) (
 		return sql, nil //nolint:nilerr // assets without a SQL dialect are rendered as-is
 	}
 
-	usedTables, err := r.tableRenamer.UsedTables(sql, dialect)
-	if err != nil {
-		return "", err
-	}
-	// Match the name exactly, as `bruin run` does: whether MART.events and
-	// mart.events are the same table depends on the dialect and on quoting,
-	// which UsedTables does not report. Renaming regenerates the SQL, so skip
-	// it when there is nothing to rename.
-	if !slices.Contains(usedTables, original) {
-		return sql, nil
-	}
-
-	return r.tableRenamer.RenameTables(sql, dialect, map[string]string{original: task.Name})
+	return devenv.RenameSelfReference(r.tableRenamer, dialect, task.Name, r.schemaPrefix, sql)
 }
 
 func isQuerySensorAsset(assetType pipeline.AssetType) bool {

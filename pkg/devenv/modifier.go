@@ -3,6 +3,8 @@ package devenv
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -16,12 +18,14 @@ import (
 type DevEnvQueryModifier struct {
 	Dialect string
 	Conn    config.ConnectionGetter
-	Parser  parser
+	Parser  TableRenamer
 
 	connSchemaCache     map[string]*ansisql.DBDatabase
 	connSchemaCacheLock sync.Mutex
 }
-type parser interface {
+
+// TableRenamer is the part of the SQL parser that dev environments use.
+type TableRenamer interface {
 	UsedTables(sql, dialect string) ([]string, error)
 	RenameTables(sql, dialect string, tableMapping map[string]string) (string, error)
 }
@@ -165,9 +169,7 @@ func (d *DevEnvQueryModifier) rewrite(ctx context.Context, schemaPrefix, connNam
 	// we modify the asset names globally outside of this function.
 	// this means if for some case the asset query queries itself, it would be cool if we handle that as well.
 	// this conditional tries to do that.
-	if original, ok := UnprefixedName(assetName, schemaPrefix); ok {
-		renameMapping[original] = assetName
-	}
+	maps.Copy(renameMapping, selfReferenceMapping(assetName, schemaPrefix))
 
 	for _, tableReference := range usedTables {
 		parts := strings.Split(tableReference, ".")
@@ -220,6 +222,41 @@ func (d *DevEnvQueryModifier) rewrite(ctx context.Context, schemaPrefix, connNam
 	}
 
 	return q, nil
+}
+
+// RenameSelfReference points references to an asset's own table at its
+// prefixed name, without connecting to the database. assetName is the already
+// prefixed name, e.g. "dev_mart.events". Only references written exactly as the
+// unprefixed name are renamed, the same rule Modify uses: whether MART.events
+// and mart.events are the same table depends on the dialect and on quoting,
+// which UsedTables does not report. Other tables are left as written, since
+// whether their prefixed copies exist can only be checked on the database.
+func RenameSelfReference(renamer TableRenamer, dialect, assetName, schemaPrefix, sql string) (string, error) {
+	mapping := selfReferenceMapping(assetName, schemaPrefix)
+	if len(mapping) == 0 {
+		return sql, nil
+	}
+
+	usedTables, err := renamer.UsedTables(sql, dialect)
+	if err != nil {
+		return "", err
+	}
+	// Renaming regenerates the SQL, so skip it when there is nothing to rename.
+	if !slices.ContainsFunc(usedTables, func(table string) bool { _, ok := mapping[table]; return ok }) {
+		return sql, nil
+	}
+
+	return renamer.RenameTables(sql, dialect, mapping)
+}
+
+// selfReferenceMapping maps the unprefixed name of an asset to its prefixed
+// name, or returns nil when the name has no prefixed schema.
+func selfReferenceMapping(assetName, schemaPrefix string) map[string]string {
+	original, ok := UnprefixedName(assetName, schemaPrefix)
+	if !ok {
+		return nil
+	}
+	return map[string]string{original: assetName}
 }
 
 // UnprefixedName returns the name an asset had before its schema was prefixed,
