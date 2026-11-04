@@ -169,6 +169,8 @@ To turn it on for every asset in a pipeline, set it under `default.parameters` i
 
 A full refresh never runs for an asset with `refresh_restricted: true`, so nothing would create its table. For such assets, `merge`, `delete+insert`, and `append` first create a missing target from the declared `columns`, as the `ddl` strategy does. This needs a `type` on every column. Fabric does not allow key constraints in `CREATE TABLE`, so no `PRIMARY KEY` is declared on the new table.
 
+Because the new table follows the order of `columns`, these assets copy rows by column name instead of by position, so the query must return every declared column. `append` stages the query in `<table>__bruin_tmp` first, like `delete+insert`.
+
 ## Source assets
 
 Use `fabric.source` to document an existing Fabric Warehouse table or view for metadata and lineage without executing it.

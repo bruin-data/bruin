@@ -72,7 +72,23 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
+	if !createsMissingTable(asset) {
+		return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
+	}
+
+	// The target may be created from the declared columns, whose order can differ
+	// from the query's, so stage the query and insert by column name. Staging also
+	// keeps CTE-bodied queries working, which a derived table would not.
+	tableName := QuoteIdentifier(asset.Name)
+	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp")
+	queries := []string{
+		"DROP TABLE IF EXISTS " + tempName,
+		"CREATE TABLE " + tempName + " AS\n" + strings.TrimSuffix(query, ";"),
+		insertFromStaging(asset, tableName, tempName),
+		"DROP TABLE IF EXISTS " + tempName,
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -95,11 +111,28 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 		"DROP TABLE IF EXISTS " + tempName,
 		"CREATE TABLE " + tempName + " AS\n" + query,
 		"DELETE FROM " + tableName + " WHERE EXISTS (\n  SELECT 1 FROM " + tempName + " WHERE " + deleteCondition + "\n)",
-		"INSERT INTO " + tableName + " SELECT * FROM " + tempName,
+		insertFromStaging(asset, tableName, tempName),
 		"DROP TABLE IF EXISTS " + tempName,
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+// insertFromStaging copies every staged row into the target. It lists the
+// declared columns when the target may have been created from them, so values
+// cannot land in the wrong column when the query orders them differently.
+func insertFromStaging(asset *pipeline.Asset, tableName, tempName string) string {
+	if !createsMissingTable(asset) {
+		return "INSERT INTO " + tableName + " SELECT * FROM " + tempName
+	}
+
+	columns := make([]string, len(asset.Columns))
+	for i, col := range asset.Columns {
+		columns[i] = QuoteIdentifier(col.Name)
+	}
+	columnList := strings.Join(columns, ", ")
+
+	return fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", tableName, columnList, columnList, tempName)
 }
 
 // NativeMergeParameter opts a merge asset into a native T-SQL MERGE. Without it,
@@ -126,9 +159,16 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func nativeMergeEnabled(asset *pipeline.Asset) (bool, error) {
+	raw, exists := asset.Parameters[NativeMergeParameter]
+	if !exists {
+		return false, nil
+	}
+
+	// GetString also fails for nil, list, and map values, which must not quietly
+	// fall back to delete+insert.
 	value, ok := asset.Parameters.GetString(NativeMergeParameter)
 	if !ok {
-		return false, nil
+		return false, fmt.Errorf("parameters.%s must be true or false, got %v", NativeMergeParameter, raw)
 	}
 
 	enabled, err := strconv.ParseBool(strings.TrimSpace(value))
@@ -240,7 +280,7 @@ func createMissingTable(build pipeline.MaterializerFunc) pipeline.MaterializerFu
 			return "", err
 		}
 
-		if asset.RefreshRestricted == nil || !*asset.RefreshRestricted || !allColumnsTyped(asset) {
+		if !createsMissingTable(asset) {
 			return materialized, nil
 		}
 
@@ -256,6 +296,12 @@ func createMissingTable(build pipeline.MaterializerFunc) pipeline.MaterializerFu
 
 		return createTable + "\n" + materialized, nil
 	}
+}
+
+// createsMissingTable reports whether incremental strategies create a missing
+// target from the declared columns.
+func createsMissingTable(asset *pipeline.Asset) bool {
+	return asset.RefreshRestricted != nil && *asset.RefreshRestricted && allColumnsTyped(asset)
 }
 
 func allColumnsTyped(asset *pipeline.Asset) bool {

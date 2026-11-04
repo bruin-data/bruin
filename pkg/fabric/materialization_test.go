@@ -334,6 +334,24 @@ func TestBuildNativeMergeQueryErrors(t *testing.T) {
 			}(),
 			wantError: `parameters.fabric_native_merge must be true or false, got "sometimes"`,
 		},
+		{
+			name: "list opt-in value",
+			asset: func() *pipeline.Asset {
+				a := nativeMergeAsset([]pipeline.Column{{Name: "id", PrimaryKey: true}})
+				a.Parameters = pipeline.ParameterMap{NativeMergeParameter: []interface{}{true}}
+				return a
+			}(),
+			wantError: "parameters.fabric_native_merge must be true or false, got [true]",
+		},
+		{
+			name: "empty opt-in value",
+			asset: func() *pipeline.Asset {
+				a := nativeMergeAsset([]pipeline.Column{{Name: "id", PrimaryKey: true}})
+				a.Parameters = pipeline.ParameterMap{NativeMergeParameter: nil}
+				return a
+			}(),
+			wantError: "parameters.fabric_native_merge must be true or false, got <nil>",
+		},
 	}
 
 	for _, tt := range tests {
@@ -354,6 +372,41 @@ func TestNativeMergeFullRefreshUsesCreateReplace(t *testing.T) {
 	expected, err := buildCreateReplaceQuery(asset, "SELECT 1 AS id")
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
+}
+
+func TestRefreshRestrictedLoadsByColumnName(t *testing.T) {
+	t.Parallel()
+
+	restricted := true
+	newAsset := func(strategy pipeline.MaterializationStrategy) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name:              "dbo.Table",
+			Materialization:   pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+			RefreshRestricted: &restricted,
+			Columns: []pipeline.Column{
+				{Name: "id", Type: "INT", PrimaryKey: true},
+				{Name: "amount", Type: "INT"},
+			},
+		}
+	}
+	query := "WITH src AS (SELECT amount, id FROM raw) SELECT amount, id FROM src"
+	namedInsert := "INSERT INTO [dbo].[Table] ([id], [amount]) SELECT [id], [amount] FROM [dbo].[Table__bruin_tmp];\n"
+
+	appendResult, err := buildAppendQuery(newAsset(pipeline.MaterializationStrategyAppend), query)
+	require.NoError(t, err)
+	assert.Equal(t, "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n"+
+		"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n"+query+";\n"+
+		namedInsert+
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];", appendResult)
+
+	deleteInsertResult, err := buildDeleteInsertQuery(newAsset(pipeline.MaterializationStrategyDeleteInsert), query)
+	require.NoError(t, err)
+	assert.Contains(t, deleteInsertResult, namedInsert)
+	assert.NotContains(t, deleteInsertResult, "SELECT *")
+
+	mergeResult, err := buildMergeQuery(newAsset(pipeline.MaterializationStrategyMerge), query)
+	require.NoError(t, err)
+	assert.Equal(t, deleteInsertResult, mergeResult)
 }
 
 func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
@@ -414,6 +467,9 @@ func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, createTable+body, result)
 				assert.NotContains(t, result, "PRIMARY KEY")
+				// The new table follows the declared column order, so rows are copied by name.
+				assert.NotContains(t, result, "SELECT *")
+				assert.NotContains(t, result, "INSERT INTO [dbo].[Table]\n")
 			}
 
 			for _, unchanged := range []*pipeline.Asset{
