@@ -45,6 +45,46 @@ func TestFabricWorkflows(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(tempPipelineDir, "pipeline.yml"), pipelineContent, 0o644))
 
+	mergeTable := "bruin_test.merge_orders_" + runID
+	mergeTemplateDir := filepath.Join(currentFolder, "test-pipelines/native-merge-pipeline")
+	mergePipelineDir := filepath.Join(tempDir, "fw-native-merge")
+	mergeAssetPath := filepath.Join(mergePipelineDir, "assets", "merge_orders.sql")
+	require.NoError(t, os.MkdirAll(filepath.Join(mergePipelineDir, "assets"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(mergePipelineDir, "resources"), 0o755))
+	copyWithRunID(t, filepath.Join(mergeTemplateDir, "pipeline.yml"), filepath.Join(mergePipelineDir, "pipeline.yml"), runID)
+	for _, resource := range []string{"merge_orders_initial.sql", "merge_orders_update.sql", "merge_orders_duplicate.sql"} {
+		copyWithRunID(t, filepath.Join(mergeTemplateDir, "resources", resource), filepath.Join(mergePipelineDir, "resources", resource), runID)
+	}
+
+	useMergeAsset := func(resource string) e2e.Task {
+		return e2e.Task{
+			Name:     "use " + resource + " as the merge asset",
+			Command:  "cp",
+			Args:     []string{filepath.Join(mergePipelineDir, "resources", resource), mergeAssetPath},
+			Expected: e2e.Output{ExitCode: 0},
+			Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
+		}
+	}
+	runMergeAsset := func(name string, exitCode int, contains ...string) e2e.Task {
+		return e2e.Task{
+			Name:     name,
+			Command:  binary,
+			Args:     append(append([]string{"run"}, configFlags...), "--env", "default", mergeAssetPath),
+			Expected: e2e.Output{ExitCode: exitCode, Contains: contains},
+			Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+		}
+	}
+	queryMergeTable := func(name, expectedCSV string) e2e.Task {
+		return e2e.Task{
+			Name:    name,
+			Command: binary,
+			Args: append(append([]string{"query"}, configFlags...), "--connection", "fabric-default", "--output", "csv", "--query",
+				"SELECT order_id, status, CAST(amount AS VARCHAR(20)) AS amount, CONVERT(VARCHAR(19), updated_at, 120) AS updated_at, CONVERT(VARCHAR(19), created_at, 120) AS created_at FROM "+mergeTable+" ORDER BY order_id;"),
+			Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(mergeTemplateDir, "expectations", expectedCSV)},
+			Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
+		}
+	}
+
 	tests := []struct {
 		name     string
 		workflow e2e.Workflow
@@ -95,6 +135,33 @@ func TestFabricWorkflows(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "fabric-native-merge",
+			workflow: e2e.Workflow{
+				Name: "fabric-native-merge",
+				Steps: []e2e.Task{
+					{
+						Name:       "initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: mergePipelineDir,
+						Expected:   e2e.Output{ExitCode: 0},
+						Asserts:    []func(*e2e.Task) error{e2e.AssertByExitCode},
+					},
+					useMergeAsset("merge_orders_initial.sql"),
+					// The table does not exist yet and no --full-refresh is given, so the
+					// refresh_restricted asset has to create it from its columns.
+					runMergeAsset("merge into a missing table", 0),
+					queryMergeTable("query the table after the first run", "after_initial.csv"),
+					useMergeAsset("merge_orders_update.sql"),
+					runMergeAsset("merge newer, stale, and new rows", 0),
+					queryMergeTable("query the table after the update", "after_update.csv"),
+					useMergeAsset("merge_orders_duplicate.sql"),
+					runMergeAsset("fail on duplicate primary keys", 1, "more than one row for the same primary key (order_id)"),
+					queryMergeTable("query the table after the failed run", "after_update.csv"),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -103,4 +170,13 @@ func TestFabricWorkflows(t *testing.T) {
 			require.NoError(t, tt.workflow.Run())
 		})
 	}
+}
+
+func copyWithRunID(t *testing.T, src, dst, runID string) {
+	t.Helper()
+
+	content, err := os.ReadFile(src)
+	require.NoError(t, err)
+	content = []byte(strings.ReplaceAll(string(content), "__RUN_ID__", "_"+runID))
+	require.NoError(t, os.WriteFile(dst, content, 0o644))
 }

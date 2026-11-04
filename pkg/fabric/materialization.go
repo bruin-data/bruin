@@ -3,8 +3,10 @@ package fabric
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -18,10 +20,10 @@ var matMap = pipeline.AssetMaterializationMap{
 	},
 	pipeline.MaterializationTypeTable: {
 		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyAppend:         createMissingTable(buildAppendQuery),
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:   buildDeleteInsertQuery,
-		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   createMissingTable(buildDeleteInsertQuery),
+		pipeline.MaterializationStrategyMerge:          createMissingTable(buildMergeQuery),
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
@@ -100,14 +102,172 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-// buildMergeQuery falls back to delete+insert because Fabric MERGE is limited.
+// NativeMergeParameter opts a merge asset into a native T-SQL MERGE. Without it,
+// merge keeps its original delete+insert behavior, which replaces matched rows
+// entirely. The default stays delete+insert because switching it silently would
+// stop updating every non-key column that lacks update_on_merge or merge_sql.
+const NativeMergeParameter = "fabric_native_merge"
+
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	native, err := nativeMergeEnabled(asset)
+	if err != nil {
+		return "", err
+	}
+	if native {
+		return buildNativeMergeQuery(asset, query)
+	}
+
 	// The delete+insert fallback has no merge match condition to attach the predicate to.
 	if strings.TrimSpace(asset.Materialization.IncrementalPredicate) != "" {
-		return "", errors.New("incremental_predicate is not supported for Fabric merge materialization")
+		return "", fmt.Errorf("incremental_predicate on Fabric merge requires `parameters.%s: true`", NativeMergeParameter)
 	}
 
 	return buildDeleteInsertQuery(asset, query)
+}
+
+func nativeMergeEnabled(asset *pipeline.Asset) (bool, error) {
+	value, ok := asset.Parameters.GetString(NativeMergeParameter)
+	if !ok {
+		return false, nil
+	}
+
+	enabled, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return false, fmt.Errorf("parameters.%s must be true or false, got %q", NativeMergeParameter, value)
+	}
+	return enabled, nil
+}
+
+// buildNativeMergeQuery stages the query in a table and merges it into the
+// target. Staging keeps CTE-bodied queries working, since Fabric rejects a WITH
+// clause inside MERGE ... USING (...).
+func buildNativeMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	strategy := asset.Materialization.Strategy
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", strategy)
+	}
+
+	pkCols := getPrimaryKeyColumns(asset)
+	if len(pkCols) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", strategy)
+	}
+
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
+	predicate := strings.TrimSpace(asset.Materialization.IncrementalPredicate)
+	if predicate != "" && len(mergeColumns) == 0 {
+		return "", errors.New("incremental_predicate on Fabric merge limits which matched rows are updated, so it requires at least one column with `update_on_merge` or `merge_sql`")
+	}
+
+	tableName := QuoteIdentifier(asset.Name)
+	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp")
+
+	mergeLines := []string{
+		"MERGE INTO " + tableName + " target",
+		"USING " + tempName + " source",
+		"ON " + buildDeleteCondition(pkCols, "target", "source"),
+	}
+
+	if len(mergeColumns) > 0 {
+		updates := make([]string, 0, len(mergeColumns))
+		for _, col := range mergeColumns {
+			value := "source." + QuoteIdentifier(col.Name)
+			if col.MergeSQL != "" {
+				value = col.MergeSQL
+			}
+			updates = append(updates, fmt.Sprintf("target.%s = %s", QuoteIdentifier(col.Name), value))
+		}
+
+		whenMatched := "WHEN MATCHED"
+		if predicate != "" {
+			whenMatched += " AND (" + predicate + ")"
+		}
+		mergeLines = append(mergeLines, whenMatched+" THEN UPDATE SET "+strings.Join(updates, ", "))
+	}
+
+	columns := make([]string, 0, len(asset.Columns))
+	values := make([]string, 0, len(asset.Columns))
+	for _, col := range asset.Columns {
+		columns = append(columns, QuoteIdentifier(col.Name))
+		values = append(values, "source."+QuoteIdentifier(col.Name))
+	}
+	mergeLines = append(mergeLines, fmt.Sprintf("WHEN NOT MATCHED BY TARGET THEN INSERT (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(values, ", ")))
+
+	queries := []string{
+		"DROP TABLE IF EXISTS " + tempName,
+		"CREATE TABLE " + tempName + " AS\n" + strings.TrimSuffix(strings.TrimSpace(query), ";"),
+		buildDuplicateKeyGuard(asset.Name, pkCols, tempName),
+		strings.Join(mergeLines, "\n"),
+		"DROP TABLE IF EXISTS " + tempName,
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+// buildDuplicateKeyGuard fails the run when the staged rows repeat a primary
+// key. MERGE would otherwise either fail with a generic "same row more than
+// once" error, when the key already exists, or insert every copy, when it doesn't.
+func buildDuplicateKeyGuard(assetName string, pkCols []string, tempName string) string {
+	quotedKeys := make([]string, len(pkCols))
+	for i, col := range pkCols {
+		quotedKeys[i] = QuoteIdentifier(col)
+	}
+
+	message := fmt.Sprintf(
+		"Fabric merge into %s failed: the query returned more than one row for the same primary key (%s). Deduplicate the query so that each key appears once.",
+		assetName,
+		strings.Join(pkCols, ", "),
+	)
+	// THROW treats % as a format character and the message is a string literal.
+	message = strings.ReplaceAll(strings.ReplaceAll(message, "%", "%%"), "'", "''")
+
+	return fmt.Sprintf(
+		"IF EXISTS (SELECT 1 FROM %s GROUP BY %s HAVING COUNT(*) > 1)\nBEGIN\nDROP TABLE IF EXISTS %s;\nTHROW 50000, N'%s', 1;\nEND",
+		tempName,
+		strings.Join(quotedKeys, ", "),
+		tempName,
+		message,
+	)
+}
+
+// createMissingTable lets an incremental strategy create its target from the
+// declared columns. It applies only to assets with refresh_restricted, which
+// can never be created by a full refresh. Assets without a type on every column
+// render unchanged.
+func createMissingTable(build pipeline.MaterializerFunc) pipeline.MaterializerFunc {
+	return func(asset *pipeline.Asset, query string) (string, error) {
+		materialized, err := build(asset, query)
+		if err != nil {
+			return "", err
+		}
+
+		if asset.RefreshRestricted == nil || !*asset.RefreshRestricted || !allColumnsTyped(asset) {
+			return materialized, nil
+		}
+
+		// Fabric rejects key constraints inside CREATE TABLE, so unlike the ddl
+		// strategy this leaves out the PRIMARY KEY clause.
+		columnDefs, _ := buildColumnDefinitions(asset)
+		createTable := fmt.Sprintf(
+			"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND;",
+			strings.ReplaceAll(asset.Name, "'", "''"),
+			QuoteIdentifier(asset.Name),
+			strings.Join(columnDefs, ",\n"),
+		)
+
+		return createTable + "\n" + materialized, nil
+	}
+}
+
+func allColumnsTyped(asset *pipeline.Asset) bool {
+	if len(asset.Columns) == 0 {
+		return false
+	}
+	for _, col := range asset.Columns {
+		if strings.TrimSpace(col.Type) == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -134,13 +294,31 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
 
-	columnDefs := make([]string, 0, len(asset.Columns)+1)
-	primaryKeys := make([]string, 0)
 	for _, col := range asset.Columns {
 		if col.Type == "" {
 			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
 		}
+	}
 
+	columnDefs, primaryKeys := buildColumnDefinitions(asset)
+	if len(primaryKeys) > 0 {
+		columnDefs = append(columnDefs, fmt.Sprintf("    PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
+	}
+
+	return fmt.Sprintf(
+		"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND;",
+		strings.ReplaceAll(asset.Name, "'", "''"),
+		QuoteIdentifier(asset.Name),
+		strings.Join(columnDefs, ",\n"),
+	), nil
+}
+
+// buildColumnDefinitions returns a definition per column and the quoted names
+// of the primary key columns. Callers must check that every column has a type.
+func buildColumnDefinitions(asset *pipeline.Asset) ([]string, []string) {
+	columnDefs := make([]string, 0, len(asset.Columns)+1)
+	primaryKeys := make([]string, 0)
+	for _, col := range asset.Columns {
 		definition := fmt.Sprintf("    %s %s", QuoteIdentifier(col.Name), col.SQLType())
 		if col.PrimaryKey || !col.Nullable.Bool() {
 			definition += " NOT NULL"
@@ -152,16 +330,7 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		}
 	}
 
-	if len(primaryKeys) > 0 {
-		columnDefs = append(columnDefs, fmt.Sprintf("    PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
-	}
-
-	return fmt.Sprintf(
-		"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND;",
-		strings.ReplaceAll(asset.Name, "'", "''"),
-		QuoteIdentifier(asset.Name),
-		strings.Join(columnDefs, ",\n"),
-	), nil
+	return columnDefs, primaryKeys
 }
 
 func getPrimaryKeyColumns(asset *pipeline.Asset) []string {

@@ -998,10 +998,10 @@ WHEN NOT MATCHED THEN INSERT (player_id, username, high_score)
 
 **Good to know:**
 
-- Without any `update_on_merge` or `merge_sql` column, most platforms only insert new keys and leave matched rows untouched. MySQL, ClickHouse, Fabric, and StarRocks behave differently: they replace matched rows entirely, so `update_on_merge` has no effect there. See [platform notes](#platform-notes).
+- Without any `update_on_merge` or `merge_sql` column, most platforms only insert new keys and leave matched rows untouched. MySQL, ClickHouse, StarRocks, and Fabric without [`fabric_native_merge`](../platforms/fabric.md#merge) behave differently: they replace matched rows entirely, so `update_on_merge` has no effect there. See [platform notes](#platform-notes).
 - `merge` never deletes. Rows removed from the source stay in the target. Use `delete+insert` if deletions must propagate.
 - `incremental_key` cannot be combined with `merge`. To limit the rows read from the source, filter the query. To limit the destination rows scanned, use `incremental_predicate`.
-- `merge_sql` is supported on BigQuery, Snowflake, PostgreSQL, Redshift, MySQL, MSSQL, Oracle, Athena (Iceberg), DuckDB, Spark, Doris, and Vertica. Databricks, Synapse, ClickHouse, and Fabric ignore it, and StarRocks rejects it.
+- `merge_sql` is supported on BigQuery, Snowflake, PostgreSQL, Redshift, MySQL, MSSQL, Oracle, Athena (Iceberg), DuckDB, Spark, Doris, and Vertica. Fabric supports it with [`fabric_native_merge`](../platforms/fabric.md#merge) and ignores it otherwise. Databricks, Synapse, and ClickHouse ignore it, and StarRocks rejects it.
 - Spark `merge` needs a catalog and table format that implement row-level `MERGE INTO`, such as Iceberg with the Spark SQL extensions enabled.
 
 ##### `incremental_predicate` {#incremental-predicate}
@@ -1076,7 +1076,8 @@ In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row des
 - The predicate is inserted as-is, without validation. It must cover every destination row that could match the source data. A row outside the window cannot match, so its key is inserted again as a duplicate. Choose a window that covers late-arriving data and the full period in which existing rows can change.
 - Supported on BigQuery, Athena, Databricks, Doris, DuckDB, MSSQL, MySQL, Oracle, PostgreSQL, Snowflake, Spark, Synapse, and Vertica.
 - On ClickHouse, the predicate is added to the `DELETE` that removes matched rows, so it must reference the target's columns directly, without the `target.` or `source.` aliases.
-- Redshift and Fabric reject it. Redshift's `MERGE` only accepts equality predicates in its match condition. StarRocks ignores it, and Python and ingestr assets fail validation.
+- On Fabric with [`fabric_native_merge`](../platforms/fabric.md#merge), the predicate is added to `WHEN MATCHED` instead of the match condition. It limits which matched rows are updated, and keys outside it are neither updated nor inserted again. It needs at least one `update_on_merge` or `merge_sql` column. Fabric without `fabric_native_merge` rejects it.
+- Redshift rejects it. Redshift's `MERGE` only accepts equality predicates in its match condition. StarRocks ignores it, and Python and ingestr assets fail validation.
 
 #### `time_interval` {#time-interval}
 
@@ -1613,7 +1614,7 @@ For `merge`:
 
 - **MySQL** stages the result, deletes matched target rows, and reinserts every staged row. Matched rows are fully replaced, so `update_on_merge` has no effect; `merge_sql` still applies.
 - **ClickHouse** deletes and reinserts rows on the primary key, so matched rows are fully replaced. Statements run one at a time, without a transaction. See [ClickHouse materialization](../platforms/clickhouse.md#materialization-and-incremental-strategies) for cluster restrictions.
-- **Fabric** deletes and reinserts rows on the primary key.
+- **Fabric** deletes and reinserts rows on the primary key by default. Set `parameters.fabric_native_merge: true` to run a native `MERGE` that updates only `update_on_merge` and `merge_sql` columns. See [Fabric merge](../platforms/fabric.md#merge).
 - **StarRocks** upserts on the primary key. It needs `starrocks.table_model: primary_key`, which is the default, creates the table if it is missing, and rejects `merge_sql` on non-key columns.
 - **Doris** needs `doris.table_model: unique_key`, which is the default.
 - **Databricks and Synapse** update only `update_on_merge` columns. They ignore `merge_sql`, so a column with only `merge_sql` is never updated.

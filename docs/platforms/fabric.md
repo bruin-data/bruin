@@ -105,6 +105,70 @@ FROM source_table
 WHERE modified_date > '{{ start_date }}'
 ```
 
+## Merge
+
+By default, `merge` on Fabric stages the query in a `<table>__bruin_tmp` table, deletes the target rows whose primary key is in it, and inserts every staged row. Matched rows are fully replaced, `update_on_merge` and `merge_sql` are ignored, and `incremental_predicate` is rejected.
+
+Set `parameters.fabric_native_merge: true` to run a native T-SQL `MERGE` instead:
+
+```sql
+/* @bruin
+name: sales.orders
+type: fabric.sql
+materialization:
+  type: table
+  strategy: merge
+parameters:
+  fabric_native_merge: true
+columns:
+  - name: order_id
+    type: int
+    primary_key: true
+  - name: status
+    type: varchar(20)
+    merge_sql: CASE WHEN source.updated_at > target.updated_at THEN source.status ELSE target.status END
+  - name: updated_at
+    type: datetime2(6)
+    merge_sql: CASE WHEN source.updated_at > target.updated_at THEN source.updated_at ELSE target.updated_at END
+  - name: created_at
+    type: datetime2(6)
+@bruin */
+
+WITH latest AS (
+    SELECT order_id, status, updated_at, created_at FROM raw.orders
+)
+SELECT order_id, status, updated_at, created_at FROM latest
+```
+
+Bruin still stages the query with `CREATE TABLE ... AS`, because Fabric rejects a CTE inside `MERGE ... USING (...)`. It then merges the staged rows on the primary key and drops the staging table:
+
+```sql
+MERGE INTO [sales].[orders] target
+USING [sales].[orders__bruin_tmp] source
+ON target.[order_id] = source.[order_id]
+WHEN MATCHED THEN UPDATE SET
+  target.[status] = CASE WHEN source.updated_at > target.updated_at THEN source.status ELSE target.status END,
+  target.[updated_at] = CASE WHEN source.updated_at > target.updated_at THEN source.updated_at ELSE target.updated_at END
+WHEN NOT MATCHED BY TARGET THEN INSERT ([order_id], [status], [updated_at], [created_at])
+  VALUES (source.[order_id], source.[status], source.[updated_at], source.[created_at]);
+```
+
+With `fabric_native_merge`:
+
+- Only columns with `update_on_merge: true` or `merge_sql` change on a match. Other columns, such as `created_at` above, keep their existing values. Without any such column, matched rows are left untouched and only new keys are inserted.
+- New keys insert the declared `columns`, so every column you want written must be listed.
+- `incremental_predicate` is added to `WHEN MATCHED`, for example `WHEN MATCHED AND (source.updated_at > target.updated_at)`. It needs at least one `update_on_merge` or `merge_sql` column.
+- The run fails before the `MERGE` when the query returns the same primary key more than once, with an error that names the key columns. The default delete+insert mode inserts every duplicate instead.
+
+> [!WARNING]
+> Turning on `fabric_native_merge` for an existing asset changes what happens to matched rows. A non-key column without `update_on_merge` or `merge_sql` stops being updated. Add `update_on_merge: true` to every column that should keep updating, or `merge_sql` for a conditional update, before you turn it on.
+
+To turn it on for every asset in a pipeline, set it under `default.parameters` in `pipeline.yml`.
+
+### First run of a `refresh_restricted` asset
+
+A full refresh never runs for an asset with `refresh_restricted: true`, so nothing would create its table. For such assets, `merge`, `delete+insert`, and `append` first create a missing target from the declared `columns`, as the `ddl` strategy does. This needs a `type` on every column. Fabric does not allow key constraints in `CREATE TABLE`, so no `PRIMARY KEY` is declared on the new table.
+
 ## Source assets
 
 Use `fabric.source` to document an existing Fabric Warehouse table or view for metadata and lineage without executing it.
