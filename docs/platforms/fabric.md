@@ -167,9 +167,11 @@ To turn it on for every asset in a pipeline, set it under `default.parameters` i
 
 ### First run of a `refresh_restricted` asset
 
-A full refresh never runs for an asset with `refresh_restricted: true`, so nothing would create its table. For such assets, `merge`, `delete+insert`, and `append` first create a missing target from the declared `columns`, as the `ddl` strategy does. This needs a `type` on every column. Fabric does not allow key constraints in `CREATE TABLE`, so no `PRIMARY KEY` is declared on the new table.
+A full refresh never runs for an asset with `refresh_restricted: true`, so nothing would create its table. With `fabric_native_merge`, such an asset creates a missing target from the declared `columns` before its query runs, as the `ddl` strategy does. This needs a `type` on every column. Fabric does not allow key constraints in `CREATE TABLE`, so no `PRIMARY KEY` is declared on the new table.
 
-The new table follows the order of `columns`, which can differ from the query's, so the run that creates it copies rows by column name. The query must return every declared column for that first load. Once the table exists, loads run exactly as they do without `refresh_restricted` and copy every column the query returns. To create the table on its first run, `append` stages the query in a staging table, which gets a unique name on each run so that parallel [backfill](../commands/backfill.md) partitions don't collide.
+Because the table exists before the query runs, a query that reads its own target, for example to find the highest loaded ID, sees an empty table on the first run. `MERGE` inserts by column name, so the query can return the columns in a different order than `columns` declares them.
+
+`append`, `delete+insert`, and `merge` without `fabric_native_merge` don't create a missing target. They copy rows by position, so a table built from `columns` would put values in the wrong column whenever the query orders them differently. Before you set `refresh_restricted: true`, create the table with one `bruin run --full-refresh` run, which builds it from the query in the query's column order.
 
 ## Source assets
 

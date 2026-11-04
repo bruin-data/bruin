@@ -373,7 +373,7 @@ func TestNativeMergeFullRefreshUsesCreateReplace(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
+func TestNativeMergeCreatesMissingTableForRefreshRestrictedAssets(t *testing.T) {
 	t.Parallel()
 
 	restricted := true
@@ -384,117 +384,95 @@ func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
 		{Name: "name", Type: "VARCHAR(100)", UpdateOnMerge: true},
 		{Name: "updated_at", Type: "DATETIME2(6)", Nullable: pipeline.DefaultTrueBool{Value: &nullable}},
 	}
+	newAsset := func(refreshRestricted *bool, columns []pipeline.Column) *pipeline.Asset {
+		asset := nativeMergeAsset(columns)
+		asset.RefreshRestricted = refreshRestricted
+		return asset
+	}
+	// The query reads its own target and returns columns in a different order than
+	// they are declared. The table is created before the query runs, and MERGE
+	// inserts by column name, so both work on the first run and every later one.
+	query := "SELECT name, id, updated_at FROM src WHERE id > (SELECT COALESCE(MAX(id), 0) FROM dbo.Table)"
+
 	// Fabric rejects key constraints in CREATE TABLE, so there is no PRIMARY KEY clause.
-	createTable := "IF OBJECT_ID('dbo.Table', 'U') IS NULL\n" +
+	want := "IF OBJECT_ID('dbo.Table', 'U') IS NULL\n" +
 		"BEGIN\n" +
 		"CREATE TABLE [dbo].[Table] (\n" +
 		"    [id] INT NOT NULL,\n" +
 		"    [name] VARCHAR(100),\n" +
 		"    [updated_at] DATETIME2(6) NOT NULL\n" +
-		");\n"
-	// A new table follows the declared column order, which can differ from the
-	// query's, so its first load copies by name.
-	firstLoad := func(tempName string) string {
-		return "EXEC sp_executesql N'INSERT INTO [dbo].[Table] ([id], [name], [updated_at]) SELECT [id], [name], [updated_at] FROM " + tempName + "';\n" +
-			"END\n" +
-			"ELSE\n" +
-			"BEGIN\n"
-	}
-	// The existing-target statements match the ones rendered without refresh_restricted.
-	deleteInsert := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
-		"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
-		"SELECT name, id, updated_at FROM src;\n" +
-		createTable +
-		firstLoad("[dbo].[Table__bruin_tmp]") +
-		"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
-		"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
 		");\n" +
-		"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp];\n" +
 		"END;\n" +
-		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
+		"CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n" +
+		query + ";\n" +
+		"IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
+		"BEGIN\n" +
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
+		"THROW 50000, N'Fabric merge into dbo.Table failed: the query returned more than one row for the same primary key (id). Deduplicate the query so that each key appears once.', 1;\n" +
+		"END;\n" +
+		"MERGE INTO [dbo].[Table] target\n" +
+		"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
+		"ON target.[id] = source.[id]\n" +
+		"WHEN MATCHED THEN UPDATE SET target.[name] = source.[name]\n" +
+		"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [name], [updated_at]) VALUES (source.[id], source.[name], source.[updated_at]);\n" +
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];"
 
-	tests := []struct {
-		strategy pipeline.MaterializationStrategy
-		params   pipeline.ParameterMap
-		want     string
-	}{
-		{
-			strategy: pipeline.MaterializationStrategyAppend,
-			want: "CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n" +
-				"SELECT name, id, updated_at FROM src;\n" +
-				createTable +
-				firstLoad("[dbo].[Table__bruin_tmp_abcefghi]") +
-				"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp_abcefghi];\n" +
-				"END;\n" +
-				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];",
-		},
-		{strategy: pipeline.MaterializationStrategyDeleteInsert, want: deleteInsert},
-		{strategy: pipeline.MaterializationStrategyMerge, want: deleteInsert},
-		{
-			strategy: pipeline.MaterializationStrategyMerge,
-			params:   pipeline.ParameterMap{NativeMergeParameter: "true"},
-			// MERGE names its columns, so an empty new table needs no separate first load.
-			want: createTable + "END;\n" +
-				"CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n" +
-				"SELECT name, id, updated_at FROM src;\n" +
-				"IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
-				"BEGIN\n" +
-				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
-				"THROW 50000, N'Fabric merge into dbo.Table failed: the query returned more than one row for the same primary key (id). Deduplicate the query so that each key appears once.', 1;\n" +
-				"END;\n" +
-				"MERGE INTO [dbo].[Table] target\n" +
-				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
-				"ON target.[id] = source.[id]\n" +
-				"WHEN MATCHED THEN UPDATE SET target.[name] = source.[name]\n" +
-				"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [name], [updated_at]) VALUES (source.[id], source.[name], source.[updated_at]);\n" +
-				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];",
-		},
+	// Even a full refresh keeps a refresh_restricted asset on its strategy.
+	for _, fullRefresh := range []bool{false, true} {
+		result, err := NewMaterializer(fullRefresh).Render(newAsset(&restricted, typedColumns), query)
+		require.NoError(t, err)
+		assert.Equal(t, want, result)
 	}
 
-	for _, tt := range tests {
-		name := string(tt.strategy)
-		if tt.params != nil {
-			name += " native"
-		}
-		t.Run(name, func(t *testing.T) {
+	for _, unchanged := range []*pipeline.Asset{
+		newAsset(nil, typedColumns),
+		newAsset(&notRestricted, typedColumns),
+		newAsset(&restricted, []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "name", Type: "VARCHAR(100)", UpdateOnMerge: true}}),
+	} {
+		result, err := NewMaterializer(false).Render(unchanged, query)
+		require.NoError(t, err)
+		assert.NotContains(t, result, "OBJECT_ID")
+	}
+}
+
+// Strategies that copy staged rows by position don't create a missing target:
+// one created from the declared columns could order them differently from the
+// query. refresh_restricted leaves their SQL unchanged.
+func TestPositionalStrategiesIgnoreRefreshRestricted(t *testing.T) {
+	t.Parallel()
+
+	restricted := true
+	for _, strategy := range []pipeline.MaterializationStrategy{
+		pipeline.MaterializationStrategyAppend,
+		pipeline.MaterializationStrategyDeleteInsert,
+		pipeline.MaterializationStrategyMerge,
+	} {
+		t.Run(string(strategy), func(t *testing.T) {
 			t.Parallel()
 
-			newAsset := func(refreshRestricted *bool, columns []pipeline.Column) *pipeline.Asset {
+			newAsset := func(refreshRestricted *bool) *pipeline.Asset {
 				return &pipeline.Asset{
-					Name: "dbo.Table",
-					Materialization: pipeline.Materialization{
-						Type:     pipeline.MaterializationTypeTable,
-						Strategy: tt.strategy,
-					},
-					Parameters:        tt.params,
+					Name:              "dbo.Table",
+					Materialization:   pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
 					RefreshRestricted: refreshRestricted,
-					Columns:           columns,
+					Columns: []pipeline.Column{
+						{Name: "id", Type: "INT", PrimaryKey: true},
+						{Name: "amount", Type: "INT"},
+					},
 				}
 			}
-			query := "SELECT name, id, updated_at FROM src"
 
-			// Even a full refresh keeps a refresh_restricted asset on its strategy.
-			for _, fullRefresh := range []bool{false, true} {
-				result, err := NewMaterializer(fullRefresh).Render(newAsset(&restricted, typedColumns), query)
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, result)
-			}
-
-			for _, unchanged := range []*pipeline.Asset{
-				newAsset(nil, typedColumns),
-				newAsset(&notRestricted, typedColumns),
-				newAsset(&restricted, []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "name", Type: "VARCHAR(100)", UpdateOnMerge: true}}),
-			} {
-				result, err := NewMaterializer(false).Render(unchanged, query)
-				require.NoError(t, err)
-				assert.NotContains(t, result, "OBJECT_ID")
-				assert.NotContains(t, result, "sp_executesql")
-			}
+			restrictedResult, err := NewMaterializer(false).Render(newAsset(&restricted), "SELECT id, amount FROM src")
+			require.NoError(t, err)
+			plainResult, err := NewMaterializer(false).Render(newAsset(nil), "SELECT id, amount FROM src")
+			require.NoError(t, err)
+			assert.Equal(t, plainResult, restrictedResult)
+			assert.NotContains(t, restrictedResult, "OBJECT_ID")
 		})
 	}
 }
 
-func TestAppendWithoutRefreshRestrictedIsUnstaged(t *testing.T) {
+func TestAppendQuery(t *testing.T) {
 	t.Parallel()
 
 	asset := &pipeline.Asset{

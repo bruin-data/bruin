@@ -72,22 +72,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	if !createsMissingTable(asset) {
-		return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
-	}
-
-	// Staging lets a missing target be loaded by column name, and keeps CTE-bodied
-	// queries working, which a derived table would not. The name is unique per run
-	// because parallel backfill partitions append to the same table.
-	tableName := QuoteIdentifier(asset.Name)
-	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp_" + helpers.PrefixGenerator())
-	queries := []string{
-		"CREATE TABLE " + tempName + " AS\n" + strings.TrimSuffix(query, ";"),
-		loadStagedRows(asset, tableName, tempName, "INSERT INTO "+tableName+" SELECT * FROM "+tempName),
-		"DROP TABLE IF EXISTS " + tempName,
-	}
-
-	return strings.Join(queries, ";\n") + ";", nil
+	return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
 }
 
 func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -109,45 +94,12 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
 		"CREATE TABLE " + tempName + " AS\n" + query,
-		loadStagedRows(
-			asset, tableName, tempName,
-			"DELETE FROM "+tableName+" WHERE EXISTS (\n  SELECT 1 FROM "+tempName+" WHERE "+deleteCondition+"\n)",
-			"INSERT INTO "+tableName+" SELECT * FROM "+tempName,
-		),
+		"DELETE FROM " + tableName + " WHERE EXISTS (\n  SELECT 1 FROM " + tempName + " WHERE " + deleteCondition + "\n)",
+		"INSERT INTO " + tableName + " SELECT * FROM " + tempName,
 		"DROP TABLE IF EXISTS " + tempName,
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
-}
-
-// loadStagedRows runs the strategy's statements for loading the staged rows
-// into an existing target, which copy every staged column by position. An
-// asset that creates its missing target instead gets a branch for that case:
-// the table is created from the declared columns and the first load copies
-// them by name, since the declared order can differ from the query's.
-//
-// The first load runs through sp_executesql. Compiled in the batch, its column
-// list would be checked against an existing target even though that branch
-// never runs there, failing the batch when the target lacks a declared column.
-func loadStagedRows(asset *pipeline.Asset, tableName, tempName string, existingTarget ...string) string {
-	if !createsMissingTable(asset) {
-		return strings.Join(existingTarget, ";\n")
-	}
-
-	columns := make([]string, len(asset.Columns))
-	for i, col := range asset.Columns {
-		columns[i] = QuoteIdentifier(col.Name)
-	}
-	columnList := strings.Join(columns, ", ")
-	firstLoad := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", tableName, columnList, columnList, tempName)
-
-	return fmt.Sprintf(
-		"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\n%s;\nEXEC sp_executesql N'%s';\nEND\nELSE\nBEGIN\n%s;\nEND",
-		strings.ReplaceAll(asset.Name, "'", "''"),
-		buildCreateTableStatement(asset),
-		strings.ReplaceAll(firstLoad, "'", "''"),
-		strings.Join(existingTarget, ";\n"),
-	)
 }
 
 // NativeMergeParameter opts a merge asset into a native T-SQL MERGE. Without it,
@@ -302,10 +254,14 @@ func buildCreateTableStatement(asset *pipeline.Asset) string {
 	return fmt.Sprintf("CREATE TABLE %s (\n%s\n)", QuoteIdentifier(asset.Name), strings.Join(columnDefs, ",\n"))
 }
 
-// createsMissingTable reports whether append, delete+insert, and merge create
-// a missing target from the declared columns. That applies only to assets with
+// createsMissingTable reports whether a native merge creates its missing target
+// from the declared columns. That applies only to assets with
 // refresh_restricted, which a full refresh never creates, and a type on every
-// declared column.
+// declared column. The target is created before the query runs, so a query
+// that reads its own target sees an empty table, and MERGE inserts by column
+// name, so the declared order may differ from the query's. Strategies that copy
+// staged rows by position would put values in the wrong columns, so they don't
+// create missing targets.
 func createsMissingTable(asset *pipeline.Asset) bool {
 	return asset.RefreshRestricted != nil && *asset.RefreshRestricted && allColumnsTyped(asset)
 }
