@@ -78,6 +78,13 @@ jobs:
           # Blacksmith's Linux runners cache Go builds through GOCACHEPROG;
           # Windows runners have no such cache and still need setup-go's.
           cache: ${{ runner.os == 'Windows' }}
+      - name: Make file modification times depend on content
+        # Go's test cache keys on the mtime of files tests read, and a fresh
+        # checkout gives every file a new one, so tests reading fixtures never
+        # hit the cache. Runs after the artifact download, which rewrites a
+        # tracked file.
+        shell: bash
+        run: python3 scripts/set_content_mtimes.py
       - name: Run full test suite
         shell: bash
         run: |
