@@ -76,8 +76,22 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
           # Blacksmith's Linux runners cache Go builds through GOCACHEPROG;
-          # Windows runners have no such cache and still need setup-go's.
-          cache: ${{ runner.os == 'Windows' }}
+          # Windows uses the cache step below.
+          cache: false
+      - name: Cache Go builds and test results
+        # setup-go's cache keys only on go.sum and is never saved again once
+        # that key exists, so cached test results stayed frozen at the first
+        # run for each go.sum. A key per commit saves every run's results, and
+        # restore-keys picks up the latest one.
+        if: runner.os == 'Windows'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/AppData/Local/go-build
+            ~/go/pkg/mod
+          key: go-test-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ runner.os }}-${{ hashFiles('go.sum') }}-
       - name: Make file modification times depend on content
         # Go's test cache keys on the mtime of files tests read, and a fresh
         # checkout gives every file a new one, so tests reading fixtures never
@@ -85,20 +99,6 @@ jobs:
         # tracked file.
         shell: bash
         run: python3 scripts/set_content_mtimes.py
-      - name: DEBUG test cache inputs (temporary)
-        if: runner.os == 'Linux'
-        shell: bash
-        env:
-          SF_DISABLE_MINICORE: 'true'
-        run: |
-          stat -c '### .git before: %y size=%s mode=%f' .git
-          for p in git lint pipeline; do
-            go test -c -tags=no_duckdb_arrow -race -o /tmp/$p.test ./pkg/$p
-            (cd pkg/$p && /tmp/$p.test -test.testlogfile=/tmp/$p.log >/dev/null 2>&1 || true)
-            echo "### pkg/$p module inputs"
-            grep -E "^(open|stat|chdir) $PWD" /tmp/$p.log | sort -u | while read -r op f; do echo "$op ${f#$PWD/} $(stat -c '%s %f %y' "$f" 2>&1)"; done | head -40
-          done
-          stat -c '### .git after probes: %y size=%s' .git
       - name: Run full test suite
         shell: bash
         run: |
@@ -107,11 +107,6 @@ jobs:
           # still covered without depending on this PATH.
           [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
           make test-full
-      - name: DEBUG .git after tests (temporary)
-        if: always() && runner.os == 'Linux'
-        run: |
-          stat -c '### .git after tests: %y size=%s' .git
-          ls -la --time-style=full-iso .git | sort -k6,7 | tail -8
   end2end:
     needs: [verify-ingestr]
     strategy:
