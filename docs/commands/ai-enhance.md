@@ -127,7 +127,7 @@ bruin ai enhance assets/orders.sql --environment production
 Override the default AI model:
 
 ```bash
-bruin ai enhance assets/orders.sql --model claude-opus-4-20250514
+bruin ai enhance assets/orders.sql --model claude-opus-5-5
 ```
 
 ### Use an Alternative Provider
@@ -236,8 +236,8 @@ The AI uses column naming conventions to infer appropriate checks:
 
 | Provider | Default Model | Flag |
 |----------|--------------|------|
-| Claude Code | `claude-sonnet-4-20250514` | `--claude` (default) |
-| OpenCode | `anthropic/claude-sonnet-4-20250514` | `--opencode` |
+| Claude Code | `claude-sonnet-5-5` | `--claude` (default) |
+| OpenCode | `anthropic/claude-sonnet-5-5` | `--opencode` |
 | Codex | `gpt-5-codex` | `--codex` |
 
 ### API Key Configuration
