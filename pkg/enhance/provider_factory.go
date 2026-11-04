@@ -26,7 +26,7 @@ func NewClaudeProvider(model string, fs afero.Fs) Provider {
 	config := CLIProviderConfig{ //nolint:gosec // G101: APIKeyEnvVar is an env var name, not a hardcoded credential
 		Name:         "claude",
 		BinaryName:   "claude",
-		DefaultModel: "claude-sonnet-4-20250514",
+		DefaultModel: "claude-sonnet-5-5",
 		UseAPIKeyEnv: true,
 		APIKeyEnvVar: "ANTHROPIC_API_KEY",
 		BuildArgs: func(modelName, prompt, systemPrompt string) []string {
@@ -63,7 +63,7 @@ func NewOpenCodeProvider(model string, fs afero.Fs) Provider {
 	config := CLIProviderConfig{
 		Name:         "opencode",
 		BinaryName:   "opencode",
-		DefaultModel: "anthropic/claude-sonnet-4-20250514",
+		DefaultModel: "anthropic/claude-sonnet-5-5",
 		UseAPIKeyEnv: false, // Uses native auth system
 		BuildArgs: func(modelName, prompt, systemPrompt string) []string {
 			return buildOpenCodeArgs(modelName, prompt, systemPrompt, "")

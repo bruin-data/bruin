@@ -388,6 +388,78 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 	}
 }
 
+type streamingHandler struct {
+	t           *testing.T
+	columns     []string
+	columnTypes []string
+	rows        [][]interface{}
+	schemaErr   error
+	rowErr      error
+}
+
+func (h *streamingHandler) Schema(columns, types []string) error {
+	require.Nil(h.t, h.columns, "schema must be sent once")
+	h.columns, h.columnTypes = columns, types
+	return h.schemaErr
+}
+
+func (h *streamingHandler) Row(row []interface{}) error {
+	require.NotNil(h.t, h.columns, "schema must precede rows")
+	h.rows = append(h.rows, row)
+	return h.rowErr
+}
+
+func TestDB_StreamWithSchema(t *testing.T) {
+	t.Parallel()
+	for _, outcome := range []string{"success", "empty", "schema error", "handler error", "read error"} {
+		t.Run(outcome, func(t *testing.T) {
+			t.Parallel()
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			client := &DB{conn: sqlx.NewDb(db, "sqlmock")}
+			rows := sqlmock.NewRowsWithColumnDefinition(
+				sqlmock.NewColumn("id").OfType("BIGINT", int64(0)),
+				sqlmock.NewColumn("name").OfType("NVARCHAR", ""),
+			)
+			if outcome != "empty" {
+				rows.AddRow(7, "a,\"b\n").AddRow(23, nil)
+			}
+			h := &streamingHandler{t: t}
+			switch outcome {
+			case "schema error":
+				h.schemaErr = assert.AnError
+			case "handler error":
+				h.rowErr = assert.AnError
+			case "read error":
+				rows.RowError(1, assert.AnError)
+			}
+			mock.ExpectQuery("SELECT id, name FROM users").WillReturnRows(rows).RowsWillBeClosed()
+			result, err := client.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id, name FROM users"}, h)
+			assert.Equal(t, []string{"id", "name"}, h.columns)
+			assert.Equal(t, []string{"BIGINT", "NVARCHAR"}, h.columnTypes)
+			switch outcome {
+			case "success":
+				require.NoError(t, err)
+				assert.Equal(t, [][]interface{}{{int64(7), "a,\"b\n"}, {int64(23), nil}}, h.rows)
+			case "empty":
+				require.NoError(t, err)
+				assert.Empty(t, h.rows)
+			case "schema error":
+				require.ErrorIs(t, err, assert.AnError)
+				assert.Empty(t, h.rows)
+			default:
+				require.ErrorIs(t, err, assert.AnError)
+				assert.Equal(t, [][]interface{}{{int64(7), "a,\"b\n"}}, h.rows)
+			}
+			if err == nil {
+				assert.Equal(t, &query.QueryResult{Columns: h.columns, ColumnTypes: h.columnTypes}, result)
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 

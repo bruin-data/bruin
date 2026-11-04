@@ -28,7 +28,7 @@ func TestConfigReadOnlyDSN(t *testing.T) {
 
 func TestClientReadOnlyQueries(t *testing.T) {
 	t.Parallel()
-	for _, method := range []string{"select", "schema", "exec"} {
+	for _, method := range []string{"select", "schema", "stream", "exec"} {
 		for _, outcome := range []string{"success", "begin error", "query error", "row error"} {
 			t.Run(method+"/"+outcome, func(t *testing.T) {
 				t.Parallel()
@@ -67,6 +67,8 @@ func TestClientReadOnlyQueries(t *testing.T) {
 					_, err = client.Select(t.Context(), q)
 				case "schema":
 					_, err = client.SelectWithSchema(t.Context(), q)
+				case "stream":
+					_, err = client.StreamWithSchema(t.Context(), q, &streamingHandler{t: t})
 				case "exec":
 					err = client.RunQueryWithoutResult(t.Context(), q)
 				}

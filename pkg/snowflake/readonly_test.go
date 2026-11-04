@@ -27,6 +27,13 @@ func TestDBReadOnly(t *testing.T) {
 			_, err := db.SelectWithSchema(ctx, q)
 			return err
 		}},
+		{name: "StreamWithSchema", run: func(ctx context.Context, db *DB, q *query.Query) error {
+			_, err := db.StreamWithSchema(ctx, q, streamHandler{
+				schema: func(_, _ []string) error { return nil },
+				row:    func(_ []interface{}) error { return nil },
+			})
+			return err
+		}},
 		{name: "RunQueryWithoutResult", run: func(ctx context.Context, db *DB, q *query.Query) error { return db.RunQueryWithoutResult(ctx, q) }},
 		{name: "IsValid", explain: true, run: func(ctx context.Context, db *DB, q *query.Query) error { _, err := db.IsValid(ctx, q); return err }},
 		{name: "DryRunQuery", explain: true, run: func(ctx context.Context, db *DB, q *query.Query) error { _, err := db.DryRunQuery(ctx, q); return err }},

@@ -55,6 +55,7 @@ GitHub source allows ingesting the following sources into separate tables:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
+| `commits` | `sha` | `committed_at` | merge | Retrieves commits on the default branch, including signature verification (`commit.verification`). The interval start and end filter on the committer date, which `committed_at` mirrors. Commits pushed after their interval has already run are not picked up; use a lookback window (e.g. `interval_modifiers`). |
 | `issues` | - | – | replace | Retrieves GitHub issues along with their comments and reactions. Full reload on each run. |
 | `pull_requests` | - | – | replace | Retrieves pull requests with comments and reactions. Full reload on each run. |
 | `repo_events` | `id` | `created_at` | merge | Retrieves recent repository events. Appends only new events using `created_at` filter. Only events from the past 30 days allowed. |

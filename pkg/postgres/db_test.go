@@ -279,6 +279,71 @@ func TestClient_SelectWithSchema(t *testing.T) {
 	}
 }
 
+func TestClient_StreamWithSchema(t *testing.T) {
+	t.Parallel()
+
+	mock, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mock.Close()
+
+	rows := pgxmock.NewRowsWithColumnDefinition(
+		pgconn.FieldDescription{Name: "id", DataTypeOID: 20},
+		pgconn.FieldDescription{Name: "name", DataTypeOID: 1043},
+	).AddRow(1, "John Doe").AddRow(2, "Jane Doe")
+	mock.ExpectQuery("SELECT \\* FROM table").WillReturnRows(rows)
+
+	client := Client{connection: mock}
+	h := &recordingRowHandler{}
+	result, err := client.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM table"}, h)
+	require.NoError(t, err)
+	assert.Equal(t, &query.QueryResult{Columns: []string{"id", "name"}, ColumnTypes: []string{"int8", "varchar"}}, result)
+	assert.Equal(t, []string{"id", "name"}, h.columns)
+	assert.Equal(t, []string{"int8", "varchar"}, h.columnTypes)
+	assert.Equal(t, [][]interface{}{{1, "John Doe"}, {2, "Jane Doe"}}, h.rows)
+}
+
+func TestClient_StreamWithSchemaStopsOnRowError(t *testing.T) {
+	t.Parallel()
+
+	mock, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mock.Close()
+
+	rows := pgxmock.NewRowsWithColumnDefinition(
+		pgconn.FieldDescription{Name: "id", DataTypeOID: 20},
+	).AddRow(1).AddRow(2)
+	mock.ExpectQuery("SELECT id FROM users").WillReturnRows(rows).RowsWillBeClosed()
+
+	client := Client{connection: mock}
+	h := &recordingRowHandler{rowErr: assert.AnError}
+	_, err = client.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id FROM users"}, h)
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Equal(t, []string{"id"}, h.columns, "schema should arrive before the first row")
+	assert.Equal(t, [][]interface{}{{1}}, h.rows)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+type recordingRowHandler struct {
+	columns     []string
+	columnTypes []string
+	rows        [][]interface{}
+	rowErr      error
+}
+
+func (h *recordingRowHandler) Schema(columns, columnTypes []string) error {
+	h.columns = columns
+	h.columnTypes = columnTypes
+	return nil
+}
+
+func (h *recordingRowHandler) Row(row []interface{}) error {
+	if h.columns == nil {
+		return errors.New("row arrived before schema")
+	}
+	h.rows = append(h.rows, row)
+	return h.rowErr
+}
+
 func TestClient_RunQueryWithoutResult(t *testing.T) {
 	t.Parallel()
 

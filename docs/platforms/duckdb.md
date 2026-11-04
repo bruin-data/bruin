@@ -81,7 +81,7 @@ Ingestr assets can read from and write to a remote DuckDB server started with th
 
 `host`, `port`, `token` and `disable_ssl` are only accepted with `quack: true`, and a Quack connection cannot also set `path`, `read_only` or `lakehouse`.
 
-Quack requires DuckDB 2.0. Bruin downloads a DuckDB 2.0.0 driver for Quack connections the first time it needs one, and keeps it apart from the driver used by local and MotherDuck connections, so those keep working. The server must run DuckDB 2.0.0. An ingestr asset cannot read from MotherDuck and write to Quack, or the other way around, because the two need different DuckDB releases.
+Bruin downloads a DuckDB 2.0.0 driver for Quack connections the first time it needs one, and keeps it apart from the driver used by local and MotherDuck connections, so those keep working. Run the Quack server on DuckDB 2.0.0, because servers on other DuckDB releases cannot connect to this driver. An ingestr asset cannot read from MotherDuck and write to Quack, or the other way around, because the two need different DuckDB releases.
 
 A Quack connection can be used by ingestr assets, [quality checks](../quality/overview.md) and `bruin query`. Checks on an ingestr asset that writes to a Quack connection run on the server. `duckdb.sql` assets do not support Quack yet.
 

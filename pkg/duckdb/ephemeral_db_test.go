@@ -576,15 +576,97 @@ func BenchmarkConnectionReuse(b *testing.B) {
 	}
 }
 
-func TestQuackSupportsDriverVersion(t *testing.T) {
-	t.Parallel()
+func scanAllRows(t *testing.T, rows Rows) [][]any {
+	t.Helper()
+	cols, err := rows.Columns()
+	require.NoError(t, err)
+	var out [][]any
+	for rows.Next() {
+		row := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range row {
+			ptrs[i] = &row[i]
+		}
+		require.NoError(t, rows.Scan(ptrs...))
+		out = append(out, row)
+	}
+	require.NoError(t, rows.Err())
+	require.NoError(t, rows.Close())
+	return out
+}
 
-	require.False(t, quackSupportsDriverVersion("v1.5.2"))
-	require.False(t, quackSupportsDriverVersion("v1.4.3"))
-	require.False(t, quackSupportsDriverVersion(""))
-	require.True(t, quackSupportsDriverVersion("v2.0.0"))
-	require.True(t, quackSupportsDriverVersion("v2.1.0-dev42"))
-	require.True(t, quackSupportsDriverVersion("v10.0.0"))
+func TestQueryStreamContextMatchesBufferedRows(t *testing.T) {
+	t.Parallel()
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+
+	// More rows than one DuckDB chunk so the stream crosses record batches.
+	q := `SELECT i, CASE WHEN i % 7 = 0 THEN NULL ELSE 'v' || i END AS s, (i * 1.25)::DECIMAL(18,3) AS d,
+		[i, i + 1] AS l, {'a': i} AS st, TIMESTAMP '2024-01-01' + INTERVAL (i) SECOND AS ts
+		FROM range(5000) t(i) ORDER BY i`
+
+	buffered, err := conn.QueryContext(t.Context(), q)
+	require.NoError(t, err)
+	want := scanAllRows(t, buffered)
+
+	streamed, err := conn.QueryStreamContext(t.Context(), q)
+	require.NoError(t, err)
+	_, ok := streamed.(*arrowStreamRows)
+	require.True(t, ok, "expected a streaming reader")
+	got := scanAllRows(t, streamed)
+
+	require.Len(t, got, 5000)
+	require.Equal(t, want, got)
+}
+
+func TestQueryStreamContextReleasesConnectionOnClose(t *testing.T) {
+	t.Parallel()
+	conn, err := NewEphemeralConnection(Config{Path: filepath.Join(t.TempDir(), "stream.duckdb")})
+	require.NoError(t, err)
+
+	rows, err := conn.QueryStreamContext(t.Context(), "SELECT i FROM range(10) t(i) WHERE false")
+	require.NoError(t, err)
+	cols, err := rows.Columns()
+	require.NoError(t, err)
+	require.Equal(t, []string{"i"}, cols)
+	require.False(t, rows.Next())
+	require.NoError(t, rows.Close())
+	require.NoError(t, rows.Close(), "closing twice must be safe")
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	var n int
+	require.NoError(t, conn.QueryRowContext(ctx, "SELECT 42").Scan(&n), "the database lock must be released after Close")
+	require.Equal(t, 42, n)
+}
+
+func TestStreamWithSchemaReportsMidStreamReadError(t *testing.T) {
+	t.Parallel()
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+	c := &Client{connection: conn}
+
+	// Early batches succeed and reach the handler; a later batch fails while it is read.
+	h := &countingRowHandler{}
+	_, err = c.StreamWithSchema(t.Context(), &query.Query{
+		Query: "SELECT CASE WHEN i < 300000 THEN i ELSE error('boom') END AS x FROM range(400000) t(i)",
+	}, h)
+	require.ErrorContains(t, err, "boom")
+	require.Positive(t, h.rows, "the error must come after rows were streamed")
+
+	_, err = c.SelectWithSchema(t.Context(), &query.Query{
+		Query: "SELECT CASE WHEN i < 300000 THEN i ELSE error('boom') END AS x FROM range(400000) t(i)",
+	})
+	require.ErrorContains(t, err, "boom")
+}
+
+type countingRowHandler struct{ rows int }
+
+func (h *countingRowHandler) Schema(_, _ []string) error { return nil }
+
+func (h *countingRowHandler) Row(_ []interface{}) error {
+	h.rows++
+	return nil
 }
 
 func TestQuackConnectionsUseTheirOwnDriver(t *testing.T) {

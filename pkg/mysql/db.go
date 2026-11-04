@@ -151,6 +151,10 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	return query.CollectRows(ctx, c, queryObj)
+}
+
+func (c *Client) StreamWithSchema(ctx context.Context, queryObj *query.Query, h query.RowHandler) (*query.QueryResult, error) {
 	if err := c.initializeDB(ctx); err != nil {
 		return nil, err
 	}
@@ -160,17 +164,20 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, err
 	}
 	defer cleanup()
+	ctx, cancel := context.WithCancel(ctx)
 	rows, err := conn.QueryContext(ctx, queryString)
 	if err != nil {
+		cancel()
 		errorMessage := err.Error()
 		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
 		return nil, err
 	}
 	defer rows.Close()
+	// Cancel before closing rows so an output failure does not drain the result.
+	defer cancel()
 
 	result := &query.QueryResult{
 		Columns: []string{},
-		Rows:    [][]interface{}{},
 	}
 
 	// Fetch column names
@@ -187,8 +194,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	for i, columnType := range columnTypes {
 		result.ColumnTypes[i] = columnType.DatabaseTypeName()
 	}
+	if err := h.Schema(result.Columns, result.ColumnTypes); err != nil {
+		return nil, err
+	}
 
-	// Fetch rows and scan into result set
+	// Fetch rows and pass them to the handler without retaining them.
 	for rows.Next() {
 		row := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))
@@ -207,7 +217,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 			}
 		}
 
-		result.Rows = append(result.Rows, row)
+		if err := h.Row(row); err != nil {
+			return nil, err
+		}
 	}
 
 	if rows.Err() != nil {

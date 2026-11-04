@@ -121,15 +121,23 @@ func (c *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	return query.CollectRows(ctx, c, queryObj)
+}
+
+func (c *Client) StreamWithSchema(ctx context.Context, queryObj *query.Query, h query.RowHandler) (*query.QueryResult, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	sql := queryObj.String()
 	if shouldUseExec(sql) {
 		if err := c.connection.Exec(ctx, sql); err != nil {
 			return nil, errors.Wrap(err, "failed to execute query")
 		}
+		if err := h.Schema([]string{}, []string{}); err != nil {
+			return nil, err
+		}
 
 		return &query.QueryResult{
 			Columns:     []string{},
-			Rows:        [][]interface{}{},
 			ColumnTypes: []string{},
 			Execution:   query.NewExecutionSummaryFromStatement("clickhouse", query.SQLStatementType(sql), nil),
 		}, nil
@@ -140,6 +148,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, errors.Wrap(err, "failed to execute query")
 	}
 	defer rows.Close()
+	defer cancel()
 
 	fieldDescriptions := rows.ColumnTypes()
 	if fieldDescriptions == nil {
@@ -152,22 +161,28 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		columns[i] = field.Name()
 		columnTypes[i] = field.DatabaseTypeName()
 	}
+	if err := h.Schema(columns, columnTypes); err != nil {
+		return nil, err
+	}
 
 	columnCount := len(fieldDescriptions)
 
-	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
 		values, err := scanValues(rows, columnCount)
 		if err != nil {
 			return nil, err
 		}
-		collectedRows = append(collectedRows, values)
+		if err := h.Row(values); err != nil {
+			return nil, err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating rows")
 	}
 
 	return &query.QueryResult{
 		Columns:     columns,
 		ColumnTypes: columnTypes,
-		Rows:        collectedRows,
 	}, nil
 }
 

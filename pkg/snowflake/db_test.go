@@ -2,6 +2,8 @@ package snowflake
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
@@ -709,6 +711,226 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+type streamHandler struct {
+	schema func([]string, []string) error
+	row    func([]interface{}) error
+}
+
+func (h streamHandler) Schema(columns, types []string) error {
+	return h.schema(columns, types)
+}
+
+func (h streamHandler) Row(row []interface{}) error {
+	return h.row(row)
+}
+
+func TestDB_StreamWithSchema(t *testing.T) {
+	t.Parallel()
+
+	for _, empty := range []bool{false, true} {
+		t.Run(fmt.Sprintf("empty=%v", empty), func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer mockDB.Close()
+			db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock")}
+			rows := sqlmock.NewRowsWithColumnDefinition(
+				sqlmock.NewColumn("ID").OfType("FIXED", int64(0)),
+				sqlmock.NewColumn("VALUE").OfType("TEXT", ""),
+			)
+			wantRows := [][]interface{}{}
+			if !empty {
+				rows.AddRow(int64(1), "first").AddRow(int64(2), nil)
+				wantRows = [][]interface{}{{int64(1), "first"}, {int64(2), nil}}
+			}
+			mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+			schemaCalls := 0
+			gotRows := [][]interface{}{}
+			result, err := db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM t"}, streamHandler{
+				schema: func(columns, types []string) error {
+					schemaCalls++
+					require.Empty(t, gotRows)
+					require.Equal(t, []string{"ID", "VALUE"}, columns)
+					require.Equal(t, []string{"FIXED", "TEXT"}, types)
+					return nil
+				},
+				row: func(row []interface{}) error {
+					require.Equal(t, 1, schemaCalls)
+					gotRows = append(gotRows, row)
+					return nil
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, 1, schemaCalls)
+			require.Equal(t, wantRows, gotRows)
+			require.Equal(t, &query.QueryResult{Columns: []string{"ID", "VALUE"}, ColumnTypes: []string{"FIXED", "TEXT"}}, result)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_StreamWithSchemaStopsWithoutRetry(t *testing.T) {
+	t.Parallel()
+
+	for _, stage := range []string{"schema", "row", "terminal"} {
+		t.Run(stage, func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer mockDB.Close()
+			retryCalls := 0
+			db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock"), retryDelay: func(int) time.Duration {
+				retryCalls++
+				return 0
+			}}
+			stopErr := errors.New("connection reset") // Retryable text must not replay callbacks.
+			rows := sqlmock.NewRows([]string{"ID"}).AddRow(1).AddRow(2)
+			if stage == "terminal" {
+				rows.RowError(1, stopErr)
+			}
+			mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+			schemaCalls, rowCalls := 0, 0
+			result, err := db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM t"}, streamHandler{
+				schema: func(_, _ []string) error {
+					schemaCalls++
+					if stage == "schema" {
+						return stopErr
+					}
+					return nil
+				},
+				row: func(_ []interface{}) error {
+					rowCalls++
+					if stage == "row" {
+						return stopErr
+					}
+					return nil
+				},
+			})
+			require.ErrorIs(t, err, stopErr)
+			require.Nil(t, result)
+			require.Equal(t, 1, schemaCalls)
+			if stage == "schema" {
+				require.Zero(t, rowCalls)
+			} else {
+				require.Equal(t, 1, rowCalls)
+			}
+			require.Zero(t, retryCalls)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_StreamWithSchemaCancelsBeforeClose(t *testing.T) {
+	t.Parallel()
+	for _, stage := range []string{"schema", "row"} {
+		t.Run(stage, func(t *testing.T) {
+			t.Parallel()
+			rows := &cancelBeforeCloseRows{closed: make(chan error, 1)}
+			conn := sql.OpenDB(cancelBeforeCloseConnector{rows: rows})
+			defer conn.Close()
+			db := &DB{conn: sqlx.NewDb(conn, "test")}
+			schemaCalls, rowCalls := 0, 0
+			result, err := db.StreamWithSchema(t.Context(), &query.Query{Query: "SELECT id FROM users"}, streamHandler{
+				schema: func(columns, _ []string) error {
+					schemaCalls++
+					require.Equal(t, []string{"id"}, columns)
+					if stage == "schema" {
+						return assert.AnError
+					}
+					return nil
+				},
+				row: func(row []interface{}) error {
+					rowCalls++
+					require.Equal(t, []interface{}{int64(1)}, row)
+					return assert.AnError
+				},
+			})
+			require.ErrorIs(t, err, assert.AnError)
+			require.Nil(t, result)
+			require.Equal(t, 1, schemaCalls)
+			if stage == "schema" {
+				require.Zero(t, rowCalls)
+			} else {
+				require.Equal(t, 1, rowCalls)
+			}
+			// database/sql may auto-close on cancellation before the explicit Close.
+			select {
+			case err := <-rows.closed:
+				require.ErrorIs(t, err, context.Canceled, "Close would drain uncanceled results")
+			case <-time.After(5 * time.Second):
+				t.Fatal("driver rows were not closed")
+			}
+		})
+	}
+}
+
+type cancelBeforeCloseConnector struct{ rows *cancelBeforeCloseRows }
+
+func (c cancelBeforeCloseConnector) Connect(context.Context) (driver.Conn, error) {
+	return cancelBeforeCloseConn(c), nil
+}
+
+func (c cancelBeforeCloseConnector) Driver() driver.Driver { return cancelBeforeCloseDriver{} }
+
+type cancelBeforeCloseDriver struct{}
+
+func (cancelBeforeCloseDriver) Open(string) (driver.Conn, error) {
+	return nil, errors.New("use connector")
+}
+
+type cancelBeforeCloseConn struct{ rows *cancelBeforeCloseRows }
+
+func (cancelBeforeCloseConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not supported")
+}
+
+func (cancelBeforeCloseConn) Begin() (driver.Tx, error) {
+	return nil, errors.New("not supported")
+}
+
+func (cancelBeforeCloseConn) Close() error { return nil }
+
+func (c cancelBeforeCloseConn) QueryContext(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
+	c.rows.contextErr = ctx.Err
+	return c.rows, nil
+}
+
+type cancelBeforeCloseRows struct {
+	contextErr func() error
+	closed     chan error
+}
+
+func (*cancelBeforeCloseRows) Columns() []string { return []string{"id"} }
+
+func (*cancelBeforeCloseRows) Next(dest []driver.Value) error {
+	// Always leave unread results for Close, even after the first row callback.
+	dest[0] = int64(1)
+	return nil
+}
+
+func (r *cancelBeforeCloseRows) Close() error {
+	// Record whether a draining driver would block here, without actually
+	// blocking: a regression must not strand database/sql's auto-close goroutine.
+	r.closed <- r.contextErr()
+	return nil
+}
+
+func TestDB_SelectWithSchemaRetriesWithoutPartialRows(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer mockDB.Close()
+	db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock"), retryDelay: func(int) time.Duration { return 0 }}
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"ID"}).
+		AddRow(1).AddRow(2).RowError(1, errors.New("connection reset"))).RowsWillBeClosed()
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"ID"}).AddRow(3)).RowsWillBeClosed()
+	result, err := db.SelectWithSchema(t.Context(), &query.Query{Query: "SELECT * FROM t"})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{int64(3)}}, result.Rows)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {

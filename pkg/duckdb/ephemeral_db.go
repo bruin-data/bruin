@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -300,15 +299,6 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 		return nil
 	}
 
-	// Older drivers fail later with an opaque serialization error, so check first.
-	version, err := queryADBCString(ctx, conn, "SELECT library_version FROM pragma_version()")
-	if err != nil {
-		return fmt.Errorf("failed to read DuckDB ADBC driver version: %w", err)
-	}
-	if !quackSupportsDriverVersion(version) {
-		return fmt.Errorf("quack: true needs a DuckDB 2.0+ ADBC driver, but the Quack driver installed by Bruin is %s", version)
-	}
-
 	for _, sqlStr := range cfg.quackAttachStatements() {
 		if err := execADBCStatement(ctx, conn, sqlStr); err != nil {
 			// DuckDB errors can echo the statement, which carries the token as a
@@ -318,38 +308,6 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 		}
 	}
 	return nil
-}
-
-func quackSupportsDriverVersion(version string) bool {
-	major, _, _ := strings.Cut(strings.TrimPrefix(version, "v"), ".")
-	n, err := strconv.Atoi(major)
-	return err == nil && n >= 2
-}
-
-func queryADBCString(ctx context.Context, conn adbc.Connection, sqlStr string) (string, error) {
-	stmt, err := conn.NewStatement()
-	if err != nil {
-		return "", err
-	}
-	defer stmt.Close()
-
-	if err := stmt.SetSqlQuery(sqlStr); err != nil {
-		return "", err
-	}
-	reader, _, err := stmt.ExecuteQuery(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer reader.Release()
-
-	rows, err := bufferArrowReader(reader)
-	if err != nil {
-		return "", err
-	}
-	if len(rows.data) == 0 || len(rows.data[0]) == 0 {
-		return "", sql.ErrNoRows
-	}
-	return fmt.Sprint(rows.data[0][0]), nil
 }
 
 func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.Connection) error {
@@ -431,6 +389,53 @@ func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string,
 	return bufferArrowReader(reader)
 }
 
+// QueryStreamContext reads record batches lazily instead of buffering them; the database stays locked until the rows are closed.
+//
+//nolint:ireturn
+func (e *EphemeralConnection) QueryStreamContext(ctx context.Context, queryStr string, args ...any) (Rows, error) {
+	conn, cleanup, err := e.openADBC(ctx, queryStr)
+	if err != nil {
+		return nil, err
+	}
+
+	stmt, err := conn.NewStatement()
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	release := func() {
+		_ = stmt.Close()
+		cleanup()
+	}
+
+	if err := stmt.SetSqlQuery(inlineQueryArgs(queryStr, args)); err != nil {
+		release()
+		return nil, transactionError(err)
+	}
+
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		release()
+		return nil, transactionError(err)
+	}
+	if reader == nil {
+		release()
+		return &bufferedRows{
+			columns:     []string{},
+			columnTypes: []*ColumnType{},
+			index:       -1,
+		}, nil
+	}
+
+	cols, colTypes := arrowSchemaColumns(reader.Schema())
+	return &arrowStreamRows{
+		reader:      reader,
+		columns:     cols,
+		columnTypes: colTypes,
+		release:     release,
+	}, nil
+}
+
 func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
 	conn, cleanup, err := e.openADBC(ctx, sqlStr)
 	if err != nil {
@@ -496,32 +501,13 @@ func (e *EphemeralConnection) QueryRowContext(ctx context.Context, queryStr stri
 
 // bufferArrowReader reads all records from an Arrow RecordReader into memory.
 func bufferArrowReader(reader array.RecordReader) (*bufferedRows, error) {
-	schema := reader.Schema()
-	numFields := schema.NumFields()
-	cols := make([]string, numFields)
-	colTypes := make([]*ColumnType, numFields)
-
-	for i, field := range schema.Fields() {
-		cols[i] = field.Name
-		colTypes[i] = arrowFieldToColumnType(field)
-	}
+	cols, colTypes := arrowSchemaColumns(reader.Schema())
 
 	var data [][]any
 	for reader.Next() {
 		record := reader.RecordBatch()
-		numRows := int(record.NumRows())
-		numCols := int(record.NumCols())
-		for i := range numRows {
-			row := make([]any, numCols)
-			for j := range numCols {
-				col := record.Column(j)
-				if col.IsNull(i) {
-					row[j] = nil
-				} else {
-					row[j] = extractArrowValue(col, i)
-				}
-			}
-			data = append(data, row)
+		for i := range int(record.NumRows()) {
+			data = append(data, arrowRowValues(record, i))
 		}
 	}
 
@@ -535,6 +521,27 @@ func bufferArrowReader(reader array.RecordReader) (*bufferedRows, error) {
 		data:        data,
 		index:       -1,
 	}, nil
+}
+
+func arrowSchemaColumns(schema *arrow.Schema) ([]string, []*ColumnType) {
+	cols := make([]string, schema.NumFields())
+	colTypes := make([]*ColumnType, schema.NumFields())
+	for i, field := range schema.Fields() {
+		cols[i] = field.Name
+		colTypes[i] = arrowFieldToColumnType(field)
+	}
+	return cols, colTypes
+}
+
+func arrowRowValues(record arrow.RecordBatch, i int) []any {
+	row := make([]any, record.NumCols())
+	for j := range row {
+		col := record.Column(j)
+		if !col.IsNull(i) {
+			row[j] = extractArrowValue(col, i)
+		}
+	}
+	return row
 }
 
 // extractArrowValue extracts a native Go value from an Arrow array at position i.
@@ -708,7 +715,10 @@ func (r *bufferedRows) Scan(dest ...any) error {
 	if r.index < 0 || r.index >= len(r.data) {
 		return sql.ErrNoRows
 	}
-	row := r.data[r.index]
+	return scanRow(r.data[r.index], dest)
+}
+
+func scanRow(row []any, dest []any) error {
 	if len(dest) != len(row) {
 		return fmt.Errorf("sql: expected %d destination arguments in Scan, got %d", len(row), len(dest))
 	}
@@ -718,6 +728,68 @@ func (r *bufferedRows) Scan(dest ...any) error {
 		}
 	}
 	return nil
+}
+
+// arrowStreamRows reads rows from an Arrow RecordReader one batch at a time.
+type arrowStreamRows struct {
+	reader      array.RecordReader
+	columns     []string
+	columnTypes []*ColumnType
+	record      arrow.RecordBatch
+	row         int
+	release     func()
+	closed      bool
+}
+
+func (r *arrowStreamRows) Close() error {
+	if !r.closed {
+		r.closed = true
+		r.record = nil
+		r.reader.Release()
+		r.release()
+	}
+	return nil
+}
+
+func (r *arrowStreamRows) Columns() ([]string, error) {
+	return r.columns, nil
+}
+
+func (r *arrowStreamRows) ColumnTypes() ([]*ColumnType, error) {
+	return r.columnTypes, nil
+}
+
+func (r *arrowStreamRows) Err() error {
+	return r.reader.Err()
+}
+
+func (r *arrowStreamRows) Next() bool {
+	if r.closed {
+		return false
+	}
+	if r.record != nil {
+		r.row++
+		if int64(r.row) < r.record.NumRows() {
+			return true
+		}
+	}
+	// The reader owns each batch and releases it on the next call, so only one batch is held at a time.
+	for r.reader.Next() {
+		r.record = r.reader.RecordBatch()
+		r.row = 0
+		if r.record.NumRows() > 0 {
+			return true
+		}
+	}
+	r.record = nil
+	return false
+}
+
+func (r *arrowStreamRows) Scan(dest ...any) error {
+	if r.record == nil {
+		return sql.ErrNoRows
+	}
+	return scanRow(arrowRowValues(r.record, r.row), dest)
 }
 
 // bufferedRow wraps bufferedRows to implement the Row interface.
