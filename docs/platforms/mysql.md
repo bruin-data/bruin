@@ -2,10 +2,6 @@
 
 Bruin supports MySQL as a data platform for SQL assets and ingestion pipelines.
 
-The [query command](/commands/query) streams MySQL results to CSV, JSON, and export writers as rows are read, without collecting the entire result in Bruin's memory. No extra flag is required. Default `plain` output displays up to 100 rows as a table and switches to CSV for larger results. Drivers may still buffer data internally.
-
-If reading or writing fails, the command stops with an error. CSV on stdout may be partial; JSON output includes an error, and incomplete export files are removed.
-
 ## Connection
 
 Add a MySQL entry under `connections` in `.bruin.yml` using the following schema.
