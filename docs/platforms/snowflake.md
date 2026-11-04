@@ -2,10 +2,6 @@
 
 Bruin supports Snowflake as a data platform.
 
-The [query command](/commands/query) streams Snowflake results to CSV, JSON, and export writers as rows are read, without collecting the entire result in Bruin's memory. No extra flag is required. Default `plain` output displays up to 100 rows as a table and switches to CSV for larger results. The driver may still prefetch result chunks.
-
-Streaming queries are not retried, avoiding duplicate output after a partial result or writer failure. If reading or writing fails, the command stops with an error. CSV on stdout may be partial; JSON output includes an error, and incomplete export files are removed.
-
 ## Connection
 
 To set up a Snowflake connection, add a `snowflake` connection to the `connections` section of your `.bruin.yml` file. The examples below show the supported fields, followed by how to obtain each value.
