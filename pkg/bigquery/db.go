@@ -343,6 +343,10 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 }
 
 func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	return query.CollectRows(ctx, d, queryObj)
+}
+
+func (d *Client) StreamWithSchema(ctx context.Context, queryObj *query.Query, h query.RowHandler) (*query.QueryResult, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
@@ -365,45 +369,46 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, fmt.Errorf("failed to read query results: %w", formatError(err))
 	}
 
-	result := &query.QueryResult{
-		Columns:     []string{},
-		Rows:        [][]interface{}{},
-		ColumnTypes: []string{},
+	// The iterator fills in its schema on the first Next call, so read one row before sending it.
+	var values []bigquery.Value
+	done, err := nextBigQueryRow(rows, &values)
+	if err != nil {
+		return nil, err
+	}
+	hasRows := !done
+	if hasRows && rows.Schema == nil {
+		return nil, errors.New("schema information is not available")
 	}
 
-	// Add a ColumnTypes field to store the types
-	columnTypes := []string{}
+	columns := make([]string, 0, len(rows.Schema))
+	columnTypes := make([]string, 0, len(rows.Schema))
+	for _, field := range rows.Schema {
+		columns = append(columns, field.Name)
+		columnTypes = append(columnTypes, string(field.Type))
+	}
+	if err := h.Schema(columns, columnTypes); err != nil {
+		return nil, err
+	}
 
-	for {
-		var values []bigquery.Value
-		err := rows.Next(&values)
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to read row: %w", err)
-		}
-
+	for !done {
 		row := make([]interface{}, len(values))
 		for i, v := range values {
 			row[i] = v
 		}
-		result.Rows = append(result.Rows, row)
-	}
-
-	if rows.Schema != nil {
-		for _, field := range rows.Schema {
-			result.Columns = append(result.Columns, field.Name)
-			// Extract the type information from the schema
-			columnTypes = append(columnTypes, string(field.Type))
+		if err := h.Row(row); err != nil {
+			return nil, err
 		}
-	} else if len(result.Rows) > 0 {
-		return nil, errors.New("schema information is not available")
+		values = nil
+		if done, err = nextBigQueryRow(rows, &values); err != nil {
+			return nil, err
+		}
 	}
 
-	// Store the column types in the result
-	result.ColumnTypes = columnTypes
-	if job != nil && len(result.Rows) == 0 && !query.IsLikelyResultQuery(queryObj.String()) {
+	result := &query.QueryResult{
+		Columns:     columns,
+		ColumnTypes: columnTypes,
+	}
+	if job != nil && !hasRows && !query.IsLikelyResultQuery(queryObj.String()) {
 		summary := d.queryExecutionSummary(ctx, job)
 		if query.IsNonResultStatement(summary) {
 			result.Execution = summary
@@ -411,6 +416,17 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 
 	return result, nil
+}
+
+func nextBigQueryRow(rows *bigquery.RowIterator, values *[]bigquery.Value) (bool, error) {
+	err := rows.Next(values)
+	if errors.Is(err, iterator.Done) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to read row: %w", err)
+	}
+	return false, nil
 }
 
 func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *query.QueryExecutionSummary {
