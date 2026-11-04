@@ -75,19 +75,16 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-          # Blacksmith's Linux runners cache Go builds through GOCACHEPROG;
-          # Windows uses the cache step below.
           cache: false
       - name: Cache Go builds and test results
         # setup-go's cache keys only on go.sum and is never saved again once
         # that key exists, so cached test results stayed frozen at the first
         # run for each go.sum. A key per commit saves every run's results, and
         # restore-keys picks up the latest one.
-        if: runner.os == 'Windows'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            ~/AppData/Local/go-build
+            ${{ runner.os == 'Windows' && '~/AppData/Local/go-build' || '~/.cache/go-build' }}
             ~/go/pkg/mod
           key: go-test-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
@@ -99,27 +96,13 @@ jobs:
         # tracked file.
         shell: bash
         run: python3 scripts/set_content_mtimes.py
-      - name: DEBUG does GOCACHEPROG overwrite entries (temporary)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          mkdir -p cachecheck && cd cachecheck
-          echo a > a.txt; echo b > b.txt; touch -d 2001-01-01 a.txt b.txt
-          cat > x_test.go <<EOF
-          package cachecheck // nonce ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}
-          import ("os"; "testing")
-          func TestPick(t *testing.T) { _, _ = os.ReadFile(os.Getenv("PICK") + ".txt") }
-          EOF
-          t() { PICK=$1 GODEBUG=gocachetest=1 go test . 2>&1 | grep -E 'input ID|^ok' | sed -E 's/[0-9a-f]{56}//g'; }
-          for mode in gocacheprog plain; do
-            [ $mode = plain ] && export GOCACHEPROG= GOCACHE=/tmp/plain-gocache
-            echo "### $mode: PICK=a"; t a
-            echo "### $mode: PICK=b"; t b
-            echo "### $mode: PICK=b again (hits only if the cache overwrote the input list)"; t b
-          done
-          cd .. && rm -rf cachecheck
       - name: Run full test suite
         shell: bash
+        env:
+          # Use the cache restored above rather than Blacksmith's GOCACHEPROG,
+          # which kept test results for packages that read files only for the
+          # run that wrote them; lint and end2end still use it for builds.
+          GOCACHEPROG: ''
         run: |
           # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
           # Installer tests inject a missing shell, so the native fallback is
