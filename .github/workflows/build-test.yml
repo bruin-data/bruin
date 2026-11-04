@@ -59,7 +59,7 @@ jobs:
     needs: [verify-ingestr]
     strategy:
       matrix:
-        platform: [depot-ubuntu-latest-4, depot-windows-latest-4, blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025]
+        platform: [blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -70,11 +70,6 @@ jobs:
         with:
           name: ingestr-hashes
           path: pkg/python
-      - name: Record runner resources
-        shell: bash
-        run: |
-          .github/scripts/runner-resources.sh info
-          .github/scripts/runner-resources.sh start
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -88,15 +83,11 @@ jobs:
           # still covered without depending on this PATH.
           [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
           make test-full
-      - name: Report runner resources
-        if: always()
-        shell: bash
-        run: .github/scripts/runner-resources.sh report
   end2end:
     needs: [verify-ingestr]
     strategy:
       matrix:
-        platform: [depot-ubuntu-latest-4, blacksmith-4vcpu-ubuntu-2404]
+        platform: [blacksmith-4vcpu-ubuntu-2404]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Install R (background)
@@ -110,11 +101,6 @@ jobs:
         with:
           name: ingestr-hashes
           path: pkg/python
-      - name: Record runner resources
-        shell: bash
-        run: |
-          .github/scripts/runner-resources.sh info
-          .github/scripts/runner-resources.sh start
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -140,10 +126,6 @@ jobs:
         run: make integration-test
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
-      - name: Report runner resources
-        if: always()
-        shell: bash
-        run: .github/scripts/runner-resources.sh report
   dockerBuild:
     # Depot build for pushes and internally-created PRs. Fork PRs cannot
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
@@ -223,21 +205,13 @@ jobs:
             BRANCH_NAME=${{ github.head_ref }}
   lint:
     needs: [verify-ingestr]
-    strategy:
-      matrix:
-        platform: [depot-ubuntu-latest-8, blacksmith-8vcpu-ubuntu-2404]
-    runs-on: ${{ matrix.platform }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ingestr-hashes
           path: pkg/python
-      - name: Record runner resources
-        shell: bash
-        run: |
-          .github/scripts/runner-resources.sh info
-          .github/scripts/runner-resources.sh start
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
@@ -255,7 +229,3 @@ jobs:
         run: make format-ci
       - name: Run full lint suite
         run: make lint-full
-      - name: Report runner resources
-        if: always()
-        shell: bash
-        run: .github/scripts/runner-resources.sh report
