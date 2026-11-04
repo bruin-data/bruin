@@ -88,6 +88,9 @@ func (s *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, asset *
 		}
 
 		pokeInterval := time.Duration(helpers.GetPokeInterval(ctx, asset)) * time.Second
+		if printerExists {
+			fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval)
+		}
 		wait := time.NewTimer(pokeInterval)
 		select {
 		case <-ctx.Done():
@@ -97,9 +100,6 @@ func (s *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, asset *
 			wait.Stop()
 			return errors.Errorf("Sensor timed out after %s", helpers.GetSensorTimeout(asset))
 		case <-wait.C:
-			if printerExists {
-				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval)
-			}
 		}
 	}
 }
