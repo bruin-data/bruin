@@ -17,6 +17,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
 	"github.com/apache/arrow-adbc/go/adbc/sqldriver"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/columnar-tech/dbc"
 	"github.com/columnar-tech/dbc/config"
@@ -63,35 +64,23 @@ func EnsureQuackADBCDriverInstalled(ctx context.Context) error {
 	return errQuackDriverInit
 }
 
-// InstallDrivers installs both DuckDB drivers and the quack extension ahead of
-// use, so images can include them instead of downloading them on every run.
+// InstallDrivers installs both DuckDB drivers ahead of use, so images can
+// include them instead of downloading them on every run. The quack extension is
+// left to the first Quack connection, so only runs that use Quack download it.
 func InstallDrivers(ctx context.Context) error {
 	if err := EnsureADBCDriverInstalled(ctx); err != nil {
 		return err
 	}
-	if err := EnsureQuackADBCDriverInstalled(ctx); err != nil {
-		return err
-	}
+	return EnsureQuackADBCDriverInstalled(ctx)
+}
 
-	dir, err := QuackADBCDriverDir()
-	if err != nil {
-		return err
+// installOutput is where one-time download messages go: the run's printer when
+// there is one, otherwise stderr so they stay out of query results.
+func installOutput(ctx context.Context) io.Writer {
+	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
+		return printer
 	}
-	var driver drivermgr.Driver
-	db, err := driver.NewDatabase(map[string]string{"driver": quackDriverPath(dir), "path": ":memory:"})
-	if err != nil {
-		return fmt.Errorf("failed to open the Quack DuckDB driver: %w", err)
-	}
-	defer db.Close()
-	conn, err := db.Open(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to open the Quack DuckDB driver: %w", err)
-	}
-	defer conn.Close()
-	if err := execADBCStatement(ctx, conn, "INSTALL quack"); err != nil {
-		return fmt.Errorf("failed to install the quack extension: %w", err)
-	}
-	return nil
+	return os.Stderr
 }
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
@@ -130,6 +119,7 @@ func ensureDriver(ctx context.Context, cfg config.Config, driverPath, version st
 			return nil
 		}
 
+		_, _ = fmt.Fprintf(installOutput(ctx), "Installing the DuckDB ADBC driver v%s...\n", version)
 		if err := installDuckDBADBCDriver(ctx, cfg, version); err != nil {
 			return err
 		}

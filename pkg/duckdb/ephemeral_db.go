@@ -299,6 +299,10 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 		return nil
 	}
 
+	if !quackExtensionInstalled(ctx, conn) {
+		_, _ = fmt.Fprintln(installOutput(ctx), "Installing the DuckDB quack extension...")
+	}
+
 	for _, sqlStr := range cfg.quackAttachStatements() {
 		if err := execADBCStatement(ctx, conn, sqlStr); err != nil {
 			// DuckDB errors can echo the statement, which carries the token as a
@@ -332,6 +336,31 @@ func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.
 		}
 	}
 	return nil
+}
+
+// quackExtensionInstalled reports whether the quack extension is already on
+// disk; on any error it reports true, since the message is only informational.
+func quackExtensionInstalled(ctx context.Context, conn adbc.Connection) bool {
+	stmt, err := conn.NewStatement()
+	if err != nil {
+		return true
+	}
+	defer stmt.Close()
+
+	if err := stmt.SetSqlQuery("SELECT count(*) FROM duckdb_extensions() WHERE extension_name = 'quack' AND installed"); err != nil {
+		return true
+	}
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return true
+	}
+	defer reader.Release()
+
+	rows, err := bufferArrowReader(reader)
+	if err != nil || len(rows.data) == 0 || len(rows.data[0]) == 0 {
+		return true
+	}
+	return fmt.Sprint(rows.data[0][0]) != "0"
 }
 
 func execADBCStatement(ctx context.Context, conn adbc.Connection, sqlStr string) error {

@@ -60,7 +60,7 @@ ENV CC="/usr/bin/gcc"
 ENV CFLAGS="-I/usr/include"
 ENV LDFLAGS="-L/usr/lib"
 
-# Install the DuckDB drivers and the quack extension so runs do not download them
+# Install the DuckDB drivers so runs do not download them
 RUN /home/bruin/.local/bin/bruin internal install-duckdb-drivers
 
 # Bootstrap the legacy and current ingestr installations

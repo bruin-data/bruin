@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/columnar-tech/dbc/config"
 	"github.com/stretchr/testify/require"
 )
@@ -143,4 +144,15 @@ func TestDriverInstallLockCanceledContext(t *testing.T) {
 	})
 	require.ErrorIs(t, err, context.Canceled)
 	require.False(t, called)
+}
+
+func TestInstallOutput(t *testing.T) {
+	t.Parallel()
+
+	var printer bytes.Buffer
+	ctx := context.WithValue(t.Context(), executor.KeyPrinter, &printer)
+	require.Same(t, &printer, installOutput(ctx))
+
+	// Without a run printer, messages go to stderr so query results on stdout stay clean.
+	require.Equal(t, os.Stderr, installOutput(t.Context()))
 }
