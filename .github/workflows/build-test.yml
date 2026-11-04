@@ -85,6 +85,22 @@ jobs:
         # tracked file.
         shell: bash
         run: python3 scripts/set_content_mtimes.py
+      - name: DEBUG test cache inputs (temporary)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          SF_DISABLE_MINICORE: 'true'
+        run: |
+          set -x
+          go env GOCACHE GOCACHEPROG GOFLAGS
+          git status --short | head -20
+          for p in path config; do
+            GODEBUG=gocachetest=1 go test -tags=no_duckdb_arrow -race -vet=off -timeout 10m ./pkg/$p 2>&1 | grep -E 'testcache|^ok|FAIL' | grep -v 'getenv' | head -20
+            go test -c -tags=no_duckdb_arrow -race -o /tmp/$p.test ./pkg/$p
+            (cd pkg/$p && /tmp/$p.test -test.testlogfile=/tmp/$p.log >/dev/null 2>&1 || true)
+            echo "### inputs for pkg/$p"
+            python3 scripts/debug_testlog.py /tmp/$p.log "$PWD/pkg/$p"
+          done
       - name: Run full test suite
         shell: bash
         run: |
