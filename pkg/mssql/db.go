@@ -104,13 +104,25 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 }
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	result, err := query.CollectRows(ctx, db, queryObj)
+	if err == nil && len(result.Rows) == 0 {
+		// Preserve the buffered API's nil rows for an empty result.
+		result.Rows = nil
+	}
+	return result, err
+}
+
+func (db *DB) StreamWithSchema(ctx context.Context, queryObj *query.Query, h query.RowHandler) (*query.QueryResult, error) {
 	queryString := queryObj.String()
+	ctx, cancel := context.WithCancel(ctx)
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err != nil {
+		cancel()
 		errorMessage := err.Error()
 		return nil, errors.Wrap(errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  ")), "failed to execute query")
 	}
 	defer rows.Close()
+	defer cancel()
 
 	// Get column information
 	cols, err := rows.Columns()
@@ -130,9 +142,10 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	for i, colType := range columnTypes {
 		columnTypeNames[i] = colType.DatabaseTypeName()
 	}
+	if err := h.Schema(columns, columnTypeNames); err != nil {
+		return nil, err
+	}
 
-	// Collect rows
-	var result [][]interface{}
 	for rows.Next() {
 		rowColumns := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))
@@ -144,7 +157,9 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 			return nil, errors.Wrap(err, "failed to scan row values")
 		}
 
-		result = append(result, rowColumns)
+		if err := h.Row(rowColumns); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = rows.Err(); err != nil {
@@ -153,7 +168,6 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 
 	queryResult := &query.QueryResult{
 		Columns:     columns,
-		Rows:        result,
 		ColumnTypes: columnTypeNames,
 	}
 	return queryResult, nil
