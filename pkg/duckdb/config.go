@@ -123,3 +123,5 @@ func isReadOnlyMotherDuck(c DuckDBConfig) bool {
 		return false
 	}
 }
+
+// CI experiment marker 1
