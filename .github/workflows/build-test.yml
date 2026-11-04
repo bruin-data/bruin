@@ -91,14 +91,14 @@ jobs:
         env:
           SF_DISABLE_MINICORE: 'true'
         run: |
-          t() { GODEBUG=gocachetest=1 go test -tags=no_duckdb_arrow -vet=off -timeout 10m ./pkg/path ./pkg/sqlparser 2>&1 | grep -E 'input ID|^ok|FAIL' | sed -E 's/test ID ([0-9a-f]{8})[0-9a-f]*/test ID \1/; s/input ID ([0-9a-f]{8})[0-9a-f]*/input ID \1/; s/=> ([0-9a-f]{8})[0-9a-f]*$/=> \1/'; }
-          echo "### GOCACHEPROG=$(go env GOCACHEPROG) run 1"; t
-          echo "### GOCACHEPROG run 2"; t
-          echo "### GOCACHEPROG run 3"; t
-          export GOCACHEPROG= GOCACHE=/tmp/plain-gocache
-          echo "### plain GOCACHE run 1"; t
-          echo "### plain GOCACHE run 2"; t
-          echo "### plain GOCACHE run 3"; t
+          stat -c '### .git before: %y size=%s mode=%f' .git
+          for p in git lint pipeline; do
+            go test -c -tags=no_duckdb_arrow -race -o /tmp/$p.test ./pkg/$p
+            (cd pkg/$p && /tmp/$p.test -test.testlogfile=/tmp/$p.log >/dev/null 2>&1 || true)
+            echo "### pkg/$p module inputs"
+            grep -E "^(open|stat|chdir) $PWD" /tmp/$p.log | sort -u | while read -r op f; do echo "$op ${f#$PWD/} $(stat -c '%s %f %y' "$f" 2>&1)"; done | head -40
+          done
+          stat -c '### .git after probes: %y size=%s' .git
       - name: Run full test suite
         shell: bash
         run: |
@@ -107,6 +107,11 @@ jobs:
           # still covered without depending on this PATH.
           [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
           make test-full
+      - name: DEBUG .git after tests (temporary)
+        if: always() && runner.os == 'Linux'
+        run: |
+          stat -c '### .git after tests: %y size=%s' .git
+          ls -la --time-style=full-iso .git | sort -k6,7 | tail -8
   end2end:
     needs: [verify-ingestr]
     strategy:
