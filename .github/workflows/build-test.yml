@@ -99,6 +99,25 @@ jobs:
         # tracked file.
         shell: bash
         run: python3 scripts/set_content_mtimes.py
+      - name: DEBUG does GOCACHEPROG overwrite entries (temporary)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p cachecheck && cd cachecheck
+          echo a > a.txt; echo b > b.txt; touch -d 2001-01-01 a.txt b.txt
+          cat > x_test.go <<EOF
+          package cachecheck // nonce ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}
+          import ("os"; "testing")
+          func TestPick(t *testing.T) { _, _ = os.ReadFile(os.Getenv("PICK") + ".txt") }
+          EOF
+          t() { PICK=$1 GODEBUG=gocachetest=1 go test . 2>&1 | grep -E 'input ID|^ok' | sed -E 's/[0-9a-f]{56}//g'; }
+          for mode in gocacheprog plain; do
+            [ $mode = plain ] && export GOCACHEPROG= GOCACHE=/tmp/plain-gocache
+            echo "### $mode: PICK=a"; t a
+            echo "### $mode: PICK=b"; t b
+            echo "### $mode: PICK=b again (hits only if the cache overwrote the input list)"; t b
+          done
+          cd .. && rm -rf cachecheck
       - name: Run full test suite
         shell: bash
         run: |
