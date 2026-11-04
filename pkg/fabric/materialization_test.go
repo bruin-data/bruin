@@ -153,14 +153,13 @@ func nativeMergeAsset(columns []pipeline.Column) *pipeline.Asset {
 }
 
 const (
-	nativeMergeStaging = "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
-		"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n"
-	nativeMergeGuard = "IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
+	nativeMergeStaging = "CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n"
+	nativeMergeGuard   = "IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
 		"BEGIN\n" +
-		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
 		"THROW 50000, N'Fabric merge into dbo.Table failed: the query returned more than one row for the same primary key (id). Deduplicate the query so that each key appears once.', 1;\n" +
 		"END;\n"
-	nativeMergeCleanup = "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
+	nativeMergeCleanup = "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];"
 )
 
 func TestBuildNativeMergeQuery(t *testing.T) {
@@ -184,7 +183,7 @@ func TestBuildNativeMergeQuery(t *testing.T) {
 				"SELECT id, name FROM src;\n" +
 				nativeMergeGuard +
 				"MERGE INTO [dbo].[Table] target\n" +
-				"USING [dbo].[Table__bruin_tmp] source\n" +
+				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
 				"ON target.[id] = source.[id]\n" +
 				"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [name]) VALUES (source.[id], source.[name]);\n" +
 				nativeMergeCleanup,
@@ -202,7 +201,7 @@ func TestBuildNativeMergeQuery(t *testing.T) {
 				"SELECT id, name, created_at, status FROM src;\n" +
 				nativeMergeGuard +
 				"MERGE INTO [dbo].[Table] target\n" +
-				"USING [dbo].[Table__bruin_tmp] source\n" +
+				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
 				"ON target.[id] = source.[id]\n" +
 				"WHEN MATCHED THEN UPDATE SET target.[name] = source.[name], target.[status] = source.[status]\n" +
 				"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [name], [created_at], [status]) VALUES (source.[id], source.[name], source.[created_at], source.[status]);\n" +
@@ -221,7 +220,7 @@ func TestBuildNativeMergeQuery(t *testing.T) {
 				"SELECT id, amount, updated_at, created_at FROM src;\n" +
 				nativeMergeGuard +
 				"MERGE INTO [dbo].[Table] target\n" +
-				"USING [dbo].[Table__bruin_tmp] source\n" +
+				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
 				"ON target.[id] = source.[id]\n" +
 				"WHEN MATCHED THEN UPDATE SET " +
 				"target.[amount] = CASE WHEN source.updated_at > target.updated_at THEN source.amount ELSE target.amount END, " +
@@ -241,7 +240,7 @@ func TestBuildNativeMergeQuery(t *testing.T) {
 				"SELECT id, val, updated_at FROM src;\n" +
 				nativeMergeGuard +
 				"MERGE INTO [dbo].[Table] target\n" +
-				"USING [dbo].[Table__bruin_tmp] source\n" +
+				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
 				"ON target.[id] = source.[id]\n" +
 				"WHEN MATCHED AND (source.updated_at > target.updated_at) THEN UPDATE SET target.[val] = source.[val]\n" +
 				"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [val]) VALUES (source.[id], source.[val]);\n" +
@@ -258,7 +257,7 @@ func TestBuildNativeMergeQuery(t *testing.T) {
 				"WITH latest AS (SELECT id, val FROM src) SELECT id, val FROM latest;\n" +
 				nativeMergeGuard +
 				"MERGE INTO [dbo].[Table] target\n" +
-				"USING [dbo].[Table__bruin_tmp] source\n" +
+				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
 				"ON target.[id] = source.[id]\n" +
 				"WHEN MATCHED THEN UPDATE SET target.[val] = source.[val]\n" +
 				"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [val]) VALUES (source.[id], source.[val]);\n" +
@@ -374,41 +373,6 @@ func TestNativeMergeFullRefreshUsesCreateReplace(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestRefreshRestrictedLoadsByColumnName(t *testing.T) {
-	t.Parallel()
-
-	restricted := true
-	newAsset := func(strategy pipeline.MaterializationStrategy) *pipeline.Asset {
-		return &pipeline.Asset{
-			Name:              "dbo.Table",
-			Materialization:   pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
-			RefreshRestricted: &restricted,
-			Columns: []pipeline.Column{
-				{Name: "id", Type: "INT", PrimaryKey: true},
-				{Name: "amount", Type: "INT"},
-			},
-		}
-	}
-	query := "WITH src AS (SELECT amount, id FROM raw) SELECT amount, id FROM src"
-	namedInsert := "INSERT INTO [dbo].[Table] ([id], [amount]) SELECT [id], [amount] FROM [dbo].[Table__bruin_tmp];\n"
-
-	appendResult, err := buildAppendQuery(newAsset(pipeline.MaterializationStrategyAppend), query)
-	require.NoError(t, err)
-	assert.Equal(t, "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n"+
-		"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n"+query+";\n"+
-		namedInsert+
-		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];", appendResult)
-
-	deleteInsertResult, err := buildDeleteInsertQuery(newAsset(pipeline.MaterializationStrategyDeleteInsert), query)
-	require.NoError(t, err)
-	assert.Contains(t, deleteInsertResult, namedInsert)
-	assert.NotContains(t, deleteInsertResult, "SELECT *")
-
-	mergeResult, err := buildMergeQuery(newAsset(pipeline.MaterializationStrategyMerge), query)
-	require.NoError(t, err)
-	assert.Equal(t, deleteInsertResult, mergeResult)
-}
-
 func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
 	t.Parallel()
 
@@ -417,31 +381,82 @@ func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
 	nullable := false
 	typedColumns := []pipeline.Column{
 		{Name: "id", Type: "INT", PrimaryKey: true},
-		{Name: "name", Type: "VARCHAR(100)"},
+		{Name: "name", Type: "VARCHAR(100)", UpdateOnMerge: true},
 		{Name: "updated_at", Type: "DATETIME2(6)", Nullable: pipeline.DefaultTrueBool{Value: &nullable}},
 	}
+	// Fabric rejects key constraints in CREATE TABLE, so there is no PRIMARY KEY clause.
 	createTable := "IF OBJECT_ID('dbo.Table', 'U') IS NULL\n" +
 		"BEGIN\n" +
 		"CREATE TABLE [dbo].[Table] (\n" +
 		"    [id] INT NOT NULL,\n" +
 		"    [name] VARCHAR(100),\n" +
 		"    [updated_at] DATETIME2(6) NOT NULL\n" +
-		")\n" +
-		"END;\n"
+		");\n"
+	// A new table follows the declared column order, which can differ from the
+	// query's, so its first load copies by name.
+	firstLoad := func(tempName string) string {
+		return "EXEC sp_executesql N'INSERT INTO [dbo].[Table] ([id], [name], [updated_at]) SELECT [id], [name], [updated_at] FROM " + tempName + "';\n" +
+			"END\n" +
+			"ELSE\n" +
+			"BEGIN\n"
+	}
+	// The existing-target statements match the ones rendered without refresh_restricted.
+	deleteInsert := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+		"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+		"SELECT name, id, updated_at FROM src;\n" +
+		createTable +
+		firstLoad("[dbo].[Table__bruin_tmp]") +
+		"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
+		"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
+		");\n" +
+		"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp];\n" +
+		"END;\n" +
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
 
-	strategies := []struct {
+	tests := []struct {
 		strategy pipeline.MaterializationStrategy
 		params   pipeline.ParameterMap
-		build    pipeline.MaterializerFunc
+		want     string
 	}{
-		{strategy: pipeline.MaterializationStrategyMerge, params: pipeline.ParameterMap{NativeMergeParameter: "true"}, build: buildNativeMergeQuery},
-		{strategy: pipeline.MaterializationStrategyMerge, build: buildDeleteInsertQuery},
-		{strategy: pipeline.MaterializationStrategyDeleteInsert, build: buildDeleteInsertQuery},
-		{strategy: pipeline.MaterializationStrategyAppend, build: buildAppendQuery},
+		{
+			strategy: pipeline.MaterializationStrategyAppend,
+			want: "CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n" +
+				"SELECT name, id, updated_at FROM src;\n" +
+				createTable +
+				firstLoad("[dbo].[Table__bruin_tmp_abcefghi]") +
+				"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp_abcefghi];\n" +
+				"END;\n" +
+				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];",
+		},
+		{strategy: pipeline.MaterializationStrategyDeleteInsert, want: deleteInsert},
+		{strategy: pipeline.MaterializationStrategyMerge, want: deleteInsert},
+		{
+			strategy: pipeline.MaterializationStrategyMerge,
+			params:   pipeline.ParameterMap{NativeMergeParameter: "true"},
+			// MERGE names its columns, so an empty new table needs no separate first load.
+			want: createTable + "END;\n" +
+				"CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n" +
+				"SELECT name, id, updated_at FROM src;\n" +
+				"IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
+				"BEGIN\n" +
+				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
+				"THROW 50000, N'Fabric merge into dbo.Table failed: the query returned more than one row for the same primary key (id). Deduplicate the query so that each key appears once.', 1;\n" +
+				"END;\n" +
+				"MERGE INTO [dbo].[Table] target\n" +
+				"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
+				"ON target.[id] = source.[id]\n" +
+				"WHEN MATCHED THEN UPDATE SET target.[name] = source.[name]\n" +
+				"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [name], [updated_at]) VALUES (source.[id], source.[name], source.[updated_at]);\n" +
+				"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];",
+		},
 	}
 
-	for _, s := range strategies {
-		t.Run(string(s.strategy), func(t *testing.T) {
+	for _, tt := range tests {
+		name := string(tt.strategy)
+		if tt.params != nil {
+			name += " native"
+		}
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			newAsset := func(refreshRestricted *bool, columns []pipeline.Column) *pipeline.Asset {
@@ -449,40 +464,47 @@ func TestCreateMissingTableForRefreshRestrictedAssets(t *testing.T) {
 					Name: "dbo.Table",
 					Materialization: pipeline.Materialization{
 						Type:     pipeline.MaterializationTypeTable,
-						Strategy: s.strategy,
+						Strategy: tt.strategy,
 					},
-					Parameters:        s.params,
+					Parameters:        tt.params,
 					RefreshRestricted: refreshRestricted,
 					Columns:           columns,
 				}
 			}
-
-			asset := newAsset(&restricted, typedColumns)
-			body, err := s.build(asset, "SELECT 1")
-			require.NoError(t, err)
+			query := "SELECT name, id, updated_at FROM src"
 
 			// Even a full refresh keeps a refresh_restricted asset on its strategy.
 			for _, fullRefresh := range []bool{false, true} {
-				result, err := NewMaterializer(fullRefresh).Render(asset, "SELECT 1")
+				result, err := NewMaterializer(fullRefresh).Render(newAsset(&restricted, typedColumns), query)
 				require.NoError(t, err)
-				assert.Equal(t, createTable+body, result)
-				assert.NotContains(t, result, "PRIMARY KEY")
-				// The new table follows the declared column order, so rows are copied by name.
-				assert.NotContains(t, result, "SELECT *")
-				assert.NotContains(t, result, "INSERT INTO [dbo].[Table]\n")
+				assert.Equal(t, tt.want, result)
 			}
 
 			for _, unchanged := range []*pipeline.Asset{
 				newAsset(nil, typedColumns),
 				newAsset(&notRestricted, typedColumns),
-				newAsset(&restricted, []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "name", Type: "VARCHAR(100)"}}),
+				newAsset(&restricted, []pipeline.Column{{Name: "id", PrimaryKey: true}, {Name: "name", Type: "VARCHAR(100)", UpdateOnMerge: true}}),
 			} {
-				result, err := NewMaterializer(false).Render(unchanged, "SELECT 1")
+				result, err := NewMaterializer(false).Render(unchanged, query)
 				require.NoError(t, err)
 				assert.NotContains(t, result, "OBJECT_ID")
+				assert.NotContains(t, result, "sp_executesql")
 			}
 		})
 	}
+}
+
+func TestAppendWithoutRefreshRestrictedIsUnstaged(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name:            "dbo.Table",
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyAppend},
+		Columns:         []pipeline.Column{{Name: "id", Type: "INT"}},
+	}
+	result, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id;")
+	require.NoError(t, err)
+	assert.Equal(t, "INSERT INTO [dbo].[Table]\nSELECT 1 AS id", result)
 }
 
 func TestBuildTruncateInsertQuery(t *testing.T) {

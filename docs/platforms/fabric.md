@@ -140,11 +140,11 @@ WITH latest AS (
 SELECT order_id, status, updated_at, created_at FROM latest
 ```
 
-Bruin still stages the query with `CREATE TABLE ... AS`, because Fabric rejects a CTE inside `MERGE ... USING (...)`. It then merges the staged rows on the primary key and drops the staging table:
+Bruin still stages the query with `CREATE TABLE ... AS`, because Fabric rejects a CTE inside `MERGE ... USING (...)`. The staging table gets a unique name on each run, so parallel backfill partitions don't collide. Bruin then merges the staged rows on the primary key and drops the staging table:
 
 ```sql
 MERGE INTO [sales].[orders] target
-USING [sales].[orders__bruin_tmp] source
+USING [sales].[orders__bruin_tmp_<run>] source
 ON target.[order_id] = source.[order_id]
 WHEN MATCHED THEN UPDATE SET
   target.[status] = CASE WHEN source.updated_at > target.updated_at THEN source.status ELSE target.status END,
@@ -169,7 +169,7 @@ To turn it on for every asset in a pipeline, set it under `default.parameters` i
 
 A full refresh never runs for an asset with `refresh_restricted: true`, so nothing would create its table. For such assets, `merge`, `delete+insert`, and `append` first create a missing target from the declared `columns`, as the `ddl` strategy does. This needs a `type` on every column. Fabric does not allow key constraints in `CREATE TABLE`, so no `PRIMARY KEY` is declared on the new table.
 
-Because the new table follows the order of `columns`, these assets copy rows by column name instead of by position, so the query must return every declared column. `append` stages the query in `<table>__bruin_tmp` first, like `delete+insert`.
+The new table follows the order of `columns`, which can differ from the query's, so the run that creates it copies rows by column name. The query must return every declared column for that first load. Once the table exists, loads run exactly as they do without `refresh_restricted` and copy every column the query returns. To create the table on its first run, `append` stages the query in a staging table, which gets a unique name on each run so that parallel [backfill](../commands/backfill.md) partitions don't collide.
 
 ## Source assets
 

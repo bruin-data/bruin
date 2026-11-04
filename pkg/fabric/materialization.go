@@ -20,10 +20,10 @@ var matMap = pipeline.AssetMaterializationMap{
 	},
 	pipeline.MaterializationTypeTable: {
 		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:         createMissingTable(buildAppendQuery),
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:   createMissingTable(buildDeleteInsertQuery),
-		pipeline.MaterializationStrategyMerge:          createMissingTable(buildMergeQuery),
+		pipeline.MaterializationStrategyDeleteInsert:   buildDeleteInsertQuery,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
@@ -76,15 +76,14 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
 	}
 
-	// The target may be created from the declared columns, whose order can differ
-	// from the query's, so stage the query and insert by column name. Staging also
-	// keeps CTE-bodied queries working, which a derived table would not.
+	// Staging lets a missing target be loaded by column name, and keeps CTE-bodied
+	// queries working, which a derived table would not. The name is unique per run
+	// because parallel backfill partitions append to the same table.
 	tableName := QuoteIdentifier(asset.Name)
-	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp")
+	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp_" + helpers.PrefixGenerator())
 	queries := []string{
-		"DROP TABLE IF EXISTS " + tempName,
 		"CREATE TABLE " + tempName + " AS\n" + strings.TrimSuffix(query, ";"),
-		insertFromStaging(asset, tableName, tempName),
+		loadStagedRows(asset, tableName, tempName, "INSERT INTO "+tableName+" SELECT * FROM "+tempName),
 		"DROP TABLE IF EXISTS " + tempName,
 	}
 
@@ -110,20 +109,29 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
 		"CREATE TABLE " + tempName + " AS\n" + query,
-		"DELETE FROM " + tableName + " WHERE EXISTS (\n  SELECT 1 FROM " + tempName + " WHERE " + deleteCondition + "\n)",
-		insertFromStaging(asset, tableName, tempName),
+		loadStagedRows(
+			asset, tableName, tempName,
+			"DELETE FROM "+tableName+" WHERE EXISTS (\n  SELECT 1 FROM "+tempName+" WHERE "+deleteCondition+"\n)",
+			"INSERT INTO "+tableName+" SELECT * FROM "+tempName,
+		),
 		"DROP TABLE IF EXISTS " + tempName,
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-// insertFromStaging copies every staged row into the target. It lists the
-// declared columns when the target may have been created from them, so values
-// cannot land in the wrong column when the query orders them differently.
-func insertFromStaging(asset *pipeline.Asset, tableName, tempName string) string {
+// loadStagedRows runs the strategy's statements for loading the staged rows
+// into an existing target, which copy every staged column by position. An
+// asset that creates its missing target instead gets a branch for that case:
+// the table is created from the declared columns and the first load copies
+// them by name, since the declared order can differ from the query's.
+//
+// The first load runs through sp_executesql. Compiled in the batch, its column
+// list would be checked against an existing target even though that branch
+// never runs there, failing the batch when the target lacks a declared column.
+func loadStagedRows(asset *pipeline.Asset, tableName, tempName string, existingTarget ...string) string {
 	if !createsMissingTable(asset) {
-		return "INSERT INTO " + tableName + " SELECT * FROM " + tempName
+		return strings.Join(existingTarget, ";\n")
 	}
 
 	columns := make([]string, len(asset.Columns))
@@ -131,8 +139,15 @@ func insertFromStaging(asset *pipeline.Asset, tableName, tempName string) string
 		columns[i] = QuoteIdentifier(col.Name)
 	}
 	columnList := strings.Join(columns, ", ")
+	firstLoad := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", tableName, columnList, columnList, tempName)
 
-	return fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", tableName, columnList, columnList, tempName)
+	return fmt.Sprintf(
+		"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\n%s;\nEXEC sp_executesql N'%s';\nEND\nELSE\nBEGIN\n%s;\nEND",
+		strings.ReplaceAll(asset.Name, "'", "''"),
+		buildCreateTableStatement(asset),
+		strings.ReplaceAll(firstLoad, "'", "''"),
+		strings.Join(existingTarget, ";\n"),
+	)
 }
 
 // NativeMergeParameter opts a merge asset into a native T-SQL MERGE. Without it,
@@ -199,7 +214,8 @@ func buildNativeMergeQuery(asset *pipeline.Asset, query string) (string, error) 
 	}
 
 	tableName := QuoteIdentifier(asset.Name)
-	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp")
+	// Unique per run so parallel backfill partitions cannot replace each other's staged rows.
+	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp_" + helpers.PrefixGenerator())
 
 	mergeLines := []string{
 		"MERGE INTO " + tableName + " target",
@@ -232,13 +248,22 @@ func buildNativeMergeQuery(asset *pipeline.Asset, query string) (string, error) 
 	}
 	mergeLines = append(mergeLines, fmt.Sprintf("WHEN NOT MATCHED BY TARGET THEN INSERT (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(values, ", ")))
 
-	queries := []string{
-		"DROP TABLE IF EXISTS " + tempName,
-		"CREATE TABLE " + tempName + " AS\n" + strings.TrimSuffix(strings.TrimSpace(query), ";"),
+	queries := make([]string, 0, 5)
+	if createsMissingTable(asset) {
+		// A MERGE into the new, empty table inserts every row by column name.
+		queries = append(queries, fmt.Sprintf(
+			"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\n%s;\nEND",
+			strings.ReplaceAll(asset.Name, "'", "''"),
+			buildCreateTableStatement(asset),
+		))
+	}
+	queries = append(
+		queries,
+		"CREATE TABLE "+tempName+" AS\n"+strings.TrimSuffix(strings.TrimSpace(query), ";"),
 		buildDuplicateKeyGuard(asset.Name, pkCols, tempName),
 		strings.Join(mergeLines, "\n"),
-		"DROP TABLE IF EXISTS " + tempName,
-	}
+		"DROP TABLE IF EXISTS "+tempName,
+	)
 
 	return strings.Join(queries, ";\n") + ";", nil
 }
@@ -269,37 +294,18 @@ func buildDuplicateKeyGuard(assetName string, pkCols []string, tempName string) 
 	)
 }
 
-// createMissingTable lets an incremental strategy create its target from the
-// declared columns. It applies only to assets with refresh_restricted, which
-// can never be created by a full refresh. Assets without a type on every column
-// render unchanged.
-func createMissingTable(build pipeline.MaterializerFunc) pipeline.MaterializerFunc {
-	return func(asset *pipeline.Asset, query string) (string, error) {
-		materialized, err := build(asset, query)
-		if err != nil {
-			return "", err
-		}
-
-		if !createsMissingTable(asset) {
-			return materialized, nil
-		}
-
-		// Fabric rejects key constraints inside CREATE TABLE, so unlike the ddl
-		// strategy this leaves out the PRIMARY KEY clause.
-		columnDefs, _ := buildColumnDefinitions(asset)
-		createTable := fmt.Sprintf(
-			"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND;",
-			strings.ReplaceAll(asset.Name, "'", "''"),
-			QuoteIdentifier(asset.Name),
-			strings.Join(columnDefs, ",\n"),
-		)
-
-		return createTable + "\n" + materialized, nil
-	}
+// buildCreateTableStatement creates the target from the declared columns.
+// Fabric rejects key constraints inside CREATE TABLE, so unlike the ddl
+// strategy it leaves out the PRIMARY KEY clause.
+func buildCreateTableStatement(asset *pipeline.Asset) string {
+	columnDefs, _ := buildColumnDefinitions(asset)
+	return fmt.Sprintf("CREATE TABLE %s (\n%s\n)", QuoteIdentifier(asset.Name), strings.Join(columnDefs, ",\n"))
 }
 
-// createsMissingTable reports whether incremental strategies create a missing
-// target from the declared columns.
+// createsMissingTable reports whether append, delete+insert, and merge create
+// a missing target from the declared columns. That applies only to assets with
+// refresh_restricted, which a full refresh never creates, and a type on every
+// declared column.
 func createsMissingTable(asset *pipeline.Asset) bool {
 	return asset.RefreshRestricted != nil && *asset.RefreshRestricted && allColumnsTyped(asset)
 }
