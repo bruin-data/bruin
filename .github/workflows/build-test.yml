@@ -70,6 +70,11 @@ jobs:
         with:
           name: ingestr-hashes
           path: pkg/python
+      - name: Record runner resources
+        shell: bash
+        run: |
+          .github/scripts/runner-resources.sh info
+          .github/scripts/runner-resources.sh start
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -83,6 +88,10 @@ jobs:
           # still covered without depending on this PATH.
           [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
           make test-full
+      - name: Report runner resources
+        if: always()
+        shell: bash
+        run: .github/scripts/runner-resources.sh report
   end2end:
     needs: [verify-ingestr]
     strategy:
@@ -101,6 +110,11 @@ jobs:
         with:
           name: ingestr-hashes
           path: pkg/python
+      - name: Record runner resources
+        shell: bash
+        run: |
+          .github/scripts/runner-resources.sh info
+          .github/scripts/runner-resources.sh start
       - name: Setup Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -126,6 +140,10 @@ jobs:
         run: make integration-test
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
+      - name: Report runner resources
+        if: always()
+        shell: bash
+        run: .github/scripts/runner-resources.sh report
   dockerBuild:
     # Depot build for pushes and internally-created PRs. Fork PRs cannot
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
@@ -215,6 +233,11 @@ jobs:
         with:
           name: ingestr-hashes
           path: pkg/python
+      - name: Record runner resources
+        shell: bash
+        run: |
+          .github/scripts/runner-resources.sh info
+          .github/scripts/runner-resources.sh start
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
@@ -232,3 +255,7 @@ jobs:
         run: make format-ci
       - name: Run full lint suite
         run: make lint-full
+      - name: Report runner resources
+        if: always()
+        shell: bash
+        run: .github/scripts/runner-resources.sh report
