@@ -62,3 +62,5 @@ func validCDCStartLSN(lsn string) bool {
 	lowValue, lowErr := strconv.ParseUint(low, 16, 32)
 	return highErr == nil && lowErr == nil && (highValue != 0 || lowValue != 0)
 }
+
+// CI experiment marker 2
