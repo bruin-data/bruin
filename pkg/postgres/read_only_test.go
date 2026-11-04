@@ -145,6 +145,10 @@ func TestClientReadOnlyValidation(t *testing.T) {
 			_, err := c.SelectWithSchema(ctx, q)
 			return err
 		}},
+		{name: "StreamWithSchema", run: func(ctx context.Context, c *Client, q *query.Query) error {
+			_, err := c.StreamWithSchema(ctx, q, &recordingRowHandler{})
+			return err
+		}},
 		{name: "RunQueryWithoutResult", run: func(ctx context.Context, c *Client, q *query.Query) error { return c.RunQueryWithoutResult(ctx, q) }},
 		{name: "IsValid", run: func(ctx context.Context, c *Client, q *query.Query) error { _, err := c.IsValid(ctx, q); return err }, expected: func(sql string) string {
 			return fmt.Sprintf("DO $TEST$ BEGIN RETURN;\n    %s\nEND; $TEST$;", sql)

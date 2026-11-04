@@ -107,18 +107,36 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	return query.CollectRows(ctx, c, queryObj)
+}
+
+func (c *Client) StreamWithSchema(ctx context.Context, queryObj *query.Query, h query.RowHandler) (*query.QueryResult, error) {
 	if err := c.validateReadOnlyQuery(queryObj.String()); err != nil {
 		return nil, err
 	}
-	return c.selectWithSchema(ctx, queryObj)
+	return c.streamWithSchema(ctx, queryObj, h)
+}
+
+type rowStreamerFunc func(ctx context.Context, q *query.Query, h query.RowHandler) (*query.QueryResult, error)
+
+func (f rowStreamerFunc) StreamWithSchema(ctx context.Context, q *query.Query, h query.RowHandler) (*query.QueryResult, error) {
+	return f(ctx, q, h)
 }
 
 func (c *Client) selectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	return query.CollectRows(ctx, rowStreamerFunc(c.streamWithSchema), queryObj)
+}
+
+func (c *Client) streamWithSchema(ctx context.Context, queryObj *query.Query, h query.RowHandler) (*query.QueryResult, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	rows, err := c.connection.Query(ctx, queryObj.String())
 	if err != nil {
+		cancel()
 		return nil, errors.Wrap(err, "failed to execute query")
 	}
 	defer rows.Close()
+	// Closing rows drains the rest of the result, so an early return cancels the query first.
+	defer cancel()
 	// Retrieve column metadata using FieldDescriptions
 	fieldDescriptions := rows.FieldDescriptions()
 	if len(fieldDescriptions) == 0 && !query.IsLikelyResultQuery(queryObj.String()) {
@@ -162,20 +180,27 @@ func (c *Client) selectWithSchema(ctx context.Context, queryObj *query.Query) (*
 			columnTypes[i] = dataType.Name
 		}
 	}
+	if err := h.Schema(columns, columnTypes); err != nil {
+		return nil, err
+	}
 
-	// Collect rows
-	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
-		return row.Values()
-	})
-	if err != nil {
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to collect row values")
+		}
+		if err := h.Row(values); err != nil {
+			return nil, err
+		}
+	}
+	if err := rows.Err(); err != nil {
 		return nil, errors.Wrap(err, "failed to collect row values")
 	}
-	result := &query.QueryResult{
+
+	return &query.QueryResult{
 		Columns:     columns,
-		Rows:        collectedRows,
 		ColumnTypes: columnTypes,
-	}
-	return result, nil
+	}, nil
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
