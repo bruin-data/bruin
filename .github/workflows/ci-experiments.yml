@@ -21,16 +21,7 @@ jobs:
 
   test:
     needs: [verify-ingestr]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {runner: blacksmith-2vcpu-ubuntu-2404, p: 2}
-          - {runner: blacksmith-4vcpu-ubuntu-2404, p: 4}
-          - {runner: blacksmith-8vcpu-ubuntu-2404, p: 8}
-          - {runner: blacksmith-4vcpu-windows-2025, p: 4}
-          - {runner: blacksmith-8vcpu-windows-2025, p: 8}
-    runs-on: ${{ matrix.runner }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -41,38 +32,16 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
-      - id: go-paths
-        shell: bash
-        run: |
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ${{ steps.go-paths.outputs.build }}
-            ${{ steps.go-paths.outputs.mod }}
-          key: exp-go-${{ github.job }}-${{ matrix.runner }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            exp-go-${{ github.job }}-${{ matrix.runner }}-${{ hashFiles('go.sum') }}-
       - name: Run full test suite
-        shell: bash
-        run: |
-          [[ "${{ runner.os }}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
-          make test-full TEST_CONCURRENCY=${{ matrix.p }}
+        run: make test-full
 
   end2end:
     needs: [verify-ingestr]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {runner: blacksmith-4vcpu-ubuntu-2404, parallel: ''}
-          - {runner: blacksmith-2vcpu-ubuntu-2404, parallel: '1'}
-          - {runner: blacksmith-4vcpu-ubuntu-2404, parallel: '1'}
-          - {runner: blacksmith-8vcpu-ubuntu-2404, parallel: '1'}
+        runner: [blacksmith-2vcpu-ubuntu-2404, blacksmith-4vcpu-ubuntu-2404]
     runs-on: ${{ matrix.runner }}
-    env:
-      ENABLE_PARALLEL: ${{ matrix.parallel }}
     steps:
       - name: Install R (background)
         run: |
@@ -86,18 +55,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
-      - id: go-paths
-        run: |
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ${{ steps.go-paths.outputs.build }}
-            ${{ steps.go-paths.outputs.mod }}
-          key: exp-go-${{ github.job }}-${{ matrix.runner }}-${{ matrix.parallel }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            exp-go-${{ github.job }}-${{ matrix.runner }}-${{ matrix.parallel }}-${{ hashFiles('go.sum') }}-
       - name: Wait for R
         run: |
           deadline=$((SECONDS + 600))
@@ -112,14 +69,7 @@ jobs:
 
   lint:
     needs: [verify-ingestr]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {runner: blacksmith-2vcpu-ubuntu-2404, c: 2}
-          - {runner: blacksmith-4vcpu-ubuntu-2404, c: 4}
-          - {runner: blacksmith-8vcpu-ubuntu-2404, c: 8}
-    runs-on: ${{ matrix.runner }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -130,22 +80,16 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
-      - id: go-paths
-        run: |
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - name: Cache golangci-lint analysis
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: |
-            ${{ steps.go-paths.outputs.build }}
-            ${{ steps.go-paths.outputs.mod }}
-            ~/.cache/golangci-lint
-          key: exp-go-${{ github.job }}-${{ matrix.runner }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          path: ~/.cache/golangci-lint
+          key: exp2-golangci-lint-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            exp-go-${{ github.job }}-${{ matrix.runner }}-${{ hashFiles('go.sum') }}-
+            exp2-golangci-lint-${{ hashFiles('go.sum') }}-
       - name: Install linting tools
         run: make setup
       - name: Check formatting
         run: make format-ci
       - name: Run full lint suite
-        run: make lint-full LINT_CONCURRENCY=${{ matrix.c }}
+        run: make lint-full
