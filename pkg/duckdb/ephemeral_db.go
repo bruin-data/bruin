@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -283,15 +282,6 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 		return nil
 	}
 
-	// Older drivers fail later with an opaque serialization error, so check first.
-	version, err := queryADBCString(ctx, conn, "SELECT library_version FROM pragma_version()")
-	if err != nil {
-		return fmt.Errorf("failed to read DuckDB ADBC driver version: %w", err)
-	}
-	if !quackSupportsDriverVersion(version) {
-		return fmt.Errorf("quack: true needs a DuckDB 2.0+ ADBC driver matching the server's release, but the installed driver is %s; install one with `dbc install duckdb=<server version>`", version)
-	}
-
 	for _, sqlStr := range cfg.quackAttachStatements() {
 		if err := execADBCStatement(ctx, conn, sqlStr); err != nil {
 			// DuckDB errors can echo the statement, which carries the token as a
@@ -301,38 +291,6 @@ func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Conn
 		}
 	}
 	return nil
-}
-
-func quackSupportsDriverVersion(version string) bool {
-	major, _, _ := strings.Cut(strings.TrimPrefix(version, "v"), ".")
-	n, err := strconv.Atoi(major)
-	return err == nil && n >= 2
-}
-
-func queryADBCString(ctx context.Context, conn adbc.Connection, sqlStr string) (string, error) {
-	stmt, err := conn.NewStatement()
-	if err != nil {
-		return "", err
-	}
-	defer stmt.Close()
-
-	if err := stmt.SetSqlQuery(sqlStr); err != nil {
-		return "", err
-	}
-	reader, _, err := stmt.ExecuteQuery(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer reader.Release()
-
-	rows, err := bufferArrowReader(reader)
-	if err != nil {
-		return "", err
-	}
-	if len(rows.data) == 0 || len(rows.data[0]) == 0 {
-		return "", sql.ErrNoRows
-	}
-	return fmt.Sprint(rows.data[0][0]), nil
 }
 
 func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.Connection) error {
