@@ -237,3 +237,5 @@ func objectCatalogsContainTable(catalogs []objectCatalog, catalogName, schemaNam
 	}
 	return false
 }
+
+// CI experiment marker 0
