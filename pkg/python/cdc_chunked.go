@@ -124,3 +124,5 @@ func ValidateCDCChunkedSnapshotParameters(asset *pipeline.Asset) error {
 	}
 	return nil
 }
+
+// CI experiment marker 2
