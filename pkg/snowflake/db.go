@@ -452,15 +452,36 @@ func (db *DB) Ping(ctx context.Context) error {
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
 	var result *query.QueryResult
 	requestID := gosnowflake.NewUUID()
+	stream := schemaStreamAttempt{db: db, requestID: &requestID}
 	err := db.withIdempotentRetry(ctx, func() error {
 		var err error
-		result, err = db.selectWithSchemaOnce(ctx, queryObj, &requestID)
+		result, err = query.CollectRows(ctx, stream, queryObj)
 		return err
 	})
 	return result, err
 }
 
-func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, requestID *gosnowflake.UUID) (*query.QueryResult, error) {
+// schemaStreamAttempt lets the buffered API retry the entire collection with the
+// same request ID, without replaying callbacks in the public streaming API.
+type schemaStreamAttempt struct {
+	db        *DB
+	requestID *gosnowflake.UUID
+}
+
+func (s schemaStreamAttempt) StreamWithSchema(ctx context.Context, q *query.Query, h query.RowHandler) (*query.QueryResult, error) {
+	return s.db.streamWithSchemaOnce(ctx, q, h, s.requestID)
+}
+
+var _ query.RowStreamer = (*DB)(nil)
+
+// StreamWithSchema delivers schema and rows without buffering. Unlike the
+// buffered API, it does not retry: callbacks may already have observable effects.
+func (db *DB) StreamWithSchema(ctx context.Context, q *query.Query, h query.RowHandler) (*query.QueryResult, error) {
+	requestID := gosnowflake.NewUUID()
+	return db.streamWithSchemaOnce(ctx, q, h, &requestID)
+}
+
+func (db *DB) streamWithSchemaOnce(ctx context.Context, queryObj *query.Query, h query.RowHandler, requestID *gosnowflake.UUID) (*query.QueryResult, error) {
 	if err := db.validateReadOnlyQuery(queryObj.String()); err != nil {
 		return nil, err
 	}
@@ -468,6 +489,8 @@ func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, r
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	// Prepare Snowflake context for the query execution
 	// Attach a query ID channel and multi-statement context
 	qidChan := make(chan string, 1)
@@ -489,13 +512,16 @@ func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, r
 		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		// Stop any pending fetch before Close, which may otherwise drain rows.
+		cancel()
+		rows.Close()
+	}()
 
 	// Initialize the result struct
 	result := &query.QueryResult{
 		Columns:     []string{},
 		ColumnTypes: []string{},
-		Rows:        [][]interface{}{},
 	}
 
 	// Fetch column names
@@ -514,6 +540,9 @@ func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, r
 		typeStrings[i] = ct.DatabaseTypeName()
 	}
 	result.ColumnTypes = typeStrings
+	if err := h.Schema(cols, typeStrings); err != nil {
+		return nil, err
+	}
 	for rows.Next() {
 		row := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))
@@ -524,7 +553,9 @@ func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, r
 		if err := rows.Scan(columnPointers...); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
-		result.Rows = append(result.Rows, row)
+		if err := h.Row(row); err != nil {
+			return nil, err
+		}
 	}
 
 	if rows.Err() != nil {
