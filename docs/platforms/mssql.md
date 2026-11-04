@@ -5,10 +5,6 @@ Bruin supports Microsoft SQL Server as a data platform.
 > [!NOTE]
 > We tend to use "MS SQL" interchangeably to refer to Microsoft SQL Server, apologies for any confusion.
 
-The [query command](/commands/query) streams SQL Server results to CSV, JSON, and export writers as rows are read, without collecting the entire result in Bruin's memory. No extra flag is required. Default `plain` output displays up to 100 rows as a table and switches to CSV for larger results. Drivers may still buffer data internally.
-
-If reading or writing fails, the command stops with an error. CSV on stdout may be partial; JSON output includes an error, and incomplete export files are removed.
-
 ## Connection
 
 In order to set up a SQL Server connection in Bruin, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
