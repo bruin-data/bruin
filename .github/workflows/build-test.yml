@@ -1,4 +1,4 @@
-# CI Checks workflow
+# CI Checks workflow (control run for #2934, do not merge)
 
 name: CI Checks
 on:
