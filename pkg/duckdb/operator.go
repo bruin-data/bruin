@@ -178,3 +178,5 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 		"pattern":         &PatternCheck{conn: manager},
 	})
 }
+
+// CI experiment marker 1
