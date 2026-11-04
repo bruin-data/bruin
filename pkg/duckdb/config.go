@@ -7,9 +7,22 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/user"
 )
 
-const quackAlias = "quack_db"
+const (
+	dbcDriverName = "duckdb"
+	quackAlias    = "quack_db"
+	// QuackDriverVersion pins the DuckDB ADBC driver used for Quack connections.
+	// Quack needs DuckDB 2.0+, while the default driver stays on a release
+	// MotherDuck supports, so the two are installed side by side.
+	QuackDriverVersion = "2.0.0"
+)
+
+// QuackADBCDriverDir returns the directory holding the Quack DuckDB driver.
+func QuackADBCDriverDir() (string, error) {
+	return user.VersionedADBCDriverDir("quack", dbcDriverName, QuackDriverVersion)
+}
 
 type Config struct {
 	Path       string

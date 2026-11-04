@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -50,20 +51,32 @@ const (
 	sqlfluffVersion  = "3.4.1"
 )
 
-func ingestrEnvVars() (map[string]string, error) {
+func ingestrEnvVars(args []string) (map[string]string, error) {
 	env := map[string]string{
 		"INGESTR_DISABLE_TELEMETRY": "true",
 		"PYTHONUNBUFFERED":          "1",
 	}
-	if os.Getenv("ADBC_DRIVER_PATH") != "" {
-		return env, nil
+	driverPath := os.Getenv("ADBC_DRIVER_PATH")
+	if driverPath == "" {
+		// ingestr installs its own ADBC drivers; keep them out of a read-only HOME.
+		dir, err := user.ADBCDriverDir()
+		if err != nil {
+			return nil, err
+		}
+		if dir != "" {
+			driverPath = dir
+			env["ADBC_DRIVER_PATH"] = dir
+		}
 	}
-	// ingestr installs its own ADBC drivers; keep them out of a read-only HOME.
-	dir, err := user.ADBCDriverDir()
-	if err != nil {
-		return nil, err
-	}
-	if dir != "" {
+	if slices.ContainsFunc(args, duck.IsQuackURI) {
+		// Quack needs the DuckDB 2.0+ driver, so its directory is searched first.
+		dir, err := duck.QuackADBCDriverDir()
+		if err != nil {
+			return nil, err
+		}
+		if driverPath != "" {
+			dir += string(os.PathListSeparator) + driverPath
+		}
 		env["ADBC_DRIVER_PATH"] = dir
 	}
 	return env, nil
@@ -603,7 +616,7 @@ func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args
 		if err != nil {
 			return nil, err
 		}
-		envVars, err := ingestrEnvVars()
+		envVars, err := ingestrEnvVars(args)
 		if err != nil {
 			return nil, err
 		}
@@ -622,7 +635,7 @@ func (u *UvPythonRunner) ingestrCommand(ctx context.Context, extraPackages, args
 	if err != nil {
 		return nil, err
 	}
-	envVars, err := ingestrEnvVars()
+	envVars, err := ingestrEnvVars(args)
 	if err != nil {
 		return nil, err
 	}

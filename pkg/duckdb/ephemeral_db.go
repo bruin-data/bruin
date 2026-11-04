@@ -31,7 +31,11 @@ type EphemeralConnection struct {
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
-	if err := EnsureADBCDriverInstalled(context.Background()); err != nil {
+	ensure := EnsureADBCDriverInstalled
+	if cfg, ok := c.(Config); ok && cfg.HasQuack() {
+		ensure = EnsureQuackADBCDriverInstalled
+	}
+	if err := ensure(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
 	}
 
@@ -243,7 +247,7 @@ func (e *EphemeralConnection) openADBC(ctx context.Context, sqlStr string) (adbc
 //nolint:ireturn
 func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	opts := e.databaseOptions()
-	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	driverPath, err := e.driverPath()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -276,10 +280,27 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 	return adb, conn, nil
 }
 
+// driverPath returns the manifest for the driver this connection needs: Quack
+// connections use their own DuckDB 2.0+ driver, everything else the default one.
+func (e *EphemeralConnection) driverPath() (string, error) {
+	if cfg, ok := e.config.(Config); ok && cfg.HasQuack() {
+		dir, err := QuackADBCDriverDir()
+		if err != nil {
+			return "", err
+		}
+		return quackDriverPath(dir), nil
+	}
+	return user.ADBCDriverPath(dbcDriverName)
+}
+
 func (e *EphemeralConnection) setupQuackADBC(ctx context.Context, conn adbc.Connection) error {
 	cfg, ok := e.config.(Config)
 	if !ok || !cfg.HasQuack() {
 		return nil
+	}
+
+	if !quackExtensionInstalled(ctx, conn) {
+		_, _ = fmt.Fprintln(installOutput(ctx), "Installing the DuckDB quack extension...")
 	}
 
 	for _, sqlStr := range cfg.quackAttachStatements() {
@@ -315,6 +336,31 @@ func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.
 		}
 	}
 	return nil
+}
+
+// quackExtensionInstalled reports whether the quack extension is already on
+// disk; on any error it reports true, since the message is only informational.
+func quackExtensionInstalled(ctx context.Context, conn adbc.Connection) bool {
+	stmt, err := conn.NewStatement()
+	if err != nil {
+		return true
+	}
+	defer stmt.Close()
+
+	if err := stmt.SetSqlQuery("SELECT count(*) FROM duckdb_extensions() WHERE extension_name = 'quack' AND installed"); err != nil {
+		return true
+	}
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return true
+	}
+	defer reader.Release()
+
+	rows, err := bufferArrowReader(reader)
+	if err != nil || len(rows.data) == 0 || len(rows.data[0]) == 0 {
+		return true
+	}
+	return fmt.Sprint(rows.data[0][0]) != "0"
 }
 
 func execADBCStatement(ctx context.Context, conn adbc.Connection, sqlStr string) error {

@@ -17,6 +17,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
 	"github.com/apache/arrow-adbc/go/adbc/sqldriver"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/columnar-tech/dbc"
 	"github.com/columnar-tech/dbc/config"
@@ -24,13 +25,14 @@ import (
 )
 
 var (
-	driverOnce    sync.Once
-	errDriverInit error
+	driverOnce         sync.Once
+	errDriverInit      error
+	quackDriverOnce    sync.Once
+	errQuackDriverInit error
 )
 
 const (
 	adbcDriverName = "adbc_duckdb"
-	dbcDriverName  = "duckdb"
 	// duckdbDriverVersion pins the DuckDB ADBC driver version installed via dbc.
 	// MotherDuck currently supports up to v1.5.2; newer DuckDB releases are rejected.
 	duckdbDriverVersion = "1.5.2"
@@ -53,27 +55,77 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 	return errDriverInit
 }
 
+// EnsureQuackADBCDriverInstalled installs the DuckDB driver used by Quack
+// connections into its own directory, leaving the default driver untouched.
+func EnsureQuackADBCDriverInstalled(ctx context.Context) error {
+	quackDriverOnce.Do(func() {
+		errQuackDriverInit = ensureQuackDriverInstalledInternal(ctx)
+	})
+	return errQuackDriverInit
+}
+
+// InstallDrivers installs both DuckDB drivers ahead of use, so images can
+// include them instead of downloading them on every run. The quack extension is
+// left to the first Quack connection, so only runs that use Quack download it.
+func InstallDrivers(ctx context.Context) error {
+	if err := EnsureADBCDriverInstalled(ctx); err != nil {
+		return err
+	}
+	return EnsureQuackADBCDriverInstalled(ctx)
+}
+
+// installOutput is where one-time download messages go: the run's printer when
+// there is one, otherwise stderr so they stay out of query results.
+func installOutput(ctx context.Context) io.Writer {
+	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
+		return printer
+	}
+	return os.Stderr
+}
+
 func ensureDriverInstalledInternal(ctx context.Context) error {
 	cfg, err := user.EnsureADBCDriverConfig(dbcDriverName)
 	if err != nil {
 		return err
 	}
-	if err := tryLoadDriver(); err == nil { //nolint:contextcheck
+	driverPath, err := user.ADBCDriverPath(dbcDriverName)
+	if err != nil {
+		return err
+	}
+	return ensureDriver(ctx, cfg, driverPath, duckdbDriverVersion)
+}
+
+func ensureQuackDriverInstalledInternal(ctx context.Context) error {
+	dir, err := QuackADBCDriverDir()
+	if err != nil {
+		return err
+	}
+	cfg := config.Config{Level: config.ConfigEnv, Location: dir}
+	return ensureDriver(ctx, cfg, quackDriverPath(dir), QuackDriverVersion)
+}
+
+func quackDriverPath(dir string) string {
+	return filepath.Join(dir, dbcDriverName+".toml")
+}
+
+func ensureDriver(ctx context.Context, cfg config.Config, driverPath, version string) error {
+	if err := tryLoadDriver(driverPath); err == nil { //nolint:contextcheck
 		return nil
 	}
 
 	return withDriverInstallLock(ctx, cfg, func() error {
 		// Another process may have installed the driver while we waited.
-		if err := tryLoadDriver(); err == nil { //nolint:contextcheck
+		if err := tryLoadDriver(driverPath); err == nil { //nolint:contextcheck
 			return nil
 		}
 
-		if err := installDuckDBADBCDriver(ctx, cfg); err != nil {
+		_, _ = fmt.Fprintf(installOutput(ctx), "Installing the DuckDB ADBC driver v%s...\n", version)
+		if err := installDuckDBADBCDriver(ctx, cfg, version); err != nil {
 			return err
 		}
 
-		if err := tryLoadDriver(); err != nil { //nolint:contextcheck
-			return fmt.Errorf("DuckDB ADBC driver still not available after installation: %w", err)
+		if err := tryLoadDriver(driverPath); err != nil { //nolint:contextcheck
+			return fmt.Errorf("DuckDB ADBC driver %s still not available after installation: %w", version, err)
 		}
 
 		return nil
@@ -99,7 +151,7 @@ func withDriverInstallLock(ctx context.Context, cfg config.Config, install func(
 	return install()
 }
 
-func installDuckDBADBCDriver(ctx context.Context, cfg config.Config) error {
+func installDuckDBADBCDriver(ctx context.Context, cfg config.Config, version string) error {
 	client, err := dbc.NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dbc client: %w", err)
@@ -121,19 +173,19 @@ func installDuckDBADBCDriver(ctx context.Context, cfg config.Config) error {
 		return fmt.Errorf("dbc driver %q not found", dbcDriverName)
 	}
 
-	constraint, err := semver.NewConstraint("=" + duckdbDriverVersion)
+	constraint, err := semver.NewConstraint("=" + version)
 	if err != nil {
 		return fmt.Errorf("failed to build dbc driver version constraint: %w", err)
 	}
 
 	pkg, err := duckDBDriver.GetWithConstraint(constraint, config.PlatformTuple())
 	if err != nil {
-		return fmt.Errorf("failed to resolve dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
+		return fmt.Errorf("failed to resolve dbc driver %s=%s: %w", dbcDriverName, version, err)
 	}
 
-	downloaded, cleanup, err := downloadDBCDriverPackage(ctx, client, pkg)
+	downloaded, cleanup, err := downloadDBCDriverPackage(ctx, client, pkg, version)
 	if err != nil {
-		return fmt.Errorf("failed to download dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
+		return fmt.Errorf("failed to download dbc driver %s=%s: %w", dbcDriverName, version, err)
 	}
 	defer func() {
 		_ = downloaded.Close()
@@ -142,23 +194,23 @@ func installDuckDBADBCDriver(ctx context.Context, cfg config.Config) error {
 
 	manifest, err := config.InstallDriver(cfg, dbcDriverName, downloaded)
 	if err != nil {
-		return fmt.Errorf("failed to install dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
+		return fmt.Errorf("failed to install dbc driver %s=%s: %w", dbcDriverName, version, err)
 	}
 
 	if err := verifyDBCDriverSignature(manifest); err != nil {
 		driverDir := filepath.Dir(manifest.Driver.Shared.Get(config.PlatformTuple()))
 		_ = os.RemoveAll(driverDir)
-		return fmt.Errorf("failed to verify dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
+		return fmt.Errorf("failed to verify dbc driver %s=%s: %w", dbcDriverName, version, err)
 	}
 
 	if err := config.CreateManifest(cfg, manifest.DriverInfo); err != nil {
-		return fmt.Errorf("failed to create dbc manifest for %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
+		return fmt.Errorf("failed to create dbc manifest for %s=%s: %w", dbcDriverName, version, err)
 	}
 
 	return nil
 }
 
-func downloadDBCDriverPackage(ctx context.Context, client *dbc.Client, pkg dbc.PkgInfo) (*os.File, func(), error) {
+func downloadDBCDriverPackage(ctx context.Context, client *dbc.Client, pkg dbc.PkgInfo, version string) (*os.File, func(), error) {
 	body, err := client.Download(ctx, pkg)
 	if err != nil {
 		return nil, nil, err
@@ -173,7 +225,7 @@ func downloadDBCDriverPackage(ctx context.Context, client *dbc.Client, pkg dbc.P
 		_ = os.RemoveAll(tmpdir)
 	}
 
-	filename := dbcDriverName + "-" + duckdbDriverVersion + ".tar.gz"
+	filename := dbcDriverName + "-" + version + ".tar.gz"
 	if pkg.Path != nil {
 		if base := path.Base(pkg.Path.Path); base != "." && base != "/" {
 			filename = base
@@ -232,11 +284,7 @@ func verifyDBCDriverSignature(manifest config.Manifest) error {
 	return nil
 }
 
-func tryLoadDriver() error {
-	driverPath, err := user.ADBCDriverPath(dbcDriverName)
-	if err != nil {
-		return err
-	}
+func tryLoadDriver(driverPath string) error {
 	var driver drivermgr.Driver
 	db, err := driver.NewDatabase(map[string]string{"driver": driverPath, "path": ":memory:"})
 	if err != nil {

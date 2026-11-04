@@ -668,3 +668,18 @@ func (h *countingRowHandler) Row(_ []interface{}) error {
 	h.rows++
 	return nil
 }
+
+func TestQuackConnectionsUseTheirOwnDriver(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "bruin home")
+	t.Setenv("BRUIN_HOME", home)
+
+	quack := &EphemeralConnection{config: Config{Quack: true, Host: "localhost", Token: "abc"}}
+	path, err := quack.driverPath()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(home, "adbc", "quack", "duckdb-"+QuackDriverVersion, "duckdb.toml"), path)
+
+	local := &EphemeralConnection{config: Config{Path: "a.db"}}
+	path, err = local.driverPath()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(home, "adbc", "duckdb.toml"), path)
+}

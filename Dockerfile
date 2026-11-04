@@ -60,6 +60,9 @@ ENV CC="/usr/bin/gcc"
 ENV CFLAGS="-I/usr/include"
 ENV LDFLAGS="-L/usr/lib"
 
+# Install the DuckDB drivers so runs do not download them
+RUN /home/bruin/.local/bin/bruin internal install-duckdb-drivers
+
 # Bootstrap the legacy and current ingestr installations
 RUN cd /tmp && /home/bruin/.local/bin/bruin init bootstrap --in-place && /home/bruin/.local/bin/bruin run bootstrap
 RUN /home/bruin/.bruin/uv python install 3.9
