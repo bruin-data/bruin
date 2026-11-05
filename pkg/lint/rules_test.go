@@ -1290,6 +1290,9 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
 	}{
 		{"engine", pipeline.ClickHouseConfig{Engine: "ReplacingMergeTree()"}},
 		{"order_by", pipeline.ClickHouseConfig{OrderBy: []string{"id", "created_at"}}},
+		{"primary_key", pipeline.ClickHouseConfig{PrimaryKey: []string{"id"}}},
+		{"indexes", pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{{Name: "idx_id", Expression: "id", Type: "minmax"}}}},
+		{"projections", pipeline.ClickHouseConfig{Projections: []pipeline.ClickHouseProjection{{Name: "p_by_d", Select: "SELECT d, count() GROUP BY d"}}}},
 		{"ttl", pipeline.ClickHouseConfig{TTL: "created_at + INTERVAL 30 DAY"}},
 		{"settings", pipeline.ClickHouseConfig{Settings: map[string]string{"index_granularity": "8192"}}},
 	}
@@ -1384,6 +1387,113 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseOptions(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("ClickHouse option 'clickhouse.%s' %s", option.name, test.wantRule), issues[0].Description)
 			})
 		}
+	}
+}
+
+func TestEnsureMaterializationValuesAreValid_ClickHouseTableDefinitions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		config pipeline.ClickHouseConfig
+		want   string
+	}{
+		{
+			name: "physical primary key independent of logical columns",
+			config: pipeline.ClickHouseConfig{
+				OrderBy:    []string{"account_id", "id"},
+				PrimaryKey: []string{"account_id"},
+				Indexes: []pipeline.ClickHouseIndex{
+					{Name: "idx_id", Expression: "id", Type: "minmax"},
+					{Name: "idx_account", Expression: "account_id", Type: "bloom_filter(0.01)", Granularity: 4},
+				},
+				Projections: []pipeline.ClickHouseProjection{{Name: "p_by_d", Select: "SELECT d, count() GROUP BY d"}},
+			},
+		},
+		{
+			name:   "blank primary key",
+			config: pipeline.ClickHouseConfig{PrimaryKey: []string{" "}},
+			want:   "clickhouse.primary_key[0] must not be empty",
+		},
+		{
+			name:   "physical primary key is not a sorting key prefix",
+			config: pipeline.ClickHouseConfig{PrimaryKey: []string{"id"}, OrderBy: []string{"account_id", "id"}},
+			want:   "ClickHouse primary key columns must be a prefix of clickhouse.order_by",
+		},
+		{
+			name:   "blank index name",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{{Name: " ", Expression: "id", Type: "minmax"}}},
+			want:   "clickhouse.indexes[0].name is required",
+		},
+		{
+			name:   "blank index expression",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{{Name: "idx_id", Expression: " ", Type: "minmax"}}},
+			want:   "clickhouse.indexes[0].expression is required",
+		},
+		{
+			name:   "blank index type",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{{Name: "idx_id", Expression: "id", Type: " "}}},
+			want:   "clickhouse.indexes[0].type is required",
+		},
+		{
+			name:   "negative index granularity",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{{Name: "idx_id", Expression: "id", Type: "minmax", Granularity: -1}}},
+			want:   "clickhouse.indexes[0].granularity must be greater than zero",
+		},
+		{
+			name: "duplicate index name",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{
+				{Name: "idx_id", Expression: "id", Type: "minmax"},
+				{Name: "idx_id", Expression: "account_id", Type: "minmax"},
+			}},
+			want: `duplicate ClickHouse index name "idx_id"`,
+		},
+		{
+			name:   "blank projection name",
+			config: pipeline.ClickHouseConfig{Projections: []pipeline.ClickHouseProjection{{Name: " ", Select: "SELECT id ORDER BY id"}}},
+			want:   "clickhouse.projections[0].name is required",
+		},
+		{
+			name:   "blank projection select",
+			config: pipeline.ClickHouseConfig{Projections: []pipeline.ClickHouseProjection{{Name: "p_by_d", Select: " "}}},
+			want:   "clickhouse.projections[0].select is required",
+		},
+		{
+			name: "duplicate projection name",
+			config: pipeline.ClickHouseConfig{Projections: []pipeline.ClickHouseProjection{
+				{Name: "p_by_d", Select: "SELECT d, count() GROUP BY d"},
+				{Name: "p_by_d", Select: "SELECT id ORDER BY id"},
+			}},
+			want: `duplicate ClickHouse projection name "p_by_d"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			for _, strategy := range []pipeline.MaterializationStrategy{
+				pipeline.MaterializationStrategyNone,
+				pipeline.MaterializationStrategyCreateReplace,
+				pipeline.MaterializationStrategyDDL,
+				pipeline.MaterializationStrategyAppend,
+			} {
+				asset := &pipeline.Asset{
+					Type:            pipeline.AssetTypeClickHouse,
+					Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+					ClickHouse:      tt.config,
+					Columns:         []pipeline.Column{{Name: "id", PrimaryKey: true}},
+				}
+				issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+				require.NoError(t, err)
+				if tt.want == "" {
+					assert.Empty(t, issues, "strategy: %s", strategy)
+					continue
+				}
+				require.Len(t, issues, 1, "strategy: %s", strategy)
+				assert.Same(t, asset, issues[0].Task)
+				assert.Equal(t, tt.want, issues[0].Description, "strategy: %s", strategy)
+			}
+		})
 	}
 }
 

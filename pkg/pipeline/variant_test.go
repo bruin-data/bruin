@@ -567,8 +567,15 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 		},
 		Metadata: map[string]string{"k": "v"},
 		ClickHouse: pipeline.ClickHouseConfig{
-			Engine:   "ReplacingMergeTree(version)",
-			OrderBy:  []string{"id"},
+			Engine:     "ReplacingMergeTree(version)",
+			OrderBy:    []string{"id"},
+			PrimaryKey: []string{"id"},
+			Indexes: []pipeline.ClickHouseIndex{
+				{Name: "idx_id", Expression: "id", Type: "minmax"},
+			},
+			Projections: []pipeline.ClickHouseProjection{
+				{Name: "p_by_id", Select: "SELECT id, count() GROUP BY id"},
+			},
 			TTL:      "created_at + INTERVAL 30 DAY",
 			Settings: map[string]string{"index_granularity": "8192"},
 		},
@@ -628,8 +635,15 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Snowflake: pipeline.SnowflakeConfig{Warehouse: "wh"},
 			Athena:    pipeline.AthenaConfig{Location: "loc"},
 			ClickHouse: pipeline.ClickHouseConfig{
-				Engine:   "ReplacingMergeTree(version)",
-				OrderBy:  []string{"id"},
+				Engine:     "ReplacingMergeTree(version)",
+				OrderBy:    []string{"id"},
+				PrimaryKey: []string{"id"},
+				Indexes: []pipeline.ClickHouseIndex{
+					{Name: "idx_id", Expression: "id", Type: "minmax"},
+				},
+				Projections: []pipeline.ClickHouseProjection{
+					{Name: "p_by_id", Select: "SELECT id, count() GROUP BY id"},
+				},
 				TTL:      "created_at + INTERVAL 30 DAY",
 				Settings: map[string]string{"index_granularity": "8192"},
 			},

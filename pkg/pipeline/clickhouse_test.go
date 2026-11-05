@@ -22,9 +22,12 @@ func TestClickHouseConfigSerialization(t *testing.T) {
 	}{
 		{name: "empty", want: "null"},
 		{
-			name:   "empty collections",
-			config: pipeline.ClickHouseConfig{OrderBy: []string{}, Settings: map[string]string{}},
-			want:   "null",
+			name: "empty collections",
+			config: pipeline.ClickHouseConfig{
+				OrderBy: []string{}, PrimaryKey: []string{}, Indexes: []pipeline.ClickHouseIndex{},
+				Projections: []pipeline.ClickHouseProjection{}, Settings: map[string]string{},
+			},
+			want: "null",
 		},
 		{
 			name:   "engine",
@@ -35,6 +38,32 @@ func TestClickHouseConfigSerialization(t *testing.T) {
 			name:   "order by",
 			config: pipeline.ClickHouseConfig{OrderBy: []string{"tenant_id", "id"}},
 			want:   `{"order_by":["tenant_id","id"]}`,
+		},
+		{
+			name:   "primary key",
+			config: pipeline.ClickHouseConfig{PrimaryKey: []string{"tenant_id"}},
+			want:   `{"primary_key":["tenant_id"]}`,
+		},
+		{
+			name: "indexes with default granularity",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{
+				{Name: "idx_id", Expression: "id", Type: "minmax"},
+			}},
+			want: `{"indexes":[{"name":"idx_id","expression":"id","type":"minmax"}]}`,
+		},
+		{
+			name: "indexes with explicit granularity",
+			config: pipeline.ClickHouseConfig{Indexes: []pipeline.ClickHouseIndex{
+				{Name: "idx_id", Expression: "id", Type: "minmax", Granularity: 4},
+			}},
+			want: `{"indexes":[{"name":"idx_id","expression":"id","type":"minmax","granularity":4}]}`,
+		},
+		{
+			name: "projections",
+			config: pipeline.ClickHouseConfig{Projections: []pipeline.ClickHouseProjection{
+				{Name: "p_by_d", Select: "SELECT d, count() GROUP BY d"},
+			}},
+			want: `{"projections":[{"name":"p_by_d","select":"SELECT d, count() GROUP BY d"}]}`,
 		},
 		{
 			name:   "ttl",
@@ -89,14 +118,29 @@ materialization:
 clickhouse:
   engine: ReplacingMergeTree(version)
   order_by: [tenant_id, id]
+  primary_key: [tenant_id]
+  indexes:
+    - {name: idx_id, expression: id, type: minmax}
+    - {name: idx_d, expression: "toDate(created_at)", type: "set(100)", granularity: 4}
+  projections:
+    - name: p_by_d
+      select: SELECT toDate(created_at) AS d, count() GROUP BY d
   ttl: created_at + INTERVAL 30 DAY
   settings:
     index_granularity: 8192
     storage_policy: "'hot'"
 `)
 	want := pipeline.ClickHouseConfig{
-		Engine:   "ReplacingMergeTree(version)",
-		OrderBy:  []string{"tenant_id", "id"},
+		Engine:     "ReplacingMergeTree(version)",
+		OrderBy:    []string{"tenant_id", "id"},
+		PrimaryKey: []string{"tenant_id"},
+		Indexes: []pipeline.ClickHouseIndex{
+			{Name: "idx_id", Expression: "id", Type: "minmax"},
+			{Name: "idx_d", Expression: "toDate(created_at)", Type: "set(100)", Granularity: 4},
+		},
+		Projections: []pipeline.ClickHouseProjection{
+			{Name: "p_by_d", Select: "SELECT toDate(created_at) AS d, count() GROUP BY d"},
+		},
 		TTL:      "created_at + INTERVAL 30 DAY",
 		Settings: map[string]string{"index_granularity": "8192", "storage_policy": "'hot'"},
 	}
@@ -149,6 +193,9 @@ default:
   clickhouse:
     engine: ReplacingMergeTree(version)
     order_by: [tenant_id, id]
+    primary_key: [tenant_id]
+    indexes: [{name: idx_id, expression: id, type: minmax}]
+    projections: [{name: p_by_d, select: "SELECT d, count() GROUP BY d"}]
     ttl: created_at + INTERVAL 30 DAY
     settings:
       index_granularity: 8192
@@ -158,8 +205,15 @@ default:
 	require.NotNil(t, p.DefaultValues)
 	defaults := p.DefaultValues.ClickHouse
 	assert.Equal(t, pipeline.ClickHouseConfig{
-		Engine:   "ReplacingMergeTree(version)",
-		OrderBy:  []string{"tenant_id", "id"},
+		Engine:     "ReplacingMergeTree(version)",
+		OrderBy:    []string{"tenant_id", "id"},
+		PrimaryKey: []string{"tenant_id"},
+		Indexes: []pipeline.ClickHouseIndex{
+			{Name: "idx_id", Expression: "id", Type: "minmax"},
+		},
+		Projections: []pipeline.ClickHouseProjection{
+			{Name: "p_by_d", Select: "SELECT d, count() GROUP BY d"},
+		},
 		TTL:      "created_at + INTERVAL 30 DAY",
 		Settings: map[string]string{"index_granularity": "8192", "storage_policy": "'hot'"},
 	}, defaults)
@@ -175,16 +229,25 @@ default:
 	assert.Equal(t, "toYYYYMM(created_at)", first.Materialization.PartitionBy)
 
 	first.ClickHouse.OrderBy[0] = "other_id"
+	first.ClickHouse.PrimaryKey[0] = "other_id"
+	first.ClickHouse.Indexes[0].Expression = "other_id"
+	first.ClickHouse.Projections[0].Select = "SELECT other_id"
 	first.ClickHouse.Settings["index_granularity"] = "4096"
 	assert.Equal(t, "tenant_id", defaults.OrderBy[0])
+	assert.Equal(t, "tenant_id", defaults.PrimaryKey[0])
+	assert.Equal(t, "id", defaults.Indexes[0].Expression)
+	assert.Equal(t, "SELECT d, count() GROUP BY d", defaults.Projections[0].Select)
 	assert.Equal(t, "8192", defaults.Settings["index_granularity"])
 	assert.Equal(t, defaults, second.ClickHouse)
 
 	partial, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{
 		ClickHouse: pipeline.ClickHouseConfig{
-			Engine:   "SummingMergeTree()",
-			OrderBy:  []string{},
-			Settings: map[string]string{},
+			Engine:      "SummingMergeTree()",
+			OrderBy:     []string{},
+			PrimaryKey:  []string{},
+			Indexes:     []pipeline.ClickHouseIndex{},
+			Projections: []pipeline.ClickHouseProjection{},
+			Settings:    map[string]string{},
 		},
 	}, &p)
 	require.NoError(t, err)
@@ -194,9 +257,16 @@ default:
 
 	overridden, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{
 		ClickHouse: pipeline.ClickHouseConfig{
-			Engine:  "SummingMergeTree()",
-			OrderBy: []string{"id"},
-			TTL:     "created_at + INTERVAL 7 DAY",
+			Engine:     "SummingMergeTree()",
+			OrderBy:    []string{"id"},
+			PrimaryKey: []string{"id"},
+			Indexes: []pipeline.ClickHouseIndex{
+				{Name: "idx_d", Expression: "d", Type: "minmax", Granularity: 8},
+			},
+			Projections: []pipeline.ClickHouseProjection{
+				{Name: "p_by_id", Select: "SELECT id, count() GROUP BY id"},
+			},
+			TTL: "created_at + INTERVAL 7 DAY",
 			Settings: map[string]string{
 				"index_granularity":              "2048",
 				"enable_mixed_granularity_parts": "1",
@@ -205,9 +275,16 @@ default:
 	}, &p)
 	require.NoError(t, err)
 	assert.Equal(t, pipeline.ClickHouseConfig{
-		Engine:  "SummingMergeTree()",
-		OrderBy: []string{"id"},
-		TTL:     "created_at + INTERVAL 7 DAY",
+		Engine:     "SummingMergeTree()",
+		OrderBy:    []string{"id"},
+		PrimaryKey: []string{"id"},
+		Indexes: []pipeline.ClickHouseIndex{
+			{Name: "idx_d", Expression: "d", Type: "minmax", Granularity: 8},
+		},
+		Projections: []pipeline.ClickHouseProjection{
+			{Name: "p_by_id", Select: "SELECT id, count() GROUP BY id"},
+		},
+		TTL: "created_at + INTERVAL 7 DAY",
 		Settings: map[string]string{
 			"index_granularity":              "2048",
 			"storage_policy":                 "'hot'",
@@ -216,6 +293,9 @@ default:
 	}, overridden.ClickHouse)
 	assert.Equal(t, "8192", defaults.Settings["index_granularity"])
 	assert.NotContains(t, defaults.Settings, "enable_mixed_granularity_parts")
+	assert.Equal(t, "tenant_id", defaults.PrimaryKey[0])
+	assert.Equal(t, "idx_id", defaults.Indexes[0].Name)
+	assert.Equal(t, "p_by_d", defaults.Projections[0].Name)
 }
 
 func TestPipelineClickHouseDefaultsOnlyApplyToNativeTables(t *testing.T) {
@@ -290,8 +370,15 @@ func TestPipelineClickHouseDefaultsOnlyApplyToNativeTables(t *testing.T) {
 						Type:            string(tt.defaultType),
 						Materialization: pipeline.Materialization{Type: tt.defaultMaterialization},
 						ClickHouse: pipeline.ClickHouseConfig{
-							Engine:   "ReplacingMergeTree(version)",
-							OrderBy:  []string{"id"},
+							Engine:     "ReplacingMergeTree(version)",
+							OrderBy:    []string{"id"},
+							PrimaryKey: []string{"id"},
+							Indexes: []pipeline.ClickHouseIndex{
+								{Name: "idx_id", Expression: "id", Type: "minmax"},
+							},
+							Projections: []pipeline.ClickHouseProjection{
+								{Name: "p_by_id", Select: "SELECT id, count() GROUP BY id"},
+							},
 							TTL:      "created_at + INTERVAL 30 DAY",
 							Settings: map[string]string{"index_granularity": "8192"},
 						},

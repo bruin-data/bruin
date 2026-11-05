@@ -1280,10 +1280,25 @@ func (b BigQueryConfig) IsZero() bool {
 }
 
 type ClickHouseConfig struct {
-	Engine   string            `json:"engine,omitempty" yaml:"engine,omitempty" mapstructure:"engine"`
-	OrderBy  []string          `json:"order_by,omitempty" yaml:"order_by,omitempty" mapstructure:"order_by"`
-	TTL      string            `json:"ttl,omitempty" yaml:"ttl,omitempty" mapstructure:"ttl"`
-	Settings map[string]string `json:"settings,omitempty" yaml:"settings,omitempty" mapstructure:"settings"`
+	Engine      string                 `json:"engine,omitempty" yaml:"engine,omitempty" mapstructure:"engine"`
+	OrderBy     []string               `json:"order_by,omitempty" yaml:"order_by,omitempty" mapstructure:"order_by"`
+	PrimaryKey  []string               `json:"primary_key,omitempty" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
+	Indexes     []ClickHouseIndex      `json:"indexes,omitempty" yaml:"indexes,omitempty" mapstructure:"indexes"`
+	Projections []ClickHouseProjection `json:"projections,omitempty" yaml:"projections,omitempty" mapstructure:"projections"`
+	TTL         string                 `json:"ttl,omitempty" yaml:"ttl,omitempty" mapstructure:"ttl"`
+	Settings    map[string]string      `json:"settings,omitempty" yaml:"settings,omitempty" mapstructure:"settings"`
+}
+
+type ClickHouseIndex struct {
+	Name        string `json:"name" yaml:"name" mapstructure:"name"`
+	Expression  string `json:"expression" yaml:"expression" mapstructure:"expression"`
+	Type        string `json:"type" yaml:"type" mapstructure:"type"`
+	Granularity int    `json:"granularity,omitempty" yaml:"granularity,omitempty" mapstructure:"granularity"`
+}
+
+type ClickHouseProjection struct {
+	Name   string `json:"name" yaml:"name" mapstructure:"name"`
+	Select string `json:"select" yaml:"select" mapstructure:"select"`
 }
 
 func (c ClickHouseConfig) MarshalJSON() ([]byte, error) {
@@ -1296,7 +1311,7 @@ func (c ClickHouseConfig) MarshalJSON() ([]byte, error) {
 }
 
 func (c ClickHouseConfig) IsZero() bool {
-	return c.Engine == "" && len(c.OrderBy) == 0 && c.TTL == "" && len(c.Settings) == 0
+	return c.Engine == "" && len(c.OrderBy) == 0 && len(c.PrimaryKey) == 0 && len(c.Indexes) == 0 && len(c.Projections) == 0 && c.TTL == "" && len(c.Settings) == 0
 }
 
 type DorisConfig struct {
@@ -3540,6 +3555,15 @@ func mergeClickHouseDefaults(target *ClickHouseConfig, defaults ClickHouseConfig
 	applyStringDefault(&target.TTL, defaults.TTL)
 	if len(target.OrderBy) == 0 && len(defaults.OrderBy) > 0 {
 		target.OrderBy = append([]string(nil), defaults.OrderBy...)
+	}
+	if len(target.PrimaryKey) == 0 && len(defaults.PrimaryKey) > 0 {
+		target.PrimaryKey = append([]string(nil), defaults.PrimaryKey...)
+	}
+	if len(target.Indexes) == 0 && len(defaults.Indexes) > 0 {
+		target.Indexes = append([]ClickHouseIndex(nil), defaults.Indexes...)
+	}
+	if len(target.Projections) == 0 && len(defaults.Projections) > 0 {
+		target.Projections = append([]ClickHouseProjection(nil), defaults.Projections...)
 	}
 	if len(defaults.Settings) > 0 {
 		if target.Settings == nil {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -1544,6 +1545,9 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	}{
 		{"engine", asset.ClickHouse.Engine != ""},
 		{"order_by", len(asset.ClickHouse.OrderBy) > 0},
+		{"primary_key", len(asset.ClickHouse.PrimaryKey) > 0},
+		{"indexes", len(asset.ClickHouse.Indexes) > 0},
+		{"projections", len(asset.ClickHouse.Projections) > 0},
 		{"ttl", asset.ClickHouse.TTL != ""},
 		{"settings", len(asset.ClickHouse.Settings) > 0},
 	} {
@@ -1560,6 +1564,12 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 				Task:        asset,
 				Description: fmt.Sprintf("ClickHouse option 'clickhouse.%s' is not supported for views", option.name),
 			})
+		}
+	}
+
+	if asset.Type == pipeline.AssetTypeClickHouse && asset.Materialization.Type == pipeline.MaterializationTypeTable {
+		if err := clickhouse.ValidateTableOptions(asset); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
 		}
 	}
 

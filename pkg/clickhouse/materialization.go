@@ -170,6 +170,25 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 	}
 
 	query = strings.TrimSuffix(query, ";")
+	if declarations := tableDeclarations(task); len(declarations) > 0 {
+		if isReplicatedMergeTree(task.ClickHouse.Engine) && strings.Contains(task.ClickHouse.Engine, "{table}") {
+			return nil, errors.New("ClickHouse table replacement with indexes or projections cannot use a Replicated*MergeTree path containing {table}; use a {uuid} path or configure the connection's cluster")
+		}
+		stage := "__bruin_tmp_" + helpers.PrefixGenerator() + "_replacement"
+		if database, _, qualified := strings.Cut(task.Name, "."); qualified {
+			stage = database + "." + stage
+		}
+		// Build and load the replacement before publishing it. A declaration-only
+		// column list prevents ClickHouse from inferring the SELECT's schema.
+		return []string{
+			fmt.Sprintf("CREATE TABLE %s %s EMPTY AS %s", stage, strings.Join(clauses, " "), query),
+			addTableDeclarations(stage, "", declarations),
+			fmt.Sprintf("INSERT INTO %s %s", stage, query),
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS %s", task.Name, stage),
+			fmt.Sprintf("EXCHANGE TABLES %s AND %s", task.Name, stage),
+			"DROP TABLE IF EXISTS " + stage,
+		}, nil
+	}
 
 	return []string{
 		fmt.Sprintf(
@@ -325,28 +344,76 @@ func buildSCD2Query(asset *pipeline.Asset, query string) ([]string, error) {
 		"WHERE " + targetMissing + " OR (" + changeCondition + ")"
 	// Materialize both sides of each replacement before deleting anything.
 	// Already expired versions are never selected or rewritten.
-	return []string{
+	queries := []string{
 		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", sourceTable, keys, source),
-		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s %s EMPTY AS SELECT * FROM %s", asset.Name, strings.Join(clauses, " "), sourceTable),
+	}
+	schemaTable := stage + "_schema"
+	declarations := tableDeclarations(asset)
+	if len(declarations) > 0 {
+		// Copy a schema template so first-run creation includes declarations
+		// without altering an existing target or its incremental staging tables.
+		queries = append(
+			queries,
+			fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() ORDER BY tuple() EMPTY AS SELECT * FROM %s", schemaTable, sourceTable),
+			addTableDeclarations(schemaTable, "", declarations),
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS %s %s", asset.Name, schemaTable, strings.Join(clauses, " ")),
+		)
+	} else {
+		queries = append(queries, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s %s EMPTY AS SELECT * FROM %s", asset.Name, strings.Join(clauses, " "), sourceTable))
+	}
+	queries = append(
+		queries,
 		fmt.Sprintf("CREATE TABLE %s ENGINE = MergeTree() PRIMARY KEY (%s) AS %s", changesTable, keys, changes),
 		fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s LIMIT 0", asset.Name, allColumns, allColumns, changesTable),
 		fmt.Sprintf("DELETE FROM %s WHERE _is_current = TRUE AND %s IN (SELECT %s FROM %s)", asset.Name, deleteKeys, keys, changesTable),
 		// A rerun after DELETE must not lose replacement rows to block deduplication.
 		fmt.Sprintf("INSERT INTO %s (%s) SETTINGS insert_deduplicate = 0 SELECT %s FROM %s", asset.Name, allColumns, allColumns, changesTable),
-		"DROP TABLE IF EXISTS " + changesTable,
-		"DROP TABLE IF EXISTS " + sourceTable,
-	}, nil
+		"DROP TABLE IF EXISTS "+changesTable,
+		"DROP TABLE IF EXISTS "+sourceTable,
+	)
+	if len(declarations) > 0 {
+		queries = append(queries, "DROP TABLE IF EXISTS "+schemaTable)
+	}
+	return queries, nil
 }
 
 func createReplaceTableClauses(task *pipeline.Asset) ([]string, error) {
-	if len(task.Columns) == 0 && len(sortingKey(task)) == 0 && task.ClickHouse.Engine == "" {
+	if len(task.Columns) == 0 && len(task.ClickHouse.PrimaryKey) == 0 && len(sortingKey(task)) == 0 && task.ClickHouse.Engine == "" {
 		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
 	}
-	primaryKeys := task.ColumnNamesWithPrimaryKey()
+	primaryKeys := tablePrimaryKey(task)
 	if len(primaryKeys) == 0 && len(sortingKey(task)) == 0 && task.ClickHouse.Engine == "" {
 		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", task.Materialization.Strategy)
 	}
 	return tableDefinitionClauses(task)
+}
+
+// tablePrimaryKey resolves the physical index independently of the column keys
+// used to match rows by incremental strategies.
+func tablePrimaryKey(asset *pipeline.Asset) []string {
+	if len(asset.ClickHouse.PrimaryKey) > 0 {
+		return asset.ClickHouse.PrimaryKey
+	}
+	return asset.ColumnNamesWithPrimaryKey()
+}
+
+func tableDeclarations(asset *pipeline.Asset) []string {
+	declarations := make([]string, 0, len(asset.ClickHouse.Indexes)+len(asset.ClickHouse.Projections))
+	for _, index := range asset.ClickHouse.Indexes {
+		declaration := fmt.Sprintf("INDEX %s %s TYPE %s", index.Name, index.Expression, index.Type)
+		if index.Granularity > 0 {
+			declaration += fmt.Sprintf(" GRANULARITY %d", index.Granularity)
+		}
+		declarations = append(declarations, declaration)
+	}
+	for _, projection := range asset.ClickHouse.Projections {
+		declarations = append(declarations, fmt.Sprintf("PROJECTION %s (%s)", projection.Name, projection.Select))
+	}
+	return declarations
+}
+
+func addTableDeclarations(table, clusterClause string, declarations []string) string {
+	return fmt.Sprintf("ALTER TABLE %s%s ADD %s", table, clusterClause, strings.Join(declarations, ", ADD "))
 }
 
 // sortingKey resolves the target's ClickHouse sorting key. A ClickHouse
@@ -372,16 +439,12 @@ func sortingKeyField(asset *pipeline.Asset) string {
 // tableDefinitionClauses is shared by the strategies that create the target
 // table. Temporary staging tables use their own MergeTree definition.
 func tableDefinitionClauses(asset *pipeline.Asset) ([]string, error) {
-	options := asset.ClickHouse
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	orderBy := sortingKey(asset)
-	if len(orderBy) > 0 {
-		for i, key := range primaryKeys {
-			if i >= len(orderBy) || unquoteKey(key) != unquoteKey(orderBy[i]) {
-				return nil, fmt.Errorf("ClickHouse primary key columns must be a prefix of %s", sortingKeyField(asset))
-			}
-		}
+	if err := ValidateTableOptions(asset); err != nil {
+		return nil, err
 	}
+	options := asset.ClickHouse
+	primaryKeys := tablePrimaryKey(asset)
+	orderBy := sortingKey(asset)
 
 	var clauses []string
 	if options.Engine != "" {
@@ -478,6 +541,7 @@ func buildDDLQueryForCluster(asset *pipeline.Asset, clusterClause string) ([]str
 		}
 		columnDefs = append(columnDefs, def)
 	}
+	columnDefs = append(columnDefs, tableDeclarations(asset)...)
 
 	clauses, err := tableDefinitionClauses(asset)
 	if err != nil {
@@ -516,7 +580,7 @@ func buildClusterQuery(asset *pipeline.Asset, query string, strategy pipeline.Ma
 		if !isReplicatedMergeTree(asset.ClickHouse.Engine) {
 			return nil, errors.New("ClickHouse cluster table replacement requires an explicit Replicated*MergeTree engine in clickhouse.engine, including Keeper arguments or configured server defaults")
 		}
-		if len(asset.ColumnNamesWithPrimaryKey()) == 0 && len(sortingKey(asset)) == 0 {
+		if len(tablePrimaryKey(asset)) == 0 && len(sortingKey(asset)) == 0 {
 			return nil, errors.New("ClickHouse cluster table replacement requires primary_key columns, clickhouse.order_by or materialization.cluster_by for the replicated engine")
 		}
 		clauses, err := createReplaceTableClauses(asset)
@@ -525,11 +589,14 @@ func buildClusterQuery(asset *pipeline.Asset, query string, strategy pipeline.Ma
 		}
 		// SYNC releases the old replica's Keeper path before it is reused.
 		// EMPTY keeps the SELECT from inserting once per cluster member.
-		return []string{
+		queries := []string{
 			fmt.Sprintf("DROP TABLE IF EXISTS %s%s SYNC", asset.Name, clusterClause),
 			fmt.Sprintf("CREATE TABLE %s%s %s EMPTY AS %s", asset.Name, clusterClause, strings.Join(clauses, " "), query),
-			fmt.Sprintf("INSERT INTO %s %s", asset.Name, query),
-		}, nil
+		}
+		if declarations := tableDeclarations(asset); len(declarations) > 0 {
+			queries = append(queries, addTableDeclarations(asset.Name, clusterClause, declarations))
+		}
+		return append(queries, fmt.Sprintf("INSERT INTO %s %s", asset.Name, query)), nil
 	case pipeline.MaterializationStrategyDDL:
 		if strings.TrimSpace(asset.ClickHouse.Engine) == "" {
 			return nil, errors.New("ClickHouse cluster ddl requires an explicit clickhouse.engine")
