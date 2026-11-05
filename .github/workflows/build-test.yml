@@ -135,7 +135,7 @@ jobs:
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [verify-ingestr]
-    runs-on: depot-ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     name: Docker Build
     permissions:
       # allow issuing OIDC tokens for this workflow run

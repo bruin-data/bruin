@@ -415,7 +415,7 @@ func TestInstallDuckDBDriversCommand(t *testing.T) {
 			called = true
 			return nil
 		})
-		require.NoError(t, cmd.Run(t.Context(), []string{"install-duckdb-drivers"}))
+		require.NoError(t, runCLI(t.Context(), cmd, []string{"install-duckdb-drivers"}))
 		require.True(t, called)
 	})
 
@@ -425,7 +425,7 @@ func TestInstallDuckDBDriversCommand(t *testing.T) {
 			return errors.New("download failed")
 		})
 		cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
-		err := cmd.Run(t.Context(), []string{"install-duckdb-drivers"})
+		err := runCLI(t.Context(), cmd, []string{"install-duckdb-drivers"})
 		var exitErr cli.ExitCoder
 		require.ErrorAs(t, err, &exitErr)
 		require.Equal(t, 1, exitErr.ExitCode())
