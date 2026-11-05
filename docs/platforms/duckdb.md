@@ -22,6 +22,32 @@ Bruin supports using a local DuckDB database.
 > [!WARNING]
 > Only one process can open a DuckDB file for writing. Other processes must not open that file while Bruin holds it. Multiple processes can share a file only when all open it read-only.
 
+### Resource limits
+
+DuckDB uses 80% of the machine's RAM and all CPU cores by default. On shared machines and containers with a memory limit, this can get the process killed for running out of memory. You can cap the resources DuckDB uses on the connection:
+
+```yaml
+    connections:
+      duckdb:
+        - name: "connection_name"
+          path: "/path/to/your/duckdb/database.db"
+          memory_limit: "4GB"
+          threads: 4
+          temp_directory: "/tmp/duckdb_spill"
+          max_temp_directory_size: "50GB"
+          preserve_insertion_order: false
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `memory_limit` | string | No | 80% of RAM | Maximum memory DuckDB can use, such as `4GB` or `512MiB`. Larger operations spill to disk |
+| `threads` | integer | No | Number of CPU cores | Number of threads DuckDB uses to run queries. Fewer threads also use less memory |
+| `temp_directory` | string | No | `<path>.tmp` | Directory where DuckDB spills data that does not fit in memory |
+| `max_temp_directory_size` | string | No | 90% of free disk space | Maximum size of the spilled data in `temp_directory`, such as `50GB` |
+| `preserve_insertion_order` | boolean | No | `true` | Set to `false` to let DuckDB reorder rows when there is no `ORDER BY`, which uses much less memory when loading or exporting large data |
+
+Bruin passes these to DuckDB as [configuration options](https://duckdb.org/docs/stable/configuration/overview) when it opens the database, and DuckDB rejects invalid values when the first query runs. The limits apply to SQL assets, quality checks and `bruin query`. Ingestr assets and Python assets run in their own processes and do not use them. See DuckDB's [memory management guide](https://duckdb.org/docs/stable/guides/troubleshooting/oom_errors) for how to choose values.
+
 ### Concurrency and connection lifetime
 
 During `bruin run`, SQL assets and quality checks share a DuckDB database instance for the same connection configuration. Lakehouse extensions, secrets, and catalog attachments are initialized once, rather than for each statement. Workers use separate sessions on that instance, allowing checks and independent SQL work to run concurrently without a process-wide write lock. You do not need `read_only: true` to run checks concurrently.

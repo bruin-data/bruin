@@ -7,8 +7,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -256,6 +258,12 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 	var drv drivermgr.Driver
 	adb, err := drv.NewDatabase(opts)
 	if err != nil {
+		// DuckDB does not say which option it rejected, so name the user-provided ones.
+		if cfg, ok := e.config.(Config); ok {
+			if names := slices.Sorted(maps.Keys(cfg.resourceOptions())); len(names) > 0 {
+				return nil, nil, fmt.Errorf("failed to create ADBC database, check the values of %s: %w", strings.Join(names, ", "), err)
+			}
+		}
 		return nil, nil, fmt.Errorf("failed to create ADBC database: %w", err)
 	}
 
@@ -978,8 +986,11 @@ func (e *EphemeralConnection) databaseOptions() map[string]string {
 		"path":   e.config.ToDBConnectionURI(),
 	}
 
-	if cfg, ok := e.config.(Config); ok && cfg.ReadOnly {
-		opts["access_mode"] = "read_only"
+	if cfg, ok := e.config.(Config); ok {
+		if cfg.ReadOnly {
+			opts["access_mode"] = "read_only"
+		}
+		maps.Copy(opts, cfg.resourceOptions())
 	}
 
 	if isReadOnlyMotherDuck(e.config) {

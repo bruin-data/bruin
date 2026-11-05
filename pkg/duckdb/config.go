@@ -33,6 +33,34 @@ type Config struct {
 	Port       int
 	Token      string
 	DisableSSL bool
+
+	MemoryLimit            string
+	Threads                int
+	TempDirectory          string
+	MaxTempDirectorySize   string
+	PreserveInsertionOrder *bool
+}
+
+// resourceOptions returns the DuckDB configuration options for the configured
+// resource limits, so they apply from the moment the database opens.
+func (c Config) resourceOptions() map[string]string {
+	opts := map[string]string{}
+	if c.MemoryLimit != "" {
+		opts["memory_limit"] = c.MemoryLimit
+	}
+	if c.Threads > 0 {
+		opts["threads"] = strconv.Itoa(c.Threads)
+	}
+	if c.TempDirectory != "" {
+		opts["temp_directory"] = c.TempDirectory
+	}
+	if c.MaxTempDirectorySize != "" {
+		opts["max_temp_directory_size"] = c.MaxTempDirectorySize
+	}
+	if c.PreserveInsertionOrder != nil {
+		opts["preserve_insertion_order"] = strconv.FormatBool(*c.PreserveInsertionOrder)
+	}
+	return opts
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
