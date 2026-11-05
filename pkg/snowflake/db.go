@@ -382,6 +382,9 @@ func (db *DB) isValidOnce(ctx context.Context, query *query.Query, requestID *go
 	}
 
 	if err := db.initializeDB(ctx); err != nil {
+		if isMissingDatabaseError(err) {
+			return false, db.missingDatabaseError()
+		}
 		return false, err
 	}
 
@@ -417,6 +420,25 @@ func (db *DB) isValidOnce(ctx context.Context, query *query.Query, requestID *go
 	}
 
 	return err == nil, err
+}
+
+// isMissingDatabaseError reports whether Snowflake rejected the login because the
+// connection's database does not exist. The same error code is used for missing
+// warehouses, schemas and roles, so the message is checked as well.
+func isMissingDatabaseError(err error) bool {
+	var sfErr *gosnowflake.SnowflakeError
+	return stderrors.As(err, &sfErr) &&
+		sfErr.Number == gosnowflake.ErrObjectNotExistOrAuthorized &&
+		strings.Contains(strings.ToLower(sfErr.Message), "database")
+}
+
+func (db *DB) missingDatabaseError() error {
+	database := "configured in the connection"
+	if db.config != nil && db.config.Database != "" {
+		database = fmt.Sprintf("'%s'", db.config.Database)
+	}
+
+	return fmt.Errorf("database %s does not exist or is not accessible, create it first or use 'bruin validate --fast' to skip query validation", database)
 }
 
 func (db *DB) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {

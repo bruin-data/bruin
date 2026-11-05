@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,6 +93,51 @@ func TestDB_IsValid(t *testing.T) {
 
 			require.Equal(t, tt.want, got)
 			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_IsValidMissingDatabase(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		config       *Config
+		connectErr   error
+		errorMessage string
+	}{
+		{
+			name:   "missing database gets a clear message",
+			config: &Config{Database: "SHOP"},
+			connectErr: fmt.Errorf("failed to connect to snowflake: %w", &gosnowflake.SnowflakeError{
+				Number:  gosnowflake.ErrObjectNotExistOrAuthorized,
+				Message: "The requested database does not exist or not authorized.",
+			}),
+			errorMessage: "database 'SHOP' does not exist or is not accessible, create it first or use 'bruin validate --fast' to skip query validation",
+		},
+		{
+			name: "missing warehouse is propagated as is",
+			connectErr: &gosnowflake.SnowflakeError{
+				Number:  gosnowflake.ErrObjectNotExistOrAuthorized,
+				Message: "The requested warehouse does not exist or not authorized.",
+			},
+			errorMessage: "390201: The requested warehouse does not exist or not authorized.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := DB{
+				config: tt.config,
+				connect: func(_ context.Context) (*sqlx.DB, error) {
+					return nil, tt.connectErr
+				},
+			}
+
+			got, err := db.IsValid(t.Context(), &query.Query{Query: "SELECT 1"})
+			require.False(t, got)
+			require.ErrorContains(t, err, tt.errorMessage)
 		})
 	}
 }
