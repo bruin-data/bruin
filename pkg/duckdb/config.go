@@ -48,7 +48,7 @@ func (c Config) resourceOptions() map[string]string {
 	if c.MemoryLimit != "" {
 		opts["memory_limit"] = c.MemoryLimit
 	}
-	if c.Threads > 0 {
+	if c.Threads != 0 {
 		opts["threads"] = strconv.Itoa(c.Threads)
 	}
 	if c.TempDirectory != "" {

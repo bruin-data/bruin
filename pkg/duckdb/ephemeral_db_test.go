@@ -469,10 +469,16 @@ func TestResourceLimitsApplyToDatabase(t *testing.T) {
 	require.Equal(t, "2.0 GiB", maxTempSize)
 	require.Equal(t, "false", preserve)
 
-	invalid, err := NewEphemeralConnection(Config{Path: ":memory:", MemoryLimit: "lots"})
-	require.NoError(t, err)
-	_, err = invalid.ExecContext(t.Context(), "SELECT 1")
-	require.ErrorContains(t, err, "memory_limit")
+	// Invalid values must fail instead of falling back to DuckDB's defaults.
+	for _, cfg := range []Config{
+		{Path: ":memory:", MemoryLimit: "lots"},
+		{Path: ":memory:", Threads: -1},
+	} {
+		invalid, err := NewEphemeralConnection(cfg)
+		require.NoError(t, err)
+		_, err = invalid.ExecContext(t.Context(), "SELECT 1")
+		require.ErrorContains(t, err, "check the values of")
+	}
 }
 
 func TestConnectionReuseCatalogPolicy(t *testing.T) {
