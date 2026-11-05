@@ -6,7 +6,7 @@ on:
 jobs:
   bump_version:
     name: Bump Version
-    runs-on: depot-ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
         with:

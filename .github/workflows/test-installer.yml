@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   test-install-unix:
-    runs-on: depot-ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Use install script
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d

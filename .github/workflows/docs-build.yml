@@ -24,7 +24,7 @@ on:
 jobs:
   docs-build:
     name: Build Documentation
-    runs-on: depot-ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
 
     steps:
 
