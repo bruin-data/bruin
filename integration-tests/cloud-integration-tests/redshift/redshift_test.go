@@ -384,6 +384,34 @@ func TestRedshiftWorkflows(t *testing.T) {
 						},
 					},
 					{
+						Name:    "scd2-by-time: run again without source changes",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "scd2-by-time: query the table after the rerun, expect no new versions",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
 						Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
 						Command: binary,
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS test.products;"),

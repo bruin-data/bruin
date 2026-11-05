@@ -703,10 +703,6 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"WHERE NOT EXISTS (\n" +
 				"  SELECT 1 FROM my.asset AS target \n" +
 				"  WHERE target.id = source.id AND target._is_current = TRUE\n" +
-				")\n" +
-				"OR EXISTS (\n" +
-				"  SELECT 1 FROM my.asset AS target\n" +
-				"  WHERE target.id = source.id AND target._is_current = FALSE AND target._valid_until = CAST(source.updated_at AS TIMESTAMP_TZ)\n" +
 				");\n\n" +
 				"COMMIT;",
 		},
@@ -1055,6 +1051,36 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSCD2ByColumnWithIncrementalKeyInsertSkipsOnlyKeysWithCurrentVersion(t *testing.T) {
+	t.Parallel()
+
+	// The final INSERT must check current versions only. Also matching a closed
+	// version whose _valid_until equals the source's incremental_key re-inserted
+	// every changed record as a second current row on each later run (#2770).
+	asset := &pipeline.Asset{
+		Name: "my.asset",
+		Type: pipeline.AssetTypeSnowflakeQuery,
+		Materialization: pipeline.Materialization{
+			Type:           pipeline.MaterializationTypeTable,
+			Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+			IncrementalKey: "ts",
+		},
+		Columns: []pipeline.Column{
+			{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+			{Name: "name", Type: "VARCHAR"},
+			{Name: "ts", Type: "TIMESTAMP"},
+		},
+	}
+
+	render, err := NewMaterializer(false).Render(asset, "SELECT id, name, ts from source_table")
+	require.NoError(t, err)
+
+	_, insert, found := strings.Cut(render, "INSERT INTO")
+	require.True(t, found, "no INSERT in:\n%s", render)
+	assert.Contains(t, insert, "target._is_current = TRUE")
+	assert.NotContains(t, insert, "target._is_current = FALSE")
 }
 
 func intp(i int) *int { return &i }

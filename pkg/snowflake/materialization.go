@@ -303,10 +303,6 @@ FROM (%s) AS source
 WHERE NOT EXISTS (
   SELECT 1 FROM %s AS target 
   WHERE %s AND target._is_current = TRUE
-)
-OR EXISTS (
-  SELECT 1 FROM %s AS target
-  WHERE %s AND target._is_current = FALSE AND target._valid_until = CAST(source.%s AS TIMESTAMP_TZ)
 );
 
 COMMIT;`,
@@ -326,9 +322,6 @@ COMMIT;`,
 			strings.TrimSpace(query),
 			tbl,
 			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
-			tbl,
-			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
-			incrementalKey,
 		)
 
 		return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(queryStr), nil
