@@ -204,3 +204,28 @@ func TestMaterializer_DeclarationsSCD2FullRefreshCleanup(t *testing.T) {
 		}
 	}
 }
+
+func TestMaterializer_DeclarationsSCD2SettingsWithoutEngine(t *testing.T) {
+	t.Parallel()
+	asset := scd2TestAsset(pipeline.MaterializationStrategySCD2ByColumn)
+	asset.ClickHouse = pipeline.ClickHouseConfig{
+		OrderBy: []string{"id", "_valid_from"},
+		Settings: map[string]string{
+			"lightweight_mutation_projection_mode": "'drop'",
+		},
+		Projections: []pipeline.ClickHouseProjection{{Name: "p_by_id", Select: "SELECT id, count() GROUP BY id"}},
+	}
+	queries, err := NewMaterializer(false).Render(asset, "SELECT id, name, updated_at FROM source")
+	require.NoError(t, err)
+	require.Len(t, queries, 11)
+	assert.Equal(t, "CREATE TABLE IF NOT EXISTS my.history AS my.__bruin_tmp_abcefghi_schema ENGINE = MergeTree() PRIMARY KEY (id) ORDER BY (id, _valid_from) SETTINGS lightweight_mutation_projection_mode = 'drop'", queries[3])
+	queries, err = NewMaterializer(true).Render(asset, "SELECT id, name, updated_at FROM source")
+	require.NoError(t, err)
+	require.Len(t, queries, 6)
+	assert.Contains(t, queries[0], "ENGINE = MergeTree() PRIMARY KEY (id) ORDER BY (id, _valid_from) SETTINGS lightweight_mutation_projection_mode = 'drop' EMPTY AS SELECT")
+	asset.ClickHouse.Projections = nil
+	queries, err = NewMaterializer(false).Render(asset, "SELECT id, name, updated_at FROM source")
+	require.NoError(t, err)
+	assert.Contains(t, queries[1], "ENGINE = MergeTree() PRIMARY KEY (id) ORDER BY (id, _valid_from) SETTINGS lightweight_mutation_projection_mode = 'drop' EMPTY AS SELECT")
+	assert.Empty(t, asset.ClickHouse.Engine)
+}

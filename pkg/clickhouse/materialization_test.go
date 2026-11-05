@@ -560,7 +560,7 @@ func TestMaterializer_TableDefinitionOptions(t *testing.T) {
 			options: pipeline.ClickHouseConfig{Settings: map[string]string{
 				"storage_policy": "'default'", "index_granularity": "4096",
 			}},
-			clauses: []string{"PRIMARY KEY (id)", "SETTINGS index_granularity = 4096, storage_policy = 'default'"},
+			clauses: []string{"ENGINE = MergeTree()", "PRIMARY KEY (id)", "SETTINGS index_granularity = 4096, storage_policy = 'default'"},
 		},
 		{
 			name:        "partitioning without clickhouse block",

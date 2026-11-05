@@ -449,6 +449,10 @@ func tableDefinitionClauses(asset *pipeline.Asset) ([]string, error) {
 	var clauses []string
 	if options.Engine != "" {
 		clauses = append(clauses, "ENGINE = "+options.Engine)
+	} else if len(options.Settings) > 0 {
+		// ClickHouse requires an explicit engine to apply table SETTINGS in
+		// schema copies and to parse SETTINGS before EMPTY AS SELECT.
+		clauses = append(clauses, "ENGINE = MergeTree()")
 	}
 	if asset.Materialization.PartitionBy != "" {
 		clauses = append(clauses, "PARTITION BY ("+asset.Materialization.PartitionBy+")")

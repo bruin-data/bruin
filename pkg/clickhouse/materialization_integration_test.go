@@ -319,20 +319,30 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) {
 	t.Helper()
 
+	var projectionMutationSettings uint64
+	require.NoError(t, conn.QueryRow(
+		t.Context(), "SELECT count() FROM system.merge_tree_settings WHERE name = 'lightweight_mutation_projection_mode'",
+	).Scan(&projectionMutationSettings))
+
 	for _, tc := range []struct {
 		name           string
 		strategy       pipeline.MaterializationStrategy
 		incrementalKey string
 		tableOptions   bool
+		projection     bool
 	}{
-		{"scd2_by_time", pipeline.MaterializationStrategySCD2ByTime, "updated_at", false},
-		{"scd2_by_column", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", false},
-		{"scd2_by_column_without_key", pipeline.MaterializationStrategySCD2ByColumn, "", false},
-		{"scd2_by_column_with_index", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", true},
+		{"scd2_by_time", pipeline.MaterializationStrategySCD2ByTime, "updated_at", false, false},
+		{"scd2_by_column", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", false, false},
+		{"scd2_by_column_without_key", pipeline.MaterializationStrategySCD2ByColumn, "", false, false},
+		{"scd2_by_column_with_index", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", true, false},
+		{"scd2_by_column_with_projection", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", true, true},
 	} {
 		//nolint:paralleltest // Staging subtests share a temporary table name.
 		for _, joinUseNulls := range []int{0, 1} {
 			t.Run(fmt.Sprintf("%s/join_use_nulls=%d", tc.name, joinUseNulls), func(t *testing.T) {
+				if tc.projection && projectionMutationSettings == 0 {
+					t.Skip("ClickHouse server does not support lightweight mutations on projection tables")
+				}
 				ctx := click_house.Context(t.Context(), click_house.WithSettings(click_house.Settings{
 					"join_use_nulls": joinUseNulls,
 				}))
@@ -358,6 +368,23 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 						},
 					}
 				}
+				if tc.projection {
+					asset.ClickHouse.Projections = []pipeline.ClickHouseProjection{
+						{Name: "p_by_current", Select: "SELECT _is_current, count() GROUP BY _is_current"},
+					}
+					asset.ClickHouse.Settings = map[string]string{"lightweight_mutation_projection_mode": "'drop'"}
+				}
+				checkProjections := func() {
+					t.Helper()
+					for _, projection := range asset.ClickHouse.Projections {
+						var projectionParts uint64
+						require.NoError(t, conn.QueryRow(
+							ctx, "SELECT count() FROM system.projection_parts WHERE database = ? AND table = ? AND name = ? AND active AND rows > 0",
+							database, fmt.Sprintf("%s_%d", tc.name, joinUseNulls), projection.Name,
+						).Scan(&projectionParts))
+						assert.Positive(t, projectionParts, "projection must be populated for inserted history rows")
+					}
+				}
 				type sourceRow struct {
 					tenant uint64
 					id     uint64
@@ -373,8 +400,13 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				}
 				run := func(query string, fullRefresh bool) {
 					t.Helper()
-					statements, _, renderErr := NewMaterializer(fullRefresh).RenderWithCleanup(asset, query)
+					statements, cleanup, renderErr := NewMaterializer(fullRefresh).RenderWithCleanup(asset, query)
 					require.NoError(t, renderErr)
+					defer func() {
+						for _, statement := range cleanup {
+							assert.NoError(t, conn.Exec(ctx, statement), statement)
+						}
+					}()
 					for _, statement := range statements {
 						require.NoError(t, conn.Exec(ctx, statement), statement)
 					}
@@ -443,6 +475,7 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				first := read()
 				require.Len(t, first, 4)
 				checkCurrent(first, "1/1/original", "2/1/unchanged", "1/2/<NULL>", "1/3/removed")
+				checkProjections()
 				run(firstQuery, false)
 				assert.Equal(t, first, read(), "unchanged reruns must retain all validity timestamps")
 
@@ -461,6 +494,7 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				second := read()
 				require.Len(t, second, 7)
 				checkCurrent(second, "1/1/<NULL>", "2/1/unchanged", "1/2/changed", "1/4/new")
+				checkProjections()
 				assert.Equal(t, first["2/1/unchanged"], second["2/1/unchanged"])
 				for old, next := range map[string]string{"1/1/original": "1/1/<NULL>", "1/2/<NULL>": "1/2/changed"} {
 					assert.Equal(t, first[old].validFrom, second[old].validFrom)
@@ -503,6 +537,7 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				refreshed := read()
 				require.Len(t, refreshed, 4)
 				checkCurrent(refreshed, "1/1/latest", "2/1/unchanged", "1/2/changed", "1/3/returned")
+				checkProjections()
 			})
 		}
 	}
