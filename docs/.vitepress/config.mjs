@@ -6,6 +6,7 @@ import {fileURLToPath} from 'url';
 
 
 import { withMermaid } from "vitepress-plugin-mermaid";
+import {organization, website} from "./schema.mjs";
 
 // Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             "noscript",
             {},
             `<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K2L7S5FP" height="0" width="0" style="display:none;visibility:hidden"></iframe>`,
+        ],
+        [
+            "script",
+            {type: "application/ld+json"},
+            JSON.stringify(organization),
+        ],
+        [
+            "script",
+            {type: "application/ld+json"},
+            JSON.stringify(website),
         ],
     ],
     transformPageData(pageData) {
