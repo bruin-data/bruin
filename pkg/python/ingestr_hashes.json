@@ -1,13 +1,1 @@
-{
-  "1.1.82": {
-    "archives": {
-      "ingestr_Darwin_arm64.tar.gz": "f12206d510fb593bb84a774571876925c8ea5009cb4f643b7e9871013d9a4ffc",
-      "ingestr_Darwin_x86_64.tar.gz": "33d781a79e32ca417e3eaae56470d1c24b234146d86066ca5bf51c9aa6ec33fd",
-      "ingestr_Linux_arm64.tar.gz": "571a75874b6e338483e6aec4a21ae7e625a395c6021a4857ef0238dec7def4a9",
-      "ingestr_Linux_x86_64.tar.gz": "42a397ee05265927f647c577d1c9dd8abe0b46e2914cb3ca8d05646c9eb4e668",
-      "ingestr_Windows_x86_64.zip": "f779c3a429c0293bcf9fef28c47e5fd3a8058162467c8d724b04dee4f6f0eb72"
-    },
-    "installer_commit": "4af269b2948c919b50da19e26f7db053578163d5",
-    "installer_sha256": "a03cba4a6961c31f122d832e3d402f1151c0bfcfab61bad142037171cb19c3d6"
-  }
-}
+{}
