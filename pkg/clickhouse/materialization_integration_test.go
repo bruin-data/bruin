@@ -75,11 +75,24 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 			"storage_policy":          "'default'",
 		},
 	}
+	indexAndProjectionOptions := pipeline.ClickHouseConfig{
+		Engine:     "MergeTree",
+		OrderBy:    []string{"id", "event_time"},
+		PrimaryKey: []string{"id"},
+		Indexes: []pipeline.ClickHouseIndex{
+			{Name: "idx_id", Expression: "id", Type: "minmax"},
+			{Name: "idx_amount", Expression: "amount + version", Type: "minmax", Granularity: 2},
+		},
+		Projections: []pipeline.ClickHouseProjection{
+			{Name: "p_by_time", Select: "SELECT event_time, count() GROUP BY event_time"},
+		},
+	}
 	cases := []struct {
 		name          string
 		options       pipeline.ClickHouseConfig
 		partitionBy   string
 		primaryKey    bool
+		inferColumns  bool
 		engine        string
 		sortingKey    string
 		primaryKeySQL string
@@ -111,6 +124,21 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 			name: "memory_without_keys", options: pipeline.ClickHouseConfig{Engine: "Memory()"},
 			engine: "Memory",
 		},
+		{
+			name: "independent_primary_key", primaryKey: true,
+			options: pipeline.ClickHouseConfig{
+				OrderBy: []string{"event_time", "id"}, PrimaryKey: []string{"event_time"},
+			},
+			engine: "MergeTree", sortingKey: "event_time, id", primaryKeySQL: "event_time",
+		},
+		{
+			name: "indexes_and_projections", options: indexAndProjectionOptions, primaryKey: true,
+			engine: "MergeTree", sortingKey: "id, event_time", primaryKeySQL: "id",
+		},
+		{
+			name: "indexes_and_projections_inferred_columns", options: indexAndProjectionOptions, inferColumns: true,
+			engine: "MergeTree", sortingKey: "id, event_time", primaryKeySQL: "id",
+		},
 	}
 	for _, strategy := range []struct {
 		name        string
@@ -123,6 +151,9 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 		{name: "merge_full_refresh", strategy: pipeline.MaterializationStrategyMerge, fullRefresh: true},
 	} {
 		for _, tc := range cases {
+			if tc.inferColumns && strategy.strategy == pipeline.MaterializationStrategyDDL {
+				continue
+			}
 			t.Run(strategy.name+"/"+tc.name, func(t *testing.T) {
 				table := strategy.name + "_" + tc.name
 				asset := &pipeline.Asset{
@@ -132,6 +163,9 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 						Type: pipeline.MaterializationTypeTable, Strategy: strategy.strategy, PartitionBy: tc.partitionBy,
 					},
 					Columns: columns(tc.primaryKey), ClickHouse: tc.options,
+				}
+				if tc.inferColumns {
+					asset.Columns = nil
 				}
 				queries, renderErr := NewMaterializer(strategy.fullRefresh).Render(asset, query)
 				require.NoError(t, renderErr)
@@ -163,6 +197,31 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 				if tc.options.Engine == "ReplacingMergeTree(version)" {
 					assert.Contains(t, createSQL, "ENGINE = ReplacingMergeTree(version)")
 				}
+				for _, index := range tc.options.Indexes {
+					var expression, indexType string
+					var granularity uint64
+					require.NoError(t, conn.QueryRow(
+						t.Context(),
+						"SELECT expr, type, granularity FROM system.data_skipping_indices WHERE database = ? AND table = ? AND name = ?",
+						database, table, index.Name,
+					).Scan(&expression, &indexType, &granularity))
+					assert.Equal(t, index.Expression, expression)
+					assert.Equal(t, index.Type, indexType)
+					if index.Granularity > 0 {
+						assert.Equal(t, uint64(index.Granularity), granularity)
+					} else {
+						assert.Equal(t, uint64(1), granularity)
+					}
+				}
+				for _, projection := range tc.options.Projections {
+					var projectionCount uint64
+					require.NoError(t, conn.QueryRow(
+						t.Context(),
+						"SELECT count() FROM system.projection_parts WHERE database = ? AND table = ? AND name = ? AND active",
+						database, table, projection.Name,
+					).Scan(&projectionCount))
+					assert.Positive(t, projectionCount, "projection must be populated for inserted rows")
+				}
 				var amount uint64
 				if tc.finalAmount != 0 {
 					require.NoError(t, conn.QueryRow(t.Context(), "SELECT sum(amount) FROM "+asset.Name+" FINAL").Scan(&amount))
@@ -181,6 +240,9 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 		pipeline.MaterializationStrategyMerge,
 	} {
 		t.Run(string(strategy)+"/staging", func(t *testing.T) {
+			stagingOptions := options
+			stagingOptions.Indexes = indexAndProjectionOptions.Indexes
+			stagingOptions.Projections = indexAndProjectionOptions.Projections
 			asset := &pipeline.Asset{
 				Name: database + ".staging_target",
 				Type: pipeline.AssetTypeClickHouse,
@@ -188,7 +250,7 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 					Type: pipeline.MaterializationTypeTable, Strategy: strategy,
 					IncrementalKey: "id", PartitionBy: "toYYYYMM(event_time)",
 				},
-				Columns: columns(true), ClickHouse: options,
+				Columns: columns(true), ClickHouse: stagingOptions,
 			}
 			queries, cleanup, renderErr := NewMaterializer(false).RenderWithCleanup(asset, query)
 			require.NoError(t, renderErr)
@@ -204,11 +266,52 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 			assert.Empty(t, partitionKey)
 			assert.NotContains(t, createSQL, "TTL")
 			assert.NotContains(t, createSQL, "index_granularity = 4096")
+			assert.NotContains(t, createSQL, "INDEX idx_id")
+			assert.NotContains(t, createSQL, "PROJECTION p_by_time")
 			for _, statement := range cleanup {
 				require.NoError(t, conn.Exec(t.Context(), statement))
 			}
 		})
 	}
+
+	t.Run("create_replace/failed_insert", func(t *testing.T) {
+		asset := &pipeline.Asset{
+			Name: database + ".replacement_failure",
+			Type: pipeline.AssetTypeClickHouse,
+			Materialization: pipeline.Materialization{
+				Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyCreateReplace,
+			},
+			ClickHouse: pipeline.ClickHouseConfig{
+				OrderBy: []string{"id"},
+				Indexes: []pipeline.ClickHouseIndex{{Name: "idx_id", Expression: "id", Type: "minmax"}},
+			},
+		}
+		require.NoError(t, conn.Exec(t.Context(), "CREATE TABLE "+asset.Name+" ENGINE=MergeTree ORDER BY id AS SELECT toUInt64(99) AS id, toUInt8(0) AS amount"))
+		queries, cleanup, renderErr := NewMaterializer(false).RenderWithCleanup(
+			asset, "SELECT number AS id, throwIf(number = 0, 'replacement insert failed') AS amount FROM numbers(1)",
+		)
+		require.NoError(t, renderErr)
+		require.NotEmpty(t, cleanup)
+		var insertErr error
+		for _, statement := range queries {
+			if err := conn.Exec(t.Context(), statement); err != nil {
+				require.True(t, strings.HasPrefix(statement, "INSERT INTO "), statement)
+				insertErr = err
+				break
+			}
+		}
+		require.ErrorContains(t, insertErr, "replacement insert failed")
+		for _, statement := range cleanup {
+			require.NoError(t, conn.Exec(t.Context(), statement))
+		}
+		var id, stagingTables uint64
+		require.NoError(t, conn.QueryRow(t.Context(), "SELECT id FROM "+asset.Name).Scan(&id))
+		assert.Equal(t, uint64(99), id, "failed replacement must preserve the target")
+		require.NoError(t, conn.QueryRow(
+			t.Context(), "SELECT count() FROM system.tables WHERE database = ? AND startsWith(name, '__bruin_tmp_')", database,
+		).Scan(&stagingTables))
+		assert.Zero(t, stagingTables)
+	})
 
 	testClickHouseSCD2History(t, conn, database)
 }
@@ -216,18 +319,30 @@ func TestMaterializer_ClickHouseServer(t *testing.T) {
 func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) {
 	t.Helper()
 
+	var projectionMutationSettings uint64
+	require.NoError(t, conn.QueryRow(
+		t.Context(), "SELECT count() FROM system.merge_tree_settings WHERE name = 'lightweight_mutation_projection_mode'",
+	).Scan(&projectionMutationSettings))
+
 	for _, tc := range []struct {
 		name           string
 		strategy       pipeline.MaterializationStrategy
 		incrementalKey string
+		tableOptions   bool
+		projection     bool
 	}{
-		{"scd2_by_time", pipeline.MaterializationStrategySCD2ByTime, "updated_at"},
-		{"scd2_by_column", pipeline.MaterializationStrategySCD2ByColumn, "updated_at"},
-		{"scd2_by_column_without_key", pipeline.MaterializationStrategySCD2ByColumn, ""},
+		{"scd2_by_time", pipeline.MaterializationStrategySCD2ByTime, "updated_at", false, false},
+		{"scd2_by_column", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", false, false},
+		{"scd2_by_column_without_key", pipeline.MaterializationStrategySCD2ByColumn, "", false, false},
+		{"scd2_by_column_with_index", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", true, false},
+		{"scd2_by_column_with_projection", pipeline.MaterializationStrategySCD2ByColumn, "updated_at", true, true},
 	} {
 		//nolint:paralleltest // Staging subtests share a temporary table name.
 		for _, joinUseNulls := range []int{0, 1} {
 			t.Run(fmt.Sprintf("%s/join_use_nulls=%d", tc.name, joinUseNulls), func(t *testing.T) {
+				if tc.projection && projectionMutationSettings == 0 {
+					t.Skip("ClickHouse server does not support lightweight mutations on projection tables")
+				}
 				ctx := click_house.Context(t.Context(), click_house.WithSettings(click_house.Settings{
 					"join_use_nulls": joinUseNulls,
 				}))
@@ -244,6 +359,32 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 						{Name: "updated_at", Type: "DateTime64(6, 'UTC')"},
 					},
 				}
+				if tc.tableOptions {
+					asset.ClickHouse = pipeline.ClickHouseConfig{
+						OrderBy:    []string{"tenant", "id", "_valid_from"},
+						PrimaryKey: []string{"tenant"},
+						Indexes: []pipeline.ClickHouseIndex{
+							{Name: "idx_valid_until", Expression: "_valid_until", Type: "minmax"},
+						},
+					}
+				}
+				if tc.projection {
+					asset.ClickHouse.Projections = []pipeline.ClickHouseProjection{
+						{Name: "p_by_current", Select: "SELECT _is_current, count() GROUP BY _is_current"},
+					}
+					asset.ClickHouse.Settings = map[string]string{"lightweight_mutation_projection_mode": "'drop'"}
+				}
+				checkProjections := func() {
+					t.Helper()
+					for _, projection := range asset.ClickHouse.Projections {
+						var projectionParts uint64
+						require.NoError(t, conn.QueryRow(
+							ctx, "SELECT count() FROM system.projection_parts WHERE database = ? AND table = ? AND name = ? AND active AND rows > 0",
+							database, fmt.Sprintf("%s_%d", tc.name, joinUseNulls), projection.Name,
+						).Scan(&projectionParts))
+						assert.Positive(t, projectionParts, "projection must be populated for inserted history rows")
+					}
+				}
 				type sourceRow struct {
 					tenant uint64
 					id     uint64
@@ -259,8 +400,13 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				}
 				run := func(query string, fullRefresh bool) {
 					t.Helper()
-					statements, _, renderErr := NewMaterializer(fullRefresh).RenderWithCleanup(asset, query)
+					statements, cleanup, renderErr := NewMaterializer(fullRefresh).RenderWithCleanup(asset, query)
 					require.NoError(t, renderErr)
+					defer func() {
+						for _, statement := range cleanup {
+							assert.NoError(t, conn.Exec(ctx, statement), statement)
+						}
+					}()
 					for _, statement := range statements {
 						require.NoError(t, conn.Exec(ctx, statement), statement)
 					}
@@ -317,9 +463,19 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 					{1, 3, "'removed'", firstDate},
 				})
 				run(firstQuery, false)
+				if tc.tableOptions {
+					var primaryKey, createSQL string
+					require.NoError(t, conn.QueryRow(
+						ctx, "SELECT primary_key, create_table_query FROM system.tables WHERE database = ? AND name = ?",
+						database, fmt.Sprintf("%s_%d", tc.name, joinUseNulls),
+					).Scan(&primaryKey, &createSQL))
+					assert.Equal(t, "tenant", primaryKey)
+					assert.Contains(t, createSQL, "INDEX idx_valid_until _valid_until TYPE minmax GRANULARITY 1")
+				}
 				first := read()
 				require.Len(t, first, 4)
 				checkCurrent(first, "1/1/original", "2/1/unchanged", "1/2/<NULL>", "1/3/removed")
+				checkProjections()
 				run(firstQuery, false)
 				assert.Equal(t, first, read(), "unchanged reruns must retain all validity timestamps")
 
@@ -338,6 +494,7 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				second := read()
 				require.Len(t, second, 7)
 				checkCurrent(second, "1/1/<NULL>", "2/1/unchanged", "1/2/changed", "1/4/new")
+				checkProjections()
 				assert.Equal(t, first["2/1/unchanged"], second["2/1/unchanged"])
 				for old, next := range map[string]string{"1/1/original": "1/1/<NULL>", "1/2/<NULL>": "1/2/changed"} {
 					assert.Equal(t, first[old].validFrom, second[old].validFrom)
@@ -380,6 +537,7 @@ func testClickHouseSCD2History(t *testing.T, conn driver.Conn, database string) 
 				refreshed := read()
 				require.Len(t, refreshed, 4)
 				checkCurrent(refreshed, "1/1/latest", "2/1/unchanged", "1/2/changed", "1/3/returned")
+				checkProjections()
 			})
 		}
 	}

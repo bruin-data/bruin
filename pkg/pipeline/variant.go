@@ -459,6 +459,32 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 			return err
 		}
 	}
+	for i, expression := range a.ClickHouse.PrimaryKey {
+		if a.ClickHouse.PrimaryKey[i], err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.primary_key[%d]", originalName, i), expression); err != nil {
+			return err
+		}
+	}
+	for i := range a.ClickHouse.Indexes {
+		index := &a.ClickHouse.Indexes[i]
+		if index.Name, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.indexes[%d].name", originalName, i), index.Name); err != nil {
+			return err
+		}
+		if index.Expression, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.indexes[%d].expression", originalName, i), index.Expression); err != nil {
+			return err
+		}
+		if index.Type, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.indexes[%d].type", originalName, i), index.Type); err != nil {
+			return err
+		}
+	}
+	for i := range a.ClickHouse.Projections {
+		projection := &a.ClickHouse.Projections[i]
+		if projection.Name, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.projections[%d].name", originalName, i), projection.Name); err != nil {
+			return err
+		}
+		if projection.Select, err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.projections[%d].select", originalName, i), projection.Select); err != nil {
+			return err
+		}
+	}
 	for key, value := range a.ClickHouse.Settings {
 		if a.ClickHouse.Settings[key], err = maybeRender(render, fmt.Sprintf("asset[%s].clickhouse.settings[%s]", originalName, key), value); err != nil {
 			return err

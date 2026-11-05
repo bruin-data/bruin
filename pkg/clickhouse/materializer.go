@@ -68,8 +68,15 @@ func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([
 	if asset.FullRefreshEnabled(m.fullRefresh) && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
+	if m.cluster == "" && len(tableDeclarations(asset)) > 0 &&
+		(strategy == pipeline.MaterializationStrategyNone || strategy == pipeline.MaterializationStrategyCreateReplace) {
+		return queries, []string{queries[len(queries)-1]}, nil
+	}
 
 	if strategy == pipeline.MaterializationStrategySCD2ByTime || strategy == pipeline.MaterializationStrategySCD2ByColumn {
+		if len(tableDeclarations(asset)) > 0 {
+			return queries, queries[len(queries)-3:], nil
+		}
 		return queries, queries[len(queries)-2:], nil
 	}
 	if strategy != pipeline.MaterializationStrategyMerge && strategy != pipeline.MaterializationStrategyDeleteInsert {
