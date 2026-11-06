@@ -2,6 +2,7 @@ package duck
 
 import (
 	"context"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -80,7 +81,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	materialized, err := o.materializer.Render(t, q.String())
+	materializedAsset, err := renderIncrementalPredicate(extractor, t)
+	if err != nil {
+		return err
+	}
+	materialized, err := o.materializer.Render(materializedAsset, q.String())
 	if err != nil {
 		return err
 	}
@@ -162,6 +167,28 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+// renderIncrementalPredicate renders the asset's incremental_predicate with the
+// asset's extractor, so it sees the same variables and macros as the query. It
+// returns a copy of the asset rather than changing the shared one.
+func renderIncrementalPredicate(extractor query.QueryExtractor, t *pipeline.Asset) (*pipeline.Asset, error) {
+	predicate := strings.TrimSpace(t.Materialization.IncrementalPredicate)
+	if predicate == "" {
+		return t, nil
+	}
+
+	rendered, err := extractor.ReextractQueriesFromSlice([]string{predicate})
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot render incremental_predicate")
+	}
+	if len(rendered) != 1 {
+		return nil, errors.Errorf("expected one rendered incremental_predicate, got %d", len(rendered))
+	}
+
+	copied := *t
+	copied.Materialization.IncrementalPredicate = rendered[0]
+	return &copied, nil
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {

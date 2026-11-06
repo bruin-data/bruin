@@ -1623,10 +1623,10 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 	case pipeline.MaterializationTypeTable:
-		if asset.Materialization.IncrementalPredicate != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyMerge {
+		if asset.Materialization.IncrementalPredicate != "" && !supportsIncrementalPredicate(asset) {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental predicate is only supported with the 'merge' strategy.",
+				Description: "Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB.",
 			})
 		}
 
@@ -1763,6 +1763,20 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	}
 
 	return issues, nil
+}
+
+// supportsIncrementalPredicate reports whether the asset's materializer applies
+// `incremental_predicate`: every `merge`, and DuckDB's `delete+insert`, which
+// adds it to the DELETE.
+func supportsIncrementalPredicate(asset *pipeline.Asset) bool {
+	switch asset.Materialization.Strategy {
+	case pipeline.MaterializationStrategyMerge:
+		return true
+	case pipeline.MaterializationStrategyDeleteInsert:
+		return asset.Type == pipeline.AssetTypeDuckDBQuery
+	default:
+		return false
+	}
 }
 
 // EnsureBigQueryTableOptionsAreValid reports `bigquery` block configurations that would fail while
