@@ -97,6 +97,7 @@ These intervals fully cover the original downstream interval and thus the downst
 
 ## Related
 
+- [Asset Health](/cloud/asset-health#inspect-an-external-dependency) — inspect upstream coverage and add manual entries while preserving run history.
 - [Pipelines](/cloud/pipelines) for enabling, monitoring, and triggering runs.
 - [Asset definition](/assets/definition-schema) for the `uri` and `depends` fields.
 - [Sensor assets](/assets/sensor) — the local-CLI primitive that backs cloud's "prerequisite" sensors.

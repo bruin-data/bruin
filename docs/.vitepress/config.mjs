@@ -132,6 +132,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Runs", link: "/cloud/runs"},
                     {text: "Backfills", link: "/cloud/backfills"},
                     {text: "Assets", link: "/cloud/assets"},
+                    {text: "Asset Health", link: "/cloud/asset-health"},
                     {text: "Catalog", link: "/cloud/catalog"},
                     {text: "Insights", link: "/cloud/insights"},
                     {text: "Dashboards", link: "/cloud/dashboards"},
