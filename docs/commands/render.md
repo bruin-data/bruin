@@ -27,6 +27,7 @@ bruin render [path to asset definition] [flags]
 | `--apply-interval-modifiers` |       | Apply [interval modifiers](/assets/interval-modifiers). Off unless the flag is given — useful for previewing the window a Bruin Cloud run would use, since Cloud always applies them. |
 | `--var`               |       | Override pipeline variables with custom values. |
 | `--output [format]`   | `-o`  | Specify the output format (e.g., `json`). Defaults to console output.  |
+| `--environment`       | `-e`, `--env` | The environment from `.bruin.yml` to render for. Applies its `schema_prefix`; see [Schema prefixes](#schema-prefixes). |
 | `--config-file`       |       | The path to the `.bruin.yml` file. |
 
 ### Examples
@@ -54,3 +55,19 @@ bruin render path/to/sample.asset.yml --output json
 ```bash
 bruin render path/to/sample.asset.yml --full-refresh
 ```
+
+**Render an Asset for a Developer Environment:**
+
+```bash
+bruin render path/to/sample.asset.yml --environment dev
+```
+
+## Schema prefixes
+
+When the environment has a [`schema_prefix`](/getting-started/devenv#schema-based-environments), `render` shows the asset as `bruin run` would build it in that environment. It uses the default environment unless you pass `--environment`.
+
+- The asset is created under the prefixed schema, e.g. `jane_mart.table1` instead of `mart.table1`.
+- `{{ schema_prefix }}` renders to the prefix and `{{ this }}` to the prefixed asset name.
+- References to the asset's own table, e.g. in an incremental query, point at the prefixed table.
+
+`render` does not connect to the database, so other tables the query reads are not rewritten. `bruin run` points those at the prefixed schema when the prefixed table exists. To see that rewrite, run the query with [`bruin query --asset`](/commands/query#schema-prefixes).

@@ -398,3 +398,16 @@ environments:
       duckdb:
         - name: "duckdb-schema-prefix"
           path: "duckdb-files/schema-prefix.db"
+
+  env-schema-prefix-query-seed:
+    connections:
+      duckdb:
+        - name: "duckdb-schema-prefix-query"
+          path: "duckdb-files/schema-prefix-query.db"
+
+  env-schema-prefix-query:
+    schema_prefix: "test"
+    connections:
+      duckdb:
+        - name: "duckdb-schema-prefix-query"
+          path: "duckdb-files/schema-prefix-query.db"
