@@ -36,17 +36,6 @@ From a pipeline's run details, click the asset waiting on an external dependency
 2. Click the upstream asset's name to expand its pipeline information and coverage summary.
 3. For partially covered slots, inspect the listed uncovered ranges.
 
-These bars show upstream runs overlapping the downstream run's **data interval**, not the upstream's entire history. The dependency mode determines what lets the downstream start:
-
-| Mode | Requirement |
-| --- | --- |
-| `full` (default) | Successful upstream intervals cover the entire downstream interval. |
-| `any` | At least one upstream run overlapping the downstream interval succeeded. |
-| `first` | The first upstream run overlapping the downstream interval succeeded. |
-| `last` | The upstream's latest run succeeded, regardless of its interval. |
-
-For `last`, the run being checked can fall outside the health bar's displayed window. The coverage summary alone therefore does not tell you whether every dependency mode is satisfied.
-
 See [cross-pipeline dependencies](/cloud/cross-pipeline) for configuring an external upstream.
 
 ## Add a manual entry
@@ -63,7 +52,7 @@ Creating, editing, or deleting manual entries requires permission to mark asset 
 
 ### Effect on downstream dependencies
 
-A successful manual entry participates in dependency checks. It can supply missing successful coverage for `full`, or satisfy another mode if that mode selects the entry. Choose the interval to match the data you have actually verified.
+A successful manual entry participates in dependency checks and can supply missing successful coverage. Choose the interval to match the data you have actually verified.
 
 The original failed run keeps its status and logs. The manual entry is a separate record, visible with a **manual** label and its note. It applies to the upstream asset and can affect other downstream runs that depend on that asset, not just the run you opened.
 
