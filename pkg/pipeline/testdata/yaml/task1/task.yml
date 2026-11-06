@@ -1,7 +1,6 @@
 name: hello-world
 description: This is a hello world task
 type: bq.sql
-run: hello.sql
 depends:
   - gcs-to-bq
 parameters:

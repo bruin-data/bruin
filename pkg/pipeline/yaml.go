@@ -434,7 +434,6 @@ type taskDefinition struct {
 	Enabled               *TemplatedBool    `yaml:"enabled"`
 	Description           string            `yaml:"description"`
 	Type                  string            `yaml:"type"`
-	RunFile               string            `yaml:"run"`
 	Depends               depends           `yaml:"depends"`
 	Parameters            ParameterMap      `yaml:"parameters"`
 	Connections           map[string]string `yaml:"connections"`
@@ -509,22 +508,6 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			Name:    filepath.Base(filePath),
 			Path:    filePath,
 			Content: string(buf),
-		}
-		if definition.RunFile != "" {
-			relativeRunFilePath := filepath.Join(filepath.Dir(filePath), definition.RunFile)
-			absRunFile, err := filepath.Abs(relativeRunFilePath)
-			if err != nil {
-				return nil, errors.Wrapf(err, "unable to resolve the absolute run file path: %s", definition.RunFile)
-			}
-
-			executableFile.Name = filepath.Base(definition.RunFile)
-			executableFile.Path = absRunFile
-
-			content, err := afero.ReadFile(fs, absRunFile)
-			if err != nil {
-				return nil, errors.Wrapf(err, "unable to read the run file: %s", absRunFile)
-			}
-			executableFile.Content = string(content)
 		}
 		task.ExecutableFile = executableFile
 

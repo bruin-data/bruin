@@ -397,7 +397,7 @@ max_active_steps: 8
 
 ### Default (pipeline-level defaults)
 
-Set sensible defaults for all assets in the pipeline so you don't repeat yourself. Override at the asset level only when a task needs something different. The `default` block accepts asset definition fields except file-derived/runtime-only fields such as `id`, `run`/executable file details, definition file details, and derived `retries_delay`.
+Set sensible defaults for all assets in the pipeline so you don't repeat yourself. Override at the asset level only when a task needs something different. The `default` block accepts asset definition fields except file-derived/runtime-only fields such as `id`, executable file details, definition file details, and derived `retries_delay`.
 
 Scalar defaults fill only empty asset fields. Maps such as `parameters`, `meta`, and `metadata` are merged without overwriting asset keys. Repeated fields such as `tags`, `domains`, `depends`, `extends`, `columns`, `custom_checks`, and `notifications` are added when they are not already present.
 

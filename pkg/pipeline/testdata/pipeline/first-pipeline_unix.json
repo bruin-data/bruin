@@ -40,9 +40,9 @@
             "instance": "",
             "owner": "",
             "executable_file": {
-                "name": "hello.sh",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/hello.sh",
-                "content": "echo \"hello world from test script\""
+                "name": "task.yml",
+                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/task.yml",
+                "content": "name: task1\nuri: postgres://host:port/db\ndescription: This is a hello world task\ntype: bash\ndepends:\n  - gcs-to-bq\nparameters:\n  param1: value1\n  param2: value2\nconnection: conn1"
             },
             "definition_file": {
                 "name": "task.yml",
