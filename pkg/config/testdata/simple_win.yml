@@ -532,6 +532,10 @@ environments:
           host: "host-123"
           port: "1234"
           database: "dbname-123"
+          schema: "schema-123"
+          ssl: true
+          timeout: 15
+          platform: "ibmi"
       oracle:
         - name: "oracle-1"
           username: "username-123"

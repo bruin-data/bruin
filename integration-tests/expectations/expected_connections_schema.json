@@ -2105,6 +2105,18 @@
         },
         "database": {
           "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "platform": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
