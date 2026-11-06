@@ -470,14 +470,18 @@ func TestResourceLimitsApplyToDatabase(t *testing.T) {
 	require.Equal(t, "false", preserve)
 
 	// Invalid values must fail instead of falling back to DuckDB's defaults.
-	for _, cfg := range []Config{
-		{Path: ":memory:", MemoryLimit: "lots"},
-		{Path: ":memory:", Threads: -1},
+	for _, tt := range []struct {
+		cfg  Config
+		want string
+	}{
+		{Config{Path: ":memory:", MemoryLimit: "lots", Threads: 2}, "  memory_limit: lots\n  threads: 2\n"},
+		{Config{Path: ":memory:", Threads: -1}, "  threads: -1\n"},
 	} {
-		invalid, err := NewEphemeralConnection(cfg)
+		invalid, err := NewEphemeralConnection(tt.cfg)
 		require.NoError(t, err)
 		_, err = invalid.ExecContext(t.Context(), "SELECT 1")
-		require.ErrorContains(t, err, "check the values of")
+		require.ErrorContains(t, err, "did not say which one")
+		require.ErrorContains(t, err, tt.want)
 	}
 }
 

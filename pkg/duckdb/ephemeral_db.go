@@ -258,10 +258,18 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 	var drv drivermgr.Driver
 	adb, err := drv.NewDatabase(opts)
 	if err != nil {
-		// DuckDB does not say which option it rejected, so name the user-provided ones.
+		// DuckDB does not say which option it rejected, so list every one the user set.
 		if cfg, ok := e.config.(Config); ok {
-			if names := slices.Sorted(maps.Keys(cfg.resourceOptions())); len(names) > 0 {
-				return nil, nil, fmt.Errorf("failed to create ADBC database, check the values of %s: %w", strings.Join(names, ", "), err)
+			if resourceOpts := cfg.resourceOptions(); len(resourceOpts) > 0 {
+				var b strings.Builder
+				b.WriteString("DuckDB rejected a setting on this connection but did not say which one. " +
+					"One of these values in the connection config is invalid:\n")
+				for _, name := range slices.Sorted(maps.Keys(resourceOpts)) {
+					fmt.Fprintf(&b, "  %s: %s\n", name, resourceOpts[name])
+				}
+				b.WriteString("Sizes take a number and a unit such as \"4GB\" or \"512MiB\", and threads must be a positive integer. " +
+					"See https://duckdb.org/docs/stable/configuration/overview for accepted values.\n")
+				return nil, nil, fmt.Errorf("%sDuckDB error: %w", b.String(), err)
 			}
 		}
 		return nil, nil, fmt.Errorf("failed to create ADBC database: %w", err)
