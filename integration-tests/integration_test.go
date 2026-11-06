@@ -4938,6 +4938,56 @@ func TestMacros(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "rerun-cooldown-translation",
+			task: e2e.Task{
+				Name:    "rerun-cooldown-translation",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/rerun-cooldown")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						// Pipeline default rerun_cooldown
+						`"default":{"type":"","materialization":null,"parameters":null,"secrets":null,"hooks":{},"snowflake":null,"athena":null,"bigquery":null,"interval_modifiers":null,"rerun_cooldown":300}`, `"retries_delay":300`,
+						// Asset with explicit rerun_cooldown
+						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
+						// Asset that inherits from pipeline
+						`"name":"inherits_pipeline"`, `"retries_delay":300`,
+						// Asset with disabled retries
+						`"name":"no_delay"`, `"rerun_cooldown":-1`, `"retries_delay":0`,
+						// Python asset with rerun_cooldown
+						`"name":"python_test"`, `"rerun_cooldown":900`, `"retries_delay":900`,
+						// Ingestr asset with rerun_cooldown
+						`"name":"ingestr_test"`, `"rerun_cooldown":450`, `"retries_delay":450`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "rerun-cooldown-asset-parsing",
+			task: e2e.Task{
+				Name:    "rerun-cooldown-asset-parsing",
+				Command: binary,
+				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/rerun-cooldown/assets/test_asset.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						// Asset with explicit rerun_cooldown should translate correctly
+						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -4950,83 +5000,4 @@ func TestMacros(t *testing.T) {
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 		})
 	}
-}
-
-func TestRerunCooldown(t *testing.T) {
-	t.Parallel()
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-	dir := t.TempDir()
-	require.NoError(t, exec.CommandContext(t.Context(), "git", "init", dir).Run())
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "assets"), 0o755))
-	files := map[string]string{
-		"pipeline.yml": "name: test-rerun-cooldown\ndefault:\n  rerun_cooldown: 300\n",
-		"assets/test_asset.sql": `/* @bruin
-name: test_asset
-type: duckdb.sql
-rerun_cooldown: 600
-@bruin */
-SELECT 1
-`,
-		"assets/inherits_pipeline.sql": `/* @bruin
-name: inherits_pipeline
-type: duckdb.sql
-@bruin */
-SELECT 2
-`,
-		"assets/no_delay.sql": `/* @bruin
-name: no_delay
-type: duckdb.sql
-rerun_cooldown: -1
-@bruin */
-SELECT 3
-`,
-		"assets/python_test.py": `""" @bruin
-name: python_test
-type: python
-rerun_cooldown: 900
-@bruin """
-`,
-		"assets/ingestr_test.asset.yml": `name: ingestr_test
-type: ingestr
-rerun_cooldown: 450
-parameters:
-  source_connection: test_source
-  source_table: public.test_table
-  destination: duckdb
-`,
-	}
-	for path, contents := range files {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte(contents), 0o600))
-	}
-
-	parse := func(t *testing.T, args ...string) string {
-		t.Helper()
-		output, err := exec.CommandContext(t.Context(), bruinBinary(cwd), args...).CombinedOutput()
-		require.NoError(t, err, "%s", output)
-		return string(output)
-	}
-
-	t.Run("pipeline", func(t *testing.T) {
-		t.Parallel()
-		output := parse(t, "internal", "parse-pipeline", dir)
-		for _, want := range []string{
-			`"default":{"type":"","materialization":null,"parameters":null,"secrets":null,"hooks":{},"snowflake":null,"athena":null,"bigquery":null,"interval_modifiers":null,"rerun_cooldown":300}`,
-			`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
-			`"name":"inherits_pipeline"`, `"retries_delay":300`,
-			`"name":"no_delay"`, `"rerun_cooldown":-1`, `"retries_delay":0`,
-			`"name":"python_test"`, `"rerun_cooldown":900`, `"retries_delay":900`,
-			`"name":"ingestr_test"`, `"rerun_cooldown":450`, `"retries_delay":450`,
-		} {
-			require.Contains(t, output, want)
-		}
-	})
-
-	t.Run("asset", func(t *testing.T) {
-		t.Parallel()
-		output := parse(t, "internal", "parse-asset", filepath.Join(dir, "assets/test_asset.sql"))
-		for _, want := range []string{`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`} {
-			require.Contains(t, output, want)
-		}
-	})
 }

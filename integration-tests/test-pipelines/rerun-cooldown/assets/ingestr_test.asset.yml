@@ -1,0 +1,23 @@
+name: ingestr_test
+type: ingestr
+rerun_cooldown: 450
+
+parameters:
+  source_connection: test_source
+  source_table: 'public.test_table'
+  destination: duckdb
+
+columns:
+  - name: id
+    type: integer
+    description: "Test ID column"
+    checks:
+      - name: not_null
+  - name: test_value
+    type: string
+    description: "Test value column"
+
+custom_checks:
+  - name: Row count check
+    value: 1
+    query: select count(*) from ingestr_test
