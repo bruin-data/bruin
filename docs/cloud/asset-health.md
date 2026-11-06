@@ -56,7 +56,7 @@ A successful manual entry participates in dependency checks and can supply missi
 
 The original failed run keeps its status and logs. The manual entry is a separate record, visible with a **manual** label and its note. It applies to the upstream asset and can affect other downstream runs that depend on that asset, not just the run you opened.
 
-This still declares an outcome for the interval: it is not an instruction to ignore the dependency. It does not execute the asset, repair its data, or add a scheduling rule such as “any successful run this morning.”
+This still declares an outcome for the interval: it is not an instruction to ignore the dependency. It does not execute the asset or repair its data.
 
 ### Edit or delete an entry
 
