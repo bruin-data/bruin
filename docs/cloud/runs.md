@@ -78,6 +78,8 @@ Click any asset row inside a run to open its **asset instance** page. This is th
 
 ## External dependencies and sensors
 
+Open an asset from the run details to see its **External Dependencies** section. Each upstream has a health bar for the downstream run's data interval. Click a slot to inspect its runs, or expand the upstream to add a manual entry. See [Asset Health](/cloud/asset-health#inspect-an-external-dependency) for the full workflow and how manual entries affect dependency checks.
+
 When a run includes assets that depend on something in another pipeline, you'll see **prerequisites** on those asset instances — the sensors that waited for the upstream. If an upstream pipeline is fine but the sensor is stuck, mark the asset instance as success to release the downstream.
 
 ## Why mark a run as success or failed?

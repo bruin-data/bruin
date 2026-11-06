@@ -40,6 +40,7 @@ Click any asset to open its detail page. The page has six primary tabs:
 The default tab. Collapsible sections, top to bottom:
 
 - **Definition** — the asset's source code (SQL, Python, YAML) with syntax highlighting and a copy button. For Jinja-templated SQL, toggle **Rendered SQL** to see what actually runs.
+- **Health** — a timeline of scheduled data intervals, with run drill-down and manual entries. See [Asset Health](/cloud/asset-health) for statuses and instructions.
 - **Schedule** — the pipeline's schedule and any per-asset interval modifiers.
 - **Owner** — the owner's name and any tags. "No Owner" if unset.
 - **Materialisation** — type and strategy (table, view, incremental), partition / cluster-by keys, incremental key.
