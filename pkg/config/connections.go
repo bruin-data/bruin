@@ -1123,6 +1123,12 @@ type DuckDBConnection struct {
 	Port               int              `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Token              string           `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" sensitive:"true"`
 	DisableSSL         bool             `yaml:"disable_ssl,omitempty" json:"disable_ssl,omitempty" mapstructure:"disable_ssl"`
+	// Resource limits passed to DuckDB as configuration options when the database is opened.
+	MemoryLimit            string `yaml:"memory_limit,omitempty" json:"memory_limit,omitempty" mapstructure:"memory_limit"`
+	Threads                int    `yaml:"threads,omitempty" json:"threads,omitempty" mapstructure:"threads"`
+	TempDirectory          string `yaml:"temp_directory,omitempty" json:"temp_directory,omitempty" mapstructure:"temp_directory"`
+	MaxTempDirectorySize   string `yaml:"max_temp_directory_size,omitempty" json:"max_temp_directory_size,omitempty" mapstructure:"max_temp_directory_size"`
+	PreserveInsertionOrder *bool  `yaml:"preserve_insertion_order,omitempty" json:"preserve_insertion_order,omitempty" mapstructure:"preserve_insertion_order"`
 }
 
 // JSONSchemaExtend requires a local path unless the connection points at a Quack server.

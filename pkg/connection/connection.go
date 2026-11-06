@@ -2231,6 +2231,12 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 		Port:       connection.Port,
 		Token:      connection.Token,
 		DisableSSL: connection.DisableSSL,
+
+		MemoryLimit:            connection.MemoryLimit,
+		Threads:                connection.Threads,
+		TempDirectory:          connection.TempDirectory,
+		MaxTempDirectorySize:   connection.MaxTempDirectorySize,
+		PreserveInsertionOrder: connection.PreserveInsertionOrder,
 	})
 	if err != nil {
 		return err

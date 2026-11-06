@@ -442,6 +442,49 @@ func TestConnectionReuseReadOnlyConfiguration(t *testing.T) {
 	require.Equal(t, 17, n)
 }
 
+func TestResourceLimitsApplyToDatabase(t *testing.T) {
+	t.Parallel()
+	tempDir := filepath.Join(t.TempDir(), "spill")
+	preserveOrder := false
+	conn, err := NewEphemeralConnection(Config{
+		Path:                   filepath.Join(t.TempDir(), "limits.db"),
+		MemoryLimit:            "1GiB",
+		Threads:                3,
+		TempDirectory:          tempDir,
+		MaxTempDirectorySize:   "2GiB",
+		PreserveInsertionOrder: &preserveOrder,
+	})
+	require.NoError(t, err)
+
+	var memoryLimit, threads, tempDirectory, maxTempSize, preserve string
+	require.NoError(t, conn.QueryRowContext(t.Context(), `SELECT
+		current_setting('memory_limit'),
+		current_setting('threads')::VARCHAR,
+		current_setting('temp_directory'),
+		current_setting('max_temp_directory_size'),
+		current_setting('preserve_insertion_order')::VARCHAR`).Scan(&memoryLimit, &threads, &tempDirectory, &maxTempSize, &preserve))
+	require.Equal(t, "1.0 GiB", memoryLimit)
+	require.Equal(t, "3", threads)
+	require.Equal(t, tempDir, tempDirectory)
+	require.Equal(t, "2.0 GiB", maxTempSize)
+	require.Equal(t, "false", preserve)
+
+	// Invalid values must fail instead of falling back to DuckDB's defaults.
+	for _, tt := range []struct {
+		cfg  Config
+		want string
+	}{
+		{Config{Path: ":memory:", MemoryLimit: "lots", Threads: 2}, "  memory_limit: lots\n  threads: 2\n"},
+		{Config{Path: ":memory:", Threads: -1}, "  threads: -1\n"},
+	} {
+		invalid, err := NewEphemeralConnection(tt.cfg)
+		require.NoError(t, err)
+		_, err = invalid.ExecContext(t.Context(), "SELECT 1")
+		require.ErrorContains(t, err, "did not say which one")
+		require.ErrorContains(t, err, tt.want)
+	}
+}
+
 func TestConnectionReuseCatalogPolicy(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
