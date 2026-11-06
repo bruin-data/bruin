@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	Version = "0.10.8"
+	Version = "0.11.33"
 
 	// Shell is the shell to use for running commands.
 	Shell = "/bin/sh"
