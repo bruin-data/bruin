@@ -13,6 +13,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSetupVariablesPreservesDeclaredSchemasAfterDiagnostics(t *testing.T) {
+	t.Parallel()
+	p := &pipeline.Pipeline{Variables: pipeline.Variables{
+		"days":     {"type": "array", "items": map[string]any{"type": "int"}, "default": []int{1, 7}},
+		"nullable": {"type": []any{"int", nil}, "default": nil},
+	}}
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigApplyIntervalModifiers, false)
+	for _, checkDiagnostics := range []bool{false, true} {
+		if checkDiagnostics {
+			require.Len(t, p.Variables.SchemaDiagnostics(), 3)
+		}
+		result, err := env.SetupVariables(ctx, p, &pipeline.Asset{}, map[string]string{})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"days":{"items":{"type":"int"},"type":"array"},"nullable":{"type":["int",null]}}`, result["BRUIN_VARS_SCHEMA"])
+		assert.JSONEq(t, `{"days":[1,7],"nullable":null}`, result["BRUIN_VARS"])
+	}
+}
+
 func TestSetupVariables(t *testing.T) {
 	t.Parallel()
 
