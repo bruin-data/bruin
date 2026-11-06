@@ -260,6 +260,35 @@ environments:
 - **Rollback on failure**: If validation fails after enhancement, the original file is automatically restored
 - **Idempotent**: Running the command multiple times on the same asset won't duplicate checks or descriptions
 
+## BigQuery Cost Guard (Preflight)
+
+Before any AI enhancement runs, `bruin ai enhance` scans the assets in scope for BigQuery assets (`bq.sql`, `bq.seed`, `bq.source`, `bq.sensor.*`). For each BigQuery connection those assets resolve to, it inspects `.bruin.yml` for at least one of these cost-guard keys:
+
+- `max_query_cost` (USD, hard limit)
+- `max_query_cost_soft` (USD, soft limit)
+- `max_billable_bytes` (bytes, hard limit)
+- `max_billable_bytes_soft` (bytes, soft limit)
+
+If a BigQuery connection has **none** of these set, you'll be prompted interactively:
+
+```text
+No BigQuery cost guard is configured on connection 'bigquery-default'.
+Running queries during AI enhancement could incur uncapped cost.
+
+Enter a per-query limit in USD, or press Enter to use the default ($5):
+```
+
+You can either:
+
+- Type a dollar amount (e.g. `2.5`) — sets `max_query_cost` on that connection in `.bruin.yml`.
+- Press Enter (or type `skip`) — applies the default `$5.00` `max_query_cost` to that connection.
+
+The limit is persisted to `.bruin.yml`, so subsequent runs won't re-prompt for the same connection.
+
+This preflight runs **before** any AI work begins. If stdin is not a terminal (CI/JSON mode) and no limits are configured, the default `$5` is applied without prompting. The check is BigQuery-only — other warehouses don't yet support Bruin cost guards.
+
+See [BigQuery: query safety limits](/platforms/bigquery#connection) for the full configuration reference.
+
 ## See Also
 
 - [Patch Command](/commands/patch) - Fill columns from database without AI
