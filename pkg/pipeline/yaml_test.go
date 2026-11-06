@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,9 +54,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Description: "This is a hello world task",
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "hello.sql",
-					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
+					Name:    "task.yml",
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task1", "task.yml")),
+					Content: mustReadRaw(t, filepath.Join("testdata", "yaml", "task1", "task.yml")),
 				},
 				Parameters: pipeline.ParameterMap{
 					"param1": "value1",
@@ -125,73 +126,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "nested runfile paths work correctly",
-			args: args{
-				filePath: filepath.Join("testdata", "yaml", "task-with-nested", "task.yml"),
-			},
-			want: &pipeline.Asset{
-				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
-				Name:        "hello-world",
-				Description: "This is a hello world task",
-				Type:        "bash",
-				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "hello.sh",
-					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
-				},
-				Parameters: pipeline.ParameterMap{
-					"param1": "value1",
-					"param2": "value2",
-				},
-				Connection: "conn1",
-				Secrets:    []pipeline.SecretMapping{},
-				Upstreams: []pipeline.Upstream{
-					{
-						Type:    "asset",
-						Value:   "gcs-to-bq",
-						Columns: make([]pipeline.DependsColumn, 0),
-						Mode:    pipeline.UpstreamModeFull,
-					},
-				},
-				Columns:      make([]pipeline.Column, 0),
-				CustomChecks: make([]pipeline.CustomCheck, 0),
-			},
-		},
-		{
-			name: "top-level runfile paths are still joined correctly",
-			args: args{
-				filePath: filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "task.yml"),
-			},
-			want: &pipeline.Asset{
-				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
-				Name:        "hello-world",
-				Description: "This is a hello world task",
-				Type:        "bash",
-				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "hello.sh",
-					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
-				},
-				Parameters: pipeline.ParameterMap{
-					"param1": "value1",
-					"param2": "value2",
-				},
-				Connection: "conn1",
-				Secrets:    []pipeline.SecretMapping{},
-				Upstreams: []pipeline.Upstream{
-					{
-						Type:    "asset",
-						Value:   "gcs-to-bq",
-						Columns: make([]pipeline.DependsColumn, 0),
-						Mode:    pipeline.UpstreamModeFull,
-					},
-				},
-				Columns:      make([]pipeline.Column, 0),
-				CustomChecks: make([]pipeline.CustomCheck, 0),
-			},
-		},
-		{
-			name: "the ones with missing runfile are ignored",
+			name: "definitions without a separate run file use the definition file as content",
 			args: args{
 				filePath: filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml"),
 			},
@@ -275,6 +210,34 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestCreateTaskFromYamlDefinition_DoesNotReadRunFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	secretPath := filepath.Join(root, "secret.txt")
+	require.NoError(t, os.WriteFile(secretPath, []byte("TOP SECRET"), 0o600))
+
+	repoDir := filepath.Join(root, "repo")
+	require.NoError(t, os.MkdirAll(repoDir, 0o755))
+	assetPath := filepath.Join(repoDir, "task.yml")
+	require.NoError(t, os.WriteFile(assetPath, []byte(strings.TrimSpace(`
+name: hello-world
+type: bash
+run: ../secret.txt
+`)), 0o644))
+
+	creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
+	got, err := creator(assetPath)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, assetPath, got.ExecutableFile.Path)
+	require.Equal(t, "task.yml", got.ExecutableFile.Name)
+	require.NotContains(t, got.ExecutableFile.Content, "TOP SECRET")
+
+	err = pipeline.ValidateAssetYAML(afero.NewOsFs(), assetPath, pipeline.YamlTask)
+	require.ErrorContains(t, err, "run")
 }
 
 func TestUpstreams(t *testing.T) {
