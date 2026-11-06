@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-go_version="1.25.13"
+go_version="1.26.10"
 go_root="$HOME/.local/share/go/$go_version"
 node_version="22.14.0"
 node_root="$HOME/.local/share/node/$node_version"
@@ -35,11 +35,11 @@ if [[ ! -x "$go_root/bin/go" ]]; then
   case "$(uname -m)" in
     x86_64)
       go_arch="amd64"
-      go_sha256="39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3"
+      go_sha256="ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5"
       ;;
     aarch64 | arm64)
       go_arch="arm64"
-      go_sha256="adad240fcb6bd180cf973b4b7c747baf4ec81d08b7d40ca35940ee4531971490"
+      go_sha256="3f4227ce7b206a513e794f1393adb473a07b46e94d18bd15d1c684bbb7319797"
       ;;
     *)
       printf 'Unsupported architecture: %s\n' "$(uname -m)" >&2

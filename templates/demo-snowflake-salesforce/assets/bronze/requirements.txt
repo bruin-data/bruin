@@ -1,2 +1,2 @@
-requests
+requests==2.33.0
 simple-salesforce
