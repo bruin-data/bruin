@@ -1,4 +1,0 @@
-name: test-rerun-cooldown 
-
-default:
-  rerun_cooldown: 300
