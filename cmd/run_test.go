@@ -3300,3 +3300,55 @@ func TestExistingExcludeTagsSeparatesMissingTags(t *testing.T) {
 	assert.Equal(t, []string{"exclude", "skip"}, existing)
 	assert.Equal(t, []string{"missing"}, missing)
 }
+
+func TestCustomCheckLocation(t *testing.T) {
+	t.Parallel()
+
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		check *pipeline.CustomCheck
+		want  string
+	}{
+		{
+			name:  "definition file under the working directory is shown relative",
+			asset: &pipeline.Asset{DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(cwd, "assets", "people.sql")}},
+			check: &pipeline.CustomCheck{Name: "no_duplicates", Line: 8},
+			want:  filepath.Join("assets", "people.sql") + ":8",
+		},
+		{
+			name:  "falls back to the executable file",
+			asset: &pipeline.Asset{ExecutableFile: pipeline.ExecutableFile{Path: filepath.Join(cwd, "assets", "people.sql")}},
+			check: &pipeline.CustomCheck{Name: "no_duplicates", Line: 8},
+			want:  filepath.Join("assets", "people.sql") + ":8",
+		},
+		{
+			name:  "file outside the working directory keeps its path",
+			asset: &pipeline.Asset{DefinitionFile: pipeline.TaskDefinitionFile{Path: "/elsewhere/people.asset.yml"}},
+			check: &pipeline.CustomCheck{Name: "no_duplicates", Line: 12},
+			want:  "/elsewhere/people.asset.yml:12",
+		},
+		{
+			name:  "unknown line",
+			asset: &pipeline.Asset{DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(cwd, "people.sql")}},
+			check: &pipeline.CustomCheck{Name: "no_duplicates"},
+			want:  "",
+		},
+		{
+			name:  "unknown file",
+			asset: &pipeline.Asset{},
+			check: &pipeline.CustomCheck{Name: "no_duplicates", Line: 8},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, customCheckLocation(tt.asset, tt.check))
+		})
+	}
+}

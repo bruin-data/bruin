@@ -504,6 +504,7 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 		if err != nil {
 			return nil, err
 		}
+		setCustomCheckLines(task, buf)
 
 		executableFile := ExecutableFile{
 			Name:    filepath.Base(filePath),
@@ -539,7 +540,26 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		return nil, err
 	}
 
-	return taskDefinitionToAsset(definition)
+	asset, err := taskDefinitionToAsset(definition)
+	if err != nil {
+		return nil, err
+	}
+	setCustomCheckLines(asset, content)
+
+	return asset, nil
+}
+
+func setCustomCheckLines(asset *Asset, content []byte) {
+	var definition struct {
+		CustomChecks []yaml.Node `yaml:"custom_checks"`
+	}
+	if err := yaml.Unmarshal(content, &definition); err != nil || len(definition.CustomChecks) != len(asset.CustomChecks) {
+		return
+	}
+
+	for i := range asset.CustomChecks {
+		asset.CustomChecks[i].Line = definition.CustomChecks[i].Line
+	}
 }
 
 func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {

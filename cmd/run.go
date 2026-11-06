@@ -1915,6 +1915,28 @@ func CheckLintAssetOnly(ctx context.Context, foundPipeline *pipeline.Pipeline, p
 	return CheckLint(ctx, foundPipeline, pipelinePath, logger, true)
 }
 
+func customCheckLocation(asset *pipeline.Asset, check *pipeline.CustomCheck) string {
+	if asset == nil || check == nil || check.Line == 0 {
+		return ""
+	}
+
+	path := asset.DefinitionFile.Path
+	if path == "" {
+		path = asset.ExecutableFile.Path
+	}
+	if path == "" {
+		return ""
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		if rel, err := filepath.Rel(cwd, path); err == nil && !strings.HasPrefix(rel, "..") {
+			path = rel
+		}
+	}
+
+	return fmt.Sprintf("%s:%d", path, check.Line)
+}
+
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) { // nolint:unparam
 	data := make(map[string][]*scheduler.TaskExecutionResult, len(errorsInTaskResults))
 	for _, result := range errorsInTaskResults {
@@ -1936,9 +1958,13 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 					color.New(color.FgRed).Sprintf("%s", result.Error)))
 
 			case *scheduler.CustomCheckInstance:
+				label := "custom check"
+				if location := customCheckLocation(instance.GetAsset(), instance.Check); location != "" {
+					label += " at " + location
+				}
 				assetBranch.AddNode(fmt.Sprintf("%s %s - %s",
 					color.New(color.FgMagenta).Sprint(instance.Check.Name),
-					faint("custom check"),
+					faint(label),
 					color.New(color.FgRed).Sprintf("%s", result.Error)))
 
 			default:
