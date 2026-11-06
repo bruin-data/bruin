@@ -75,11 +75,34 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-          # Blacksmith's Linux runners cache Go builds through GOCACHEPROG;
-          # Windows runners have no such cache and still need setup-go's.
-          cache: ${{ runner.os == 'Windows' }}
+          cache: false
+      - name: Cache Go builds and test results
+        # setup-go's cache keys only on go.sum and is never saved again once
+        # that key exists, so cached test results stayed frozen at the first
+        # run for each go.sum. A key per commit saves every run's results, and
+        # restore-keys picks up the latest one.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ runner.os == 'Windows' && '~/AppData/Local/go-build' || '~/.cache/go-build' }}
+            ~/go/pkg/mod
+          key: go-test-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+      - name: Make file modification times depend on content
+        # Go's test cache keys on the mtime of files tests read, and a fresh
+        # checkout gives every file a new one, so tests reading fixtures never
+        # hit the cache. Runs after the artifact download, which rewrites a
+        # tracked file.
+        shell: bash
+        run: python3 scripts/set_content_mtimes.py
       - name: Run full test suite
         shell: bash
+        env:
+          # Use the cache restored above rather than Blacksmith's GOCACHEPROG,
+          # which kept test results for packages that read files only for the
+          # run that wrote them; lint and end2end still use it for builds.
+          GOCACHEPROG: ''
         run: |
           # Race-enabled Windows binaries need the matching MinGW runtime DLLs.
           # Installer tests inject a missing shell, so the native fallback is
