@@ -458,11 +458,13 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Assets[].Materialization.Type":                 true,
 		"Pipeline.Assets[].Materialization.Strategy":             true,
 		"Pipeline.Assets[].Materialization.TimeGranularity":      true,
+		"Pipeline.Assets[].Materialization.TableFormat":          true,
 		"Pipeline.Assets[].Upstreams[].Type":                     true,
 		"Pipeline.Assets[].Upstreams[].Mode":                     true,
 		"Pipeline.DefaultValues.Materialization.Type":            true,
 		"Pipeline.DefaultValues.Materialization.Strategy":        true,
 		"Pipeline.DefaultValues.Materialization.TimeGranularity": true,
+		"Pipeline.DefaultValues.Materialization.TableFormat":     true,
 		"Pipeline.DefaultValues.Upstreams[].Type":                true,
 		"Pipeline.DefaultValues.Upstreams[].Mode":                true,
 

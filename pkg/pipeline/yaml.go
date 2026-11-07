@@ -238,6 +238,7 @@ type materialization struct {
 	IncrementalKey       string    `yaml:"incremental_key"`
 	IncrementalPredicate string    `yaml:"incremental_predicate"`
 	TimeGranularity      string    `yaml:"time_granularity,omitempty"`
+	TableFormat          string    `yaml:"table_format,omitempty"`
 }
 
 type columnCheckValue struct {
@@ -551,6 +552,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		IncrementalKey:       definition.Materialization.IncrementalKey,
 		IncrementalPredicate: definition.Materialization.IncrementalPredicate,
 		TimeGranularity:      MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
+		TableFormat:          MaterializationTableFormat(strings.ToLower(definition.Materialization.TableFormat)),
 	}
 
 	columns := make([]Column, len(definition.Columns))

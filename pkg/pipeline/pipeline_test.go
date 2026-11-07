@@ -1204,6 +1204,13 @@ func TestMaterialization_MarshalJSON(t *testing.T) {
 			},
 			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","incremental_predicate":"target.dt >= DATE '2026-07-01'","time_granularity":""}`,
 		},
+		{
+			name: "table format only materialization is preserved",
+			materialization: pipeline.Materialization{
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","incremental_predicate":"","time_granularity":"","table_format":"iceberg"}`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -3084,6 +3091,49 @@ default:
 	assert.Empty(t, got.Name)
 	assert.Empty(t, got.ID)
 	assert.Equal(t, "default description", got.Description)
+}
+
+func TestBuilder_SetupDefaultsFromPipelineSkipsTableFormatForUnsupportedAssets(t *testing.T) {
+	t.Parallel()
+
+	defaults := &pipeline.DefaultValues{
+		Materialization: pipeline.Materialization{
+			Type:        pipeline.MaterializationTypeTable,
+			TableFormat: pipeline.MaterializationTableFormatIceberg,
+		},
+	}
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+	}{
+		{
+			name:  "sql table",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypePostgresQuery},
+		},
+		{
+			name: "sql view",
+			asset: &pipeline.Asset{
+				Type:            pipeline.AssetTypeSnowflakeQuery,
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
+			},
+		},
+		{
+			name:  "python asset",
+			asset: &pipeline.Asset{Type: pipeline.AssetTypePython},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			builder := &pipeline.Builder{}
+			got, err := builder.SetupDefaultsFromPipeline(t.Context(), tt.asset, &pipeline.Pipeline{DefaultValues: defaults})
+			require.NoError(t, err)
+			assert.Equal(t, pipeline.MaterializationTableFormatDefault, got.Materialization.TableFormat)
+		})
+	}
 }
 
 func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T) {
