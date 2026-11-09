@@ -400,6 +400,18 @@ func Test_createTaskFromFile(t *testing.T) {
 	}
 }
 
+func TestCreateTaskFromFileComments_tableFormat(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	content := "-- @bruin.name: analytics.events\n-- @bruin.type: sf.sql\n-- @bruin.materialization.type: table\n-- @bruin.materialization.table_format: Iceberg\n\nSELECT 1\n"
+	require.NoError(t, afero.WriteFile(fs, "events.sql", []byte(content), 0o644))
+
+	task, err := pipeline.CreateTaskFromFileComments(fs)("events.sql")
+	require.NoError(t, err)
+	assert.Equal(t, pipeline.MaterializationTableFormatIceberg, task.Materialization.TableFormat)
+}
+
 func TestCreateTaskFromFileComments_invalidEmbeddedYAML(t *testing.T) {
 	t.Parallel()
 
