@@ -111,6 +111,17 @@ func TestRenderRawQuerySQL(t *testing.T) {
 			want:   "SELECT * FROM jane_raw.events",
 		},
 		{
+			name:   "large integer variables keep their digits",
+			sql:    "SELECT {{ big_id }} AS id",
+			prefix: "jane_",
+			conn:   prefixedRawRenderConnection(),
+			opts: func(o rawQueryRenderOptions) rawQueryRenderOptions {
+				o.Vars = map[string]any{"big_id": "18446744073709551615"}
+				return o
+			},
+			want: "SELECT 18446744073709551615 AS id",
+		},
+		{
 			name:   "full refresh and variables are available to jinja",
 			sql:    `SELECT '{{ schema_prefix }}' AS prefix, {{ count }} AS count, {% if full_refresh %}true{% else %}false{% endif %} AS full_refresh`,
 			prefix: "jane_",
