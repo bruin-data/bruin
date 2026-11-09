@@ -147,6 +147,8 @@ How each variant materializes:
 | `client_beta` (beta, eu) | `beta_users_eu` | `analytics_eu.raw_users` | `beta_users_eu` |
 | `client_gamma` (gamma, ap) | `gamma_users_ap` | `analytics_ap.raw_users` | `gamma_users_ap` |
 
+The selected variant's name is also available as <code v-pre>{{ variant }}</code>, for example <code v-pre>SELECT '{{ variant }}' AS variant_name</code>.
+
 ## Complete Pipeline Example
 
 A full, runnable variant pipeline template lives in the repo at [`templates/variant-example`](https://github.com/bruin-data/bruin/tree/main/templates/variant-example). It uses DuckDB so you can scaffold and run it locally end-to-end:

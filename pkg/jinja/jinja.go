@@ -334,6 +334,9 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		tempContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 		tempContext["this"] = asset.Name
 		tempContext["var"] = pipe.Variables.Value()
+		if pipe.SelectedVariant != "" {
+			tempContext["variant"] = pipe.SelectedVariant
+		}
 		tempRenderer := &Renderer{
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
@@ -357,6 +360,9 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	jinjaContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 	jinjaContext["this"] = asset.Name
 	jinjaContext["var"] = pipe.Variables.Value()
+	if pipe.SelectedVariant != "" {
+		jinjaContext["variant"] = pipe.SelectedVariant
+	}
 	jinjaContext["commit_hash"] = pipe.Commit
 	if env, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment); ok && env != nil {
 		jinjaContext["schema_prefix"] = env.SchemaPrefix
