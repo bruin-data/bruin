@@ -402,7 +402,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 			stats: &bigquery.QueryStatistics{
 				TotalBytesProcessed: 3_000_000_000,
 			},
-			wantErr: "BigQuery query exceeds configured cost limits: estimated query cost $0.015000 exceeds max_query_cost $0.010000. Query was not executed",
+			wantErr: "BigQuery query exceeds configured cost limits: estimated query cost $0.017053 exceeds max_query_cost $0.010000. Query was not executed",
 		},
 		{
 			name: "uses billed bytes when available",
@@ -433,7 +433,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 				TotalBytesProcessed: 1_001,
 			},
 			enforceSoftLimits: true,
-			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $5.005e-09. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $5.690e-09. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
 		},
 		{
 			name: "soft query cost over limit",
@@ -444,7 +444,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 				TotalBytesProcessed: 3_000_000_000,
 			},
 			enforceSoftLimits: true,
-			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.015000 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.015000. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.017053 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.017053. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
 		},
 	}
 
@@ -3053,6 +3053,74 @@ func TestTruncateQuery(t *testing.T) {
 			t.Parallel()
 			result := truncateQuery(tt.query)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEnvMaxBillableBytesIsSentWithEachQuery(t *testing.T) {
+	t.Parallel()
+
+	envCap := int64(1_000)
+	looserCap := int64(5_000)
+	for _, tc := range []struct {
+		name        string
+		config      Config
+		wantDryRuns int32
+	}{
+		{name: "env cap only, no dry run", config: Config{EnvMaxBillableBytes: &envCap}},
+		{name: "env cap only, read-only, no dry run", config: Config{EnvMaxBillableBytes: &envCap, ReadOnly: true}},
+		{name: "stricter env cap wins over max_billable_bytes", config: Config{EnvMaxBillableBytes: &envCap, MaxBillableBytes: &looserCap}, wantDryRuns: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var requests, dryRuns atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body struct {
+					DryRun             bool   `json:"dryRun"`
+					MaximumBytesBilled string `json:"maximumBytesBilled"`
+					Configuration      struct {
+						DryRun bool `json:"dryRun"`
+						Query  struct {
+							MaximumBytesBilled string `json:"maximumBytesBilled"`
+						} `json:"query"`
+					} `json:"configuration"`
+				}
+				assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				requests.Add(1)
+				if body.DryRun || body.Configuration.DryRun {
+					dryRuns.Add(1)
+				}
+				sent := body.MaximumBytesBilled
+				if sent == "" {
+					sent = body.Configuration.Query.MaximumBytesBilled
+				}
+				assert.Equal(t, "1000", sent, "%s %s", r.Method, r.URL.Path)
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":{"code":400,"message":"Query exceeded limit for bytes billed: 1000. 10485760 or higher required.","errors":[{"reason":"bytesBilledLimitExceeded"}]}}`))
+			}))
+			defer server.Close()
+
+			bq, err := bigquery.NewClient(
+				t.Context(), "test-project",
+				option.WithEndpoint(server.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   "test-project",
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+				}),
+			)
+			require.NoError(t, err)
+			defer bq.Close()
+
+			cfg := tc.config
+			client := &Client{client: bq, config: &cfg}
+			err = client.RunQueryWithoutResult(t.Context(), &query.Query{Query: "SELECT * FROM dataset.big_table"})
+
+			require.Error(t, err)
+			require.Positive(t, requests.Load())
+			require.Equal(t, tc.wantDryRuns, dryRuns.Load())
 		})
 	}
 }

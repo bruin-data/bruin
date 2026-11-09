@@ -749,6 +749,42 @@ func TestListConnectionSets(t *testing.T) {
 	assert.Equal(t, 2, sets[1].ID)
 }
 
+func TestSetConnectionSetCostLimit(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/connection-sets/5/cost-limit", r.URL.Path)
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.InDelta(t, 0.1, body["max_query_cost"], 0.0001)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"id": 5, "max_query_cost": 0.1})
+	})
+
+	limit := 0.1
+	saved, err := client.SetConnectionSetCostLimit(t.Context(), 5, &limit)
+	require.NoError(t, err)
+	require.NotNil(t, saved)
+	assert.InDelta(t, 0.1, *saved, 0.0001)
+}
+
+func TestRemoveConnectionSetCostLimit(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		value, present := body["max_query_cost"]
+		assert.True(t, present)
+		assert.Nil(t, value)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"id": 5, "max_query_cost": nil})
+	})
+
+	saved, err := client.SetConnectionSetCostLimit(t.Context(), 5, nil)
+	require.NoError(t, err)
+	assert.Nil(t, saved)
+}
+
 func TestListConnectionSetConnections(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

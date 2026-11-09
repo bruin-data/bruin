@@ -387,7 +387,7 @@ func TestCloudConnectionSetsCommand_Help(t *testing.T) {
 	cmd := CloudConnectionSets()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "connection-sets", cmd.Name)
-	require.Len(t, cmd.Commands, 5)
+	require.Len(t, cmd.Commands, 6)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -398,6 +398,7 @@ func TestCloudConnectionSetsCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "create")
 	assert.Contains(t, subNames, "update")
 	assert.Contains(t, subNames, "delete")
+	assert.Contains(t, subNames, "cost-limit")
 }
 
 func TestCloudLeafCommandsHaveTeamFlag(t *testing.T) {
