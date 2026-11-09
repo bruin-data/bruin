@@ -7,7 +7,47 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func TestFixtureTimestampLiterals(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, dialect, typ, literal, want string
+	}{
+		{"UTC", "duckdb", "TIMESTAMPTZ", "2026-10-09T11:00:00Z", "2026-10-09T11:00:00Z"},
+		{"midnight", "duckdb", "TIMESTAMPTZ", "2026-10-09T00:00:00Z", "2026-10-09T00:00:00Z"},
+		{"offset", "duckdb", "timestamp with time zone", "2026-10-09T11:00:00+01:00", "2026-10-09T11:00:00+01:00"},
+		{"fraction", "duckdb", "TIMESTAMPTZ", "2026-10-09T11:00:00.123456-04:00", "2026-10-09T11:00:00.123456-04:00"},
+		{"undeclared", "duckdb", "", "2026-10-09T11:00:00Z", "2026-10-09T11:00:00Z"},
+		{"date", "duckdb", "TIMESTAMPTZ", "2026-10-09", "2026-10-09"},
+		{"no zone", "duckdb", "TIMESTAMPTZ", "2026-10-09 11:00:00", "2026-10-09 11:00:00"},
+		{"timestamp column", "duckdb", "TIMESTAMP", "2026-10-09T11:00:00Z", "2026-10-09 11:00:00"},
+		{"date column", "duckdb", "DATE", "2026-10-09T00:00:00Z", "2026-10-09"},
+		{"string column", "duckdb", "VARCHAR", "2026-10-09T11:00:00Z", "2026-10-09 11:00:00"},
+		{"bigquery datetime", "bigquery", "DATETIME", "2026-10-09T11:00:00Z", "2026-10-09 11:00:00"},
+		{"bigquery date", "bigquery", "DATE", "2026-10-09T00:00:00Z", "2026-10-09"},
+		{"quoted", "duckdb", "TIMESTAMPTZ", `"2026-10-09T11:00:00Z"`, "2026-10-09T11:00:00Z"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var input pipeline.UnitTestInput
+			require.NoError(t, yaml.Unmarshal([]byte("asset: events\nrows:\n  - at: "+tc.literal+"\n  - at: "+tc.literal+"\n"), &input))
+			for range 2 {
+				got, err := fixtureSelect(input, []pipeline.Column{{Name: "at", Type: tc.typ}}, tc.dialect)
+				require.NoError(t, err)
+				first := "'" + tc.want + "'"
+				if tc.typ != "" {
+					first = "CAST(" + first + " AS " + tc.typ + ")"
+				}
+				require.Equal(t, "SELECT "+first+" AS at UNION ALL SELECT '"+tc.want+"'", got)
+				encoded, err := yaml.Marshal(input)
+				require.NoError(t, err)
+				require.NoError(t, yaml.Unmarshal(encoded, &input))
+			}
+		})
+	}
+}
 
 // fakeRewriter stands in for the SQL parser: RenameTables does a naive textual
 // replace and PrependCTEs wraps the query in a WITH, which is enough to assert

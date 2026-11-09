@@ -39,6 +39,8 @@ This mocks `analytics.orders` with those three rows, runs the query on the `snow
 
 Each entry under `inputs:` is a table the query reads (`asset:`) and the rows that stand in for it. Rows are sparse: a column you leave out of a row is `NULL` in that row. Only columns that at least one row sets exist in the mock, so list every column the query reads, using `null` where the value doesn't matter. When the input is itself a pipeline asset with declared `columns:`, Bruin casts the fixture to those types, so an all-null column still gets the right type instead of the database guessing.
 
+On DuckDB, timestamps with an explicit timezone, such as `2026-10-09T11:00:00Z` or `2026-10-09T12:00:00+01:00`, retain their timezone for `TIMESTAMPTZ` (`TIMESTAMP WITH TIME ZONE`) columns. This also applies to inputs without a declared column type, so a cast in the query sees the original timezone. Dates and timestamps without a timezone keep their existing interpretation. These rules apply to both inline inputs and shared fixtures.
+
 A nested value, a YAML object or list, is written as JSON text, so it can fill a `json` column. On BigQuery, declared `json` columns are built with `PARSE_JSON`.:
 
 ```yaml

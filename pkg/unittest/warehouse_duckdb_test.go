@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -15,7 +16,69 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/unittest"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func TestFixtureTimestampsAcrossTimezones(t *testing.T) {
+	t.Parallel()
+	parser, err := sqlparser.NewSQLParser(false)
+	require.NoError(t, err)
+	require.NoError(t, parser.Start())
+	defer parser.Close()
+
+	literals := []string{
+		"2026-10-09T11:00:00Z",
+		"2026-10-09T00:00:00Z",
+		"2026-10-09T11:00:00+01:00",
+		"2026-10-09T11:00:00.123456-04:00",
+		"2026-01-09T11:00:00Z",
+	}
+	var rows strings.Builder
+	want := make([]int64, len(literals))
+	for i, literal := range literals {
+		fmt.Fprintf(&rows, "          - {id: %d, seen_at: %s}\n", i, literal)
+		stamp, err := time.Parse(time.RFC3339Nano, literal)
+		require.NoError(t, err)
+		want[i] = stamp.UnixMicro()
+	}
+	asset, err := pipeline.ConvertYamlToTask([]byte("name: result\ntype: duckdb.sql\nunit_tests:\n  - name: timestamps\n    inputs:\n      - asset: events\n        rows:\n" + rows.String()))
+	require.NoError(t, err)
+
+	for _, zone := range []string{"UTC", "Europe/London"} {
+		t.Run(zone, func(t *testing.T) {
+			conn, err := duck.NewEphemeralConnection(duck.Config{Path: filepath.Join(t.TempDir(), "timestamps.duckdb")})
+			require.NoError(t, err)
+			for _, typ := range []string{"TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE", ""} {
+				t.Run(typ, func(t *testing.T) {
+					test := asset.UnitTests[0]
+					for range 2 {
+						sql, err := unittest.BuildWarehouseQuery(parser, "duckdb",
+							"SELECT current_setting('TimeZone'), epoch_us(CAST(seen_at AS TIMESTAMPTZ)) AS instant FROM events ORDER BY id", test,
+							map[string][]pipeline.Column{"events": {{Name: "seen_at", Type: typ}}})
+						require.NoError(t, err)
+						// Each query opens a connection, so set its timezone in the same batch.
+						result, err := conn.QueryContext(context.Background(), fmt.Sprintf("SET TimeZone = '%s'; %s", zone, sql))
+						require.NoError(t, err)
+						var got []int64
+						for result.Next() {
+							var actualZone string
+							var instant int64
+							require.NoError(t, result.Scan(&actualZone, &instant))
+							require.Equal(t, zone, actualZone)
+							got = append(got, instant)
+						}
+						require.NoError(t, result.Err())
+						require.NoError(t, result.Close())
+						require.Equal(t, want, got)
+						encoded, err := yaml.Marshal(test)
+						require.NoError(t, err)
+						require.NoError(t, yaml.Unmarshal(encoded, &test))
+					}
+				})
+			}
+		})
+	}
+}
 
 // TestBuildWarehouseQuery_RunsOnDuckDB proves the CTE-injected, read-only query
 // is semantically correct by executing it on DuckDB (standing in for a real
