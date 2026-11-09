@@ -1713,7 +1713,42 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			want: []string{
-				"Incremental predicate is only supported with the 'merge' strategy.",
+				"Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB.",
+			},
+		},
+		{
+			name: "duckdb delete+insert accepts an incremental predicate",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Type: pipeline.AssetTypeDuckDBQuery,
+					Materialization: pipeline.Materialization{
+						Type:                 pipeline.MaterializationTypeTable,
+						Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+						IncrementalKey:       "batch_id",
+						IncrementalPredicate: "target.region = 'eu'",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "delete+insert outside duckdb rejects an incremental predicate",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Type: pipeline.AssetTypeBigqueryQuery,
+					Materialization: pipeline.Materialization{
+						Type:                 pipeline.MaterializationTypeTable,
+						Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+						IncrementalKey:       "dt",
+						IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB.",
 			},
 		},
 		{

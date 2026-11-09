@@ -699,7 +699,7 @@ materialization:
 | `strategy` | String | How Bruin loads a table. One of the [strategies](#strategies). **Default:** `create+replace`. |
 | `incremental_key` | String | Column used to decide which rows to replace or how to version them. Required by `delete+insert`, `time_interval`, and `scd2_by_time`; optional for `scd2_by_column`. Setting it with any other explicit `strategy` is a validation error. |
 | `time_granularity` | `date` \| `timestamp` | Whether the `time_interval` window is applied to a `DATE` or a `TIMESTAMP` column. Required by `time_interval`. |
-| `incremental_predicate` | String | Extra SQL condition that limits which destination rows a `merge` considers. Only valid with `merge`. See [`incremental_predicate`](#incremental-predicate). |
+| `incremental_predicate` | String | Extra SQL condition that limits which destination rows a `merge` considers, or which rows a DuckDB `delete+insert` deletes. Valid with `merge`, and with `delete+insert` on DuckDB. See [`incremental_predicate`](#incremental-predicate). |
 | `partition_by` | String | Column or expression used to partition the table. See [Partitioning and clustering](#partitioning-and-clustering). |
 | `cluster_by` | String[] | Columns used to cluster or sort the table. See [Partitioning and clustering](#partitioning-and-clustering). |
 
@@ -943,6 +943,7 @@ Some platforms do this differently. See [platform notes](#platform-notes).
 
 - Only keys present in the new result are touched. If the result contains no rows for `2024-03-01`, the existing rows for that date stay.
 - Because the batch is deleted and reinserted, rows that disappeared from the source within a batch are removed from the target. `merge` cannot do that.
+- On DuckDB, `incremental_predicate` narrows the delete. See [`incremental_predicate` with `delete+insert`](#incremental-predicate-delete-insert).
 - On Fabric, `delete+insert` matches on the primary key columns. `incremental_key` is still required by validation but is not used.
 
 #### `merge`
@@ -1077,6 +1078,43 @@ In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row des
 - Supported on BigQuery, Athena, Databricks, Doris, DuckDB, MSSQL, MySQL, Oracle, PostgreSQL, Snowflake, Spark, Synapse, and Vertica.
 - On ClickHouse, the predicate is added to the `DELETE` that removes matched rows, so it must reference the target's columns directly, without the `target.` or `source.` aliases.
 - Redshift and Fabric reject it. Redshift's `MERGE` only accepts equality predicates in its match condition. StarRocks ignores it, and Python and ingestr assets fail validation.
+
+###### With `delete+insert` on DuckDB {#incremental-predicate-delete-insert}
+
+On DuckDB, `incremental_predicate` also works with `delete+insert`. Bruin adds it to the `DELETE` that removes the batch, so the delete only removes target rows that match both the key and the predicate. When the key's values are spread across the table, as a random load ID is, DuckDB can't skip files or row groups on the key alone. A predicate on the table's partition or sort columns lets it skip them.
+
+The target table is aliased as `target`, and unqualified columns also refer to it. The staged query result has a generated name, so the predicate can't reference it.
+
+When it runs a DuckDB asset, Bruin renders the predicate with Jinja before it builds the statement, for `merge` and `delete+insert` alike. The predicate sees the same variables and macros as the query, so it can follow the run's [variables](../variables/overview.md).
+
+```bruin-sql
+/* @bruin
+
+name: analytics.board_members
+type: duckdb.sql
+
+materialization:
+  type: table
+  strategy: delete+insert
+  incremental_key: batch_id
+  incremental_predicate: target.region = '{{ var.region }}' AND target.period = {{ var.period }} # [!code focus]
+
+@bruin */
+
+SELECT batch_id, region, period, member_id
+FROM raw.board_members
+WHERE region = '{{ var.region }}' AND period = {{ var.period }}
+```
+
+With `--var region='"eu"' --var period=1086`, the delete becomes:
+
+```sql
+DELETE FROM analytics.board_members AS target
+WHERE batch_id IN (SELECT DISTINCT batch_id FROM <staged result>)
+  AND (target.region = 'eu' AND target.period = 1086); -- [!code focus]
+```
+
+Target rows that share a key with the new result but fall outside the predicate are kept, and the insert still adds every staged row. If the query can return rows outside the predicate, those keys end up duplicated. Make the predicate cover every row the query can return. Other platforms reject `incremental_predicate` with `delete+insert`.
 
 #### `time_interval` {#time-interval}
 
@@ -1622,6 +1660,7 @@ For `merge`:
 For `delete+insert`:
 
 - **ClickHouse** requires exactly one `primary_key` column.
+- **DuckDB** adds `incremental_predicate` to the delete when it is set. See [`incremental_predicate` with `delete+insert`](#incremental-predicate-delete-insert).
 - **Fabric** matches on the primary key columns and does not use `incremental_key`.
 - **Doris and StarRocks** build a new table from the remaining and new rows and swap it in. The new table does not keep your partitioning or distribution.
 - **Trino, Dremio, Sail, Spark, and Oracle** run the asset query twice instead of staging it in a temporary table. **Databricks** stages it in a temporary view, which is evaluated again by both the delete and the insert.

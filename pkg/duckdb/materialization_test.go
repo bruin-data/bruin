@@ -119,6 +119,44 @@ COMMIT;`,
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
 				"COMMIT;$",
 		},
+		{
+			name: "delete+insert adds the incremental predicate to the delete",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "batch_id",
+					IncrementalPredicate: " target.region = 'eu' AND period = 1086 ",
+				},
+			},
+			query: "SELECT 1",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"DELETE FROM my.asset AS target WHERE batch_id in \\(SELECT DISTINCT batch_id FROM __bruin_tmp_.+\\) AND \\(target.region = 'eu' AND period = 1086\\);\n" +
+				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "delete+insert ignores a blank incremental predicate",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "dt",
+					IncrementalPredicate: "   ",
+				},
+			},
+			query: "SELECT 1",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
+				"COMMIT;$",
+		},
 
 		{
 			name: "delete+insert semicolon comment out ",
