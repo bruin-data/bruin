@@ -4,11 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockExtractor struct {
@@ -226,6 +228,75 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestBasicOperator_RunTask_RendersIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	macros := "{% macro partition(alias='') -%}\n" +
+		"{{ alias ~ '.' if alias }}region = '{{ var.region }}' AND {{ alias ~ '.' if alias }}period = {{ var.period }}\n" +
+		"{%- endmacro %}"
+
+	tests := []struct {
+		name      string
+		predicate string
+	}{
+		{
+			name:      "variables",
+			predicate: "target.region = '{{ var.region }}' AND target.period = {{ var.period }}",
+		},
+		{
+			name:      "project macro",
+			predicate: "{{ partition('target') }}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			renderer := jinja.NewRendererWithMacros(jinja.Context{
+				"var": map[string]any{"region": "eu", "period": 1086},
+			}, macros)
+			client := new(mockQuerierWithResult)
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", mock.Anything).Return(client, nil)
+			client.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
+			client.On("Close").Return()
+
+			var ran []string
+			client.On("RunQueryWithoutResult", mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { ran = append(ran, args.Get(1).(*query.Query).Query) }).
+				Return(nil)
+
+			o := BasicOperator{
+				connection:   conn,
+				extractor:    &query.WholeFileExtractor{Renderer: renderer},
+				materializer: NewMaterializer(false),
+			}
+
+			asset := &pipeline.Asset{
+				Name: "bronze.board_member",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM raw.board_member WHERE {{ partition() }}",
+				},
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "batch_id",
+					IncrementalPredicate: tt.predicate,
+				},
+			}
+
+			require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, asset))
+			require.Len(t, ran, 1)
+			assert.Contains(t, ran[0], "SELECT * FROM raw.board_member WHERE region = 'eu' AND period = 1086;")
+			assert.Regexp(t,
+				`DELETE FROM bronze\.board_member AS target WHERE batch_id in \(SELECT DISTINCT batch_id FROM __bruin_tmp_\w+\) AND \(target\.region = 'eu' AND target\.period = 1086\);`,
+				ran[0])
+			assert.Equal(t, tt.predicate, asset.Materialization.IncrementalPredicate, "the shared asset keeps its template")
 		})
 	}
 }
