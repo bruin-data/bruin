@@ -334,6 +334,9 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		tempContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 		tempContext["this"] = asset.Name
 		tempContext["var"] = pipe.Variables.Value()
+		if pipe.SelectedVariant != "" {
+			tempContext["variant"] = pipe.SelectedVariant
+		}
 		tempRenderer := &Renderer{
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},

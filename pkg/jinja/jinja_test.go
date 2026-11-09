@@ -1516,4 +1516,18 @@ func TestRenderer_CloneForAsset_ExposesSelectedVariant(t *testing.T) {
 	require.NoError(t, err)
 	_, err = clonedRenderer.Render("{{ variant }}")
 	require.Error(t, err)
+
+	// Interval modifiers are rendered with a separate context; it must see the variant too.
+	assetWithModifier := &pipeline.Asset{
+		Name: "schema.asset",
+		IntervalModifiers: pipeline.IntervalModifiers{
+			Start: pipeline.TimeModifier{Template: "{% if variant == 'client_eu' %}-7d{% else %}-1d{% endif %}"},
+		},
+	}
+	modifierCtx := context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
+	clonedRenderer, err = baseRenderer.CloneForAsset(modifierCtx, withVariant, assetWithModifier)
+	require.NoError(t, err)
+	result, err = clonedRenderer.Render("{{ start_date }}")
+	require.NoError(t, err)
+	assert.Equal(t, "2023-12-25", result)
 }
