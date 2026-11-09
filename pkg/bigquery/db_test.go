@@ -3103,7 +3103,8 @@ func TestEnvMaxBillableBytesIsSentWithEachQuery(t *testing.T) {
 			}))
 			defer server.Close()
 
-			bq, err := bigquery.NewClient(t.Context(), "test-project",
+			bq, err := bigquery.NewClient(
+				t.Context(), "test-project",
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
 					ProjectID:   "test-project",
