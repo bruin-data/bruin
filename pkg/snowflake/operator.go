@@ -146,8 +146,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			return err
 		}
 	} else if t.Materialization.IsIceberg() && t.Materialization.Type == pipeline.MaterializationTypeTable {
-		// Snowflake can't turn a regular table into an Iceberg table in place, and every strategy
-		// would otherwise keep writing to the regular table or fail on it.
+		// Snowflake can't turn a regular table into an Iceberg table in place.
 		err = conn.EnsureIcebergTable(ctx, t)
 		if err != nil {
 			return err

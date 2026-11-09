@@ -630,12 +630,8 @@ func (db *DB) existingObject(ctx context.Context, asset *pipeline.Asset) (fqn st
 	return fqn, objectType, materializationType, isIceberg, nil
 }
 
-// RecreateTableOnMaterializationTypeMismatch drops the existing object when it doesn't match the
-// asset: a view where the asset is a table (or the other way around), or a regular table where the
-// asset is an Iceberg table. Snowflake can't CREATE OR REPLACE across these object types. An existing
-// Iceberg table is never dropped to change its type or format, and neither is a regular table for an
-// Iceberg DDL asset. Those return an error, except that assets
-// without a materialization and regular DDL assets leave an Iceberg table alone.
+// RecreateTableOnMaterializationTypeMismatch drops the existing object when its type or table format
+// doesn't match the asset. Iceberg tables are never dropped, and DDL assets never drop a table.
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
 	fqn, objectType, dbMaterializationType, isIceberg, err := db.existingObject(ctx, asset)
 	if err != nil || objectType == "" {
@@ -650,8 +646,7 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 	}
 
 	if isIceberg {
-		// Assets without a materialization manage their own objects, and DDL assets never replace
-		// an existing table.
+		// Assets without a materialization manage their own objects; DDL assets never replace a table.
 		if asset.Materialization.Type == pipeline.MaterializationTypeNone ||
 			(formatMismatch && asset.Materialization.Strategy == pipeline.MaterializationStrategyDDL) {
 			return nil
@@ -679,9 +674,8 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 	return nil
 }
 
-// EnsureIcebergTable fails when an Iceberg asset's name is already taken by a regular table or a view.
-// Snowflake can't convert those in place, and replacing them drops their data, so that is left to
-// a full refresh.
+// EnsureIcebergTable fails when an Iceberg asset's name is taken by a regular table or a view,
+// since Snowflake can't convert them in place. Replacing them is left to a full refresh.
 func (db *DB) EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) error {
 	fqn, objectType, _, isIceberg, err := db.existingObject(ctx, asset)
 	if err != nil || objectType == "" || isIceberg {
@@ -692,8 +686,7 @@ func (db *DB) EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) err
 	if objectType != "TABLE" {
 		existing = "a " + strings.ToLower(objectType)
 	}
-	// A full refresh can't replace a regular table for a DDL asset, and doesn't run for a
-	// refresh-restricted one; see RecreateTableOnMaterializationTypeMismatch.
+	// A full refresh doesn't replace a regular table for DDL assets or run for refresh-restricted ones.
 	fix := "run the asset with --full-refresh to replace it with an Iceberg table"
 	if (objectType == "TABLE" && asset.Materialization.Strategy == pipeline.MaterializationStrategyDDL) ||
 		(asset.RefreshRestricted != nil && *asset.RefreshRestricted) {
