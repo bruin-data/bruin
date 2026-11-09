@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,6 +78,29 @@ func (q *QueryValidatorRule) wrapRenderedHooks(ctx context.Context, p *pipeline.
 	return pipeline.WrapHooks(sql, renderedHooks, q.HookHoister, asset.Type), nil
 }
 
+// withRenderedIncrementalPredicate returns a copy of the asset whose
+// incremental_predicate is rendered with the asset's Jinja context, so the
+// materializer sees the same predicate a run would.
+func (q *QueryValidatorRule) withRenderedIncrementalPredicate(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) (*pipeline.Asset, error) {
+	if q.HookRenderer == nil || strings.TrimSpace(asset.Materialization.IncrementalPredicate) == "" {
+		return asset, nil
+	}
+
+	assetRenderer, err := q.HookRenderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create incremental_predicate renderer: %w", err)
+	}
+
+	rendered, err := assetRenderer.Render(asset.Materialization.IncrementalPredicate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render incremental_predicate: %w", err)
+	}
+
+	copied := *asset
+	copied.Materialization.IncrementalPredicate = strings.TrimSpace(rendered)
+	return &copied, nil
+}
+
 func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != q.TaskType {
@@ -128,7 +152,15 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	foundQuery := queries[0]
 
 	if q.Materializer != nil {
-		materialized, err := q.Materializer.Render(asset, foundQuery.Query)
+		materializedAsset, err := q.withRenderedIncrementalPredicate(ctx, p, asset)
+		if err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Failed to materialize query: %s", err),
+			})
+			return issues, nil
+		}
+		materialized, err := q.Materializer.Render(materializedAsset, foundQuery.Query)
 		if err != nil {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -237,6 +269,18 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 		return
 	}
 
+	materializedTask := task
+	if q.Materializer != nil {
+		materializedTask, err = q.withRenderedIncrementalPredicate(ctx, p, task)
+		if err != nil {
+			done <- append(issues, &Issue{
+				Task:        task,
+				Description: fmt.Sprintf("Failed to materialize query: %s", err),
+			})
+			return
+		}
+	}
+
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -252,7 +296,7 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 			start := time.Now()
 
 			if q.Materializer != nil {
-				materialized, err := q.Materializer.Render(task, foundQuery.Query)
+				materialized, err := q.Materializer.Render(materializedTask, foundQuery.Query)
 				if err != nil {
 					issues = append(issues, &Issue{
 						Task:        task,
