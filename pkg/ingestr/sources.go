@@ -777,10 +777,12 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "invoices"},
 		{Name: "commerce_payments"},
 		{Name: "taxes"},
+		{Name: "campaigns"},
 		{Name: "owners"},
 		{Name: "schemas"},
 		{Name: "pipelines"},
 		{Name: "pipeline_stages"},
+		{Name: "campaign_metrics"},
 	},
 
 	// Indeed - Job search platform
