@@ -768,6 +768,75 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-schema-prefix-env",
+			task: e2e.Task{
+				Name:    "render-schema-prefix-env",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--env", "env-schema-prefix",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_sql.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						`CREATE TABLE test_schema_prefix_test.check_prefix_sql AS SELECT 'test_' as prefix`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-schema-prefix-self-reference",
+			task: e2e.Task{
+				Name:    "render-schema-prefix-self-reference",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--env", "env-schema-prefix-query",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-query-test/assets/report_append.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					// render does not connect to the database, so only the asset's own
+					// table is prefixed; sp_raw is left as is.
+					Contains: []string{
+						`INSERT INTO test_sp_mart.report_append SELECT a.src FROM sp_raw.dev_and_prod AS a WHERE NOT EXISTS(SELECT 1 FROM test_sp_mart.report_append)`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-unknown-environment",
+			task: e2e.Task{
+				Name:    "render-unknown-environment",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--env", "env-does-not-exist",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_sql.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{`environment 'env-does-not-exist' not found`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "schema-prefix-sql",
 			task: e2e.Task{
 				Name:    "schema-prefix-sql",
@@ -2332,6 +2401,84 @@ func TestWorkflowTasks(t *testing.T) {
 							e2e.AssertByExitCode,
 							e2e.AssertByOutputJSON,
 						},
+					},
+				},
+			},
+		},
+		{
+			name: "query_with_schema_prefix",
+			workflow: e2e.Workflow{
+				Name: "query_with_schema_prefix",
+				Steps: []e2e.Task{
+					{
+						Name:    "query_with_schema_prefix: seed prod and dev tables",
+						Command: binary,
+						Args: []string{
+							"query", "--env", "env-schema-prefix-query-seed", "--connection", "duckdb-schema-prefix-query", "--output", "json",
+							"--query", "CREATE SCHEMA IF NOT EXISTS sp_raw; CREATE SCHEMA IF NOT EXISTS test_sp_raw; " +
+								"CREATE OR REPLACE TABLE sp_raw.dev_and_prod AS SELECT 'prod' AS src; " +
+								"CREATE OR REPLACE TABLE sp_raw.prod_only AS SELECT 'prod' AS src; " +
+								"CREATE OR REPLACE TABLE test_sp_raw.dev_and_prod AS SELECT 'dev' AS src;",
+						},
+						Env:      []string{},
+						Expected: e2e.Output{ExitCode: 0},
+						Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
+					},
+					{
+						Name:    "query_with_schema_prefix: direct query reads the prefixed table only where it exists",
+						Command: binary,
+						Args: []string{
+							"query", "--env", "env-schema-prefix-query", "--connection", "duckdb-schema-prefix-query", "--output", "json",
+							"--query", "SELECT a.src AS a_src, b.src AS b_src FROM sp_raw.dev_and_prod a CROSS JOIN sp_raw.prod_only b",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[["dev","prod"]]`, `FROM test_sp_raw.dev_and_prod AS a CROSS JOIN sp_raw.prod_only AS b`},
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+					},
+					{
+						Name:    "query_with_schema_prefix: direct query renders schema_prefix for the given environment",
+						Command: binary,
+						Args: []string{
+							"query", "--env", "env-schema-prefix-query", "--connection", "duckdb-schema-prefix-query", "--output", "json",
+							"--query", "SELECT '{{ schema_prefix }}' AS prefix",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[["test_"]]`},
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+					},
+					{
+						Name:    "query_with_schema_prefix: asset query renders and rewrites for the given environment",
+						Command: binary,
+						Args: []string{
+							"query", "--env", "env-schema-prefix-query", "--output", "json",
+							"--asset", filepath.Join(currentFolder, "test-pipelines/schema-prefix-query-test/assets/report.sql"),
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[["dev","prod","test_"]]`},
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+					},
+					{
+						Name:    "query_with_schema_prefix: asset query without a prefix reads prod",
+						Command: binary,
+						Args: []string{
+							"query", "--env", "env-schema-prefix-query-seed", "--output", "json",
+							"--asset", filepath.Join(currentFolder, "test-pipelines/schema-prefix-query-test/assets/report.sql"),
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{`"rows":[["prod","prod",""]]`},
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 					},
 				},
 			},
