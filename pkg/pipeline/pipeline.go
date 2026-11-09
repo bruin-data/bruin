@@ -1162,17 +1162,53 @@ type UnitTest struct {
 // dimension tables) instead of repeating them in every test. A test's own
 // inputs take precedence over a referenced fixture for the same asset.
 type Fixture struct {
-	Name  string                   `json:"name" yaml:"name" mapstructure:"name"`
-	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
-	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Name  string      `json:"name" yaml:"name" mapstructure:"name"`
+	Asset string      `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  FixtureRows `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
 }
 
 // UnitTestInput is a mocked table the asset's query reads from, identified by
 // the upstream asset name as it appears in the SQL. Rows are sparse: any column
 // not listed defaults to NULL.
 type UnitTestInput struct {
-	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
-	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Asset string      `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  FixtureRows `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+}
+
+// FixtureRows are the mock rows of a unit test input. YAML decodes both
+// 2026-10-09T11:00:00Z and 2026-10-09 11:00:00 to the same time.Time in
+// time.UTC, so decoding moves a value written with Z to an equal UTC location
+// of its own. A time.Time in time.UTC therefore always means no zone was
+// written, and any other location means one was.
+type FixtureRows []map[string]interface{}
+
+func (r *FixtureRows) UnmarshalYAML(value *yaml.Node) error {
+	var rows []map[string]fixtureCell
+	if err := value.Decode(&rows); err != nil {
+		return err
+	}
+	*r = make(FixtureRows, len(rows))
+	for i, row := range rows {
+		(*r)[i] = make(map[string]interface{}, len(row))
+		for k, cell := range row {
+			(*r)[i][k] = cell.value
+		}
+	}
+	return nil
+}
+
+type fixtureCell struct {
+	value interface{}
+}
+
+func (c *fixtureCell) UnmarshalYAML(value *yaml.Node) error {
+	if err := value.Decode(&c.value); err != nil {
+		return err
+	}
+	if t, ok := c.value.(time.Time); ok && strings.HasSuffix(value.Value, "Z") {
+		c.value = t.In(time.FixedZone("UTC", 0))
+	}
+	return nil
 }
 
 // UnitTestExpected describes the output a unit test asserts. Count and Rows are

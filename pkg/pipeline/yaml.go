@@ -349,8 +349,8 @@ type customCheck struct {
 }
 
 type unitTestInput struct {
-	Asset string                   `yaml:"asset"`
-	Rows  []map[string]interface{} `yaml:"rows"`
+	Asset string      `yaml:"asset"`
+	Rows  FixtureRows `yaml:"rows"`
 }
 
 type unitTestCTEExpected struct {
