@@ -1018,6 +1018,8 @@ The expression can reference two aliases:
 
 Provide only the expression, without a leading `WHERE` or `AND` and without a trailing semicolon.
 
+The expression is rendered with Jinja before it runs, so it can use the same variables as the asset query, such as `{{ start_date }}` or `{{ var.region }}`.
+
 The following BigQuery asset reads seven days from its source and restricts matching to the same seven days of the partitioned destination:
 
 ```bruin-sql

@@ -76,6 +76,50 @@ func TestRenderAssetHooks_Error(t *testing.T) {
 	assert.ErrorContains(t, err, "error rendering hooks for asset schema.asset")
 }
 
+func TestRenderAssetHooks_IncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "schema.asset",
+		Materialization: pipeline.Materialization{
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyMerge,
+			IncrementalPredicate: "target.region = '{{ var.region }}' AND target.dt >= '{{ start_date }}'",
+		},
+	}
+	p := &pipeline.Pipeline{
+		Name: "pipe",
+		Variables: pipeline.Variables{
+			"region": map[string]any{"type": "string", "default": "eu"},
+		},
+	}
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, startDate.Add(24*time.Hour))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "run-id")
+
+	err := renderAssetHooks(ctx, p, asset, jinja.NewRenderer(jinja.Context{}))
+	require.NoError(t, err)
+	assert.Equal(t, "target.region = 'eu' AND target.dt >= '2024-01-01'", asset.Materialization.IncrementalPredicate)
+}
+
+func TestRenderAssetHooks_IncrementalPredicateError(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "schema.asset",
+		Materialization: pipeline.Materialization{
+			IncrementalPredicate: "target.region = '{{ missing }}'",
+		},
+	}
+
+	err := renderAssetHooks(t.Context(), &pipeline.Pipeline{Name: "pipe"}, asset, jinja.NewRenderer(jinja.Context{}))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "error rendering incremental_predicate for asset schema.asset")
+}
+
 func TestRenderAssetParamsMutatorPreservesStructuredParameters(t *testing.T) {
 	t.Parallel()
 

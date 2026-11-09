@@ -151,6 +151,14 @@ func renderAssetHooks(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Ass
 	}
 	a.Hooks = renderedHooks
 
+	if strings.TrimSpace(a.Materialization.IncrementalPredicate) != "" {
+		renderedPredicate, err := assetRenderer.Render(a.Materialization.IncrementalPredicate)
+		if err != nil {
+			return fmt.Errorf("error rendering incremental_predicate for asset %s: %w", a.Name, err)
+		}
+		a.Materialization.IncrementalPredicate = strings.TrimSpace(renderedPredicate)
+	}
+
 	return nil
 }
 
