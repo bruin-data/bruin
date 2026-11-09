@@ -1490,3 +1490,30 @@ func TestRenderer_SchemaPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderer_CloneForAsset_ExposesSelectedVariant(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx := t.Context()
+	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, startDate.Add(24*time.Hour))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+	asset := &pipeline.Asset{Name: "schema.asset"}
+	baseRenderer := NewRendererWithStartEndDates(&startDate, &startDate, &startDate, "test-pipeline", "test-run-id", nil)
+
+	withVariant := &pipeline.Pipeline{Name: "test-pipeline", SelectedVariant: "client_eu"}
+	clonedRenderer, err := baseRenderer.CloneForAsset(ctx, withVariant, asset)
+	require.NoError(t, err)
+	result, err := clonedRenderer.Render("SELECT '{{ variant }}' AS variant")
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT 'client_eu' AS variant", result)
+
+	withoutVariant := &pipeline.Pipeline{Name: "test-pipeline"}
+	clonedRenderer, err = baseRenderer.CloneForAsset(ctx, withoutVariant, asset)
+	require.NoError(t, err)
+	_, err = clonedRenderer.Render("{{ variant }}")
+	require.Error(t, err)
+}
