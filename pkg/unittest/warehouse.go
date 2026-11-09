@@ -180,7 +180,7 @@ func fixtureSelect(input pipeline.UnitTestInput, schema []pipeline.Column, diale
 	for i, row := range input.Rows {
 		exprs := make([]string, len(cols))
 		for j, c := range cols {
-			lit := fixtureLiteral(row[c], dialect, declared[c])
+			lit := sqlLiteral(row[c], dialect, declared[c])
 			switch {
 			case row[c] != nil && isBigQueryJSON(dialect, declared[c]):
 				lit = "PARSE_JSON(" + bigQueryStringLiteral(jsonText(row[c])) + ")"
@@ -302,22 +302,8 @@ func normalizeName(s string) string {
 	return strings.ToLower(strings.ReplaceAll(s, `"`, ""))
 }
 
-func fixtureLiteral(v interface{}, dialect, typ string) string {
-	if dialect == "duckdb" && (typ == "" || strings.EqualFold(typ, "TIMESTAMPTZ") || strings.EqualFold(typ, "TIMESTAMP WITH TIME ZONE")) {
-		switch t := v.(type) {
-		case pipeline.FixtureTimestamp:
-			if t.HasTimezone() {
-				return quoteStringLiteral(t.Format(time.RFC3339Nano))
-			}
-		case time.Time:
-			return quoteStringLiteral(t.Format(time.RFC3339Nano))
-		}
-	}
-	return sqlLiteral(v)
-}
-
-// sqlLiteral renders a fixture value as a portable SQL literal.
-func sqlLiteral(v interface{}) string {
+// sqlLiteral renders a fixture value as a SQL literal.
+func sqlLiteral(v interface{}, dialect, typ string) string {
 	switch val := v.(type) {
 	case nil:
 		return "NULL"
@@ -339,6 +325,9 @@ func sqlLiteral(v interface{}) string {
 	case time.Time:
 		return quoteStringLiteral(formatTimeLiteral(val))
 	case pipeline.FixtureTimestamp:
+		if val.HasTimezone() && dialect == "duckdb" && (typ == "" || strings.EqualFold(typ, "TIMESTAMPTZ") || strings.EqualFold(typ, "TIMESTAMP WITH TIME ZONE")) {
+			return quoteStringLiteral(val.Format(time.RFC3339Nano))
+		}
 		return quoteStringLiteral(formatTimeLiteral(val.Time))
 	case string:
 		return quoteStringLiteral(val)
