@@ -1087,8 +1087,6 @@ On DuckDB, `incremental_predicate` also works with `delete+insert`. Bruin adds i
 
 The target table is aliased as `target`, and unqualified columns also refer to it. The staged query result has a generated name, so the predicate can't reference it.
 
-When it runs a DuckDB asset, Bruin renders the predicate with Jinja before it builds the statement, for `merge` and `delete+insert` alike. The predicate sees the same variables and macros as the query, so it can follow the run's [variables](../variables/overview.md).
-
 ```bruin-sql
 /* @bruin
 
