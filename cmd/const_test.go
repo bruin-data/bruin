@@ -105,6 +105,39 @@ func TestRenderAssetHooks_IncrementalPredicate(t *testing.T) {
 	assert.Equal(t, "target.region = 'eu' AND target.dt >= '2024-01-01'", asset.Materialization.IncrementalPredicate)
 }
 
+func TestRenderAssetHooks_IncrementalPredicateVariantAndMacro(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "schema.asset",
+		Materialization: pipeline.Materialization{
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyMerge,
+			IncrementalPredicate: "{{ region_filter() }} AND target.client = '{{ variant }}'",
+		},
+	}
+	p := &pipeline.Pipeline{
+		Name:            "pipe",
+		SelectedVariant: "client_eu",
+		Variables: pipeline.Variables{
+			"region": map[string]any{"type": "string", "default": "eu"},
+		},
+		Macros: []pipeline.Macro{
+			`{% macro region_filter() %}target.region = '{{ var.region }}'{% endmacro %}`,
+		},
+	}
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, startDate.Add(24*time.Hour))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "run-id")
+
+	err := renderAssetHooks(ctx, p, asset, jinja.NewRenderer(jinja.Context{}))
+	require.NoError(t, err)
+	assert.Equal(t, "target.region = 'eu' AND target.client = 'client_eu'", asset.Materialization.IncrementalPredicate)
+}
+
 func TestRenderAssetHooks_IncrementalPredicateError(t *testing.T) {
 	t.Parallel()
 
