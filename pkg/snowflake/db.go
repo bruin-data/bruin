@@ -631,7 +631,7 @@ func (db *DB) existingObject(ctx context.Context, asset *pipeline.Asset) (fqn st
 }
 
 // RecreateTableOnMaterializationTypeMismatch drops the existing object when its type or table format
-// doesn't match the asset. Iceberg tables are never dropped, and DDL assets never drop a table.
+// doesn't match the asset, since Snowflake can't CREATE OR REPLACE across them.
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
 	fqn, objectType, dbMaterializationType, isIceberg, err := db.existingObject(ctx, asset)
 	if err != nil || objectType == "" {
@@ -643,25 +643,6 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 		isIceberg != asset.Materialization.IsIceberg()
 	if dbMaterializationType == asset.Materialization.Type && !formatMismatch {
 		return nil
-	}
-
-	if isIceberg {
-		// Assets without a materialization manage their own objects; DDL assets never replace a table.
-		if asset.Materialization.Type == pipeline.MaterializationTypeNone ||
-			(formatMismatch && asset.Materialization.Strategy == pipeline.MaterializationStrategyDDL) {
-			return nil
-		}
-		return errors.Errorf(
-			"'%s' is an Iceberg table and Bruin doesn't drop Iceberg tables; "+
-				"set `materialization.table_format: iceberg` on a table asset to keep it, or drop it yourself to replace it",
-			fqn,
-		)
-	}
-	if formatMismatch && asset.Materialization.Strategy == pipeline.MaterializationStrategyDDL {
-		return errors.Errorf(
-			"'%s' is a regular table and the DDL strategy never drops tables; drop it yourself to recreate it as an Iceberg table",
-			fqn,
-		)
 	}
 
 	dropQuery := query.Query{
@@ -686,10 +667,9 @@ func (db *DB) EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) err
 	if objectType != "TABLE" {
 		existing = "a " + strings.ToLower(objectType)
 	}
-	// A full refresh doesn't replace a regular table for DDL assets or run for refresh-restricted ones.
+	// Refresh-restricted assets don't run a full refresh.
 	fix := "run the asset with --full-refresh to replace it with an Iceberg table"
-	if (objectType == "TABLE" && asset.Materialization.Strategy == pipeline.MaterializationStrategyDDL) ||
-		(asset.RefreshRestricted != nil && *asset.RefreshRestricted) {
+	if asset.RefreshRestricted != nil && *asset.RefreshRestricted {
 		fix = "drop it yourself to recreate it as an Iceberg table"
 	}
 	return errors.Errorf("'%s' already exists as %s; %s", fqn, existing, fix)

@@ -1050,10 +1050,13 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			},
 		},
 		{
-			name: "Iceberg table is kept when the asset is a regular table",
+			name: "Iceberg table is dropped when the asset is a regular table",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
@@ -1061,13 +1064,15 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 					Type: pipeline.MaterializationTypeTable,
 				},
 			},
-			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' is an Iceberg table and Bruin doesn't drop Iceberg tables",
 		},
 		{
-			name: "Iceberg table is kept when the asset is a view",
+			name: "Iceberg table is dropped when the asset is a view",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
@@ -1075,23 +1080,15 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 					Type: pipeline.MaterializationTypeView,
 				},
 			},
-			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' is an Iceberg table and Bruin doesn't drop Iceberg tables",
 		},
 		{
-			name: "Iceberg table is left alone for an asset without a materialization",
+			name: "Iceberg table is dropped for a regular DDL asset",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
-			},
-			asset: &pipeline.Asset{
-				Name: "test_schema.test_table",
-			},
-		},
-		{
-			name: "Iceberg table is left alone for a regular DDL asset",
-			mockSetup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
@@ -1102,10 +1099,13 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			},
 		},
 		{
-			name: "regular table is kept for an Iceberg DDL asset",
+			name: "regular table is dropped for an Iceberg DDL asset",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "NO"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
@@ -1115,7 +1115,6 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 					TableFormat: pipeline.MaterializationTableFormatIceberg,
 				},
 			},
-			expectedError: "the DDL strategy never drops tables",
 		},
 		{
 			name: "asset name with 1 component",
@@ -1206,13 +1205,7 @@ func TestDB_EnsureIcebergTable(t *testing.T) {
 			name:          "existing regular table for a DDL asset",
 			strategy:      pipeline.MaterializationStrategyDDL,
 			rows:          sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "NO"),
-			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a regular table; drop it yourself",
-		},
-		{
-			name:          "existing view for a DDL asset",
-			strategy:      pipeline.MaterializationStrategyDDL,
-			rows:          sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("VIEW", "NO"),
-			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a view; run the asset with --full-refresh",
+			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a regular table; run the asset with --full-refresh",
 		},
 		{
 			name:              "existing view for a refresh-restricted asset",
