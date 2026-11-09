@@ -74,10 +74,12 @@ parameters:
 | `invoices` | hs_object_id | hs_lastmodifieddate | merge | Retrieves invoice records. |
 | `commerce_payments` | hs_object_id | hs_lastmodifieddate | merge | Retrieves commerce payment records. |
 | `taxes` | hs_object_id | hs_lastmodifieddate | merge | Retrieves tax records. |
+| `campaigns` | hs_object_id | hs_lastmodifieddate | merge | Retrieves marketing campaigns. Requires the `marketing.campaigns.read` scope. |
 | `owners` | id | – | merge | Retrieves HubSpot users who can be assigned to CRM records. |
 | `schemas` | id | – | merge | Returns all object schemas that have been defined for your account. |
 | `pipelines` | object_type, pipeline_id | – | replace | Pipeline definitions across all pipelined object types. One row per pipeline. |
 | `pipeline_stages` | object_type, pipeline_id, stage_id | – | replace | Stage definitions for each pipeline. One row per stage. |
+| `campaign_metrics` | campaign_id | – | replace | All-time totals per campaign: influenced contacts, new contacts (first/last touch) and sessions. Join to `campaigns` on `hs_object_id`. Requires the `marketing.campaigns.read` scope. |
 
 ### Property History Tables
 
@@ -106,8 +108,9 @@ Use the format `property_history:<table>` as the `source_table` value. An option
 | `property_history:invoices` | hs_object_id, property_name, timestamp | timestamp | merge | Property change history for invoices. |
 | `property_history:commerce_payments` | hs_object_id, property_name, timestamp | timestamp | merge | Property change history for commerce payments. |
 | `property_history:taxes` | hs_object_id, property_name, timestamp | timestamp | merge | Property change history for taxes. |
+| `property_history:campaigns` | hs_object_id, property_name, timestamp | timestamp | merge | Property change history for campaigns. |
 
-> **Note:** The `owners` and `schemas` tables do not have history variants. Custom objects also support history via `property_history:custom:<objectType>` (e.g., `property_history:custom:myObject`).
+> **Note:** The `owners`, `schemas` and `campaign_metrics` tables do not have history variants. Custom objects also support history via `property_history:custom:<objectType>` (e.g., `property_history:custom:myObject`).
 
 ## Overriding associations
 
