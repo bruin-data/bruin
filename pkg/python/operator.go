@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
@@ -145,6 +146,10 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 	envVariables["BRUIN_THIS"] = t.Name
+	if executablePath, err := os.Executable(); err == nil {
+		envVariables["BRUIN_PATH"] = executablePath
+		envVariables["BRUIN_EXECUTABLE"] = executablePath
+	}
 	if t.Connection != "" {
 		envVariables["BRUIN_CONNECTION"] = t.Connection
 	}

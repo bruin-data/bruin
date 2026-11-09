@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const testModule = "path.to.module"
@@ -239,12 +241,17 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
+				executablePath, err := os.Executable()
+				require.NoError(t, err)
+
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.module == "path.to.module" &&
 						ec.envVariables["BRUIN_CONNECTION"] == "my_bigquery" &&
 						ec.envVariables["BRUIN_ASSET"] == "my-asset" &&
 						ec.envVariables["BRUIN_THIS"] == "my-asset" &&
-						ec.envVariables["BRUIN_PIPELINE"] == "test-pipeline"
+						ec.envVariables["BRUIN_PIPELINE"] == "test-pipeline" &&
+						ec.envVariables["BRUIN_PATH"] == executablePath &&
+						ec.envVariables["BRUIN_EXECUTABLE"] == executablePath
 				})).
 					Return(nil)
 			},

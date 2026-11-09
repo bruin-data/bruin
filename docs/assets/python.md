@@ -233,6 +233,7 @@ The following environment variables are available in every Python asset executio
 | `BRUIN_THIS`             | The name of the current Python asset                                                                              |
 | `BRUIN_CONNECTION`       | The connection name configured for the asset (only set if the asset has a `connection` defined)                   |
 | `BRUIN_CONNECTION_TYPES` | JSON object mapping secret injection keys to their connection types (e.g., `{"DATABASE": "postgres"}`). Only set if secrets are defined |
+| `BRUIN_PATH`             | Path to the running `bruin` binary. Use it to call Bruin commands from Python without relying on `PATH`. Also exported as `BRUIN_EXECUTABLE` |
 | `BRUIN_VARS`            | JSON document containing all pipeline variables (see [Pipeline Variables](#pipeline) section below)              |
 | `BRUIN_VARS_SCHEMA`     | JSON document containing the schema definition for pipeline variables (see [Variables](/variables/overview)) |
 | `PYTHONUNBUFFERED`      | Set to `1` to enable unbuffered Python output for real-time logging                                               |

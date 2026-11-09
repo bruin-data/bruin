@@ -92,6 +92,15 @@ func Render() *cli.Command {
 				Name:  "raw-query",
 				Usage: "output only the raw query",
 			},
+			&cli.BoolFlag{
+				Name:  "stdin",
+				Usage: "render raw SQL read from standard input, without an asset file; requires --connection",
+			},
+			&cli.StringFlag{
+				Name:    "connection",
+				Aliases: []string{"c"},
+				Usage:   "the connection used to render SQL from --stdin",
+			},
 			&cli.StringFlag{
 				Name:    "environment",
 				Aliases: []string{"e", "env"},
@@ -99,6 +108,10 @@ func Render() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			if c.Bool("stdin") {
+				return runRawQueryRender(ctx, c)
+			}
+
 			fullRefresh := c.Bool("full-refresh")
 
 			variantName := c.String("variant")
