@@ -24,7 +24,7 @@ func TestFixtureTimestampsAcrossTimezones(t *testing.T) {
 	parser, err := sqlparser.NewSQLParser(false)
 	require.NoError(t, err)
 	require.NoError(t, parser.Start())
-	defer parser.Close()
+	t.Cleanup(func() { require.NoError(t, parser.Close()) })
 
 	literals := []string{
 		"2026-10-09T11:00:00Z",
@@ -46,10 +46,12 @@ func TestFixtureTimestampsAcrossTimezones(t *testing.T) {
 
 	for _, zone := range []string{"UTC", "Europe/London"} {
 		t.Run(zone, func(t *testing.T) {
+			t.Parallel()
 			conn, err := duck.NewEphemeralConnection(duck.Config{Path: filepath.Join(t.TempDir(), "timestamps.duckdb")})
 			require.NoError(t, err)
 			for _, typ := range []string{"TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE", ""} {
 				t.Run(typ, func(t *testing.T) {
+					t.Parallel()
 					test := asset.UnitTests[0]
 					for range 2 {
 						sql, err := unittest.BuildWarehouseQuery(parser, "duckdb",
@@ -72,7 +74,9 @@ func TestFixtureTimestampsAcrossTimezones(t *testing.T) {
 						require.Equal(t, want, got)
 						encoded, err := yaml.Marshal(test)
 						require.NoError(t, err)
-						require.NoError(t, yaml.Unmarshal(encoded, &test))
+						var roundTripped pipeline.UnitTest
+						require.NoError(t, yaml.Unmarshal(encoded, &roundTripped))
+						test = roundTripped
 					}
 				})
 			}
