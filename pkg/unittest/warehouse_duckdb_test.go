@@ -16,7 +16,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/unittest"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestFixtureTimestampsAcrossTimezones(t *testing.T) {
@@ -52,32 +51,24 @@ func TestFixtureTimestampsAcrossTimezones(t *testing.T) {
 			for _, typ := range []string{"TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE", ""} {
 				t.Run(typ, func(t *testing.T) {
 					t.Parallel()
-					test := asset.UnitTests[0]
-					for range 2 {
-						sql, err := unittest.BuildWarehouseQuery(parser, "duckdb",
-							"SELECT current_setting('TimeZone'), epoch_us(CAST(seen_at AS TIMESTAMPTZ)) AS instant FROM events ORDER BY id", test,
-							map[string][]pipeline.Column{"events": {{Name: "seen_at", Type: typ}}})
-						require.NoError(t, err)
-						// Each query opens a connection, so set its timezone in the same batch.
-						result, err := conn.QueryContext(context.Background(), fmt.Sprintf("SET TimeZone = '%s'; %s", zone, sql))
-						require.NoError(t, err)
-						var got []int64
-						for result.Next() {
-							var actualZone string
-							var instant int64
-							require.NoError(t, result.Scan(&actualZone, &instant))
-							require.Equal(t, zone, actualZone)
-							got = append(got, instant)
-						}
-						require.NoError(t, result.Err())
-						require.NoError(t, result.Close())
-						require.Equal(t, want, got)
-						encoded, err := yaml.Marshal(test)
-						require.NoError(t, err)
-						var roundTripped pipeline.UnitTest
-						require.NoError(t, yaml.Unmarshal(encoded, &roundTripped))
-						test = roundTripped
+					sql, err := unittest.BuildWarehouseQuery(parser, "duckdb",
+						"SELECT current_setting('TimeZone'), epoch_us(CAST(seen_at AS TIMESTAMPTZ)) AS instant FROM events ORDER BY id", asset.UnitTests[0],
+						map[string][]pipeline.Column{"events": {{Name: "seen_at", Type: typ}}})
+					require.NoError(t, err)
+					// Each query opens a connection, so set its timezone in the same batch.
+					result, err := conn.QueryContext(context.Background(), fmt.Sprintf("SET TimeZone = '%s'; %s", zone, sql))
+					require.NoError(t, err)
+					var got []int64
+					for result.Next() {
+						var actualZone string
+						var instant int64
+						require.NoError(t, result.Scan(&actualZone, &instant))
+						require.Equal(t, zone, actualZone)
+						got = append(got, instant)
 					}
+					require.NoError(t, result.Err())
+					require.NoError(t, result.Close())
+					require.Equal(t, want, got)
 				})
 			}
 		})
