@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -194,20 +195,21 @@ func TestParseTypedQueryVars(t *testing.T) {
 func TestRenderCommandStdinRendersWithEnvironment(t *testing.T) { //nolint:paralleltest // uses t.Chdir
 	dir := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(dir, ".git"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".bruin.yml"), []byte(`
+	dbPath := filepath.ToSlash(filepath.Join(dir, "test.duckdb"))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".bruin.yml"), []byte(fmt.Sprintf(`
 environments:
   default:
     connections:
       duckdb:
         - name: local
-          path: ":memory:"
+          path: '%s'
   dev:
     schema_prefix: jane_
     connections:
       duckdb:
         - name: local
-          path: ":memory:"
-`), 0o600))
+          path: '%s'
+`, dbPath, dbPath)), 0o600))
 	t.Chdir(dir)
 
 	command := Render()
@@ -229,14 +231,15 @@ environments:
 func TestRenderCommandStdinConnectionAndEnvironmentErrors(t *testing.T) { //nolint:paralleltest // uses t.Chdir
 	dir := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(dir, ".git"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".bruin.yml"), []byte(`
+	dbPath := filepath.ToSlash(filepath.Join(dir, "test.duckdb"))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".bruin.yml"), []byte(fmt.Sprintf(`
 environments:
   default:
     connections:
       duckdb:
         - name: local
-          path: ":memory:"
-`), 0o600))
+          path: '%s'
+`, dbPath)), 0o600))
 	t.Chdir(dir)
 
 	run := func(args ...string) error {
