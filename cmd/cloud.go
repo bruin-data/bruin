@@ -4643,6 +4643,7 @@ func CloudConnectionSets() *cli.Command {
 			cloudConnectionSetsCreate(),
 			cloudConnectionSetsUpdate(),
 			cloudConnectionSetsDelete(),
+			cloudConnectionSetsCostLimit(),
 		},
 	}
 }
@@ -4681,9 +4682,9 @@ func cloudConnectionSetsList() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Name", "Created", "Updated"})
+			t.AppendHeader(table.Row{"ID", "Name", "Cost limit", "Created", "Updated"})
 			for _, s := range sets {
-				t.AppendRow(table.Row{s.ID, s.Name, s.CreatedAt, s.UpdatedAt})
+				t.AppendRow(table.Row{s.ID, s.Name, formatCostLimit(s.MaxQueryCost), s.CreatedAt, s.UpdatedAt})
 			}
 			t.Render()
 			return nil
@@ -4872,6 +4873,70 @@ func cloudConnectionSetsDelete() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func cloudConnectionSetsCostLimit() *cli.Command {
+	return &cli.Command{
+		Name:  "cost-limit",
+		Usage: "Set the max cost (USD) of a single BigQuery query run through Bruin Cloud with this set",
+		Description: "Bruin Cloud refuses BigQuery queries over the limit before they run, so nothing is billed. " +
+			"It applies to queries through Bruin Cloud (cloud query mode, the API and Bruin Cloud agents), not to queries run with credentials in your local .bruin.yml; " +
+			"for those, set max_query_cost on the connection. Needs the connection-set:cost-limit permission.",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+			&cli.FloatFlag{Name: "max-query-cost", Usage: "max cost of a single BigQuery query in USD (minimum 0.01)"},
+			&cli.BoolFlag{Name: "remove", Usage: "remove the limit"},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			if c.Int("set-id") <= 0 {
+				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
+				return cli.Exit("", 1)
+			}
+			if c.IsSet("max-query-cost") == c.Bool("remove") {
+				printError(errors.New("pass either --max-query-cost or --remove"), output, "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
+			var limit *float64
+			if !c.Bool("remove") {
+				value := c.Float("max-query-cost")
+				limit = &value
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			saved, err := client.SetConnectionSetCostLimit(ctx, c.Int("set-id"), limit)
+			if err != nil {
+				printError(err, output, "Failed to set the cost limit")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(map[string]any{"id": c.Int("set-id"), "max_query_cost": saved}, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Connection set %d cost limit: %s", c.Int("set-id"), formatCostLimit(saved)))
+			return nil
+		},
+	}
+}
+
+func formatCostLimit(limit *float64) string {
+	if limit == nil {
+		return "none"
+	}
+	return fmt.Sprintf("$%.2f per query", *limit)
 }
 
 // connectionSetInputsFromConfig reads each named connection from the local

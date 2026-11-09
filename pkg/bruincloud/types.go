@@ -335,10 +335,11 @@ type Connection struct {
 // ConnectionSet represents a Bruin Cloud connection set (dev-env secret): a named
 // bundle of connections an agent runs against via its connection_set_id.
 type ConnectionSet struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID           int      `json:"id"`
+	Name         string   `json:"name"`
+	MaxQueryCost *float64 `json:"max_query_cost"`
+	CreatedAt    string   `json:"created_at"`
+	UpdatedAt    string   `json:"updated_at"`
 }
 
 // Skill is a team skill-library entry — a named instruction snippet attached to

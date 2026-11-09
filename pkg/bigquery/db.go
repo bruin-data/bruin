@@ -36,7 +36,12 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/drive",
 }
 
-const bigQueryOnDemandCostPerTBUSD = 5.0
+// https://cloud.google.com/bigquery/pricing#on_demand_pricing
+const bigQueryOnDemandCostPerTiBUSD = 6.25
+
+func estimatedCostUSD(bytes int64) float64 {
+	return float64(bytes) / (1 << 40) * bigQueryOnDemandCostPerTiBUSD
+}
 
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
@@ -525,8 +530,10 @@ func (d *Client) shouldEnforceSoftQueryLimits(ctx context.Context) bool {
 
 func (d *Client) queryForExecution(ctx context.Context, queryString string) *bigquery.Query {
 	bqQuery := d.client.Query(queryString)
-	if d.config != nil && d.config.MaxBillableBytes != nil {
-		bqQuery.MaxBytesBilled = *d.config.MaxBillableBytes
+	if d.config != nil {
+		if limit := d.config.bytesBilledLimit(); limit != nil {
+			bqQuery.MaxBytesBilled = *limit
+		}
 	}
 	if d.isReadOnly() {
 		bqQuery.Location = d.client.Location
@@ -545,7 +552,7 @@ func (d *Client) validateQueryLimits(stats *bigquery.QueryStatistics, enforceSof
 	if estimatedBillableBytes == 0 {
 		estimatedBillableBytes = stats.TotalBytesProcessed
 	}
-	estimatedCost := float64(estimatedBillableBytes) / 1e12 * bigQueryOnDemandCostPerTBUSD
+	estimatedCost := estimatedCostUSD(estimatedBillableBytes)
 
 	var violations []string
 	if d.config.MaxBillableBytes != nil && estimatedBillableBytes > *d.config.MaxBillableBytes {
@@ -630,7 +637,7 @@ func (d *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRun
 		ConnectionType:      "bigquery",
 		Valid:               true,
 		TotalBytesProcessed: stats.TotalBytesProcessed,
-		EstimatedCostUSD:    float64(stats.TotalBytesProcessed) / 1e12 * bigQueryOnDemandCostPerTBUSD,
+		EstimatedCostUSD:    estimatedCostUSD(stats.TotalBytesProcessed),
 		StatementType:       stats.StatementType,
 	}
 

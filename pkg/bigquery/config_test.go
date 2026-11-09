@@ -204,3 +204,50 @@ func TestNewDB_ADCWarning(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxBillableBytesFromEnv(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	for _, tc := range []struct {
+		name    string
+		env     string
+		want    *int64
+		wantErr bool
+	}{
+		{name: "unset means no cap", env: ""},
+		{name: "positive integer", env: " 1000 ", want: int64Ptr(1000)},
+		{name: "invalid fails closed", env: "lots", wantErr: true},
+		{name: "zero fails closed", env: "0", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(MaxBillableBytesEnv, tc.env)
+
+			got, err := MaxBillableBytesFromEnv()
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestBytesBilledLimitTakesTheStricterCap(t *testing.T) {
+	t.Parallel()
+
+	require.Nil(t, Config{}.bytesBilledLimit())
+	require.Equal(t, int64Ptr(500), Config{MaxBillableBytes: int64Ptr(500)}.bytesBilledLimit())
+	require.Equal(t, int64Ptr(1000), Config{EnvMaxBillableBytes: int64Ptr(1000)}.bytesBilledLimit())
+	require.Equal(t, int64Ptr(1000), Config{MaxBillableBytes: int64Ptr(5000), EnvMaxBillableBytes: int64Ptr(1000)}.bytesBilledLimit())
+	require.Equal(t, int64Ptr(500), Config{MaxBillableBytes: int64Ptr(500), EnvMaxBillableBytes: int64Ptr(1000)}.bytesBilledLimit())
+}
+
+func TestEnvCapAloneDoesNotTriggerTheDryRunCheck(t *testing.T) {
+	t.Parallel()
+
+	client := &Client{config: &Config{EnvMaxBillableBytes: int64Ptr(1000)}}
+	require.False(t, client.hasActiveQueryLimits(t.Context()))
+}
+
+func int64Ptr(v int64) *int64 {
+	return &v
+}

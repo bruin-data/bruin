@@ -44,6 +44,17 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
           max_query_cost_soft: 0.50 # USD
 ```
 
+### Query cost limits
+
+There are two places to cap what a BigQuery query can cost. Which one applies depends on where the query runs:
+
+| Where the query runs | Where to set the limit |
+|---|---|
+| Locally, with credentials from your `.bruin.yml` | `max_query_cost` / `max_billable_bytes` (and the `_soft` variants) on the connection, as above |
+| Through Bruin Cloud: cloud query mode (`use_cloud`), the Bruin Cloud API, Bruin Cloud agents | The connection set's cost limit, in the Bruin Cloud app or with [`bruin cloud connection-sets cost-limit`](../commands/cloud.md#cost-limit) |
+
+Costs are estimated at BigQuery's on-demand price of $6.25 per TiB. Bruin Cloud passes its limit to agent runs as the `BRUIN_BIGQUERY_MAX_BILLABLE_BYTES` environment variable. When it is set, the stricter of it and the connection's `max_billable_bytes` is sent to BigQuery with each SQL query, and BigQuery refuses queries that would bill more. It doesn't apply to ingestr or Python assets, which don't run through Bruin's BigQuery client.
+
 ### Authentication Options
 
 Bruin supports three authentication methods for BigQuery connections, listed in order of precedence:

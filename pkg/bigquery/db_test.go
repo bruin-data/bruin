@@ -402,7 +402,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 			stats: &bigquery.QueryStatistics{
 				TotalBytesProcessed: 3_000_000_000,
 			},
-			wantErr: "BigQuery query exceeds configured cost limits: estimated query cost $0.015000 exceeds max_query_cost $0.010000. Query was not executed",
+			wantErr: "BigQuery query exceeds configured cost limits: estimated query cost $0.017053 exceeds max_query_cost $0.010000. Query was not executed",
 		},
 		{
 			name: "uses billed bytes when available",
@@ -433,7 +433,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 				TotalBytesProcessed: 1_001,
 			},
 			enforceSoftLimits: true,
-			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $5.005e-09. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $5.690e-09. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
 		},
 		{
 			name: "soft query cost over limit",
@@ -444,7 +444,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 				TotalBytesProcessed: 3_000_000_000,
 			},
 			enforceSoftLimits: true,
-			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.015000 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.015000. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.017053 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.017053. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
 		},
 	}
 

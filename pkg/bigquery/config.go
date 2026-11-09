@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"golang.org/x/oauth2/google"
 )
@@ -22,7 +24,37 @@ type Config struct {
 	MaxQueryCost                     *float64
 	MaxBillableBytesSoft             *int64
 	MaxQueryCostSoft                 *float64
+	EnvMaxBillableBytes              *int64
 	ReadOnly                         bool
+}
+
+// MaxBillableBytesEnv lets Bruin Cloud cap every BigQuery connection of an agent run.
+const MaxBillableBytesEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES"
+
+func MaxBillableBytesFromEnv() (*int64, error) {
+	raw := strings.TrimSpace(os.Getenv(MaxBillableBytesEnv))
+	if raw == "" {
+		return nil, nil //nolint:nilnil // unset means no cap
+	}
+
+	limit, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || limit <= 0 {
+		return nil, fmt.Errorf("%s must be a positive integer, got %q", MaxBillableBytesEnv, raw)
+	}
+
+	return &limit, nil
+}
+
+// The env cap is only sent to BigQuery, never dry-run first like max_billable_bytes, so scripts a dry run can't plan still run.
+func (c Config) bytesBilledLimit() *int64 {
+	if c.EnvMaxBillableBytes == nil {
+		return c.MaxBillableBytes
+	}
+	if c.MaxBillableBytes != nil && *c.MaxBillableBytes < *c.EnvMaxBillableBytes {
+		return c.MaxBillableBytes
+	}
+
+	return c.EnvMaxBillableBytes
 }
 
 func (c Config) IsValid() bool {

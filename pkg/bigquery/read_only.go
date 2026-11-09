@@ -33,8 +33,8 @@ func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.Quer
 		UseLegacySql: &useLegacySQL,
 		Location:     d.config.Location,
 	}
-	if d.config.MaxBillableBytes != nil {
-		req.MaximumBytesBilled = *d.config.MaxBillableBytes
+	if limit := d.config.bytesBilledLimit(); limit != nil {
+		req.MaximumBytesBilled = *limit
 	}
 	resp, err := d.readOnlyService.Jobs.Query(d.config.ProjectID, req).Context(ctx).Do()
 	if err != nil {
