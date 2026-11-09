@@ -376,11 +376,7 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-// buildDeleteStatement deletes the target rows matching keyCondition. The
-// optional incremental_predicate narrows the delete so BigQuery can prune
-// partitions the key alone cannot. The target is aliased as `target` so the
-// predicate can be shared with a merge asset; unqualified columns also
-// resolve to the target.
+// buildDeleteStatement narrows the delete with incremental_predicate when set.
 func buildDeleteStatement(asset *pipeline.Asset, keyCondition string) string {
 	target := asset.Name
 	conditions := []string{keyCondition}
