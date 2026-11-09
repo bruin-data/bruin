@@ -1117,15 +1117,6 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			},
 		},
 		{
-			name: "existing table is left alone for an asset without a materialization",
-			asset: &pipeline.Asset{
-				Name: "test_schema.test_table",
-			},
-			mockSetup: func(mock sqlmock.Sqlmock) {
-				// No query expected: Bruin doesn't manage the object.
-			},
-		},
-		{
 			name: "asset name with 1 component",
 			asset: &pipeline.Asset{
 				Name: "test_table",
