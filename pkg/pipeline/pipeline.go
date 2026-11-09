@@ -1182,17 +1182,17 @@ type UnitTest struct {
 // dimension tables) instead of repeating them in every test. A test's own
 // inputs take precedence over a referenced fixture for the same asset.
 type Fixture struct {
-	Name  string                   `json:"name" yaml:"name" mapstructure:"name"`
-	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
-	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Name  string      `json:"name" yaml:"name" mapstructure:"name"`
+	Asset string      `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  FixtureRows `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
 }
 
 // UnitTestInput is a mocked table the asset's query reads from, identified by
 // the upstream asset name as it appears in the SQL. Rows are sparse: any column
 // not listed defaults to NULL.
 type UnitTestInput struct {
-	Asset string                   `json:"asset" yaml:"asset" mapstructure:"asset"`
-	Rows  []map[string]interface{} `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
+	Asset string      `json:"asset" yaml:"asset" mapstructure:"asset"`
+	Rows  FixtureRows `json:"rows,omitempty" yaml:"rows,omitempty" mapstructure:"rows"`
 }
 
 // UnitTestExpected describes the output a unit test asserts. Count and Rows are

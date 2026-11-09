@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestCreateTaskFromYamlDefinition(t *testing.T) {
@@ -666,6 +667,27 @@ func TestCheckRetries(t *testing.T) {
 	require.NotNil(t, got.CustomChecks[0].Retries)
 	require.Equal(t, 3, *got.CustomChecks[0].Retries)
 	require.Nil(t, got.CustomChecks[1].Retries)
+}
+
+func TestFixtureRowsAliasesAndOtherValues(t *testing.T) {
+	t.Parallel()
+	var fixture pipeline.Fixture
+	require.NoError(t, yaml.Unmarshal([]byte(`
+name: events
+asset: events
+rows:
+  - &base {at: &stamp 2026-10-09T11:00:00Z, quoted: "2026-10-09T11:00:00Z", id: 1, enabled: true, empty: null, nested: {key: value}}
+  - {<<: *base, at: *stamp}
+  - null
+`), &fixture))
+	require.Equal(t, fixture.Rows[0], fixture.Rows[1])
+	require.True(t, fixture.Rows[1]["at"].(pipeline.FixtureTimestamp).HasTimezone())
+	require.Equal(t, "2026-10-09T11:00:00Z", fixture.Rows[0]["quoted"])
+	require.Equal(t, 1, fixture.Rows[0]["id"])
+	require.Equal(t, true, fixture.Rows[0]["enabled"])
+	require.Nil(t, fixture.Rows[0]["empty"])
+	require.Equal(t, map[string]interface{}{"key": "value"}, fixture.Rows[0]["nested"])
+	require.Nil(t, fixture.Rows[2])
 }
 
 func TestUnitTestsParsing(t *testing.T) {
