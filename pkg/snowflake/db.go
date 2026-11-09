@@ -570,6 +570,11 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 }
 
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
+	// Assets without a materialization manage their own objects.
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+
 	tableComponents := strings.Split(asset.Name, ".")
 	var databaseName string
 	var schemaName string
