@@ -645,6 +645,21 @@ const (
 	MaterializationStrategyDataVaultSatellite MaterializationStrategy        = "datavault_satellite"
 )
 
+type MaterializationTableFormat string
+
+const (
+	MaterializationTableFormatDefault MaterializationTableFormat = ""
+	MaterializationTableFormatIceberg MaterializationTableFormat = "iceberg"
+)
+
+// tableFormatAssetTypes lists the asset types that can create tables in a non-default table format.
+var tableFormatAssetTypes = map[AssetType]bool{}
+
+// SupportsTableFormat reports whether assets of this type can set materialization.table_format.
+func (a AssetType) SupportsTableFormat() bool {
+	return tableFormatAssetTypes[a]
+}
+
 // IsDataVault reports whether the strategy is one of the Data Vault loading strategies.
 // These carry their own full-refresh handling, so they must never be silently swapped
 // for another strategy on a platform that does not implement them.
@@ -680,14 +695,19 @@ type Materialization struct {
 	IncrementalKey       string                         `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
 	IncrementalPredicate string                         `json:"incremental_predicate" yaml:"incremental_predicate,omitempty" mapstructure:"incremental_predicate"`
 	TimeGranularity      MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
+	TableFormat          MaterializationTableFormat     `json:"table_format,omitempty" yaml:"table_format,omitempty" mapstructure:"table_format"`
 }
 
 func (m Materialization) IsSCD2() bool {
 	return m.Strategy == MaterializationStrategySCD2ByColumn || m.Strategy == MaterializationStrategySCD2ByTime
 }
 
+func (m Materialization) IsIceberg() bool {
+	return m.TableFormat == MaterializationTableFormatIceberg
+}
+
 func (m Materialization) MarshalJSON() ([]byte, error) {
-	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.IncrementalPredicate == "" && m.TimeGranularity == "" {
+	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.IncrementalPredicate == "" && m.TimeGranularity == "" && m.TableFormat == "" {
 		return []byte("null"), nil
 	}
 
@@ -3451,6 +3471,12 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	appendMissingStringValues(&asset.Domains, defaults.Domains)
 	appendMissingStringValues(&asset.Extends, defaults.Extends)
 	mergeMaterializationDefaults(&asset.Materialization, defaults.Materialization)
+	// The table format default only applies where it is supported, so other assets in the pipeline
+	// still pass lint without a way to opt out of it.
+	if asset.Materialization.TableFormat == "" && asset.Type.SupportsTableFormat() &&
+		asset.Materialization.Type == MaterializationTypeTable {
+		asset.Materialization.TableFormat = MaterializationTableFormat(strings.ToLower(string(defaults.Materialization.TableFormat)))
+	}
 	asset.Upstreams = appendMissingUpstreams(asset.Upstreams, defaults.Upstreams)
 	mergeColumnDefaults(asset, defaults.Columns)
 	mergeCustomCheckDefaults(asset, defaults.CustomChecks)

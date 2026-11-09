@@ -1537,6 +1537,32 @@ func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline,
 	return issues, nil
 }
 
+// tableFormatIssues validates materialization.table_format: the value must be known, the asset type must
+// support it, and it only applies to table materializations.
+func tableFormatIssues(asset *pipeline.Asset) []*Issue {
+	tableFormat := asset.Materialization.TableFormat
+	switch {
+	case tableFormat == pipeline.MaterializationTableFormatDefault:
+		return nil
+	case tableFormat != pipeline.MaterializationTableFormatIceberg:
+		return []*Issue{{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization table_format '%s' is not supported, the only supported value is 'iceberg'", tableFormat),
+		}}
+	case !asset.Type.SupportsTableFormat():
+		return []*Issue{{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization table_format '%s' is not supported for %s assets", tableFormat, asset.Type),
+		}}
+	case asset.Materialization.Type != pipeline.MaterializationTypeTable:
+		return []*Issue{{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization table_format '%s' requires the materialization type to be 'table'", tableFormat),
+		}}
+	}
+	return nil
+}
+
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	for _, option := range []struct {
@@ -1572,6 +1598,8 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
 		}
 	}
+
+	issues = append(issues, tableFormatIssues(asset)...)
 
 	if asset.Type == pipeline.AssetTypeInference {
 		if err := inference.ValidateAsset(asset); err != nil {

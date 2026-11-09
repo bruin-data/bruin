@@ -442,6 +442,27 @@ bigquery:
 	require.NoError(t, pipeline.ValidateAssetYAML(fs, "bigquery.sql", pipeline.CommentTask))
 }
 
+func TestConvertYamlToTask_TableFormat(t *testing.T) {
+	t.Parallel()
+
+	definition := strings.TrimSpace(`
+name: analytics.events
+type: sf.sql
+materialization:
+  type: table
+  table_format: Iceberg
+`)
+	task, err := pipeline.ConvertYamlToTask([]byte(definition))
+	require.NoError(t, err)
+	require.Equal(t, pipeline.MaterializationTableFormatIceberg, task.Materialization.TableFormat)
+	require.True(t, task.Materialization.IsIceberg())
+
+	fs := afero.NewMemMapFs()
+	content := "/* @bruin\n" + definition + "\n@bruin */\n\nSELECT 1"
+	require.NoError(t, afero.WriteFile(fs, "events.sql", []byte(content), 0o644))
+	require.NoError(t, pipeline.ValidateAssetYAML(fs, "events.sql", pipeline.CommentTask))
+}
+
 func TestConvertYamlToTask_Timeout(t *testing.T) {
 	t.Parallel()
 

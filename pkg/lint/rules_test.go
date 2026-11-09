@@ -1582,6 +1582,58 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseSCD2(t *testing.T) {
 	}
 }
 
+func TestEnsureMaterializationValuesAreValid_TableFormat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		assetType pipeline.AssetType
+		matType   pipeline.MaterializationType
+		format    pipeline.MaterializationTableFormat
+		want      []string
+	}{
+		{
+			name:      "no table format",
+			assetType: pipeline.AssetTypeSnowflakeQuery,
+			matType:   pipeline.MaterializationTypeTable,
+		},
+		{
+			name:      "unknown table format",
+			assetType: pipeline.AssetTypeSnowflakeQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			format:    "delta",
+			want:      []string{"Materialization table_format 'delta' is not supported, the only supported value is 'iceberg'"},
+		},
+		{
+			name:      "Iceberg on an asset type that does not support it",
+			assetType: pipeline.AssetTypePostgresQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			format:    pipeline.MaterializationTableFormatIceberg,
+			want:      []string{"Materialization table_format 'iceberg' is not supported for pg.sql assets"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Type: tt.assetType,
+				Materialization: pipeline.Materialization{
+					Type:        tt.matType,
+					TableFormat: tt.format,
+				},
+			}
+			issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			descriptions := make([]string, 0, len(issues))
+			for _, issue := range issues {
+				descriptions = append(descriptions, issue.Description)
+			}
+			assert.ElementsMatch(t, tt.want, descriptions)
+		})
+	}
+}
+
 func TestEnsureMaterializationValuesAreValid_SCD2ReservedColumns(t *testing.T) {
 	t.Parallel()
 
