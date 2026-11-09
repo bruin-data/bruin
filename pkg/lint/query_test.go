@@ -136,6 +136,95 @@ func TestQueryValidatorRule_ValidateAssetWithHookScope(t *testing.T) {
 	connections.AssertExpectations(t)
 }
 
+func TestQueryValidatorRule_RendersIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		validate func(ctx context.Context, rule *QueryValidatorRule, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
+	}{
+		{
+			name: "asset level",
+			validate: func(ctx context.Context, rule *QueryValidatorRule, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				return rule.ValidateAsset(ctx, p, asset)
+			},
+		},
+		{
+			name: "pipeline level",
+			validate: func(ctx context.Context, rule *QueryValidatorRule, p *pipeline.Pipeline, _ *pipeline.Asset) ([]*Issue, error) {
+				return rule.Validate(ctx, p)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			startDate := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2024, time.January, 31, 0, 0, 0, 0, time.UTC)
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+			asset := &pipeline.Asset{
+				Name: "dataset.table",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "asset query",
+				},
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyMerge,
+					IncrementalPredicate: "target.region = '{{ var.region }}' AND target.dt >= '{{ start_date }}'",
+				},
+			}
+			p := &pipeline.Pipeline{
+				Name:   "test-pipeline",
+				Assets: []*pipeline.Asset{asset},
+				Variables: pipeline.Variables{
+					"region": map[string]any{"type": "string", "default": "eu"},
+				},
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "gcp-conn",
+				},
+			}
+
+			extractor := new(mockExtractor)
+			extractor.On("CloneForAsset", mock.Anything, p, asset).Return(extractor, nil)
+			extractor.On("ExtractQueriesFromString", "asset query").Return([]*query.Query{{Query: "select 1"}}, nil)
+
+			materializer := new(mockMaterializer)
+			materializer.On("Render", mock.MatchedBy(func(a *pipeline.Asset) bool {
+				return a.Materialization.IncrementalPredicate == "target.region = 'eu' AND target.dt >= '2024-01-01'"
+			}), "select 1").Return("MERGE dataset.table", nil)
+
+			validator := new(mockValidator)
+			validator.On("IsValid", mock.Anything, mock.Anything).Return(true, nil)
+
+			connections := new(mockConnectionManager)
+			connections.On("GetConnection", "gcp-conn").Return(validator)
+
+			rule := &QueryValidatorRule{
+				TaskType:     pipeline.AssetTypeBigqueryQuery,
+				Connections:  connections,
+				Extractor:    extractor,
+				Materializer: materializer,
+				HookRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &endDate, "test-pipeline", "test-run-id", nil),
+				WorkerCount:  1,
+				Logger:       zap.NewNop().Sugar(),
+			}
+
+			issues, err := tt.validate(ctx, rule, p, asset)
+			require.NoError(t, err)
+			assert.Empty(t, issues)
+			materializer.AssertExpectations(t)
+			assert.Equal(t, "target.region = '{{ var.region }}' AND target.dt >= '{{ start_date }}'", asset.Materialization.IncrementalPredicate, "the shared asset must not be changed")
+		})
+	}
+}
+
 func TestQueryValidatorRule_ValidateAssetWithPipelineMacro(t *testing.T) {
 	t.Parallel()
 
