@@ -317,6 +317,109 @@ func TestBasicOperator_RunTask_WarehouseOverride(t *testing.T) {
 	})
 }
 
+func TestBasicOperator_RunTask_Iceberg(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		materialization   pipeline.Materialization
+		fullRefresh       bool
+		refreshRestricted bool
+		wantEnsure        bool
+		wantRecreate      bool
+	}{
+		{
+			name: "Iceberg create+replace checks the existing table",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyCreateReplace,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			wantEnsure: true,
+		},
+		{
+			name: "Iceberg merge checks the existing table",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyMerge,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			wantEnsure: true,
+		},
+		{
+			name: "Iceberg full refresh replaces a mismatched object",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyCreateReplace,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			fullRefresh:  true,
+			wantRecreate: true,
+		},
+		{
+			name: "refresh-restricted Iceberg asset checks the existing table on full refresh",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyCreateReplace,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			fullRefresh:       true,
+			refreshRestricted: true,
+			wantEnsure:        true,
+		},
+		{
+			name: "regular create+replace leaves the check to full refresh",
+			materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyCreateReplace,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := new(mockQuerierWithResult)
+			client.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
+			client.On("RecreateTableOnMaterializationTypeMismatch", mock.Anything, mock.Anything).Return(nil)
+			client.On("EnsureIcebergTable", mock.Anything, mock.Anything).Return(nil)
+			client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "materialized"}).Return(nil)
+
+			extractor := new(mockExtractor)
+			extractor.On("ExtractQueriesFromString", "some content").Return([]*query.Query{{Query: "select 1"}}, nil)
+			preExtractor := new(mockExtractor)
+			preExtractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(extractor, nil)
+			mat := new(mockMaterializer)
+			mat.On("Render", mock.Anything, "select 1").Return("materialized", nil)
+			mat.On("IsFullRefresh").Return(tt.fullRefresh)
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", mock.Anything).Return(client)
+
+			o := BasicOperator{connection: conn, extractor: preExtractor, materializer: mat}
+			require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
+				Name:              "my.asset",
+				Type:              pipeline.AssetTypeSnowflakeQuery,
+				ExecutableFile:    pipeline.ExecutableFile{Path: "test-file.sql", Content: "some content"},
+				Materialization:   tt.materialization,
+				RefreshRestricted: &tt.refreshRestricted,
+			}))
+
+			if tt.wantEnsure {
+				client.AssertCalled(t, "EnsureIcebergTable", mock.Anything, mock.Anything)
+			} else {
+				client.AssertNotCalled(t, "EnsureIcebergTable", mock.Anything, mock.Anything)
+			}
+			if tt.wantRecreate {
+				client.AssertCalled(t, "RecreateTableOnMaterializationTypeMismatch", mock.Anything, mock.Anything)
+			} else {
+				client.AssertNotCalled(t, "RecreateTableOnMaterializationTypeMismatch", mock.Anything, mock.Anything)
+			}
+			client.AssertCalled(t, "RunQueryWithoutResult", mock.Anything, &query.Query{Query: "materialized"})
+		})
+	}
+}
+
 func TestQuerySensorTimesOutWhenConfigured(t *testing.T) {
 	t.Parallel()
 

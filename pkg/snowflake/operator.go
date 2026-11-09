@@ -38,6 +38,7 @@ type SfClient interface {
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 	PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error
 	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error
+	EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) error
 	SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
@@ -141,6 +142,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	fullRefresh := t.FullRefreshEnabled(o.materializer.IsFullRefresh())
 	if fullRefresh {
 		err = conn.RecreateTableOnMaterializationTypeMismatch(ctx, t)
+		if err != nil {
+			return err
+		}
+	} else if t.Materialization.IsIceberg() && t.Materialization.Type == pipeline.MaterializationTypeTable {
+		// Snowflake can't turn a regular table into an Iceberg table in place, and every strategy
+		// would otherwise keep writing to the regular table or fail on it.
+		err = conn.EnsureIcebergTable(ctx, t)
 		if err != nil {
 			return err
 		}
