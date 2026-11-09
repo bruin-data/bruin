@@ -1018,6 +1018,8 @@ The expression can reference two aliases:
 
 Provide only the expression, without a leading `WHERE` or `AND` and without a trailing semicolon.
 
+The expression is rendered with Jinja before it runs, so it can use the same variables as the asset query, such as <code v-pre>{{ start_date }}</code> or <code v-pre>{{ var.region }}</code>.
+
 The following BigQuery asset reads seven days from its source and restricts matching to the same seven days of the partitioned destination:
 
 ```bruin-sql
@@ -1084,8 +1086,6 @@ In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row des
 On DuckDB, `incremental_predicate` also works with `delete+insert`. Bruin adds it to the `DELETE` that removes the batch, so the delete only removes target rows that match both the key and the predicate. When the key's values are spread across the table, as a random load ID is, DuckDB can't skip files or row groups on the key alone. A predicate on the table's partition or sort columns lets it skip them.
 
 The target table is aliased as `target`, and unqualified columns also refer to it. The staged query result has a generated name, so the predicate can't reference it.
-
-When it runs a DuckDB asset, Bruin renders the predicate with Jinja before it builds the statement, for `merge` and `delete+insert` alike. The predicate sees the same variables and macros as the query, so it can follow the run's [variables](../variables/overview.md).
 
 ```bruin-sql
 /* @bruin
