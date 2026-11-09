@@ -72,7 +72,7 @@ func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) 
 	if writer == nil {
 		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
 	}
-	message := "Full refresh detected, but DDL strategy is in use — table will NOT be dropped or recreated.\n"
+	message := "Full refresh detected, but DDL strategy is in use — table will NOT be dropped or recreated unless its type or table format has to change.\n"
 	writerObj, ok := writer.(io.Writer)
 	if !ok {
 		return errors.New("writer is not an io.Writer")
