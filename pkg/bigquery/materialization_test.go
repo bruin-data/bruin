@@ -313,6 +313,47 @@ COMMIT TRANSACTION;`,
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "delete+insert adds the incremental predicate to the delete",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "batch_id",
+					IncrementalPredicate: " target.dt >= '2026-07-01' ",
+				},
+			},
+			query: "SELECT 1",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"DELETE FROM my\\.asset AS target WHERE batch_id in \\(SELECT DISTINCT batch_id FROM __bruin_tmp_.+\\) AND \\(target\\.dt >= '2026-07-01'\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "delete+insert with a typed key adds the incremental predicate to the delete",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "batch_id",
+					IncrementalPredicate: "target.dt >= '2026-07-01'",
+				},
+				Columns: []pipeline.Column{
+					{Name: "batch_id", Type: "string"},
+				},
+			},
+			query: "SELECT 1",
+			want: "^DECLARE distinct_keys.+ array<string>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct batch_id\\) FROM __bruin_tmp_.+\\);\n" +
+				"DELETE FROM my\\.asset AS target WHERE batch_id in unnest\\(distinct_keys.+\\) AND \\(target\\.dt >= '2026-07-01'\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "delete+insert required partition filter must use the incremental key",
 			task: &pipeline.Asset{
 				Name: "my.asset",
