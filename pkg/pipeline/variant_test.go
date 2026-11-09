@@ -285,7 +285,8 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		t.Parallel()
 		// Variant materialization runs with only `var` and `variant` in scope.
 		// Anything that may reference runtime variables (start_date, end_date,
-		// this, …) — parameter values, hook queries, custom check queries — must
+		// this, …) — parameter values, hook queries, custom check queries,
+		// incremental predicates — must
 		// be left untouched so the per-asset renderer can resolve them at
 		// execution time with the full Jinja context. Variant variable values
 		// still flow through because ApplyVariantVariables merges them into
@@ -305,6 +306,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 			"query":    "select '{{ start_date }}'",
 		}
 		pl.Assets[0].CustomChecks[0].Query = "select '{{ end_date }}'"
+		pl.Assets[0].Materialization.IncrementalPredicate = "target.dt >= '{{ start_date }}' AND target.client = '{{ var.client }}'"
 		pl.Assets[0].Hooks = pipeline.Hooks{
 			Pre:  []pipeline.Hook{{Query: "select '{{ start_datetime }}'"}},
 			Post: []pipeline.Hook{{Query: "select '{{ end_datetime }}'"}},
@@ -316,6 +318,7 @@ func TestPipeline_MaterializeVariant(t *testing.T) {
 		assert.Equal(t, "select '{{ start_date }}'", pl.Assets[0].Parameters["query"])
 		assert.Equal(t, "{{ var.region }}", pl.DefaultValues.Parameters["region"])
 		assert.Equal(t, "select '{{ end_date }}'", pl.Assets[0].CustomChecks[0].Query)
+		assert.Equal(t, "target.dt >= '{{ start_date }}' AND target.client = '{{ var.client }}'", pl.Assets[0].Materialization.IncrementalPredicate)
 		assert.Equal(t, "select '{{ start_datetime }}'", pl.Assets[0].Hooks.Pre[0].Query)
 		assert.Equal(t, "select '{{ end_datetime }}'", pl.Assets[0].Hooks.Post[0].Query)
 		assert.Equal(t, "select '{{ start_date }}'", pl.DefaultValues.Hooks.Pre[0].Query)
@@ -453,6 +456,9 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Assets[].DefinitionFile.Type":    true,
 		"Pipeline.Assets[].Hooks.Pre[].Query":      true,
 		"Pipeline.Assets[].Hooks.Post[].Query":     true,
+		// Rendered at execution time with the full Jinja context.
+		"Pipeline.Assets[].Materialization.IncrementalPredicate":      true,
+		"Pipeline.DefaultValues.Materialization.IncrementalPredicate": true,
 
 		// Enum-typed strings on Asset.
 		"Pipeline.Assets[].Materialization.Type":                 true,
