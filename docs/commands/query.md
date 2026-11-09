@@ -128,7 +128,7 @@ bruin query --env dev --connection my_connection \
 
 Bruin reads the list of tables from the connection to decide what to rewrite. The query that was executed is returned in the `query` field of `--output json`.
 
-To preview the SQL without executing it, use [`bruin render --stdin`](/commands/render#rendering-raw-sql) with the same connection and environment. It returns the exact query `bruin query` would run.
+To preview the schema-prefix rewrite without executing the query, use [`bruin render --stdin`](/commands/render#rendering-raw-sql) with the same connection and environment. It applies the same schema-prefix rules as `bruin query`; Jinja values supplied with `--var` are decoded as JSON.
 
 Semantic queries prefix every `schema.table` reference without checking that the prefixed table exists, the same as [`bruin semantic check`](/commands/semantic).
 

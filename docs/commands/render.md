@@ -73,12 +73,13 @@ echo "SELECT * FROM raw.events" | bruin render --stdin --connection my_connectio
 
 ## Rendering raw SQL
 
-`bruin render --stdin` renders arbitrary SQL for a connection and environment without an asset file. It runs the exact SQL pipeline [`bruin query`](/commands/query) uses before execution, so the returned SQL is what `bruin query` would run:
+`bruin render --stdin` renders arbitrary SQL for a connection and environment without an asset file. It uses the same Jinja and schema-prefix pipeline as [`bruin query`](/commands/query), so schema-prefix behavior matches:
 
 - Jinja rendering runs first, including `{{ schema_prefix }}`, `{{ start_date }}`, `{{ end_date }}`, `{{ full_refresh }}` and variables passed with `--var`.
 - When the selected environment has a `schema_prefix`, each `schema.table` reference is rewritten to `<prefix>schema.table` only if the prefixed table exists on the connection. Quoted or differently-cased identifiers are matched exactly and left alone when they do not name an existing prefixed table.
 - No asset exists, so no materialization or asset hooks are applied.
 - `--full-refresh` sets the `full_refresh` Jinja variable. It does not materialize anything.
+- Connections marked `use_cloud: true` skip local schema-prefix rewriting, since there is no local connection to inspect.
 
 The SQL is read from stdin. With `--output json`, the final SQL is written to stdout as a JSON object:
 

@@ -99,6 +99,13 @@ func resolveRawQueryRenderConnection(ctx context.Context, c *cli.Command, fs afe
 		return nil, "", "", err
 	}
 
+	connectionName := c.String("connection")
+	// Cloud-routed connections have no local dialect or tables to inspect.
+	// `bruin query` skips local schema-prefix rewriting for them; render does the same.
+	if rawRenderConnectionUsesCloud(cm, connectionName) {
+		return nil, "", "", nil
+	}
+
 	schemaPrefix := ""
 	if cm.SelectedEnvironment != nil {
 		schemaPrefix = cm.SelectedEnvironment.SchemaPrefix
@@ -111,13 +118,20 @@ func resolveRawQueryRenderConnection(ctx context.Context, c *cli.Command, fs afe
 		return nil, "", "", errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
-	connectionName := c.String("connection")
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
 		return nil, "", "", config.NewConnectionNotFoundError(ctx, "", connectionName)
 	}
 
 	return conn, sqlparser.ConnectionTypeToDialect(manager.GetConnectionType(connectionName)), schemaPrefix, nil
+}
+
+func rawRenderConnectionUsesCloud(cm *config.Config, connectionName string) bool {
+	if cm == nil || cm.SelectedEnvironment == nil || cm.SelectedEnvironment.Connections == nil {
+		return false
+	}
+	cloudConnection, ok := cm.SelectedEnvironment.Connections.GetConnection(connectionName).(interface{ IsCloud() bool })
+	return ok && cloudConnection.IsCloud()
 }
 
 // renderRawQuerySQL renders Jinja first, then applies the environment schema
@@ -211,18 +225,22 @@ func parseTypedQueryVarValue(value string) any {
 }
 
 // normalizeJSONNumbers turns JSON numbers into int64 or float64 so templates get
-// "3" rather than "3.0" for integer values. json.Number otherwise leaks into
-// template rendering.
+// "3" rather than "3.0" for integer values. Integers outside int64 stay as their
+// original digits instead of being rounded through float64.
 func normalizeJSONNumbers(value any) any {
 	switch typed := value.(type) {
 	case json.Number:
-		if integer, err := typed.Int64(); err == nil {
-			return integer
+		number := typed.String()
+		if !strings.ContainsAny(number, ".eE") {
+			if integer, err := typed.Int64(); err == nil {
+				return integer
+			}
+			return number
 		}
 		if float, err := typed.Float64(); err == nil {
 			return float
 		}
-		return typed.String()
+		return number
 	case []any:
 		for i, item := range typed {
 			typed[i] = normalizeJSONNumbers(item)
