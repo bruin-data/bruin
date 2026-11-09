@@ -126,6 +126,22 @@ jobs:
             sleep 2
           done
           echo "R available after ${SECONDS}s"
+      - name: Install verified ingestr for integration tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ingestr_version="$(jq -er 'keys[0]' pkg/python/ingestr_hashes.json)"
+          ingestr_archive="ingestr_Linux_x86_64.tar.gz"
+          ingestr_hash="$(jq -er --arg version "$ingestr_version" --arg archive "$ingestr_archive" \
+            '.[$version].archives[$archive]' pkg/python/ingestr_hashes.json)"
+          mkdir -p "$RUNNER_TEMP/ingestr"
+          gh release download "v${ingestr_version}" --repo bruin-data/ingestr \
+            --pattern "$ingestr_archive" --dir "$RUNNER_TEMP/ingestr"
+          printf '%s  %s\n' "$ingestr_hash" "$RUNNER_TEMP/ingestr/$ingestr_archive" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/ingestr/$ingestr_archive" -C "$RUNNER_TEMP/ingestr"
+          ingestr_dir="${BRUIN_HOME:-$HOME/.bruin}/ingestr/$ingestr_version"
+          mkdir -p "$ingestr_dir"
+          install -m 755 "$RUNNER_TEMP/ingestr/ingestr" "$ingestr_dir/ingestr"
       - name: Run integration tests
         run: make integration-test
       - name: Run MSSQL developer environment integration test
