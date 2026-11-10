@@ -5153,7 +5153,7 @@ func TestMacros(t *testing.T) {
 			task: e2e.Task{
 				Name:    "rerun-cooldown-translation",
 				Command: binary,
-				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "../test-rerun-cooldown")},
+				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/rerun-cooldown")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -5183,7 +5183,7 @@ func TestMacros(t *testing.T) {
 			task: e2e.Task{
 				Name:    "rerun-cooldown-asset-parsing",
 				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "../test-rerun-cooldown/assets/test_asset.sql")},
+				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/rerun-cooldown/assets/test_asset.sql")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
