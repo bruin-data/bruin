@@ -175,6 +175,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Cross-pipeline Dependencies", link: "/cloud/cross-pipeline"},
                     {text: "Governance", link: "/cloud/governance"},
                     {text: "Instance Types", link: "/cloud/instance-types"},
+                    {text: "Hybrid Deployment", link: "/cloud/hybrid-deployment"},
                     {
                         text: "Security",
                         link: "/cloud/security",
