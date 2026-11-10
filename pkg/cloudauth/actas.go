@@ -48,30 +48,56 @@ func (s Store) LoadActAs() (*ActAsSession, error) {
 }
 
 func (s Store) ReadActAs(apiURL string) (*ActAsSession, error) {
-	session, err := s.LoadActAs()
-	if err != nil || session == nil {
-		return nil, err
-	}
-	if err := CheckDestination(session.APIURL, apiURL); err != nil {
-		return nil, errors.New("act-as session belongs to a different Cloud API destination; run 'bruin cloud act-as --stop'")
-	}
-	owned, err := s.ownsActAsKey(session.TokenKey)
-	if err != nil {
-		return nil, err
-	}
-	if !owned {
-		return nil, errors.New("act-as session does not belong to this configuration; run 'bruin cloud act-as --stop'")
-	}
+	unlock := s.readLockActAs()
+	defer unlock()
 	store, err := s.Open()
 	if err != nil {
 		return nil, err
 	}
-	item, err := store.Get(session.TokenKey)
-	if err != nil || len(item.Data) == 0 {
+	for attempt := 0; ; attempt++ {
+		session, err := s.LoadActAs()
+		if err != nil || session == nil {
+			return nil, err
+		}
+		if err := CheckDestination(session.APIURL, apiURL); err != nil {
+			return nil, errors.New("act-as session belongs to a different Cloud API destination; run 'bruin cloud act-as --stop'")
+		}
+		owned, err := s.ownsActAsKey(session.TokenKey)
+		if err != nil {
+			return nil, err
+		}
+		if !owned {
+			return nil, errors.New("act-as session does not belong to this configuration; run 'bruin cloud act-as --stop'")
+		}
+		item, err := store.Get(session.TokenKey)
+		if err == nil && len(item.Data) > 0 {
+			session.Token = string(item.Data)
+			return session, nil
+		}
+		// A save without the lock (e.g. lock unavailable) may have swapped keys since the load.
+		if latest, _ := s.LoadActAs(); attempt == 0 && latest != nil && latest.TokenKey != session.TokenKey {
+			continue
+		}
 		return nil, errors.New("cannot read the act-as token from the OS credential store; run 'bruin cloud act-as --stop'")
 	}
-	session.Token = string(item.Data)
-	return session, nil
+}
+
+// readLockActAs takes a shared lock when it can; reads fall back to retrying if it is unavailable.
+// nolint: contextcheck // reads have no caller context, so the wait is bounded by its own timeout.
+func (s Store) readLockActAs() func() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	lock := flock.New(s.actAsLockPath())
+	locked, err := lock.TryRLockContext(ctx, 20*time.Millisecond)
+	if err != nil || !locked {
+		_ = lock.Close()
+		return func() {}
+	}
+	return func() { _ = lock.Unlock() }
+}
+
+func (s Store) actAsLockPath() string {
+	return filepath.Join(filepath.Dir(s.Path), "cloud-act-as.lock")
 }
 
 // SaveActAs stages the token under a fresh key so a failed write leaves the previous session usable.
@@ -142,7 +168,7 @@ func (s Store) WithActAsLock(ctx context.Context, fn func() error) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	lock := flock.New(filepath.Join(filepath.Dir(s.Path), "cloud-act-as.lock"))
+	lock := flock.New(s.actAsLockPath())
 	locked, err := lock.TryLockContext(ctx, 20*time.Millisecond)
 	if err != nil || !locked {
 		return errors.New("another bruin command is changing the act-as session; try again")

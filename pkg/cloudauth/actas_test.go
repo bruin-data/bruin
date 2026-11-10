@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -99,4 +100,81 @@ func TestActAsFailedSaveKeepsPreviousSession(t *testing.T) {
 	keys, err := secrets.Keys()
 	require.NoError(t, err)
 	assert.Len(t, keys, 1)
+}
+
+type swappingSecrets struct {
+	keyring.Keyring
+	beforeGet func()
+}
+
+func (s *swappingSecrets) Get(key string) (keyring.Item, error) {
+	if hook := s.beforeGet; hook != nil {
+		s.beforeGet = nil
+		hook()
+	}
+	return s.Keyring.Get(key)
+}
+
+func TestReadActAsRetriesWhenKeySwappedMidRead(t *testing.T) {
+	t.Parallel()
+	secrets := &swappingSecrets{Keyring: keyring.NewArrayKeyring(nil)}
+	store := Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
+	session := ActAsSession{AgentID: 12, Team: "acme", ExpiresAt: time.Now().Add(time.Hour), APIURL: DefaultAPIURL, Token: "old-token"}
+	require.NoError(t, store.SaveActAs(session))
+	secrets.beforeGet = func() {
+		session.Token = "renewed-token"
+		require.NoError(t, store.SaveActAs(session))
+	}
+
+	loaded, err := store.ReadActAs(DefaultAPIURL)
+	require.NoError(t, err)
+	assert.Equal(t, "renewed-token", loaded.Token)
+}
+
+// syncedSecrets stands in for the OS keychain, which is safe to share between processes.
+type syncedSecrets struct {
+	mu      sync.Mutex
+	secrets *keyring.ArrayKeyring
+}
+
+func (s *syncedSecrets) Get(key string) (keyring.Item, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.secrets.Get(key)
+}
+
+func (s *syncedSecrets) Set(item keyring.Item) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.secrets.Set(item)
+}
+
+func (s *syncedSecrets) Remove(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.secrets.Remove(key)
+}
+
+func TestReadActAsWaitsForWriters(t *testing.T) {
+	t.Parallel()
+	secrets := &syncedSecrets{secrets: keyring.NewArrayKeyring(nil)}
+	store := Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
+	session := ActAsSession{AgentID: 12, Team: "acme", ExpiresAt: time.Now().Add(time.Hour), APIURL: DefaultAPIURL, Token: "old-token"}
+	require.NoError(t, store.SaveActAs(session))
+
+	read := make(chan string, 1)
+	require.NoError(t, store.WithActAsLock(t.Context(), func() error {
+		go func() {
+			loaded, err := store.ReadActAs(DefaultAPIURL)
+			if err != nil {
+				read <- err.Error()
+				return
+			}
+			read <- loaded.Token
+		}()
+		time.Sleep(200 * time.Millisecond)
+		session.Token = "renewed-token"
+		return store.SaveActAs(session)
+	}))
+	assert.Equal(t, "renewed-token", <-read)
 }
