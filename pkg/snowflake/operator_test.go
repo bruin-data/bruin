@@ -347,6 +347,15 @@ func TestBasicOperator_RunTask_Iceberg(t *testing.T) {
 			wantEnsure: true,
 		},
 		{
+			name: "Iceberg SCD2 skips the TIMESTAMP_TZ migration",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategySCD2ByColumn,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			wantEnsure: true,
+		},
+		{
 			name: "Iceberg full refresh replaces a mismatched object",
 			materialization: pipeline.Materialization{
 				Type:        pipeline.MaterializationTypeTable,
@@ -380,6 +389,7 @@ func TestBasicOperator_RunTask_Iceberg(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// The mock client has no Select expectation, so the SCD2 migration would fail the test.
 			client := new(mockQuerierWithResult)
 			client.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 			client.On("RecreateTableOnMaterializationTypeMismatch", mock.Anything, mock.Anything).Return(nil)

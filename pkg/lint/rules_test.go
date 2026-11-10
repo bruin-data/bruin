@@ -1605,6 +1605,19 @@ func TestEnsureMaterializationValuesAreValid_TableFormat(t *testing.T) {
 			want:      []string{"Materialization table_format 'delta' is not supported, the only supported value is 'iceberg'"},
 		},
 		{
+			name:      "Iceberg table on Snowflake",
+			assetType: pipeline.AssetTypeSnowflakeQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			format:    pipeline.MaterializationTableFormatIceberg,
+		},
+		{
+			name:      "Iceberg view on Snowflake",
+			assetType: pipeline.AssetTypeSnowflakeQuery,
+			matType:   pipeline.MaterializationTypeView,
+			format:    pipeline.MaterializationTableFormatIceberg,
+			want:      []string{"Materialization table_format 'iceberg' requires the materialization type to be 'table'"},
+		},
+		{
 			name:      "Iceberg on an asset type that does not support it",
 			assetType: pipeline.AssetTypePostgresQuery,
 			matType:   pipeline.MaterializationTypeTable,

@@ -445,6 +445,12 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	if a.Snowflake.Warehouse, err = maybeRender(render, fmt.Sprintf("asset[%s].snowflake.warehouse", originalName), a.Snowflake.Warehouse); err != nil {
 		return err
 	}
+	if a.Snowflake.ExternalVolume, err = maybeRender(render, fmt.Sprintf("asset[%s].snowflake.external_volume", originalName), a.Snowflake.ExternalVolume); err != nil {
+		return err
+	}
+	if a.Snowflake.BaseLocation, err = maybeRender(render, fmt.Sprintf("asset[%s].snowflake.base_location", originalName), a.Snowflake.BaseLocation); err != nil {
+		return err
+	}
 	if a.Athena.Location, err = maybeRender(render, fmt.Sprintf("asset[%s].athena.location", originalName), a.Athena.Location); err != nil {
 		return err
 	}

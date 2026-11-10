@@ -448,7 +448,9 @@ func convertUnitTestExpected(e unitTestExpected) UnitTestExpected {
 }
 
 type snowflake struct {
-	Warehouse string `yaml:"warehouse"`
+	Warehouse      string `yaml:"warehouse"`
+	ExternalVolume string `yaml:"external_volume"`
+	BaseLocation   string `yaml:"base_location"`
 }
 
 type athena struct {
@@ -712,8 +714,12 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 		Hooks:           definition.Hooks,
-		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
-		Athena:          AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		Snowflake: SnowflakeConfig{
+			Warehouse:      definition.Snowflake.Warehouse,
+			ExternalVolume: definition.Snowflake.ExternalVolume,
+			BaseLocation:   definition.Snowflake.BaseLocation,
+		},
+		Athena: AthenaConfig{Location: definition.Athena.QueryResultsPath},
 		BigQuery: BigQueryConfig{
 			RequirePartitionFilter:  definition.BigQuery.RequirePartitionFilter,
 			PartitionExpirationDays: definition.BigQuery.PartitionExpirationDays,

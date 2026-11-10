@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -1081,6 +1082,116 @@ func TestSCD2ByColumnWithIncrementalKeyInsertSkipsOnlyKeysWithCurrentVersion(t *
 	require.True(t, found, "no INSERT in:\n%s", render)
 	assert.Contains(t, insert, "target._is_current = TRUE")
 	assert.NotContains(t, insert, "target._is_current = FALSE")
+}
+
+func TestMaterializer_RenderIceberg(t *testing.T) {
+	t.Parallel()
+
+	icebergAsset := func(strategy pipeline.MaterializationStrategy, settings pipeline.SnowflakeConfig) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name: "my.asset",
+			Type: pipeline.AssetTypeSnowflakeQuery,
+			Materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    strategy,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			Snowflake: settings,
+			Columns: []pipeline.Column{
+				{Name: "id", Type: "INTEGER", PrimaryKey: true},
+				{Name: "name", Type: "VARCHAR"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		fullRefresh bool
+		want        string
+	}{
+		{
+			name:  "create+replace without volume uses the Snowflake default volume",
+			asset: icebergAsset(pipeline.MaterializationStrategyCreateReplace, pipeline.SnowflakeConfig{}),
+			want:  "CREATE OR REPLACE ICEBERG TABLE my.asset  CATALOG = 'SNOWFLAKE' AS\nSELECT 1",
+		},
+		{
+			name: "create+replace with volume, base location and cluster by",
+			asset: func() *pipeline.Asset {
+				a := icebergAsset(pipeline.MaterializationStrategyCreateReplace, pipeline.SnowflakeConfig{
+					ExternalVolume: "my_vol",
+					BaseLocation:   "analytics/it's",
+				})
+				a.Materialization.ClusterBy = []string{"id"}
+				return a
+			}(),
+			want: "CREATE OR REPLACE ICEBERG TABLE my.asset CLUSTER BY (id) CATALOG = 'SNOWFLAKE' EXTERNAL_VOLUME = 'my_vol' BASE_LOCATION = 'analytics/it''s' AS\nSELECT 1",
+		},
+		{
+			name:        "full refresh of an incremental strategy creates an Iceberg table",
+			asset:       icebergAsset(pipeline.MaterializationStrategyMerge, pipeline.SnowflakeConfig{ExternalVolume: "my_vol"}),
+			fullRefresh: true,
+			want:        "CREATE OR REPLACE ICEBERG TABLE my.asset  CATALOG = 'SNOWFLAKE' EXTERNAL_VOLUME = 'my_vol' AS\nSELECT 1",
+		},
+		{
+			name:  "merge writes into the existing table unchanged",
+			asset: icebergAsset(pipeline.MaterializationStrategyMerge, pipeline.SnowflakeConfig{}),
+			want: "MERGE INTO my.asset target\nUSING (SELECT 1) source ON target.id = source.id\n\n" +
+				"WHEN NOT MATCHED THEN INSERT(id, name) VALUES(id, name);",
+		},
+		{
+			name:  "ddl creates an Iceberg table",
+			asset: icebergAsset(pipeline.MaterializationStrategyDDL, pipeline.SnowflakeConfig{ExternalVolume: "my_vol"}),
+			want:  "CREATE ICEBERG TABLE IF NOT EXISTS my.asset (\nid INTEGER,\nname VARCHAR,\nprimary key (id)\n) CATALOG = 'SNOWFLAKE' EXTERNAL_VOLUME = 'my_vol'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			render, err := NewMaterializer(tt.fullRefresh).Render(tt.asset, "SELECT 1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, render)
+		})
+	}
+}
+
+func TestMaterializer_RenderIcebergSCD2UsesLocalTimestamps(t *testing.T) {
+	t.Parallel()
+
+	for _, strategy := range []pipeline.MaterializationStrategy{pipeline.MaterializationStrategySCD2ByColumn, pipeline.MaterializationStrategySCD2ByTime} {
+		for _, fullRefresh := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/full_refresh=%t", strategy, fullRefresh), func(t *testing.T) {
+				t.Parallel()
+				asset := &pipeline.Asset{
+					Name: "my.asset",
+					Type: pipeline.AssetTypeSnowflakeQuery,
+					Materialization: pipeline.Materialization{
+						Type:           pipeline.MaterializationTypeTable,
+						Strategy:       strategy,
+						IncrementalKey: "ts",
+						TableFormat:    pipeline.MaterializationTableFormatIceberg,
+					},
+					Snowflake: pipeline.SnowflakeConfig{ExternalVolume: "my_vol"},
+					Columns: []pipeline.Column{
+						{Name: "id", Type: "INTEGER", PrimaryKey: true},
+						{Name: "ts", Type: "TIMESTAMP"},
+					},
+				}
+
+				render, err := NewMaterializer(fullRefresh).Render(asset, "SELECT id, ts FROM source_table")
+				require.NoError(t, err)
+
+				// Iceberg tables reject TIMESTAMP_TZ and timestamps above microsecond precision.
+				assert.NotContains(t, render, "TIMESTAMP_TZ")
+				assert.Contains(t, render, "CAST('9999-12-31 23:59:59' AS TIMESTAMP_LTZ(6))")
+				assert.Contains(t, render, "AS TIMESTAMP_LTZ(6))")
+				if fullRefresh {
+					assert.Contains(t, render, "CREATE OR REPLACE ICEBERG TABLE my.asset CLUSTER BY (_is_current, id) CATALOG = 'SNOWFLAKE' EXTERNAL_VOLUME = 'my_vol' AS")
+				}
+			})
+		}
+	}
 }
 
 func intp(i int) *int { return &i }

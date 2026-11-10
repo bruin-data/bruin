@@ -153,7 +153,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	if t.Materialization.IsSCD2() && !fullRefresh {
+	// The migration converts legacy validity columns to TIMESTAMP_TZ, which Iceberg tables don't support.
+	if t.Materialization.IsSCD2() && !fullRefresh && !t.Materialization.IsIceberg() {
 		if err = scd2migration.Snowflake(ctx, conn, t.Name); err != nil {
 			return err
 		}
