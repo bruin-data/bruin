@@ -618,8 +618,11 @@ type ConnectionSetQueryResult struct {
 // columnar result. The SQL is sent verbatim — cloud query mode does not accept
 // template variables. A non-2xx response (e.g. a query error or a non-read-only
 // statement) surfaces as an *APIError.
-func (c *APIClient) RunConnectionSetQuery(ctx context.Context, connectionSetID int, connection, query string) (*ConnectionSetQueryResult, error) {
+func (c *APIClient) RunConnectionSetQuery(ctx context.Context, connectionSetID int, connection, query string, bypassSoftLimit bool) (*ConnectionSetQueryResult, error) {
 	body := map[string]any{"connection": connection, "query": query}
+	if bypassSoftLimit {
+		body["bypass_soft_limit"] = true
+	}
 	var raw json.RawMessage
 	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/connection-sets/%d/query", connectionSetID), body, &raw); err != nil {
 		return nil, err
@@ -946,24 +949,19 @@ func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connecti
 	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d", setID), body, nil)
 }
 
-// SetConnectionSetCostLimit sets the set's max cost per BigQuery query in USD; nil removes it.
-func (c *APIClient) SetConnectionSetCostLimit(ctx context.Context, setID int, maxQueryCost *float64) (*float64, error) {
-	var resp struct {
-		MaxQueryCost *float64 `json:"max_query_cost"`
-	}
-	body := map[string]any{"max_query_cost": maxQueryCost}
-	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/cost-limit", setID), body, &resp)
-	return resp.MaxQueryCost, err
+// SetConnectionSetCostLimit updates the cost limits (USD per query) on every BigQuery connection in the set.
+// Only the keys in changes are sent; a nil value removes that limit.
+func (c *APIClient) SetConnectionSetCostLimit(ctx context.Context, setID int, changes map[string]*float64) (*CostLimits, error) {
+	var resp CostLimits
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/cost-limit", setID), changes, &resp)
+	return &resp, err
 }
 
-// SetConnectionCostLimit sets one BigQuery connection's max cost per query in USD; nil removes it.
-func (c *APIClient) SetConnectionCostLimit(ctx context.Context, setID int, connection string, maxQueryCost *float64) (*float64, error) {
-	var resp struct {
-		MaxQueryCost *float64 `json:"max_query_cost"`
-	}
-	body := map[string]any{"max_query_cost": maxQueryCost}
-	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/connections/%s/cost-limit", setID, url.PathEscape(connection)), body, &resp)
-	return resp.MaxQueryCost, err
+// SetConnectionCostLimit updates one BigQuery connection's cost limits the same way.
+func (c *APIClient) SetConnectionCostLimit(ctx context.Context, setID int, connection string, changes map[string]*float64) (*CostLimits, error) {
+	var resp CostLimits
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/connections/%s/cost-limit", setID, url.PathEscape(connection)), changes, &resp)
+	return &resp, err
 }
 
 func (c *APIClient) DeleteConnectionSet(ctx context.Context, setID int) error {

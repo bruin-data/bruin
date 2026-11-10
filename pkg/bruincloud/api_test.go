@@ -756,16 +756,18 @@ func TestSetConnectionSetCostLimit(t *testing.T) {
 		assert.Equal(t, "/connection-sets/5/cost-limit", r.URL.Path)
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		assert.InDelta(t, 0.1, body["max_query_cost"], 0.0001)
+		assert.Equal(t, map[string]any{"max_query_cost": 0.1}, body)
 		w.WriteHeader(http.StatusOK)
-		writeJSON(t, w, map[string]any{"id": 5, "max_query_cost": 0.1})
+		writeJSON(t, w, map[string]any{"id": 5, "max_query_cost": 0.1, "max_query_cost_soft": 0.05})
 	})
 
 	limit := 0.1
-	saved, err := client.SetConnectionSetCostLimit(t.Context(), 5, &limit)
+	saved, err := client.SetConnectionSetCostLimit(t.Context(), 5, map[string]*float64{"max_query_cost": &limit})
 	require.NoError(t, err)
-	require.NotNil(t, saved)
-	assert.InDelta(t, 0.1, *saved, 0.0001)
+	require.NotNil(t, saved.MaxQueryCost)
+	assert.InDelta(t, 0.1, *saved.MaxQueryCost, 0.0001)
+	require.NotNil(t, saved.MaxQueryCostSoft)
+	assert.InDelta(t, 0.05, *saved.MaxQueryCostSoft, 0.0001)
 }
 
 func TestSetConnectionCostLimit(t *testing.T) {
@@ -775,16 +777,17 @@ func TestSetConnectionCostLimit(t *testing.T) {
 		assert.Equal(t, "/connection-sets/5/connections/bq prod/cost-limit", r.URL.Path)
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		assert.InDelta(t, 0.1, body["max_query_cost"], 0.0001)
+		assert.Equal(t, map[string]any{"max_query_cost_soft": 2.5}, body)
 		w.WriteHeader(http.StatusOK)
-		writeJSON(t, w, map[string]any{"id": 5, "connection": "bq prod", "max_query_cost": 0.1})
+		writeJSON(t, w, map[string]any{"id": 5, "connection": "bq prod", "max_query_cost": nil, "max_query_cost_soft": 2.5})
 	})
 
-	limit := 0.1
-	saved, err := client.SetConnectionCostLimit(t.Context(), 5, "bq prod", &limit)
+	limit := 2.5
+	saved, err := client.SetConnectionCostLimit(t.Context(), 5, "bq prod", map[string]*float64{"max_query_cost_soft": &limit})
 	require.NoError(t, err)
-	require.NotNil(t, saved)
-	assert.InDelta(t, 0.1, *saved, 0.0001)
+	assert.Nil(t, saved.MaxQueryCost)
+	require.NotNil(t, saved.MaxQueryCostSoft)
+	assert.InDelta(t, 2.5, *saved.MaxQueryCostSoft, 0.0001)
 }
 
 func TestRemoveConnectionSetCostLimit(t *testing.T) {
@@ -792,16 +795,15 @@ func TestRemoveConnectionSetCostLimit(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		value, present := body["max_query_cost"]
-		assert.True(t, present)
-		assert.Nil(t, value)
+		assert.Equal(t, map[string]any{"max_query_cost": nil, "max_query_cost_soft": nil}, body)
 		w.WriteHeader(http.StatusOK)
-		writeJSON(t, w, map[string]any{"id": 5, "max_query_cost": nil})
+		writeJSON(t, w, map[string]any{"id": 5, "max_query_cost": nil, "max_query_cost_soft": nil})
 	})
 
-	saved, err := client.SetConnectionSetCostLimit(t.Context(), 5, nil)
+	saved, err := client.SetConnectionSetCostLimit(t.Context(), 5, map[string]*float64{"max_query_cost": nil, "max_query_cost_soft": nil})
 	require.NoError(t, err)
-	assert.Nil(t, saved)
+	assert.Nil(t, saved.MaxQueryCost)
+	assert.Nil(t, saved.MaxQueryCostSoft)
 }
 
 func TestListConnectionSetConnections(t *testing.T) {
@@ -2181,7 +2183,7 @@ func TestRunConnectionSetQuery_Success(t *testing.T) {
 		})
 	})
 
-	res, err := client.RunConnectionSetQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n")
+	res, err := client.RunConnectionSetQuery(t.Context(), 42, "warehouse_prod", "SELECT 1 AS n", false)
 	require.NoError(t, err)
 
 	assert.Equal(t, http.MethodPost, gotMethod)
@@ -2191,6 +2193,8 @@ func TestRunConnectionSetQuery_Success(t *testing.T) {
 	// Cloud query mode never sends template variables.
 	_, hasParams := gotBody["query_params"]
 	assert.False(t, hasParams, "query_params must never be sent")
+	_, hasBypass := gotBody["bypass_soft_limit"]
+	assert.False(t, hasBypass)
 
 	assert.Equal(t, []string{"n", "label"}, res.Columns)
 	assert.Equal(t, []string{"INT8", "VARCHAR"}, res.ColumnTypes)
@@ -2208,7 +2212,7 @@ func TestRunConnectionSetQuery_SurfacesAPIError(t *testing.T) {
 		})
 	})
 
-	_, err := client.RunConnectionSetQuery(t.Context(), 42, "conn", "DROP TABLE users")
+	_, err := client.RunConnectionSetQuery(t.Context(), 42, "conn", "DROP TABLE users", false)
 	require.Error(t, err)
 
 	var apiErr *APIError
@@ -2218,6 +2222,19 @@ func TestRunConnectionSetQuery_SurfacesAPIError(t *testing.T) {
 	assert.Contains(t, apiErr.Message, "read-only")
 }
 
+func TestRunConnectionSetQuery_SendsBypassSoftLimit(t *testing.T) {
+	t.Parallel()
+	var gotBody map[string]any
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotBody = readJSON(t, r)
+		writeJSON(t, w, map[string]any{"columns": []string{"n"}, "rows": [][]any{{1}}})
+	})
+
+	_, err := client.RunConnectionSetQuery(t.Context(), 42, "conn", "SELECT 1", true)
+	require.NoError(t, err)
+	assert.Equal(t, true, gotBody["bypass_soft_limit"])
+}
+
 func TestRunConnectionSetQuery_PreservesLargeIntegerPrecision(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -2225,7 +2242,7 @@ func TestRunConnectionSetQuery_PreservesLargeIntegerPrecision(t *testing.T) {
 		_, _ = w.Write([]byte(`{"columns":["id"],"rows":[[9007199254740993]]}`))
 	})
 
-	res, err := client.RunConnectionSetQuery(t.Context(), 1, "c", "SELECT id")
+	res, err := client.RunConnectionSetQuery(t.Context(), 1, "c", "SELECT id", false)
 	require.NoError(t, err)
 	require.Len(t, res.Rows, 1)
 	assert.Equal(t, json.Number("9007199254740993"), res.Rows[0][0])

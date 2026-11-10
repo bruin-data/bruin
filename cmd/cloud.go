@@ -4738,13 +4738,16 @@ func cloudConnectionSetsGet() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"Name", "Type", "Cost limit"})
+			t.AppendHeader(table.Row{"Name", "Type", "Hard limit", "Soft limit"})
 			for _, conn := range conns {
-				limit := ""
+				hard, soft := "", ""
 				if conn.MaxQueryCost != nil {
-					limit = formatCostLimit(conn.MaxQueryCost)
+					hard = formatCostLimit(conn.MaxQueryCost)
 				}
-				t.AppendRow(table.Row{conn.Name, conn.Type, limit})
+				if conn.MaxQueryCostSoft != nil {
+					soft = formatCostLimit(conn.MaxQueryCostSoft)
+				}
+				t.AppendRow(table.Row{conn.Name, conn.Type, hard, soft})
 			}
 			t.Render()
 			return nil
@@ -4882,18 +4885,22 @@ func cloudConnectionSetsDelete() *cli.Command {
 func cloudConnectionSetsCostLimit() *cli.Command {
 	return &cli.Command{
 		Name:  "cost-limit",
-		Usage: "Set the max cost (USD) of a single BigQuery query run through Bruin Cloud on a connection in this set",
-		Description: "Bruin Cloud refuses BigQuery queries over the limit before they run, so nothing is billed. " +
-			"Pass --connection to limit one BigQuery connection; without it the limit is applied to every BigQuery connection in the set. " +
-			"It applies to queries through Bruin Cloud (cloud query mode, the API and Bruin Cloud agents), not to queries run with credentials in your local .bruin.yml; " +
-			"for those, set max_query_cost on the connection. Needs the connection-set:cost-limit permission.",
+		Usage: "Set the hard and soft max cost (USD) of a single BigQuery query run through Bruin Cloud on a connection in this set",
+		Description: "Bruin Cloud refuses BigQuery queries over the hard limit before they run, so nothing is billed. " +
+			"Queries over the soft limit are refused too, unless the caller confirms (bruin query --dangerously-bypass-soft-limits). " +
+			"Pass --connection to limit one BigQuery connection; without it the limits are applied to every BigQuery connection in the set. " +
+			"They apply to queries through Bruin Cloud (cloud query mode, the API and Bruin Cloud agents), not to queries run with credentials in your local .bruin.yml; " +
+			"for those, set max_query_cost and max_query_cost_soft on the connection. Needs the connection-set:cost-limit permission.",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
 			&cli.StringFlag{Name: "connection", Usage: "the BigQuery connection in the set to limit (default: every BigQuery connection in the set)"},
-			&cli.FloatFlag{Name: "max-query-cost", Usage: "max cost of a single BigQuery query in USD (minimum 0.01)"},
-			&cli.BoolFlag{Name: "remove", Usage: "remove the limit"},
+			&cli.FloatFlag{Name: "max-query-cost", Usage: "hard limit: max cost of a single BigQuery query in USD (minimum 0.01)"},
+			&cli.FloatFlag{Name: "max-query-cost-soft", Usage: "soft limit: queries above it need confirmation, in USD (minimum 0.01)"},
+			&cli.BoolFlag{Name: "remove", Usage: "remove both limits"},
+			&cli.BoolFlag{Name: "remove-hard", Usage: "remove the hard limit"},
+			&cli.BoolFlag{Name: "remove-soft", Usage: "remove the soft limit"},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -4903,15 +4910,10 @@ func cloudConnectionSetsCostLimit() *cli.Command {
 				printError(fmt.Errorf("--set-id must be a positive integer, got %d", c.Int("set-id")), output, "Invalid --set-id")
 				return cli.Exit("", 1)
 			}
-			if c.IsSet("max-query-cost") == c.Bool("remove") {
-				printError(errors.New("pass either --max-query-cost or --remove"), output, "Invalid flags")
+			changes, err := costLimitChanges(c)
+			if err != nil {
+				printError(err, output, "Invalid flags")
 				return cli.Exit("", 1)
-			}
-
-			var limit *float64
-			if !c.Bool("remove") {
-				value := c.Float("max-query-cost")
-				limit = &value
 			}
 
 			client, err := newCloudClient(c)
@@ -4921,19 +4923,35 @@ func cloudConnectionSetsCostLimit() *cli.Command {
 			}
 
 			connection := c.String("connection")
-			var saved *float64
+			var saved *bruincloud.CostLimits
 			if connection != "" {
-				saved, err = client.SetConnectionCostLimit(ctx, c.Int("set-id"), connection, limit)
+				saved, err = client.SetConnectionCostLimit(ctx, c.Int("set-id"), connection, changes)
 			} else {
-				saved, err = client.SetConnectionSetCostLimit(ctx, c.Int("set-id"), limit)
+				saved, err = client.SetConnectionSetCostLimit(ctx, c.Int("set-id"), changes)
 			}
 			if err != nil {
 				printError(err, output, "Failed to set the cost limit")
 				return cli.Exit("", 1)
 			}
 
+			// Without --connection, Bruin Cloud only returns the limits that were changed.
+			changed := map[string]*float64{}
+			var summary []string
+			if _, ok := changes["max_query_cost"]; ok {
+				changed["max_query_cost"] = saved.MaxQueryCost
+				summary = append(summary, "hard limit "+formatCostLimit(saved.MaxQueryCost))
+			}
+			if _, ok := changes["max_query_cost_soft"]; ok {
+				changed["max_query_cost_soft"] = saved.MaxQueryCostSoft
+				summary = append(summary, "soft limit "+formatCostLimit(saved.MaxQueryCostSoft))
+			}
+
 			if output == "json" {
-				data, _ := json.MarshalIndent(map[string]any{"id": c.Int("set-id"), "connection": connection, "max_query_cost": saved}, "", "  ")
+				result := map[string]any{"id": c.Int("set-id"), "connection": connection}
+				for key, value := range changed {
+					result[key] = value
+				}
+				data, _ := json.MarshalIndent(result, "", "  ")
 				fmt.Println(string(data))
 				return nil
 			}
@@ -4942,10 +4960,48 @@ func cloudConnectionSetsCostLimit() *cli.Command {
 			if connection != "" {
 				target = fmt.Sprintf("connection '%s'", connection)
 			}
-			printSuccessForOutput(output, fmt.Sprintf("Connection set %d, %s: cost limit %s", c.Int("set-id"), target, formatCostLimit(saved)))
+			printSuccessForOutput(output, fmt.Sprintf("Connection set %d, %s: %s", c.Int("set-id"), target, strings.Join(summary, ", ")))
 			return nil
 		},
 	}
+}
+
+func costLimitChanges(c *cli.Command) (map[string]*float64, error) {
+	setHard, setSoft := c.IsSet("max-query-cost"), c.IsSet("max-query-cost-soft")
+	removeHard, removeSoft := c.Bool("remove-hard"), c.Bool("remove-soft")
+	if c.Bool("remove") {
+		if setHard || setSoft || removeHard || removeSoft {
+			return nil, errors.New("--remove removes both limits; don't combine it with other limit flags")
+		}
+		removeHard, removeSoft = true, true
+	}
+	if setHard && removeHard {
+		return nil, errors.New("pass either --max-query-cost or --remove-hard, not both")
+	}
+	if setSoft && removeSoft {
+		return nil, errors.New("pass either --max-query-cost-soft or --remove-soft, not both")
+	}
+
+	changes := map[string]*float64{}
+	if setHard {
+		value := c.Float("max-query-cost")
+		changes["max_query_cost"] = &value
+	}
+	if removeHard {
+		changes["max_query_cost"] = nil
+	}
+	if setSoft {
+		value := c.Float("max-query-cost-soft")
+		changes["max_query_cost_soft"] = &value
+	}
+	if removeSoft {
+		changes["max_query_cost_soft"] = nil
+	}
+	if len(changes) == 0 {
+		return nil, errors.New("pass --max-query-cost, --max-query-cost-soft, --remove, --remove-hard or --remove-soft")
+	}
+
+	return changes, nil
 }
 
 func formatCostLimit(limit *float64) string {

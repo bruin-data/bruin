@@ -423,6 +423,10 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	if err != nil {
 		return err
 	}
+	envMaxQueryCostSoft, err := bigquery.MaxQueryCostSoftFromEnv(connection.Name)
+	if err != nil {
+		return err
+	}
 
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ReadOnly:                         connection.ReadOnly,
@@ -436,7 +440,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		MaxBillableBytes:                 connection.MaxBillableBytes,
 		MaxQueryCost:                     connection.MaxQueryCost,
 		MaxBillableBytesSoft:             connection.MaxBillableBytesSoft,
-		MaxQueryCostSoft:                 connection.MaxQueryCostSoft,
+		MaxQueryCostSoft:                 bigquery.StricterLimit(connection.MaxQueryCostSoft, envMaxQueryCostSoft),
 		EnvMaxBillableBytes:              envMaxBillableBytes,
 	})
 	if err != nil {
