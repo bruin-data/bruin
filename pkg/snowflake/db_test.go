@@ -945,7 +945,7 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			name: "materialization type mismatch, table dropped and recreated",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Mock the SELECT query to check the table type
-				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
 
 				mock.ExpectQuery(`DROP VIEW IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
@@ -962,7 +962,7 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			name: "three-part name looks up and drops in the named database",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Must use OTHER_DB (from the asset name), not MYDB (the config default).
-				mock.ExpectQuery(`SELECT TABLE_TYPE FROM OTHER_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM OTHER_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
 
 				mock.ExpectQuery(`DROP VIEW IF EXISTS OTHER_DB.TEST_SCHEMA.TEST_TABLE`).
@@ -979,7 +979,7 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			name: "table or view does not exist",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Mock the SELECT query to return no rows
-				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}))
 			},
 			asset: &pipeline.Asset{
@@ -993,7 +993,7 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			name: "error during table type retrieval",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Mock the SELECT query to return an error
-				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnError(errors.New("query error"))
 			},
 			asset: &pipeline.Asset{
@@ -1008,13 +1008,111 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			name: "materialization type matches, no action taken",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Mock the SELECT query to return the same type
-				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
 					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("BASE TABLE"))
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "regular table is dropped when the asset is an Iceberg table",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "NO"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					TableFormat: pipeline.MaterializationTableFormatIceberg,
+				},
+			},
+		},
+		{
+			name: "Iceberg table matches an Iceberg asset, no action taken",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					TableFormat: pipeline.MaterializationTableFormatIceberg,
+				},
+			},
+		},
+		{
+			name: "Iceberg table is dropped when the asset is a regular table",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "Iceberg table is dropped when the asset is a view",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+			},
+		},
+		{
+			name: "Iceberg table is dropped for a regular DDL asset",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+			},
+		},
+		{
+			name: "regular table is dropped for an Iceberg DDL asset",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "NO"))
+
+				mock.ExpectQuery(`DROP TABLE IF EXISTS MYDB.TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					TableFormat: pipeline.MaterializationTableFormatIceberg,
 				},
 			},
 		},
@@ -1070,6 +1168,77 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			}
 
 			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_EnsureIcebergTable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		strategy          pipeline.MaterializationStrategy
+		refreshRestricted bool
+		rows              *sqlmock.Rows
+		expectedError     string
+	}{
+		{
+			name: "no existing table",
+			rows: sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}),
+		},
+		{
+			name: "existing Iceberg table",
+			rows: sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "YES"),
+		},
+		{
+			name:          "existing regular table",
+			rows:          sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "NO"),
+			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a regular table; run the asset with --full-refresh",
+		},
+		{
+			name:          "existing view",
+			rows:          sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("VIEW", "NO"),
+			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a view; run the asset with --full-refresh",
+		},
+		{
+			name:          "existing regular table for a DDL asset",
+			strategy:      pipeline.MaterializationStrategyDDL,
+			rows:          sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("BASE TABLE", "NO"),
+			expectedError: "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a regular table; run the asset with --full-refresh",
+		},
+		{
+			name:              "existing view for a refresh-restricted asset",
+			refreshRestricted: true,
+			rows:              sqlmock.NewRows([]string{"TABLE_TYPE", "IS_ICEBERG"}).AddRow("VIEW", "NO"),
+			expectedError:     "'MYDB.TEST_SCHEMA.TEST_TABLE' already exists as a view; drop it yourself",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+
+			db := &DB{conn: sqlx.NewDb(mockDB, "sqlmock"), config: &Config{Database: "MYDB"}}
+			mock.ExpectQuery(`SELECT TABLE_TYPE, IS_ICEBERG FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).WillReturnRows(tt.rows)
+
+			err = db.EnsureIcebergTable(t.Context(), &pipeline.Asset{
+				Name:              "test_schema.test_table",
+				RefreshRestricted: &tt.refreshRestricted,
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    tt.strategy,
+					TableFormat: pipeline.MaterializationTableFormatIceberg,
+				},
+			})
+			if tt.expectedError != "" {
+				require.ErrorContains(t, err, tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

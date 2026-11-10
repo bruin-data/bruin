@@ -569,7 +569,9 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 	return db.schemaCreator.CreateSchemaIfNotExist(ctx, db, asset)
 }
 
-func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
+// existingObject looks up the object that holds the asset's name. objectType is the keyword for DROP:
+// "TABLE" for base tables, otherwise the raw TABLE_TYPE such as "VIEW", or empty when nothing exists.
+func (db *DB) existingObject(ctx context.Context, asset *pipeline.Asset) (fqn string, objectType string, materializationType pipeline.MaterializationType, isIceberg bool, err error) {
 	tableComponents := strings.Split(asset.Name, ".")
 	var databaseName string
 	var schemaName string
@@ -584,52 +586,93 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
-		return nil
+		return "", "", "", false, nil
 	}
+	fqn = fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
 
 	queryStr := fmt.Sprintf(
-		`SELECT TABLE_TYPE FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+		`SELECT TABLE_TYPE, IS_ICEBERG FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
 		databaseName, schemaName, tableName,
 	)
 
 	result, err := db.Select(ctx, &query.Query{Query: queryStr})
 	if err != nil {
-		return errors.Wrapf(err, "unable to retrieve table metadata for '%s.%s'", schemaName, tableName)
+		return "", "", "", false, errors.Wrapf(err, "unable to retrieve table metadata for '%s.%s'", schemaName, tableName)
 	}
 
 	if len(result) == 0 {
+		return fqn, "", "", false, nil
+	}
+
+	if typeField, ok := result[0][0].(string); ok {
+		objectType = typeField
+	}
+
+	if objectType == "" {
+		return "", "", "", false, errors.New("could not determine the materialization type")
+	}
+
+	if len(result[0]) > 1 {
+		if icebergField, ok := result[0][1].(string); ok {
+			isIceberg = strings.EqualFold(icebergField, "YES")
+		}
+	}
+	switch objectType {
+	case "BASE TABLE":
+		materializationType = pipeline.MaterializationTypeTable
+		objectType = "TABLE"
+	case "VIEW":
+		materializationType = pipeline.MaterializationTypeView
+	default:
+		materializationType = pipeline.MaterializationTypeNone
+	}
+
+	return fqn, objectType, materializationType, isIceberg, nil
+}
+
+// RecreateTableOnMaterializationTypeMismatch drops the existing object when its type or table format
+// doesn't match the asset, since Snowflake can't CREATE OR REPLACE across them.
+func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
+	fqn, objectType, dbMaterializationType, isIceberg, err := db.existingObject(ctx, asset)
+	if err != nil || objectType == "" {
+		return err
+	}
+
+	formatMismatch := dbMaterializationType == pipeline.MaterializationTypeTable &&
+		asset.Materialization.Type == pipeline.MaterializationTypeTable &&
+		isIceberg != asset.Materialization.IsIceberg()
+	if dbMaterializationType == asset.Materialization.Type && !formatMismatch {
 		return nil
 	}
 
-	var materializationType string
-	if typeField, ok := result[0][0].(string); ok {
-		materializationType = typeField
+	dropQuery := query.Query{
+		Query: fmt.Sprintf("DROP %s IF EXISTS %s", objectType, fqn),
 	}
-
-	if materializationType == "" {
-		return errors.New("could not determine the materialization type")
-	}
-	var dbMaterializationType pipeline.MaterializationType
-	switch materializationType {
-	case "BASE TABLE":
-		dbMaterializationType = pipeline.MaterializationTypeTable
-		materializationType = "TABLE"
-	case "VIEW":
-		dbMaterializationType = pipeline.MaterializationTypeView
-	default:
-		dbMaterializationType = pipeline.MaterializationTypeNone
-	}
-	if dbMaterializationType != asset.Materialization.Type {
-		dropQuery := query.Query{
-			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s.%s", materializationType, databaseName, schemaName, tableName),
-		}
-
-		if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
-			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s.%s", materializationType, databaseName, schemaName, tableName)
-		}
+	if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
+		return errors.Wrapf(dropErr, "failed to drop existing %s: %s", objectType, fqn)
 	}
 
 	return nil
+}
+
+// EnsureIcebergTable fails when an Iceberg asset's name is taken by a regular table or a view,
+// since Snowflake can't convert them in place. Replacing them is left to a full refresh.
+func (db *DB) EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) error {
+	fqn, objectType, _, isIceberg, err := db.existingObject(ctx, asset)
+	if err != nil || objectType == "" || isIceberg {
+		return err
+	}
+
+	existing := "a regular table"
+	if objectType != "TABLE" {
+		existing = "a " + strings.ToLower(objectType)
+	}
+	// Refresh-restricted assets don't run a full refresh.
+	fix := "run the asset with --full-refresh to replace it with an Iceberg table"
+	if asset.RefreshRestricted != nil && *asset.RefreshRestricted {
+		fix = "drop it yourself to recreate it as an Iceberg table"
+	}
+	return errors.Errorf("'%s' already exists as %s; %s", fqn, existing, fix)
 }
 
 func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {

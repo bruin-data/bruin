@@ -61,6 +61,12 @@ func (m *mockQuerierWithResult) RecreateTableOnMaterializationTypeMismatch(ctx c
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) error {
+	args := m.Called(ctx, asset)
+
+	return args.Error(0)
+}
+
 func (m *mockQuerierWithResult) SelectOnlyLastResult(ctx context.Context, q *query.Query) ([][]interface{}, error) {
 	args := m.Called(ctx, q)
 	get := args.Get(0)
