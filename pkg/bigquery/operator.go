@@ -142,10 +142,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	if t.FullRefreshEnabled(o.materializer.IsFullRefresh()) && t.Materialization.Strategy != pipeline.MaterializationStrategyDDL {
+	if t.FullRefreshEnabled(o.materializer.IsFullRefresh()) {
 		err = conn.DropTableOnMismatch(ctx, t.Name, t)
 		if err != nil {
 			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)
+		}
+	} else if t.Materialization.IsIceberg() && t.Materialization.Type == pipeline.MaterializationTypeTable {
+		// BigQuery can't turn a regular table into an Iceberg table in place.
+		if err := conn.EnsureIcebergTable(ctx, t.Name, t); err != nil {
+			return err
 		}
 	}
 

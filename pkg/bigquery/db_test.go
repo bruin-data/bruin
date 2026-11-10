@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -3121,6 +3122,176 @@ func TestEnvMaxBillableBytesIsSentWithEachQuery(t *testing.T) {
 			require.Error(t, err)
 			require.Positive(t, requests.Load())
 			require.Equal(t, tc.wantDryRuns, dryRuns.Load())
+		})
+	}
+}
+
+func TestClient_DropTableOnMismatch_TableFormat(t *testing.T) {
+	t.Parallel()
+
+	const icebergTable = `{"type": "TABLE", "biglakeConfiguration": {"tableFormat": "ICEBERG", "fileFormat": "PARQUET"}}`
+	tests := []struct {
+		name         string
+		existing     string
+		strategy     pipeline.MaterializationStrategy
+		format       pipeline.MaterializationTableFormat
+		wantDeletion bool
+	}{
+		{
+			name:         "regular table for an Iceberg asset",
+			existing:     `{"type": "TABLE"}`,
+			strategy:     pipeline.MaterializationStrategyCreateReplace,
+			format:       pipeline.MaterializationTableFormatIceberg,
+			wantDeletion: true,
+		},
+		{
+			name:         "Iceberg table for a regular asset",
+			existing:     icebergTable,
+			strategy:     pipeline.MaterializationStrategyMerge,
+			wantDeletion: true,
+		},
+		{
+			name:         "Iceberg table for a regular ddl asset",
+			existing:     icebergTable,
+			strategy:     pipeline.MaterializationStrategyDDL,
+			wantDeletion: true,
+		},
+		{
+			name:     "Iceberg table for an Iceberg asset",
+			existing: icebergTable,
+			strategy: pipeline.MaterializationStrategyCreateReplace,
+			format:   pipeline.MaterializationTableFormatIceberg,
+		},
+		{
+			name:     "view for a ddl asset is left as before",
+			existing: `{"type": "VIEW"}`,
+			strategy: pipeline.MaterializationStrategyDDL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var deleted atomic.Bool
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodDelete {
+					deleted.Store(true)
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tt.existing))
+			}))
+			defer srv.Close()
+
+			client, err := bigquery.NewClient(
+				t.Context(),
+				testProjectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   testProjectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{client: client, config: &Config{ProjectID: testProjectID}}
+			err = d.DropTableOnMismatch(t.Context(), "dataset.table", &pipeline.Asset{
+				Name: "dataset.table",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    tt.strategy,
+					TableFormat: tt.format,
+				},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantDeletion, deleted.Load())
+		})
+	}
+}
+
+func TestClient_EnsureIcebergTable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		status            int
+		existing          string
+		refreshRestricted bool
+		wantErr           string
+	}{
+		{
+			name:   "no existing table",
+			status: http.StatusNotFound,
+		},
+		{
+			name:     "existing Iceberg table",
+			existing: `{"type": "TABLE", "biglakeConfiguration": {"tableFormat": "ICEBERG", "fileFormat": "PARQUET"}}`,
+		},
+		{
+			name:     "existing regular table",
+			existing: `{"type": "TABLE"}`,
+			wantErr:  "'dataset.table' already exists as a regular table; run the asset with --full-refresh",
+		},
+		{
+			name:     "existing view",
+			existing: `{"type": "VIEW"}`,
+			wantErr:  "'dataset.table' already exists as a view; run the asset with --full-refresh",
+		},
+		{
+			name:              "existing regular table for a refresh-restricted asset",
+			existing:          `{"type": "TABLE"}`,
+			refreshRestricted: true,
+			wantErr:           "'dataset.table' already exists as a regular table; drop it yourself",
+		},
+		{
+			name:    "metadata lookup fails",
+			status:  http.StatusForbidden,
+			wantErr: "failed to fetch metadata for table 'dataset.table'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if tt.status != 0 {
+					w.WriteHeader(tt.status)
+					_, _ = w.Write([]byte(`{"error": {"code": ` + strconv.Itoa(tt.status) + `, "message": "failed"}}`))
+					return
+				}
+				_, _ = w.Write([]byte(tt.existing))
+			}))
+			defer srv.Close()
+
+			client, err := bigquery.NewClient(
+				t.Context(),
+				testProjectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   testProjectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{client: client, config: &Config{ProjectID: testProjectID}}
+			err = d.EnsureIcebergTable(t.Context(), "dataset.table", &pipeline.Asset{
+				Name:              "dataset.table",
+				RefreshRestricted: &tt.refreshRestricted,
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					TableFormat: pipeline.MaterializationTableFormatIceberg,
+				},
+			})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
