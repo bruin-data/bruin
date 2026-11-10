@@ -655,6 +655,7 @@ const (
 // tableFormatAssetTypes lists the asset types that can create tables in a non-default table format.
 var tableFormatAssetTypes = map[AssetType]bool{
 	AssetTypeSnowflakeQuery: true,
+	AssetTypeBigqueryQuery:  true,
 }
 
 // SupportsTableFormat reports whether assets of this type can set materialization.table_format.
@@ -1289,6 +1290,9 @@ type BigQueryConfig struct {
 	RequirePartitionFilter  *bool    `json:"require_partition_filter,omitempty" yaml:"require_partition_filter,omitempty" mapstructure:"require_partition_filter"`
 	PartitionExpirationDays *float64 `json:"partition_expiration_days,omitempty" yaml:"partition_expiration_days,omitempty" mapstructure:"partition_expiration_days"`
 	PartitionKeyImmutable   *bool    `json:"partition_key_immutable,omitempty" yaml:"partition_key_immutable,omitempty" mapstructure:"partition_key_immutable"`
+	// StorageURI and CloudResourceConnection only apply to Iceberg tables.
+	StorageURI              string `json:"storage_uri,omitempty" yaml:"storage_uri,omitempty" mapstructure:"storage_uri"`
+	CloudResourceConnection string `json:"cloud_resource_connection,omitempty" yaml:"cloud_resource_connection,omitempty" mapstructure:"cloud_resource_connection"`
 }
 
 func (b BigQueryConfig) MarshalJSON() ([]byte, error) {
@@ -1301,7 +1305,8 @@ func (b BigQueryConfig) MarshalJSON() ([]byte, error) {
 }
 
 func (b BigQueryConfig) IsZero() bool {
-	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil
+	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil &&
+		b.StorageURI == "" && b.CloudResourceConnection == ""
 }
 
 type ClickHouseConfig struct {
@@ -3585,6 +3590,10 @@ func mergeBigQueryDefaults(target *BigQueryConfig, defaults BigQueryConfig) {
 		value := *defaults.PartitionKeyImmutable
 		target.PartitionKeyImmutable = &value
 	}
+	if target.CloudResourceConnection == "" {
+		target.CloudResourceConnection = defaults.CloudResourceConnection
+	}
+	// StorageURI isn't inherited: Iceberg tables sharing a folder overwrite each other's files.
 }
 
 func mergeClickHouseDefaults(target *ClickHouseConfig, defaults ClickHouseConfig) {

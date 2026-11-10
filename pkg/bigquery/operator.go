@@ -77,6 +77,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 	q := queries[0]
+	if t.Materialization.IsIceberg() && t.BigQuery.StorageURI == "" {
+		return errors.Errorf("asset '%s' is an Iceberg table but has no storage URI, set bigquery.storage_uri on the asset", t.Name)
+	}
 	materialized, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err

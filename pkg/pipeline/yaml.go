@@ -461,6 +461,8 @@ type bigquery struct {
 	RequirePartitionFilter  *bool    `yaml:"require_partition_filter"`
 	PartitionExpirationDays *float64 `yaml:"partition_expiration_days"`
 	PartitionKeyImmutable   *bool    `yaml:"partition_key_immutable"`
+	StorageURI              string   `yaml:"storage_uri"`
+	CloudResourceConnection string   `yaml:"cloud_resource_connection"`
 }
 
 type doris struct {
@@ -724,6 +726,8 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			RequirePartitionFilter:  definition.BigQuery.RequirePartitionFilter,
 			PartitionExpirationDays: definition.BigQuery.PartitionExpirationDays,
 			PartitionKeyImmutable:   definition.BigQuery.PartitionKeyImmutable,
+			StorageURI:              definition.BigQuery.StorageURI,
+			CloudResourceConnection: definition.BigQuery.CloudResourceConnection,
 		},
 		ClickHouse: definition.ClickHouse,
 		Doris: DorisConfig{

@@ -702,7 +702,7 @@ materialization:
 | `incremental_predicate` | String | Extra SQL condition that limits which destination rows a `merge` considers, or which rows a `delete+insert` deletes on DuckDB, BigQuery and Snowflake. Valid with `merge`, and with `delete+insert` on DuckDB, BigQuery and Snowflake. See [`incremental_predicate`](#incremental-predicate). |
 | `partition_by` | String | Column or expression used to partition the table. See [Partitioning and clustering](#partitioning-and-clustering). |
 | `cluster_by` | String[] | Columns used to cluster or sort the table. See [Partitioning and clustering](#partitioning-and-clustering). |
-| `table_format` | `iceberg` | Creates the table as an Iceberg table instead of a native table. Only supported for `sf.sql` assets with `type: table`; as a pipeline default, other assets ignore it. See [Snowflake Iceberg tables](../platforms/snowflake.md#iceberg-tables). |
+| `table_format` | `iceberg` | Creates the table as an Iceberg table instead of a native table. Only supported for `sf.sql` and `bq.sql` assets with `type: table`; as a pipeline default, other assets ignore it. See [Snowflake Iceberg tables](../platforms/snowflake.md#iceberg-tables) and [BigQuery Iceberg tables](../platforms/bigquery.md#iceberg-tables). |
 
 Some strategies also read column-level settings from the asset's [`columns`](./columns.md):
 

@@ -432,6 +432,30 @@ snowflake:
 	require.NoError(t, pipeline.ValidateAssetYAML(fs, "events.sql", pipeline.CommentTask))
 }
 
+func TestConvertYamlToTask_BigQueryIcebergSettings(t *testing.T) {
+	t.Parallel()
+
+	definition := strings.TrimSpace(`
+name: analytics.events
+type: bq.sql
+materialization:
+  type: table
+  table_format: iceberg
+bigquery:
+  storage_uri: gs://bucket/custom/events
+  cloud_resource_connection: my-project.eu.my_conn
+`)
+	task, err := pipeline.ConvertYamlToTask([]byte(definition))
+	require.NoError(t, err)
+	require.Equal(t, "gs://bucket/custom/events", task.BigQuery.StorageURI)
+	require.Equal(t, "my-project.eu.my_conn", task.BigQuery.CloudResourceConnection)
+
+	fs := afero.NewMemMapFs()
+	content := "/* @bruin\n" + definition + "\n@bruin */\n\nSELECT 1"
+	require.NoError(t, afero.WriteFile(fs, "events.sql", []byte(content), 0o644))
+	require.NoError(t, pipeline.ValidateAssetYAML(fs, "events.sql", pipeline.CommentTask))
+}
+
 func TestConvertYamlToTask_Timeout(t *testing.T) {
 	t.Parallel()
 

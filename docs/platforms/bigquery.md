@@ -122,6 +122,54 @@ connections:
 
 Read-only mode requires `service_account_file` or `service_account_json`; ADC and access tokens are not supported. Ingestr and BigQuery Data Transfer are unavailable in this mode. Defaults to `false`.
 
+## Iceberg tables
+
+Set `table_format: iceberg` to create a [BigQuery Iceberg table](https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery). BigQuery keeps the table's files in your Cloud Storage bucket.
+
+::: warning Required
+Set `storage_uri` in the asset's `bigquery:` block. Without it, the run fails.
+:::
+
+```bruin-sql
+/* @bruin
+name: analytics.orders
+type: bq.sql
+materialization:
+    type: table
+    table_format: iceberg
+
+bigquery:
+    storage_uri: gs://my-bucket/analytics/orders
+    cloud_resource_connection: my-project.europe-west3.my_connection # optional
+@bruin */
+
+select order_id, status from raw.orders
+```
+
+| Field | Description |
+| --- | --- |
+| `storage_uri` | **Required.** The table's folder in Cloud Storage. Give every table its own folder; tables sharing one overwrite each other's files. |
+| `cloud_resource_connection` | Optional. The [Cloud resource connection](https://cloud.google.com/bigquery/docs/create-cloud-resource-connection) BigQuery writes the files with, as `project.region.name`. Defaults to the project's [default connection](https://docs.cloud.google.com/bigquery/docs/default-connections). |
+
+In `pipeline.yml`, `default.bigquery.cloud_resource_connection` applies to every asset; `storage_uri` doesn't, because it must be different for each table.
+
+### Setup
+
+Before the first run, set up a Cloud resource connection, the bucket permissions, and the roles for the account Bruin runs as. Follow BigQuery's guides:
+
+- [Required roles for Iceberg tables](https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#required-roles)
+- [Create a Cloud resource connection](https://cloud.google.com/bigquery/docs/create-cloud-resource-connection)
+- [Default connections](https://docs.cloud.google.com/bigquery/docs/default-connections), if you don't set `cloud_resource_connection`
+
+With the default connection, missing setup or permissions show up only as `An internal error occurred`.
+
+### Limitations
+
+- No `TRUNCATE`, so `truncate+insert` uses `DELETE` instead.
+- No `JSON`, `BIGNUMERIC`, `INTERVAL`, `RANGE`, or `GEOGRAPHY` columns, and no integer-range partitioning.
+- An existing table can't switch between native and Iceberg in place. Run the asset once with `--full-refresh` to drop it and create the right type; without it, an Iceberg asset over a native table or a view fails. Assets with `refresh_restricted: true` never run a full refresh, so drop the table yourself.
+- Dropping or replacing a table leaves its files in the bucket.
+
 ## BigQuery Assets
 
 ### `bq.sql`
