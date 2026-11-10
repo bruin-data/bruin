@@ -549,6 +549,15 @@ func (c *APIClient) GetGlossaryEntity(ctx context.Context, project, entityName s
 
 // --- Agents ---
 
+// ActAsAgent exchanges the caller's own token for a short-lived token owned by the agent.
+func (c *APIClient) ActAsAgent(ctx context.Context, agentID int) (*ActAsAgentResult, error) {
+	var result ActAsAgentResult
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/act-as", agentID), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	var resp struct {
 		Agents []Agent `json:"agents"`

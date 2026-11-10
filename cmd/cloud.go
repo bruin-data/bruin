@@ -36,6 +36,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudLogin(),
 			CloudLogout(),
 			CloudAuth(),
+			CloudActAs(),
 			CloudTeams(),
 			CloudProjects(),
 			CloudPipelines(),
@@ -203,11 +204,7 @@ func newCloudClient(c *cli.Command) (*bruincloud.APIClient, error) {
 		return nil, err
 	}
 	client := bruincloud.NewAPIClient(auth.token)
-	team := resolveTeam(c)
-	if team == "" && auth.source == cloudAuthGlobal {
-		team = auth.team
-	}
-	if team != "" {
+	if team := auth.teamFor(c); team != "" {
 		client.SetTeam(team)
 	}
 	return client, nil

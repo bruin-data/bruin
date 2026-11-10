@@ -24,7 +24,7 @@ export BRUIN_CLOUD_API_KEY="your-api-key-here"
 bruin cloud projects list
 ```
 
-Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin cloud auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
+Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → [act-as session](#act-as) → repository login → global login. Run `bruin cloud auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
 
 To save an existing token for a repository, add a `bruin` connection to its `.bruin.yml`:
 
@@ -98,6 +98,19 @@ bruin cloud auth status
 ```
 
 Use `--api-key` or `--team` to inspect an explicit override. This checks local credentials; Cloud validates the token and permissions when an API command runs.
+
+### `act-as`
+
+Run cloud commands as one of your team's agents, with the agent's permissions. Cloud logs those actions as the agent. You need a global login (`bruin cloud login --global`):
+
+```bash
+bruin cloud act-as --agent 12
+bruin cloud agents list        # runs as the agent
+bruin cloud act-as             # show the current session
+bruin cloud act-as --stop      # use your own login again
+```
+
+The session is pinned to the team it started on; pass `--team` when starting it to pick another team. The agent token lasts about an hour and renews automatically with your own login. If renewal fails, for example because you lost access to the agent, commands stop with the reason; run `bruin cloud act-as --stop`. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence over the session, and `bruin cloud logout --global` also ends it. Use `--output json` for machine-readable output.
 
 ### `teams`
 

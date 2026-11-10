@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/bruin-data/bruin/pkg/cloudauth"
@@ -25,11 +26,10 @@ func CloudAuth() *cli.Command {
 			if auth.connection != "" {
 				_, _ = fmt.Fprintf(writer, "Connection: %s/%s\n", auth.environment, auth.connection)
 			}
-			team := resolveTeam(c)
-			if team == "" && auth.source == cloudAuthGlobal {
-				team = auth.team
+			if auth.actAs != nil {
+				_, _ = fmt.Fprintf(writer, "Acting as agent: %s\n", actAsLabel(auth.actAs))
 			}
-			if team != "" {
+			if team := auth.teamFor(c); team != "" {
 				_, _ = fmt.Fprintf(writer, "Default team: %s\n", team)
 			}
 			_, _ = fmt.Fprintln(writer, "Local credential found. API validity and permissions are checked by Cloud on each request.")
@@ -148,10 +148,24 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 			}
 			_, _ = fmt.Fprintln(output, "Token revoked in Bruin Cloud. Other copies of this token are now invalid.")
 		}
+		if err := stopActAsOnLogout(store, output); err != nil {
+			return err
+		}
 		if err := store.Delete(); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintln(output, "Global login removed. Repository connections and environment variables are unchanged.")
 		return nil
 	}}
+}
+
+func stopActAsOnLogout(store cloudauth.Store, output io.Writer) error {
+	session, err := store.ClearActAs()
+	if err != nil {
+		return err
+	}
+	if session != nil {
+		_, _ = fmt.Fprintf(output, "Stopped acting as agent %s.\n", actAsLabel(session))
+	}
+	return nil
 }
