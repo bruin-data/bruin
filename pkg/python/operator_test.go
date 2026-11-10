@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -239,12 +240,17 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
+				// The operator leaves both unset when the binary cannot be found.
+				executable, _ := os.Executable()
+
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.module == "path.to.module" &&
 						ec.envVariables["BRUIN_CONNECTION"] == "my_bigquery" &&
 						ec.envVariables["BRUIN_ASSET"] == "my-asset" &&
 						ec.envVariables["BRUIN_THIS"] == "my-asset" &&
-						ec.envVariables["BRUIN_PIPELINE"] == "test-pipeline"
+						ec.envVariables["BRUIN_PIPELINE"] == "test-pipeline" &&
+						ec.envVariables["BRUIN_PATH"] == executable &&
+						ec.envVariables["BRUIN_EXECUTABLE"] == executable
 				})).
 					Return(nil)
 			},
