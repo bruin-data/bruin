@@ -534,10 +534,12 @@ select order_id, status from raw.orders
 | `snowflake.external_volume` | Optional. The [external volume](https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-external-volume) for the table's files. Defaults to the schema, database, or account `EXTERNAL_VOLUME`. |
 | `snowflake.base_location` | Optional. Folder for the table's files inside the volume. Defaults to `<database>/<schema>/<table>`. Snowflake adds a [random suffix](https://docs.snowflake.com/en/release-notes/bcr-bundles/2025_01/bcr-1873) to the folder, and a new one each time the table is recreated. |
 
+Both can also be set for every asset in the pipeline under `default.snowflake` in `pipeline.yml`; values on the asset override them.
+
 Things to know:
 
 - **Types:** Iceberg tables don't support `TIMESTAMP_TZ`, `VARIANT`, or `NUMBER` without precision. Cast timestamps to microseconds, for example `current_timestamp()::timestamp_ltz(6)`. See [Iceberg data types](https://docs.snowflake.com/en/user-guide/tables-iceberg-data-types).
-- **Existing tables:** Snowflake can't convert a regular table or a view to an Iceberg table, or the other way around. If one already uses the asset's name, drop it before the first run. Otherwise creating the table fails with "already exists as TABLE", and incremental strategies such as `merge` keep writing to the existing regular table.
+- **Existing tables:** Snowflake can't convert a regular table to an Iceberg table, and a full refresh doesn't drop it. If one already uses the asset's name, drop it before the first run. Otherwise creating the table fails with "already exists as TABLE", and incremental strategies such as `merge` keep writing to the regular table.
 - **Recreating:** `create+replace` and full refreshes recreate the Iceberg table, which gives it new metadata and files. Use `merge`, `append`, or `ddl` if other engines read the table and it must keep its identity.
 - **Permissions:** Snowflake needs access to the volume's bucket; see Snowflake's setup guides for [Google Cloud Storage](https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-external-volume-gcs) and [Amazon S3](https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-external-volume-s3). On Google Cloud Storage it also needs `storage.buckets.get`, or creating a table fails with "Query needs to be retried to setup external volume".
 

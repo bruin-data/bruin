@@ -3513,6 +3513,12 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if asset.Snowflake.Warehouse == "" {
 		asset.Snowflake.Warehouse = defaults.Snowflake.Warehouse
 	}
+	if asset.Snowflake.ExternalVolume == "" {
+		asset.Snowflake.ExternalVolume = defaults.Snowflake.ExternalVolume
+	}
+	if asset.Snowflake.BaseLocation == "" {
+		asset.Snowflake.BaseLocation = defaults.Snowflake.BaseLocation
+	}
 	if asset.Athena.Location == "" {
 		asset.Athena.Location = defaults.Athena.Location
 	}
