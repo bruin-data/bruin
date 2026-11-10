@@ -2,10 +2,10 @@ package bigquery
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"golang.org/x/oauth2/google"
@@ -28,18 +28,26 @@ type Config struct {
 	ReadOnly                         bool
 }
 
-// MaxBillableBytesEnv lets Bruin Cloud cap every BigQuery connection of an agent run.
-const MaxBillableBytesEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES"
+// MaxBillableBytesByConnectionEnv lets Bruin Cloud cap an agent run's BigQuery connections: a JSON object of connection name to bytes.
+const MaxBillableBytesByConnectionEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION"
 
-func MaxBillableBytesFromEnv() (*int64, error) {
-	raw := strings.TrimSpace(os.Getenv(MaxBillableBytesEnv))
+func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
+	raw := strings.TrimSpace(os.Getenv(MaxBillableBytesByConnectionEnv))
 	if raw == "" {
 		return nil, nil //nolint:nilnil // unset means no cap
 	}
 
-	limit, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || limit <= 0 {
-		return nil, fmt.Errorf("%s must be a positive integer, got %q", MaxBillableBytesEnv, raw)
+	var limits map[string]int64
+	if err := json.Unmarshal([]byte(raw), &limits); err != nil || limits == nil {
+		return nil, fmt.Errorf("%s must be a JSON object of connection name to bytes, got %q", MaxBillableBytesByConnectionEnv, raw)
+	}
+
+	limit, ok := limits[connectionName]
+	if !ok {
+		return nil, nil //nolint:nilnil // connection has no cap
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("%s: the limit for %q must be a positive integer, got %d", MaxBillableBytesByConnectionEnv, connectionName, limit)
 	}
 
 	return &limit, nil

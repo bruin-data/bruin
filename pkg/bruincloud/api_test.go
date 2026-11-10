@@ -768,6 +768,25 @@ func TestSetConnectionSetCostLimit(t *testing.T) {
 	assert.InDelta(t, 0.1, *saved, 0.0001)
 }
 
+func TestSetConnectionCostLimit(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/connection-sets/5/connections/bq prod/cost-limit", r.URL.Path)
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.InDelta(t, 0.1, body["max_query_cost"], 0.0001)
+		w.WriteHeader(http.StatusOK)
+		writeJSON(t, w, map[string]any{"id": 5, "connection": "bq prod", "max_query_cost": 0.1})
+	})
+
+	limit := 0.1
+	saved, err := client.SetConnectionCostLimit(t.Context(), 5, "bq prod", &limit)
+	require.NoError(t, err)
+	require.NotNil(t, saved)
+	assert.InDelta(t, 0.1, *saved, 0.0001)
+}
+
 func TestRemoveConnectionSetCostLimit(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
