@@ -148,7 +148,7 @@ select order_id, status from raw.orders
 
 | Field | Description |
 | --- | --- |
-| `storage_uri` | **Required.** The table's folder in Cloud Storage. Give every table its own folder; tables sharing one overwrite each other's files. |
+| `storage_uri` | **Required.** The table's folder in Cloud Storage. Give every table its own folder, including dev copies made with a schema prefix: BigQuery rejects a folder another table already uses. |
 | `cloud_resource_connection` | Optional. The [Cloud resource connection](https://cloud.google.com/bigquery/docs/create-cloud-resource-connection) BigQuery writes the files with, as `project.region.name`. Defaults to the project's [default connection](https://docs.cloud.google.com/bigquery/docs/default-connections). |
 
 In `pipeline.yml`, `default.bigquery.cloud_resource_connection` applies to every asset; `storage_uri` doesn't, because it must be different for each table.

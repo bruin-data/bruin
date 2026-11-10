@@ -3593,7 +3593,7 @@ func mergeBigQueryDefaults(target *BigQueryConfig, defaults BigQueryConfig) {
 	if target.CloudResourceConnection == "" {
 		target.CloudResourceConnection = defaults.CloudResourceConnection
 	}
-	// StorageURI isn't inherited: Iceberg tables sharing a folder overwrite each other's files.
+	// StorageURI isn't inherited: BigQuery rejects two Iceberg tables on the same folder.
 }
 
 func mergeClickHouseDefaults(target *ClickHouseConfig, defaults ClickHouseConfig) {

@@ -909,6 +909,17 @@ func TestMaterializer_RenderIceberg(t *testing.T) {
 			want: "BEGIN TRANSACTION;\nDELETE FROM my.asset WHERE TRUE;\nINSERT INTO my.asset SELECT 1;\nCOMMIT TRANSACTION;",
 		},
 		{
+			name: "truncate+insert on a partitioned table filters on the partition column",
+			task: func() *pipeline.Asset {
+				a := icebergAsset(pipeline.MaterializationStrategyTruncateInsert)
+				a.Materialization.PartitionBy = "TIMESTAMP_TRUNC(ts, MONTH)"
+				requireFilter := true
+				a.BigQuery.RequirePartitionFilter = &requireFilter
+				return a
+			}(),
+			want: "BEGIN TRANSACTION;\nDELETE FROM my.asset WHERE `ts` IS NULL OR `ts` IS NOT NULL;\nINSERT INTO my.asset SELECT 1;\nCOMMIT TRANSACTION;",
+		},
+		{
 			name: "ddl",
 			task: icebergAsset(pipeline.MaterializationStrategyDDL),
 			want: "CREATE TABLE IF NOT EXISTS my.asset (\n  id INT64,\n  PRIMARY KEY (id) NOT ENFORCED\n)\n" + icebergOptions,
