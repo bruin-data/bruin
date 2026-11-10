@@ -53,7 +53,7 @@ There are two places to cap what a BigQuery query can cost. Which one applies de
 | Locally, with credentials from your `.bruin.yml` | `max_query_cost` / `max_billable_bytes` (and the `_soft` variants) on the connection, as above |
 | Through Bruin Cloud: cloud query mode (`use_cloud`), the Bruin Cloud API, Bruin Cloud agents | The connection's cost limit in its Bruin Cloud connection set, in the app or with [`bruin cloud connection-sets cost-limit`](../commands/cloud.md#cost-limit) |
 
-Costs are estimated at BigQuery's on-demand price of $6.25 per TiB. Bruin Cloud passes its limits to agent runs as `BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION`, a JSON object of connection name to bytes (`BRUIN_BIGQUERY_MAX_BILLABLE_BYTES` caps every connection not in it). When one applies, the stricter of it and the connection's `max_billable_bytes` is sent to BigQuery with each SQL query, and BigQuery refuses queries that would bill more. It doesn't apply to ingestr or Python assets, which don't run through Bruin's BigQuery client.
+Costs are estimated at BigQuery's on-demand price of $6.25 per TiB. Bruin Cloud passes its limits to agent runs as `BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION`, a JSON object of connection name to bytes. When one applies to a connection, the stricter of it and the connection's `max_billable_bytes` is sent to BigQuery with each SQL query, and BigQuery refuses queries that would bill more. It doesn't apply to ingestr or Python assets, which don't run through Bruin's BigQuery client.
 
 ### Authentication Options
 
