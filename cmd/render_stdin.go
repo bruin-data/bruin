@@ -21,13 +21,20 @@ import (
 func runRenderStdin(ctx context.Context, c *cli.Command) error {
 	output := c.String("output")
 
+	w := c.Root().Writer
 	rendered, err := renderStdin(ctx, c, afero.NewOsFs())
 	if err != nil {
-		printError(err, output, "Failed to render the query")
+		// Callers such as the Python SDK read {"error": ...} from stdout.
+		if output == "json" {
+			if js, marshalErr := marshal(ErrorResponse{Error: err.Error()}); marshalErr == nil {
+				fmt.Fprintln(w, string(js))
+			}
+		} else {
+			printError(err, output, "Failed to render the query")
+		}
 		return cli.Exit("", 1)
 	}
 
-	w := c.Root().Writer
 	if output != "json" {
 		_, err = fmt.Fprintln(w, rendered)
 		return err

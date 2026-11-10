@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -409,6 +410,35 @@ func TestRenderStdinCommandErrors(t *testing.T) {
 			require.ErrorContains(t, err, tt.wantErr)
 		})
 	}
+}
+
+//nolint:paralleltest // urfave/cli mutates the shared date flag definitions during setup.
+func TestRenderStdinCommandFailureOutput(t *testing.T) {
+	configFile := writeRenderStdinConfig(t, renderStdinTestConfig)
+	args := []string{"--stdin", "--connection", "nope", "--config-file", configFile}
+
+	assertExitCode := func(t *testing.T, err error) {
+		t.Helper()
+		var exitErr cli.ExitCoder
+		require.ErrorAs(t, err, &exitErr)
+		assert.Equal(t, 1, exitErr.ExitCode())
+	}
+
+	t.Run("json output is an error object on stdout and exit code 1", func(t *testing.T) {
+		got, err := runRenderCommand(t, "SELECT 1", append(args, "--output", "json")...)
+		assertExitCode(t, err)
+
+		var payload map[string]string
+		require.NoError(t, json.Unmarshal([]byte(got), &payload))
+		assert.Len(t, payload, 1)
+		assert.Contains(t, payload["error"], "connection 'nope' not found")
+	})
+
+	t.Run("plain output keeps stdout empty and exits with code 1", func(t *testing.T) {
+		got, err := runRenderCommand(t, "SELECT 1", args...)
+		assertExitCode(t, err)
+		assert.Empty(t, got)
+	})
 }
 
 //nolint:paralleltest // urfave/cli mutates the shared date flag definitions during setup.
