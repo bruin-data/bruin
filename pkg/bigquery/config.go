@@ -25,7 +25,6 @@ type Config struct {
 	MaxBillableBytesSoft             *int64
 	MaxQueryCostSoft                 *float64
 	EnvMaxBillableBytes              *int64
-	EnvMaxQueryCostSoft              *float64
 	ReadOnly                         bool
 }
 
@@ -65,15 +64,12 @@ func connectionLimitFromEnv[T int64 | float64](envName, connectionName, unit str
 	return &limit, nil
 }
 
-func (c Config) maxQueryCostSoft() *float64 {
-	if c.EnvMaxQueryCostSoft == nil {
-		return c.MaxQueryCostSoft
-	}
-	if c.MaxQueryCostSoft != nil && *c.MaxQueryCostSoft < *c.EnvMaxQueryCostSoft {
-		return c.MaxQueryCostSoft
+func StricterLimit(a, b *float64) *float64 {
+	if a == nil || (b != nil && *b < *a) {
+		return b
 	}
 
-	return c.EnvMaxQueryCostSoft
+	return a
 }
 
 // The env cap is only sent to BigQuery, never dry-run first like max_billable_bytes, so scripts a dry run can't plan still run.

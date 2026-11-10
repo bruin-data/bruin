@@ -262,22 +262,14 @@ func TestMaxQueryCostSoftFromEnv(t *testing.T) { //nolint:paralleltest // uses t
 	}
 }
 
-func TestMaxQueryCostSoftTakesTheStricterLimit(t *testing.T) {
+func TestStricterLimit(t *testing.T) {
 	t.Parallel()
 
-	require.Nil(t, Config{}.maxQueryCostSoft())
-	require.Equal(t, float64Ptr(5), Config{MaxQueryCostSoft: float64Ptr(5)}.maxQueryCostSoft())
-	require.Equal(t, float64Ptr(1), Config{EnvMaxQueryCostSoft: float64Ptr(1)}.maxQueryCostSoft())
-	require.Equal(t, float64Ptr(1), Config{MaxQueryCostSoft: float64Ptr(5), EnvMaxQueryCostSoft: float64Ptr(1)}.maxQueryCostSoft())
-	require.Equal(t, float64Ptr(0.5), Config{MaxQueryCostSoft: float64Ptr(0.5), EnvMaxQueryCostSoft: float64Ptr(1)}.maxQueryCostSoft())
-}
-
-func TestEnvSoftLimitOnlyChecksBruinQuery(t *testing.T) {
-	t.Parallel()
-
-	client := &Client{config: &Config{EnvMaxQueryCostSoft: float64Ptr(1)}}
-	require.False(t, client.hasActiveQueryLimits(t.Context()))
-	require.True(t, client.hasActiveQueryLimits(WithSoftQueryLimits(t.Context())))
+	require.Nil(t, StricterLimit(nil, nil))
+	require.Equal(t, float64Ptr(5), StricterLimit(float64Ptr(5), nil))
+	require.Equal(t, float64Ptr(1), StricterLimit(nil, float64Ptr(1)))
+	require.Equal(t, float64Ptr(1), StricterLimit(float64Ptr(5), float64Ptr(1)))
+	require.Equal(t, float64Ptr(0.5), StricterLimit(float64Ptr(0.5), float64Ptr(1)))
 }
 
 func TestBytesBilledLimitTakesTheStricterCap(t *testing.T) {

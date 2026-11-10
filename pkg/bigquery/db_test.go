@@ -446,27 +446,6 @@ func TestClientValidateQueryLimits(t *testing.T) {
 			enforceSoftLimits: true,
 			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.017053 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.017053. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
 		},
-		{
-			name: "soft limit from the env applies when stricter than the connection's",
-			config: &Config{
-				MaxQueryCostSoft:    float64Ptr(1),
-				EnvMaxQueryCostSoft: &maxCost,
-			},
-			stats: &bigquery.QueryStatistics{
-				TotalBytesProcessed: 3_000_000_000,
-			},
-			enforceSoftLimits: true,
-			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.017053 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.017053. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
-		},
-		{
-			name: "soft limit from the env ignored unless enforced",
-			config: &Config{
-				EnvMaxQueryCostSoft: &maxCost,
-			},
-			stats: &bigquery.QueryStatistics{
-				TotalBytesProcessed: 3_000_000_000,
-			},
-		},
 	}
 
 	for _, tt := range tests {

@@ -520,7 +520,7 @@ func (d *Client) hasActiveQueryLimits(ctx context.Context) bool {
 		return true
 	}
 
-	return d.shouldEnforceSoftQueryLimits(ctx) && (d.config.MaxBillableBytesSoft != nil || d.config.maxQueryCostSoft() != nil)
+	return d.shouldEnforceSoftQueryLimits(ctx) && (d.config.MaxBillableBytesSoft != nil || d.config.MaxQueryCostSoft != nil)
 }
 
 func (d *Client) shouldEnforceSoftQueryLimits(ctx context.Context) bool {
@@ -570,8 +570,8 @@ func (d *Client) validateQueryLimits(stats *bigquery.QueryStatistics, enforceSof
 		if d.config.MaxBillableBytesSoft != nil && estimatedBillableBytes > *d.config.MaxBillableBytesSoft {
 			softViolations = append(softViolations, fmt.Sprintf("estimated billable bytes %d exceeds max_billable_bytes_soft %d", estimatedBillableBytes, *d.config.MaxBillableBytesSoft))
 		}
-		if limit := d.config.maxQueryCostSoft(); limit != nil && estimatedCost > *limit {
-			softViolations = append(softViolations, fmt.Sprintf("estimated query cost $%.6f exceeds max_query_cost_soft $%.6f", estimatedCost, *limit))
+		if d.config.MaxQueryCostSoft != nil && estimatedCost > *d.config.MaxQueryCostSoft {
+			softViolations = append(softViolations, fmt.Sprintf("estimated query cost $%.6f exceeds max_query_cost_soft $%.6f", estimatedCost, *d.config.MaxQueryCostSoft))
 		}
 		if len(softViolations) > 0 {
 			return fmt.Errorf("BigQuery query exceeds configured soft limits for bruin query: %s. Estimated query cost: %s. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits", strings.Join(softViolations, "; "), formatBigQueryCostUSD(estimatedCost))

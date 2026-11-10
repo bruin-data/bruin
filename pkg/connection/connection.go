@@ -440,9 +440,8 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		MaxBillableBytes:                 connection.MaxBillableBytes,
 		MaxQueryCost:                     connection.MaxQueryCost,
 		MaxBillableBytesSoft:             connection.MaxBillableBytesSoft,
-		MaxQueryCostSoft:                 connection.MaxQueryCostSoft,
+		MaxQueryCostSoft:                 bigquery.StricterLimit(connection.MaxQueryCostSoft, envMaxQueryCostSoft),
 		EnvMaxBillableBytes:              envMaxBillableBytes,
-		EnvMaxQueryCostSoft:              envMaxQueryCostSoft,
 	})
 	if err != nil {
 		return err
