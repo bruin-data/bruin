@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,6 +172,54 @@ func TestGetPipelineFallsBackToStandalonePythonScript(t *testing.T) {
 	assert.True(t, info.StandalonePythonScript)
 	assert.True(t, info.ValidateOnlyAssetLevel)
 	assert.Equal(t, "not-in-a-pipeline", info.Pipeline.Assets[0].Name)
+}
+
+func TestGetPipelinePopulatesCommitFromGitCheckout(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "pipeline.yml"), []byte("name: commit-probe\n"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, "assets"), 0o755))
+	assetPath := filepath.Join(repoRoot, "assets", "probe.py")
+	require.NoError(t, os.WriteFile(assetPath, []byte("\"\"\"@bruin\nname: probe\ntype: python\n@bruin\"\"\"\nprint('hi')\n"), 0o644))
+
+	runGit := func(args ...string) string {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd.Dir = repoRoot
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		return strings.TrimSpace(string(out))
+	}
+	runGit("init", "-q")
+	runGit("add", ".")
+	runGit("commit", "-q", "-m", "init")
+	head := runGit("rev-parse", "HEAD")
+	require.Len(t, head, 40)
+
+	for name, inputPath := range map[string]string{"pipeline dir": repoRoot, "asset file": assetPath} {
+		info, err := GetPipeline(t.Context(), inputPath, &scheduler.RunConfig{}, zaptest.NewLogger(t).Sugar())
+		require.NoError(t, err, name)
+		require.NotNil(t, info.Pipeline, name)
+		assert.Equal(t, head, info.Pipeline.Commit, name)
+	}
+}
+
+func TestAttachGitCommitLeavesCommitEmptyWithoutHead(t *testing.T) {
+	t.Parallel()
+
+	// A freshly initialized repository has no HEAD commit, so the lookup fails.
+	dir := t.TempDir()
+	out, err := exec.CommandContext(t.Context(), "git", "init", "-q", dir).CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	p := &pipeline.Pipeline{}
+	attachGitCommit(p, dir, zaptest.NewLogger(t).Sugar())
+	assert.Empty(t, p.Commit)
+
+	existing := &pipeline.Pipeline{Commit: "preset"}
+	attachGitCommit(existing, dir, zaptest.NewLogger(t).Sugar())
+	assert.Equal(t, "preset", existing.Commit)
 }
 
 func TestStandalonePythonAssetIDUsesFullPath(t *testing.T) {
