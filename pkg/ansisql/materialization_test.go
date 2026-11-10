@@ -74,3 +74,15 @@ func TestAddIncrementalPredicate(t *testing.T) {
 		AddIncrementalPredicate(base, "  target.event_date >= DATE '2026-07-01'  "),
 	)
 }
+
+func TestBuildIncrementalDelete(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "DELETE FROM my.asset WHERE id in (1)", BuildIncrementalDelete("my.asset", "id in (1)", ""))
+	assert.Equal(t, "DELETE FROM my.asset WHERE id in (1)", BuildIncrementalDelete("my.asset", "id in (1)", "  "))
+	assert.Equal(
+		t,
+		"DELETE FROM my.asset AS target WHERE id in (1) AND (target.region = 'eu')",
+		BuildIncrementalDelete("my.asset", "id in (1)", " target.region = 'eu' "),
+	)
+}
