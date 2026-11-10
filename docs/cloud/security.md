@@ -9,5 +9,6 @@ For teams that require IP allowlisting, Bruin Cloud can provision dedicated egre
 ## Related
 
 - [Bruin's IP Addresses](/cloud/security/ip-addresses) - dedicated egress IPs for repository, database, and service access.
+- [Hybrid Deployment](/cloud/hybrid-deployment) - run workloads in your own infrastructure, with credentials kept on your side.
 - [Connections](/cloud/connections) - configure the credentials Bruin Cloud uses to reach your data platforms.
 - [Audit Logs](/cloud/audit-logs) - review security-relevant activity in your team.
