@@ -985,7 +985,12 @@ func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asse
 		}
 		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
-	if d.IsMaterializationTypeMismatch(ctx, meta, asset) || d.IsPartitioningOrClusteringMismatch(ctx, meta, asset) {
+	// DDL assets keep their table unless it has to switch between table and view.
+	mismatch := d.IsMaterializationTypeMismatch(ctx, meta, asset)
+	if asset.Materialization.Strategy != pipeline.MaterializationStrategyDDL {
+		mismatch = mismatch || d.IsPartitioningOrClusteringMismatch(ctx, meta, asset)
+	}
+	if mismatch {
 		if err := tableRef.Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
 		}

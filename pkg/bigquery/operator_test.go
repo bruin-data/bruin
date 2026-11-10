@@ -558,3 +558,34 @@ func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
 	assert.Contains(t, executedQuery.Query, `"version":"1.0"`)
 	assert.Contains(t, executedQuery.Query, "SELECT * FROM orders")
 }
+
+func TestBasicOperator_RunTask_DDLFullRefreshChecksForMismatch(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	client.On("CreateDataSetIfNotExist", mock.Anything, mock.Anything).Return(nil)
+	client.On("DropTableOnMismatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "materialized"}).Return(nil)
+
+	extractor := new(mockExtractor)
+	extractor.On("ExtractQueriesFromString", "some content").Return([]*query.Query{{Query: "select 1"}}, nil)
+	mat := new(mockMaterializer)
+	mat.On("Render", mock.Anything, "select 1").Return("materialized", nil)
+	mat.On("IsFullRefresh").Return(true)
+	mat.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).Return(nil)
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "gcp-default").Return(client)
+
+	o := BasicOperator{connection: conn, extractor: extractor, materializer: mat}
+	require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
+		Name:           "dataset.table",
+		Type:           pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{Path: "test-file.sql", Content: "some content"},
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyDDL,
+		},
+	}))
+
+	client.AssertCalled(t, "DropTableOnMismatch", mock.Anything, mock.Anything, mock.Anything)
+}

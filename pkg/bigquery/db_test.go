@@ -3124,3 +3124,77 @@ func TestEnvMaxBillableBytesIsSentWithEachQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_DropTableOnMismatch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		existing     string
+		strategy     pipeline.MaterializationStrategy
+		wantDeletion bool
+	}{
+		{
+			name:         "ddl asset replaces a view",
+			existing:     `{"type": "VIEW"}`,
+			strategy:     pipeline.MaterializationStrategyDDL,
+			wantDeletion: true,
+		},
+		{
+			name:     "ddl asset keeps a table with different partitioning",
+			existing: `{"type": "TABLE", "timePartitioning": {"type": "DAY", "field": "dt"}}`,
+			strategy: pipeline.MaterializationStrategyDDL,
+		},
+		{
+			name:         "create+replace asset replaces a table with different partitioning",
+			existing:     `{"type": "TABLE", "timePartitioning": {"type": "DAY", "field": "dt"}}`,
+			strategy:     pipeline.MaterializationStrategyCreateReplace,
+			wantDeletion: true,
+		},
+		{
+			name:     "matching table is kept",
+			existing: `{"type": "TABLE"}`,
+			strategy: pipeline.MaterializationStrategyDDL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var deleted atomic.Bool
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodDelete {
+					deleted.Store(true)
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tt.existing))
+			}))
+			defer srv.Close()
+
+			client, err := bigquery.NewClient(
+				t.Context(),
+				testProjectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   testProjectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{client: client, config: &Config{ProjectID: testProjectID}}
+			err = d.DropTableOnMismatch(t.Context(), "dataset.table", &pipeline.Asset{
+				Name: "dataset.table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: tt.strategy,
+				},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantDeletion, deleted.Load())
+		})
+	}
+}

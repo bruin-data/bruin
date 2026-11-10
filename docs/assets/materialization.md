@@ -1557,7 +1557,7 @@ During a full refresh, table assets are rebuilt with `create+replace` instead of
 | Strategy | Full-refresh behavior |
 | --- | --- |
 | `create+replace`, `truncate+insert`, `append`, `delete+insert`, `merge`, `time_interval` | The table is recreated from the full query result. |
-| `ddl` | Unchanged. The table isn't recreated, except on Snowflake when the existing object's type or table format doesn't match the asset; then it's dropped and created again. |
+| `ddl` | Unchanged. The table isn't recreated, except when the existing object is a view instead of a table (or on Snowflake, has a different table format); then it's dropped and created again. |
 | `scd2_by_column`, `scd2_by_time` | A new SCD2 table is built from the current source snapshot. Existing history is lost. |
 | Data Vault | On PostgreSQL and DuckDB, the table is dropped and recreated, then loaded with the Data Vault rules. |
 | `type: view` | Unchanged. Views are always replaced. |
