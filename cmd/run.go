@@ -1693,8 +1693,6 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 					}, standaloneErr
 				}
 
-				attachGitCommit(foundPipeline, filepath.Dir(inputPath), log)
-
 				return &PipelineInfo{
 					Pipeline:               foundPipeline,
 					RunningForAnAsset:      true,
@@ -1711,7 +1709,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}
 	}
 
-	opts = append(opts, pipeline.WithMutate())
+	opts = append(opts, pipeline.WithMutate(), pipeline.WithGitMetadata())
 	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		errorPrinter.Println("Failed to build pipeline: ", err.Error())
@@ -1724,33 +1722,11 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}, err
 	}
 
-	attachGitCommit(foundPipeline, filepath.Dir(foundPipeline.DefinitionFile.Path), log)
-
 	return &PipelineInfo{
 		Pipeline:           foundPipeline,
 		RunningForAnAsset:  runningForAnAsset,
 		RunDownstreamTasks: runConfig.Downstream,
 	}, nil
-}
-
-// attachGitCommit fills in the pipeline's commit hash from the git repository
-// that contains dir. It feeds BRUIN_COMMIT_HASH and the commit_hash Jinja
-// variable. Running outside a git checkout is valid, so a failed lookup leaves
-// the commit empty instead of failing the run.
-func attachGitCommit(p *pipeline.Pipeline, dir string, log logger.Logger) {
-	if p == nil || p.Commit != "" {
-		return
-	}
-
-	commit, err := git.CurrentCommit(dir)
-	if err != nil {
-		if log != nil {
-			log.Debugf("could not determine the git commit for '%s', BRUIN_COMMIT_HASH will be empty: %v", dir, err)
-		}
-		return
-	}
-
-	p.Commit = commit
 }
 
 func isPythonScriptPath(inputPath string) bool {
@@ -1789,6 +1765,10 @@ func buildStandalonePythonPipeline(ctx context.Context, inputPath string) (*pipe
 			Path: filepath.Join(scriptDir, "pipeline.yml"),
 		},
 		MacrosPath: filepath.Join(scriptDir, "macros"),
+	}
+	// Set before mutation so rendered parameters see commit_hash; left empty when HEAD is unavailable.
+	if commit, commitErr := git.CurrentCommit(scriptDir); commitErr == nil {
+		pl.Commit = commit
 	}
 
 	pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)

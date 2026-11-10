@@ -3014,6 +3014,8 @@ type createPipelineConfig struct {
 
 type CreatePipelineOption func(*createPipelineConfig)
 
+// WithGitMetadata fills Pipeline.Commit from the git repository containing the
+// pipeline. The commit is left empty when it cannot be resolved.
 func WithGitMetadata() CreatePipelineOption {
 	return func(o *createPipelineConfig) {
 		o.parseGitMetadata = true
@@ -3080,10 +3082,12 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
 
+	// Resolve the commit before any mutator runs so rendered asset parameters
+	// see commit_hash. A missing HEAD (e.g. a repository with no commits yet)
+	// is not fatal: the commit is left empty.
 	if config.parseGitMetadata {
-		pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing commit: %w", err)
+		if commit, commitErr := git.CurrentCommit(pathToPipeline); commitErr == nil {
+			pipeline.Commit = commit
 		}
 	}
 

@@ -205,23 +205,6 @@ func TestGetPipelinePopulatesCommitFromGitCheckout(t *testing.T) {
 	}
 }
 
-func TestAttachGitCommitLeavesCommitEmptyWithoutHead(t *testing.T) {
-	t.Parallel()
-
-	// A freshly initialized repository has no HEAD commit, so the lookup fails.
-	dir := t.TempDir()
-	out, err := exec.CommandContext(t.Context(), "git", "init", "-q", dir).CombinedOutput()
-	require.NoError(t, err, string(out))
-
-	p := &pipeline.Pipeline{}
-	attachGitCommit(p, dir, zaptest.NewLogger(t).Sugar())
-	assert.Empty(t, p.Commit)
-
-	existing := &pipeline.Pipeline{Commit: "preset"}
-	attachGitCommit(existing, dir, zaptest.NewLogger(t).Sugar())
-	assert.Equal(t, "preset", existing.Commit)
-}
-
 func TestStandalonePythonAssetIDUsesFullPath(t *testing.T) {
 	t.Parallel()
 
