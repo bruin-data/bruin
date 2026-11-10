@@ -96,21 +96,10 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
-	// The optional incremental_predicate narrows the delete to the target rows
-	// it matches, which lets DuckDB prune partitions or files the key alone
-	// cannot. The target is aliased as `target` so the predicate can be shared
-	// with a merge asset; unqualified columns also resolve to the target.
-	deleteTarget := task.Name
-	deleteConditions := []string{fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName)}
-	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
-		deleteTarget += " AS target"
-		deleteConditions = ansisql.AddIncrementalPredicate(deleteConditions, mat.IncrementalPredicate)
-	}
-
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
-		fmt.Sprintf("DELETE FROM %s WHERE %s", deleteTarget, strings.Join(deleteConditions, " AND ")),
+		ansisql.BuildIncrementalDelete(task.Name, fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName), mat.IncrementalPredicate),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",

@@ -353,7 +353,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
-		buildDeleteStatement(asset, fmt.Sprintf("%s in unnest(%s)", mat.IncrementalKey, declaredVarName)),
+		ansisql.BuildIncrementalDelete(asset.Name, fmt.Sprintf("%s in unnest(%s)", mat.IncrementalKey, declaredVarName), mat.IncrementalPredicate),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",
 	}
@@ -368,24 +368,12 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
-		buildDeleteStatement(asset, fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName)),
+		ansisql.BuildIncrementalDelete(asset.Name, fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName), mat.IncrementalPredicate),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
-}
-
-// buildDeleteStatement narrows the delete with incremental_predicate when set.
-func buildDeleteStatement(asset *pipeline.Asset, keyCondition string) string {
-	target := asset.Name
-	conditions := []string{keyCondition}
-	if strings.TrimSpace(asset.Materialization.IncrementalPredicate) != "" {
-		target += " AS target"
-		conditions = ansisql.AddIncrementalPredicate(conditions, asset.Materialization.IncrementalPredicate)
-	}
-
-	return fmt.Sprintf("DELETE FROM %s WHERE %s", target, strings.Join(conditions, " AND "))
 }
 
 // ValidateTableOptions reports configuration errors in an asset's `bigquery` block without
