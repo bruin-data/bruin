@@ -55,6 +55,8 @@ There are two places to cap what a BigQuery query can cost. Which one applies de
 
 Costs are estimated at BigQuery's on-demand price of $6.25 per TiB. Bruin Cloud passes its limits to agent runs as `BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION`, a JSON object of connection name to bytes. When one applies to a connection, the stricter of it and the connection's `max_billable_bytes` is sent to BigQuery with each SQL query, and BigQuery refuses queries that would bill more. It doesn't apply to ingestr or Python assets, which don't run through Bruin's BigQuery client.
 
+Soft limits come the same way, as `BRUIN_BIGQUERY_MAX_QUERY_COST_SOFT_BY_CONNECTION` (connection name to USD); the stricter of it and the connection's `max_query_cost_soft` applies. Like `max_query_cost_soft`, it's only checked by `bruin query`, which refuses queries over it unless you pass `--dangerously-bypass-soft-limits`. In cloud query mode that flag is forwarded to Bruin Cloud.
+
 ### Authentication Options
 
 Bruin supports three authentication methods for BigQuery connections, listed in order of precedence:

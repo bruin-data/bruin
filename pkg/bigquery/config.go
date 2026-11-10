@@ -25,21 +25,33 @@ type Config struct {
 	MaxBillableBytesSoft             *int64
 	MaxQueryCostSoft                 *float64
 	EnvMaxBillableBytes              *int64
+	EnvMaxQueryCostSoft              *float64
 	ReadOnly                         bool
 }
 
 // MaxBillableBytesByConnectionEnv lets Bruin Cloud cap an agent run's BigQuery connections: a JSON object of connection name to bytes.
 const MaxBillableBytesByConnectionEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION"
 
+// MaxQueryCostSoftByConnectionEnv sets soft limits the same way: a JSON object of connection name to USD.
+const MaxQueryCostSoftByConnectionEnv = "BRUIN_BIGQUERY_MAX_QUERY_COST_SOFT_BY_CONNECTION"
+
 func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
-	raw := strings.TrimSpace(os.Getenv(MaxBillableBytesByConnectionEnv))
+	return connectionLimitFromEnv[int64](MaxBillableBytesByConnectionEnv, connectionName, "bytes")
+}
+
+func MaxQueryCostSoftFromEnv(connectionName string) (*float64, error) {
+	return connectionLimitFromEnv[float64](MaxQueryCostSoftByConnectionEnv, connectionName, "USD")
+}
+
+func connectionLimitFromEnv[T int64 | float64](envName, connectionName, unit string) (*T, error) {
+	raw := strings.TrimSpace(os.Getenv(envName))
 	if raw == "" {
 		return nil, nil //nolint:nilnil // unset means no cap
 	}
 
-	var limits map[string]int64
+	var limits map[string]T
 	if err := json.Unmarshal([]byte(raw), &limits); err != nil || limits == nil {
-		return nil, fmt.Errorf("%s must be a JSON object of connection name to bytes, got %q", MaxBillableBytesByConnectionEnv, raw)
+		return nil, fmt.Errorf("%s must be a JSON object of connection name to %s, got %q", envName, unit, raw)
 	}
 
 	limit, ok := limits[connectionName]
@@ -47,10 +59,21 @@ func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
 		return nil, nil //nolint:nilnil // connection has no cap
 	}
 	if limit <= 0 {
-		return nil, fmt.Errorf("%s: the limit for %q must be a positive integer, got %d", MaxBillableBytesByConnectionEnv, connectionName, limit)
+		return nil, fmt.Errorf("%s: the limit for %q must be positive, got %v", envName, connectionName, limit)
 	}
 
 	return &limit, nil
+}
+
+func (c Config) maxQueryCostSoft() *float64 {
+	if c.EnvMaxQueryCostSoft == nil {
+		return c.MaxQueryCostSoft
+	}
+	if c.MaxQueryCostSoft != nil && *c.MaxQueryCostSoft < *c.EnvMaxQueryCostSoft {
+		return c.MaxQueryCostSoft
+	}
+
+	return c.EnvMaxQueryCostSoft
 }
 
 // The env cap is only sent to BigQuery, never dry-run first like max_billable_bytes, so scripts a dry run can't plan still run.

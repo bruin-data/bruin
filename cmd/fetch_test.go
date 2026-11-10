@@ -1396,3 +1396,54 @@ func TestCloudQueryAPIKey(t *testing.T) { //nolint:paralleltest // uses t.Setenv
 		})
 	}
 }
+
+func TestCloudQuerySoftLimit(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	bruinToken := "      bruin:\n        - name: agent-cloud-cli-token\n          api_token: yml-token\n"
+
+	for _, tt := range []struct {
+		name       string
+		args       []string
+		wantBypass bool
+	}{
+		{name: "soft limit enforced by default"},
+		{name: "the bypass flag is forwarded to Bruin Cloud", args: []string{"--dangerously-bypass-soft-limits"}, wantBypass: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var body map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				_ = json.NewEncoder(w).Encode(map[string]any{"columns": []string{"n"}, "rows": [][]any{{1}}})
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+			t.Setenv("BRUIN_CLOUD_CONNECTION_SET_ID", "9")
+			t.Setenv("BRUIN_CLOUD_API_KEY", "")
+
+			cmd := Query()
+			cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			args := append([]string{"query", "--config-file", writeCloudQueryConfig(t, bruinToken), "--connection", "warehouse", "--query", "SELECT 1", "--output", "json"}, tt.args...)
+			require.NoError(t, cmd.Run(t.Context(), args))
+
+			bypass, sent := body["bypass_soft_limit"]
+			assert.Equal(t, tt.wantBypass, sent)
+			if tt.wantBypass {
+				assert.Equal(t, true, bypass)
+			}
+		})
+	}
+}
+
+func TestCloudQuerierSoftLimitError(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	message := "This query would cost about $3.20, over the soft limit of $1.00 per query on connection 'c'. It was not run."
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = json.NewEncoder(w).Encode(map[string]any{"message": message, "error": "query_cost_soft_limit_exceeded"})
+	}))
+	defer server.Close()
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+	q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 1, connectionName: "c"}
+	_, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT * FROM t"})
+	require.Error(t, err)
+	assert.Equal(t, message+" With bruin query, rerun with --dangerously-bypass-soft-limits once the user confirms", err.Error())
+}

@@ -328,9 +328,15 @@ type SendAgentMessageResponse struct {
 
 // Connection represents a Bruin Cloud connection (name and type only).
 type Connection struct {
-	Name         string   `json:"name"`
-	Type         string   `json:"type"`
-	MaxQueryCost *float64 `json:"max_query_cost,omitempty"`
+	Name             string   `json:"name"`
+	Type             string   `json:"type"`
+	MaxQueryCost     *float64 `json:"max_query_cost,omitempty"`
+	MaxQueryCostSoft *float64 `json:"max_query_cost_soft,omitempty"`
+}
+
+type CostLimits struct {
+	MaxQueryCost     *float64 `json:"max_query_cost"`
+	MaxQueryCostSoft *float64 `json:"max_query_cost_soft"`
 }
 
 // ConnectionSet represents a Bruin Cloud connection set (dev-env secret): a named

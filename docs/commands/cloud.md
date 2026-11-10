@@ -977,10 +977,13 @@ Cap what a single BigQuery query can cost on a BigQuery connection in this set, 
 
 ```bash
 bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --max-query-cost 0.10
+bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --max-query-cost-soft 0.05
 bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --remove
 ```
 
-Without `--connection`, the limit is applied to every BigQuery connection in the set. The limit is in USD (minimum `0.01`) and shows in `connection-sets get`. The same call over the API is `PUT /api/v1/connection-sets/{id}/connections/{name}/cost-limit` with `{"max_query_cost": 0.10}` (`null` removes it).
+`--max-query-cost` is the hard limit. Queries over the soft limit (`--max-query-cost-soft`) are refused too, unless the caller confirms: `bruin query --dangerously-bypass-soft-limits`, or `"bypass_soft_limit": true` on the API. `--remove` clears both limits; `--remove-hard` and `--remove-soft` clear one.
+
+Without `--connection`, the limits are applied to every BigQuery connection in the set. Limits are in USD (minimum `0.01`) and show in `connection-sets get`. The same call over the API is `PUT /api/v1/connection-sets/{id}/connections/{name}/cost-limit` with `{"max_query_cost": 0.10, "max_query_cost_soft": 0.05}`; only the keys you send change, and `null` removes a limit.
 
 It needs the `connection-set:cost-limit` permission, and an agent's own run token can't change it. Queries run with credentials from your local `.bruin.yml` are not affected; cap those with `max_query_cost` on the connection (see [BigQuery](../platforms/bigquery.md#query-cost-limits)).
 

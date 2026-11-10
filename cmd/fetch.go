@@ -499,11 +499,16 @@ type cloudQuerier struct {
 	connectionSetID int
 	connectionName  string
 	limit           int64
+	bypassSoftLimit bool
 }
 
 func (q *cloudQuerier) SelectWithSchema(ctx context.Context, qq *query.Query) (*query.QueryResult, error) {
-	res, err := q.client.RunConnectionSetQuery(ctx, q.connectionSetID, q.connectionName, qq.Query)
+	res, err := q.client.RunConnectionSetQuery(ctx, q.connectionSetID, q.connectionName, qq.Query, q.bypassSoftLimit)
 	if err != nil {
+		var apiErr *bruincloud.APIError
+		if errors.As(err, &apiErr) && apiErr.Code == "query_cost_soft_limit_exceeded" {
+			return nil, fmt.Errorf("%s. With bruin query, rerun with --dangerously-bypass-soft-limits once the user confirms", strings.TrimRight(apiErr.Message, ". "))
+		}
 		return nil, err
 	}
 
@@ -562,6 +567,7 @@ func prepareCloudQueryExecution(c *cli.Command, cm *config.Config) (string, inte
 		connectionSetID: connectionSetID,
 		connectionName:  connectionName,
 		limit:           c.Int64("limit"),
+		bypassSoftLimit: c.Bool("dangerously-bypass-soft-limits"),
 	}
 	return connectionName, querier, queryStr, "", nil, nil
 }
