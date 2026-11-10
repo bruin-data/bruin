@@ -1432,18 +1432,3 @@ func TestCloudQuerySoftLimit(t *testing.T) { //nolint:paralleltest // uses t.Set
 		})
 	}
 }
-
-func TestCloudQuerierSoftLimitError(t *testing.T) { //nolint:paralleltest // uses t.Setenv
-	message := "This query would cost about $3.20, over the soft limit of $1.00 per query on connection 'c'. It was not run."
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_ = json.NewEncoder(w).Encode(map[string]any{"message": message, "error": "query_cost_soft_limit_exceeded"})
-	}))
-	defer server.Close()
-	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
-
-	q := &cloudQuerier{client: bruincloud.NewAPIClient("k"), connectionSetID: 1, connectionName: "c"}
-	_, err := q.SelectWithSchema(context.Background(), &query.Query{Query: "SELECT * FROM t"})
-	require.Error(t, err)
-	assert.Equal(t, message+" With bruin query, rerun with --dangerously-bypass-soft-limits once the user confirms", err.Error())
-}

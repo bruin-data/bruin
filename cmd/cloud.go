@@ -4934,13 +4934,24 @@ func cloudConnectionSetsCostLimit() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Without --connection, Bruin Cloud only returns the limits that were changed.
+			changed := map[string]*float64{}
+			var summary []string
+			if _, ok := changes["max_query_cost"]; ok {
+				changed["max_query_cost"] = saved.MaxQueryCost
+				summary = append(summary, "hard limit "+formatCostLimit(saved.MaxQueryCost))
+			}
+			if _, ok := changes["max_query_cost_soft"]; ok {
+				changed["max_query_cost_soft"] = saved.MaxQueryCostSoft
+				summary = append(summary, "soft limit "+formatCostLimit(saved.MaxQueryCostSoft))
+			}
+
 			if output == "json" {
-				data, _ := json.MarshalIndent(map[string]any{
-					"id":                  c.Int("set-id"),
-					"connection":          connection,
-					"max_query_cost":      saved.MaxQueryCost,
-					"max_query_cost_soft": saved.MaxQueryCostSoft,
-				}, "", "  ")
+				result := map[string]any{"id": c.Int("set-id"), "connection": connection}
+				for key, value := range changed {
+					result[key] = value
+				}
+				data, _ := json.MarshalIndent(result, "", "  ")
 				fmt.Println(string(data))
 				return nil
 			}
@@ -4949,7 +4960,7 @@ func cloudConnectionSetsCostLimit() *cli.Command {
 			if connection != "" {
 				target = fmt.Sprintf("connection '%s'", connection)
 			}
-			printSuccessForOutput(output, fmt.Sprintf("Connection set %d, %s: hard limit %s, soft limit %s", c.Int("set-id"), target, formatCostLimit(saved.MaxQueryCost), formatCostLimit(saved.MaxQueryCostSoft)))
+			printSuccessForOutput(output, fmt.Sprintf("Connection set %d, %s: %s", c.Int("set-id"), target, strings.Join(summary, ", ")))
 			return nil
 		},
 	}

@@ -2110,3 +2110,35 @@ func TestCloudConnectionSetsCostLimit_Body(t *testing.T) { //nolint:paralleltest
 		})
 	}
 }
+
+func TestCloudConnectionSetsCostLimit_PrintsOnlyChangedLimits(t *testing.T) { //nolint:paralleltest // uses t.Setenv and os.Stdout
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":7,"max_query_cost":1}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	originalStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		_ = reader.Close()
+		_ = writer.Close()
+	})
+
+	cmd := cloudConnectionSetsCostLimit()
+	err = cmd.Run(t.Context(), []string{"cost-limit", "--api-key", "test-key", "--set-id", "7", "--output", "json", "--max-query-cost", "1"})
+	require.NoError(t, err)
+	os.Stdout = originalStdout
+	require.NoError(t, writer.Close())
+
+	output, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(output, &got))
+	assert.Equal(t, map[string]any{"id": 7.0, "connection": "", "max_query_cost": 1.0}, got)
+}
