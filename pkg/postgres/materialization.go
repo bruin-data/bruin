@@ -73,13 +73,18 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
+	// Redshift's DELETE cannot alias its target, so a predicate written against `target` would not resolve.
+	if task.Type == pipeline.AssetTypeRedshiftQuery && strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		return "", errors.New("incremental_predicate is not supported for Redshift delete+insert materialization")
+	}
+
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 	quotedIncrementalKey := QuoteIdentifier(mat.IncrementalKey)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
-		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(task.Name), quotedIncrementalKey, quotedIncrementalKey, tempTableName),
+		ansisql.BuildIncrementalDelete(QuoteIdentifier(task.Name), fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", quotedIncrementalKey, quotedIncrementalKey, tempTableName), mat.IncrementalPredicate),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(task.Name), tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
