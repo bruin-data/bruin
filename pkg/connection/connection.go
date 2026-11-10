@@ -419,7 +419,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 
 	// Note: ADC validation is deferred - it will only happen when the client is actually used.
 	// This allows pipelines without BigQuery assets to run even if ADC is not configured.
-	envMaxBillableBytes, err := bigquery.MaxBillableBytesFromEnv()
+	envMaxBillableBytes, err := bigquery.MaxBillableBytesFromEnv(connection.Name)
 	if err != nil {
 		return err
 	}

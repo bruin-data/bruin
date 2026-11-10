@@ -207,20 +207,28 @@ func TestNewDB_ADCWarning(t *testing.T) {
 
 func TestMaxBillableBytesFromEnv(t *testing.T) { //nolint:paralleltest // uses t.Setenv
 	for _, tc := range []struct {
-		name    string
-		env     string
-		want    *int64
-		wantErr bool
+		name         string
+		env          string
+		byConnection string
+		want         *int64
+		wantErr      bool
 	}{
-		{name: "unset means no cap", env: ""},
-		{name: "positive integer", env: " 1000 ", want: int64Ptr(1000)},
+		{name: "unset means no cap"},
+		{name: "one cap for every connection", env: " 1000 ", want: int64Ptr(1000)},
 		{name: "invalid fails closed", env: "lots", wantErr: true},
 		{name: "zero fails closed", env: "0", wantErr: true},
+		{name: "per-connection cap", byConnection: `{"bq-prod": 500, "bq-dev": 900}`, want: int64Ptr(500)},
+		{name: "per-connection cap wins over the shared cap", env: "1000", byConnection: `{"bq-prod": 5000}`, want: int64Ptr(5000)},
+		{name: "a connection missing from the map falls back to the shared cap", env: "1000", byConnection: `{"bq-dev": 900}`, want: int64Ptr(1000)},
+		{name: "a connection missing from the map has no cap", byConnection: `{"bq-dev": 900}`},
+		{name: "invalid map fails closed", byConnection: `{"bq-prod": "lots"}`, wantErr: true},
+		{name: "non-positive map value fails closed", byConnection: `{"bq-prod": 0}`, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(MaxBillableBytesEnv, tc.env)
+			t.Setenv(MaxBillableBytesByConnectionEnv, tc.byConnection)
 
-			got, err := MaxBillableBytesFromEnv()
+			got, err := MaxBillableBytesFromEnv("bq-prod")
 			if tc.wantErr {
 				require.Error(t, err)
 				return

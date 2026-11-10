@@ -4682,9 +4682,9 @@ func cloudConnectionSetsList() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"ID", "Name", "Cost limit", "Created", "Updated"})
+			t.AppendHeader(table.Row{"ID", "Name", "Created", "Updated"})
 			for _, s := range sets {
-				t.AppendRow(table.Row{s.ID, s.Name, formatCostLimit(s.MaxQueryCost), s.CreatedAt, s.UpdatedAt})
+				t.AppendRow(table.Row{s.ID, s.Name, s.CreatedAt, s.UpdatedAt})
 			}
 			t.Render()
 			return nil
@@ -4738,9 +4738,13 @@ func cloudConnectionSetsGet() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"Name", "Type"})
+			t.AppendHeader(table.Row{"Name", "Type", "Cost limit"})
 			for _, conn := range conns {
-				t.AppendRow(table.Row{conn.Name, conn.Type})
+				limit := ""
+				if conn.MaxQueryCost != nil {
+					limit = formatCostLimit(conn.MaxQueryCost)
+				}
+				t.AppendRow(table.Row{conn.Name, conn.Type, limit})
 			}
 			t.Render()
 			return nil
@@ -4878,14 +4882,16 @@ func cloudConnectionSetsDelete() *cli.Command {
 func cloudConnectionSetsCostLimit() *cli.Command {
 	return &cli.Command{
 		Name:  "cost-limit",
-		Usage: "Set the max cost (USD) of a single BigQuery query run through Bruin Cloud with this set",
+		Usage: "Set the max cost (USD) of a single BigQuery query run through Bruin Cloud on a connection in this set",
 		Description: "Bruin Cloud refuses BigQuery queries over the limit before they run, so nothing is billed. " +
+			"Pass --connection to limit one BigQuery connection; without it the limit is applied to every BigQuery connection in the set. " +
 			"It applies to queries through Bruin Cloud (cloud query mode, the API and Bruin Cloud agents), not to queries run with credentials in your local .bruin.yml; " +
 			"for those, set max_query_cost on the connection. Needs the connection-set:cost-limit permission.",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
+			&cli.StringFlag{Name: "connection", Usage: "the BigQuery connection in the set to limit (default: every BigQuery connection in the set)"},
 			&cli.FloatFlag{Name: "max-query-cost", Usage: "max cost of a single BigQuery query in USD (minimum 0.01)"},
 			&cli.BoolFlag{Name: "remove", Usage: "remove the limit"},
 		},
@@ -4914,19 +4920,29 @@ func cloudConnectionSetsCostLimit() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			saved, err := client.SetConnectionSetCostLimit(ctx, c.Int("set-id"), limit)
+			connection := c.String("connection")
+			var saved *float64
+			if connection != "" {
+				saved, err = client.SetConnectionCostLimit(ctx, c.Int("set-id"), connection, limit)
+			} else {
+				saved, err = client.SetConnectionSetCostLimit(ctx, c.Int("set-id"), limit)
+			}
 			if err != nil {
 				printError(err, output, "Failed to set the cost limit")
 				return cli.Exit("", 1)
 			}
 
 			if output == "json" {
-				data, _ := json.MarshalIndent(map[string]any{"id": c.Int("set-id"), "max_query_cost": saved}, "", "  ")
+				data, _ := json.MarshalIndent(map[string]any{"id": c.Int("set-id"), "connection": connection, "max_query_cost": saved}, "", "  ")
 				fmt.Println(string(data))
 				return nil
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Connection set %d cost limit: %s", c.Int("set-id"), formatCostLimit(saved)))
+			target := "every BigQuery connection"
+			if connection != "" {
+				target = fmt.Sprintf("connection '%s'", connection)
+			}
+			printSuccessForOutput(output, fmt.Sprintf("Connection set %d, %s: cost limit %s", c.Int("set-id"), target, formatCostLimit(saved)))
 			return nil
 		},
 	}

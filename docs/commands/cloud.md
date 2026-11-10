@@ -973,14 +973,16 @@ To assign a set to an agent, use `bruin cloud agents update --agent-id <id> --co
 
 #### `cost-limit`
 
-Cap what a single BigQuery query can cost when it runs through Bruin Cloud with this set: cloud query mode (`use_cloud`), the Bruin Cloud API, and Bruin Cloud agents. Queries over the limit are refused before they run, so nothing is billed:
+Cap what a single BigQuery query can cost on a BigQuery connection in this set, when it runs through Bruin Cloud: cloud query mode (`use_cloud`), the Bruin Cloud API, and Bruin Cloud agents. Queries over the limit are refused before they run, so nothing is billed:
 
 ```bash
-bruin cloud connection-sets cost-limit --set-id 7 --max-query-cost 0.10
-bruin cloud connection-sets cost-limit --set-id 7 --remove
+bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --max-query-cost 0.10
+bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --remove
 ```
 
-The limit is in USD (minimum `0.01`) and shows in `connection-sets list`. It needs the `connection-set:cost-limit` permission, and an agent's own run token can't change it. Queries run with credentials from your local `.bruin.yml` are not affected; cap those with `max_query_cost` on the connection (see [BigQuery](../platforms/bigquery.md#query-cost-limits)).
+Without `--connection`, the limit is applied to every BigQuery connection in the set. The limit is in USD (minimum `0.01`) and shows in `connection-sets get`. The same call over the API is `PUT /api/v1/connection-sets/{id}/connections/{name}/cost-limit` with `{"max_query_cost": 0.10}` (`null` removes it).
+
+It needs the `connection-set:cost-limit` permission, and an agent's own run token can't change it. Queries run with credentials from your local `.bruin.yml` are not affected; cap those with `max_query_cost` on the connection (see [BigQuery](../platforms/bigquery.md#query-cost-limits)).
 
 ### `dashboards`
 

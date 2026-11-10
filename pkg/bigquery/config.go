@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -28,10 +29,26 @@ type Config struct {
 	ReadOnly                         bool
 }
 
-// MaxBillableBytesEnv lets Bruin Cloud cap every BigQuery connection of an agent run.
-const MaxBillableBytesEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES"
+// Bruin Cloud caps an agent run's BigQuery connections with these: per connection name, or one cap for all.
+const (
+	MaxBillableBytesEnv             = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES"
+	MaxBillableBytesByConnectionEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION"
+)
 
-func MaxBillableBytesFromEnv() (*int64, error) {
+func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
+	if raw := strings.TrimSpace(os.Getenv(MaxBillableBytesByConnectionEnv)); raw != "" {
+		var limits map[string]int64
+		if err := json.Unmarshal([]byte(raw), &limits); err != nil {
+			return nil, fmt.Errorf("%s must be a JSON object of connection name to bytes: %w", MaxBillableBytesByConnectionEnv, err)
+		}
+		if limit, ok := limits[connectionName]; ok {
+			if limit <= 0 {
+				return nil, fmt.Errorf("%s: the limit for %q must be a positive integer, got %d", MaxBillableBytesByConnectionEnv, connectionName, limit)
+			}
+			return &limit, nil
+		}
+	}
+
 	raw := strings.TrimSpace(os.Getenv(MaxBillableBytesEnv))
 	if raw == "" {
 		return nil, nil //nolint:nilnil // unset means no cap
