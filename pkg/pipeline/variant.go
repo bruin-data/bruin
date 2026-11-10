@@ -451,6 +451,12 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	if a.Snowflake.BaseLocation, err = maybeRender(render, fmt.Sprintf("asset[%s].snowflake.base_location", originalName), a.Snowflake.BaseLocation); err != nil {
 		return err
 	}
+	if a.BigQuery.StorageURI, err = maybeRender(render, fmt.Sprintf("asset[%s].bigquery.storage_uri", originalName), a.BigQuery.StorageURI); err != nil {
+		return err
+	}
+	if a.BigQuery.CloudResourceConnection, err = maybeRender(render, fmt.Sprintf("asset[%s].bigquery.cloud_resource_connection", originalName), a.BigQuery.CloudResourceConnection); err != nil {
+		return err
+	}
 	if a.Athena.Location, err = maybeRender(render, fmt.Sprintf("asset[%s].athena.location", originalName), a.Athena.Location); err != nil {
 		return err
 	}

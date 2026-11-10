@@ -1618,6 +1618,12 @@ func TestEnsureMaterializationValuesAreValid_TableFormat(t *testing.T) {
 			want:      []string{"Materialization table_format 'iceberg' requires the materialization type to be 'table'"},
 		},
 		{
+			name:      "Iceberg table on BigQuery",
+			assetType: pipeline.AssetTypeBigqueryQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			format:    pipeline.MaterializationTableFormatIceberg,
+		},
+		{
 			name:      "Iceberg on an asset type that does not support it",
 			assetType: pipeline.AssetTypePostgresQuery,
 			matType:   pipeline.MaterializationTypeTable,

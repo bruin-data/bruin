@@ -3126,6 +3126,26 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesSnowflakeIcebergDefaults(t *tes
 	assert.Equal(t, "asset/location", got.Snowflake.BaseLocation)
 }
 
+func TestBuilder_SetupDefaultsFromPipelineAppliesBigQueryIcebergDefaults(t *testing.T) {
+	t.Parallel()
+
+	defaults := &pipeline.DefaultValues{
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, TableFormat: "iceberg"},
+		BigQuery: pipeline.BigQueryConfig{
+			StorageURI:              "gs://bucket/shared",
+			CloudResourceConnection: "my-project.eu.my_conn",
+		},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{Type: pipeline.AssetTypeBigqueryQuery}, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	assert.Equal(t, pipeline.MaterializationTableFormatIceberg, got.Materialization.TableFormat)
+	assert.Equal(t, "my-project.eu.my_conn", got.BigQuery.CloudResourceConnection)
+	// A shared folder would make Iceberg tables overwrite each other's files.
+	assert.Empty(t, got.BigQuery.StorageURI)
+}
+
 func TestBuilder_SetupDefaultsFromPipelineSkipsTableFormatForUnsupportedAssets(t *testing.T) {
 	t.Parallel()
 

@@ -202,6 +202,29 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Iceberg asset without a storage URI fails before rendering",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "some content").
+					Return([]*query.Query{
+						{Query: "select * from users"},
+					}, nil)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "some content",
+					},
+					Materialization: pipeline.Materialization{
+						Type:        pipeline.MaterializationTypeTable,
+						TableFormat: pipeline.MaterializationTableFormatIceberg,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
 				f.e.On("ExtractQueriesFromString", "some content").
@@ -645,6 +668,7 @@ func TestBasicOperator_RunTask_IcebergExistingTable(t *testing.T) {
 				Type:              pipeline.AssetTypeBigqueryQuery,
 				ExecutableFile:    pipeline.ExecutableFile{Path: "test-file.sql", Content: "some content"},
 				Materialization:   tt.materialization,
+				BigQuery:          pipeline.BigQueryConfig{StorageURI: "gs://bucket/dataset/table"},
 				RefreshRestricted: &tt.refreshRestricted,
 			}))
 
