@@ -2,7 +2,6 @@ name: task1
 uri: postgres://host:port/db
 description: This is a hello world task
 type: bash
-run: hello.sh
 depends:
   - gcs-to-bq
 parameters:

@@ -24,6 +24,12 @@ func mustReadWithoutReplacement(t *testing.T, file string) string {
 	return strings.TrimSpace(string(content))
 }
 
+func mustReadRaw(t *testing.T, file string) string {
+	content, err := afero.ReadFile(afero.NewOsFs(), file)
+	require.NoError(t, err)
+	return string(content)
+}
+
 func Test_createTaskFromFile(t *testing.T) {
 	t.Parallel()
 

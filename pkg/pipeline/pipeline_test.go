@@ -269,9 +269,9 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Description: "This is a hello world task",
 		Type:        "bash",
 		ExecutableFile: pipeline.ExecutableFile{
-			Name:    "hello.sh",
-			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task1/hello.sh"),
-			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/task1/hello.sh"),
+			Name:    "task.yml",
+			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task1/task.yml"),
+			Content: mustReadRaw(t, "testdata/pipeline/first-pipeline/tasks/task1/task.yml"),
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "task.yml",
