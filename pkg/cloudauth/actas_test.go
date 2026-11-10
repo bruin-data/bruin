@@ -3,6 +3,7 @@ package cloudauth
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -73,4 +74,29 @@ func TestActAsSessionInvalidFileCanBeCleared(t *testing.T) {
 	session, err := store.LoadActAs()
 	require.NoError(t, err)
 	assert.Nil(t, session)
+}
+
+func TestActAsFailedSaveKeepsPreviousSession(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs a directory the process cannot write to")
+	}
+	secrets := keyring.NewArrayKeyring(nil)
+	dir := filepath.Join(t.TempDir(), "bruin")
+	store := Store{Path: filepath.Join(dir, "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
+	session := ActAsSession{AgentID: 12, AgentName: "Reporter", Team: "acme", ExpiresAt: time.Now().Add(time.Hour), APIURL: DefaultAPIURL, Token: "working-token"}
+	require.NoError(t, store.SaveActAs(session))
+
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	session.Token = "replacement-token"
+	require.Error(t, store.SaveActAs(session))
+	require.NoError(t, os.Chmod(dir, 0o700))
+
+	loaded, err := store.ReadActAs(DefaultAPIURL)
+	require.NoError(t, err)
+	assert.Equal(t, "working-token", loaded.Token)
+	keys, err := secrets.Keys()
+	require.NoError(t, err)
+	assert.Len(t, keys, 1)
 }

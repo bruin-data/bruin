@@ -29,6 +29,21 @@ type actAsServer struct {
 	requests []actAsRequest
 	status   int
 	body     string
+	bodies   map[string]string
+	hold     chan struct{}
+	arrived  chan struct{}
+}
+
+// holdNext parks the next request until release is called, returning a channel closed once it arrives.
+func (s *actAsServer) holdNext(t *testing.T) (<-chan struct{}, func()) {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	hold, arrived := make(chan struct{}), make(chan struct{})
+	s.hold, s.arrived = hold, arrived
+	release := sync.OnceFunc(func() { close(hold) })
+	t.Cleanup(release)
+	return arrived, release
 }
 
 func (s *actAsServer) respond(status int, body string) {
@@ -60,12 +75,21 @@ func newActAsTestEnv(t *testing.T) (*actAsServer, cloudauth.Store) {
 	t.Helper()
 	loginTestRepo(t, "")
 	t.Setenv("BRUIN_CLOUD_TEAM", "")
-	stub := &actAsServer{status: http.StatusCreated}
+	stub := &actAsServer{status: http.StatusCreated, bodies: map[string]string{}}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		stub.mu.Lock()
 		stub.requests = append(stub.requests, actAsRequest{path: r.Method + " " + r.URL.Path, auth: r.Header.Get("Authorization"), team: r.Header.Get("X-Bruin-Team")})
 		status, body := stub.status, stub.body
+		if override, ok := stub.bodies[r.URL.Path]; ok {
+			body = override
+		}
+		hold, arrived := stub.hold, stub.arrived
+		stub.hold, stub.arrived = nil, nil
 		stub.mu.Unlock()
+		if hold != nil {
+			close(arrived)
+			<-hold
+		}
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
 	}))
@@ -310,4 +334,63 @@ func TestLogoutClearsActAsSession(t *testing.T) { //nolint:paralleltest // uses 
 	credential, err := store.Read(cloudauth.APIURL())
 	require.NoError(t, err)
 	assert.Nil(t, credential)
+}
+
+type actAsOutcome struct {
+	auth resolvedCloudAuth
+	err  error
+}
+
+func resolveInBackground(t *testing.T, store cloudauth.Store) <-chan actAsOutcome {
+	t.Helper()
+	done := make(chan actAsOutcome, 1)
+	go func() {
+		auth, err := resolveWithActAs(t, store)
+		done <- actAsOutcome{auth: auth, err: err}
+	}()
+	return done
+}
+
+func TestActAsRenewalDoesNotRestoreStoppedSession(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	stub, store := newActAsTestEnv(t)
+	saveActAsSession(t, store, "old-agent-token", "acme", time.Now().Add(time.Minute))
+	stub.respond(http.StatusCreated, actAsResponse(t, "renewed-token", time.Now().Add(time.Hour), "acme"))
+	arrived, release := stub.holdNext(t)
+	done := resolveInBackground(t, store)
+	<-arrived
+
+	output, err := runActAsCommand(t, store, "--stop")
+	require.NoError(t, err)
+	assert.Contains(t, output, "Stopped acting as agent")
+	release()
+
+	outcome := <-done
+	require.NoError(t, outcome.err)
+	assert.Equal(t, "person-token", outcome.auth.token)
+	assert.Equal(t, cloudAuthGlobal, outcome.auth.source)
+	session, err := store.LoadActAs()
+	require.NoError(t, err)
+	assert.Nil(t, session)
+}
+
+func TestActAsRenewalDoesNotOverwriteNewAgent(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	stub, store := newActAsTestEnv(t)
+	saveActAsSession(t, store, "old-agent-token", "acme", time.Now().Add(time.Minute))
+	stub.respond(http.StatusCreated, actAsResponse(t, "renewed-token", time.Now().Add(time.Hour), "acme"))
+	stub.bodies["/agents/34/act-as"] = actAsResponse(t, "agent-34-token", time.Now().Add(time.Hour), "acme")
+	arrived, release := stub.holdNext(t)
+	done := resolveInBackground(t, store)
+	<-arrived
+
+	_, err := runActAsCommand(t, store, "--agent", "34")
+	require.NoError(t, err)
+	release()
+
+	outcome := <-done
+	require.NoError(t, outcome.err)
+	assert.Equal(t, "agent-34-token", outcome.auth.token)
+	session, err := store.ReadActAs(cloudauth.APIURL())
+	require.NoError(t, err)
+	assert.Equal(t, 34, session.AgentID)
+	assert.Equal(t, "agent-34-token", session.Token)
 }

@@ -78,7 +78,12 @@ func runActAs(ctx context.Context, c *cli.Command, deps actAsDependencies, write
 	}
 	switch {
 	case c.Bool("stop"):
-		session, err := store.ClearActAs()
+		var session *cloudauth.ActAsSession
+		err := store.WithActAsLock(ctx, func() error {
+			var clearErr error
+			session, clearErr = store.ClearActAs()
+			return clearErr
+		})
 		if err != nil {
 			return err
 		}
@@ -92,9 +97,12 @@ func runActAs(ctx context.Context, c *cli.Command, deps actAsDependencies, write
 		_, _ = fmt.Fprintf(writer, "Stopped acting as agent %s. Cloud commands use your own login again.\n", actAsLabel(session))
 		return nil
 	case c.IsSet("agent"):
-		session, err := requestActAs(ctx, store, agentID, resolveTeam(c))
+		session, err := fetchActAs(ctx, store, agentID, resolveTeam(c))
 		if err != nil {
 			return fmt.Errorf("could not act as agent %d: %w", agentID, err)
+		}
+		if err := store.WithActAsLock(ctx, func() error { return store.SaveActAs(*session) }); err != nil {
+			return err
 		}
 		if output == "json" {
 			return writeActAsJSON(writer, session)

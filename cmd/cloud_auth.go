@@ -84,31 +84,65 @@ func resolveActAs(c *cli.Command, store cloudauth.Store, session *cloudauth.ActA
 	if err := cloudauth.CheckDestination(session.APIURL, cloudauth.APIURL()); err != nil {
 		return resolvedCloudAuth{}, errors.New("act-as session belongs to a different Cloud API destination; run 'bruin cloud act-as --stop'")
 	}
-	var err error
 	if time.Until(session.ExpiresAt) < actAsRefreshMargin {
-		session, err = refreshActAs(store, session)
-	} else {
-		session, err = store.ReadActAs(cloudauth.APIURL())
+		renewed, stale, err := renewActAs(store, session)
+		if err != nil {
+			return resolvedCloudAuth{}, err
+		}
+		if stale {
+			return resolveCloudAuthWithActAs(c, func() (cloudauth.Store, error) { return store, nil })
+		}
+		return actAsAuth(renewed), nil
 	}
+	current, err := store.ReadActAs(cloudauth.APIURL())
 	if err != nil {
 		return resolvedCloudAuth{}, err
 	}
-	return resolvedCloudAuth{token: session.Token, source: cloudAuthActAs, team: session.Team, actAs: session}, nil
+	return actAsAuth(current), nil
 }
 
-// nolint: contextcheck // auth resolution has no caller context, so the refresh carries its own timeout.
-func refreshActAs(store cloudauth.Store, session *cloudauth.ActAsSession) (*cloudauth.ActAsSession, error) {
+func actAsAuth(session *cloudauth.ActAsSession) resolvedCloudAuth {
+	return resolvedCloudAuth{token: session.Token, source: cloudAuthActAs, team: session.Team, actAs: session}
+}
+
+// renewActAs reports stale when the session was stopped or replaced while the renewal was in flight.
+// nolint: contextcheck // auth resolution has no caller context, so the renewal carries its own timeout.
+func renewActAs(store cloudauth.Store, original *cloudauth.ActAsSession) (*cloudauth.ActAsSession, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	refreshed, err := requestActAs(ctx, store, session.AgentID, session.Team)
-	if err != nil {
-		return nil, fmt.Errorf("acting as agent %s ended: %s. Run 'bruin cloud act-as --stop' to use your own login again", actAsLabel(session), strings.TrimRight(err.Error(), "."))
+	renewed, fetchErr := fetchActAs(ctx, store, original.AgentID, original.Team)
+	stale := false
+	err := store.WithActAsLock(ctx, func() error {
+		latest, err := store.LoadActAs()
+		if err != nil {
+			return err
+		}
+		if !sameActAs(latest, original) {
+			stale = true
+			return nil
+		}
+		if fetchErr == nil {
+			return store.SaveActAs(*renewed)
+		}
+		return nil
+	})
+	switch {
+	case err != nil:
+		return nil, false, err
+	case stale:
+		return nil, true, nil
+	case fetchErr != nil:
+		return nil, false, fmt.Errorf("acting as agent %s ended: %s. Run 'bruin cloud act-as --stop' to use your own login again", actAsLabel(original), strings.TrimRight(fetchErr.Error(), "."))
 	}
-	return refreshed, nil
+	return renewed, false, nil
 }
 
-// requestActAs always authenticates with the person's global login, never a repo connection or agent token.
-func requestActAs(ctx context.Context, store cloudauth.Store, agentID int, team string) (*cloudauth.ActAsSession, error) {
+func sameActAs(a, b *cloudauth.ActAsSession) bool {
+	return a != nil && b != nil && a.AgentID == b.AgentID && a.Team == b.Team && a.APIURL == b.APIURL
+}
+
+// fetchActAs always authenticates with the person's global login, never a repo connection or agent token.
+func fetchActAs(ctx context.Context, store cloudauth.Store, agentID int, team string) (*cloudauth.ActAsSession, error) {
 	credential, err := store.Read(cloudauth.APIURL())
 	if err != nil {
 		return nil, err
@@ -141,9 +175,6 @@ func requestActAs(ctx context.Context, store cloudauth.Store, agentID int, team 
 	}
 	if session.Team == "" {
 		session.Team = team
-	}
-	if err := store.SaveActAs(session); err != nil {
-		return nil, err
 	}
 	return &session, nil
 }

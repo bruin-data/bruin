@@ -148,7 +148,7 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 			}
 			_, _ = fmt.Fprintln(output, "Token revoked in Bruin Cloud. Other copies of this token are now invalid.")
 		}
-		if err := stopActAsOnLogout(store, output); err != nil {
+		if err := stopActAsOnLogout(ctx, store, output); err != nil {
 			return err
 		}
 		if err := store.Delete(); err != nil {
@@ -159,8 +159,13 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 	}}
 }
 
-func stopActAsOnLogout(store cloudauth.Store, output io.Writer) error {
-	session, err := store.ClearActAs()
+func stopActAsOnLogout(ctx context.Context, store cloudauth.Store, output io.Writer) error {
+	var session *cloudauth.ActAsSession
+	err := store.WithActAsLock(ctx, func() error {
+		var clearErr error
+		session, clearErr = store.ClearActAs()
+		return clearErr
+	})
 	if err != nil {
 		return err
 	}

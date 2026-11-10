@@ -1,14 +1,18 @@
 package cloudauth
 
 import (
+	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/99designs/keyring"
+	"github.com/gofrs/flock"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,6 +23,7 @@ type ActAsSession struct {
 	ExpiresAt   time.Time `yaml:"expires_at"`
 	APIURL      string    `yaml:"api_url"`
 	Permissions []string  `yaml:"permissions,omitempty"`
+	TokenKey    string    `yaml:"token_key"`
 	Token       string    `yaml:"-"`
 }
 
@@ -50,15 +55,18 @@ func (s Store) ReadActAs(apiURL string) (*ActAsSession, error) {
 	if err := CheckDestination(session.APIURL, apiURL); err != nil {
 		return nil, errors.New("act-as session belongs to a different Cloud API destination; run 'bruin cloud act-as --stop'")
 	}
-	key, err := s.actAsKey()
+	owned, err := s.ownsActAsKey(session.TokenKey)
 	if err != nil {
 		return nil, err
+	}
+	if !owned {
+		return nil, errors.New("act-as session does not belong to this configuration; run 'bruin cloud act-as --stop'")
 	}
 	store, err := s.Open()
 	if err != nil {
 		return nil, err
 	}
-	item, err := store.Get(key)
+	item, err := store.Get(session.TokenKey)
 	if err != nil || len(item.Data) == 0 {
 		return nil, errors.New("cannot read the act-as token from the OS credential store; run 'bruin cloud act-as --stop'")
 	}
@@ -66,6 +74,7 @@ func (s Store) ReadActAs(apiURL string) (*ActAsSession, error) {
 	return session, nil
 }
 
+// SaveActAs stages the token under a fresh key so a failed write leaves the previous session usable.
 func (s Store) SaveActAs(session ActAsSession) error {
 	if session.Token == "" || session.AgentID == 0 || session.APIURL == "" {
 		return errors.New("cannot store an incomplete act-as session")
@@ -73,11 +82,13 @@ func (s Store) SaveActAs(session ActAsSession) error {
 	if err := os.MkdirAll(filepath.Dir(s.Path), 0o700); err != nil {
 		return err
 	}
-	data, err := yaml.Marshal(session)
+	previous, _ := s.LoadActAs()
+	key, err := s.newActAsKey()
 	if err != nil {
 		return err
 	}
-	key, err := s.actAsKey()
+	session.TokenKey = key
+	data, err := yaml.Marshal(session)
 	if err != nil {
 		return err
 	}
@@ -92,6 +103,9 @@ func (s Store) SaveActAs(session ActAsSession) error {
 		_ = store.Remove(key)
 		return err
 	}
+	if previous != nil {
+		s.removeActAsToken(store, previous.TokenKey)
+	}
 	return nil
 }
 
@@ -101,16 +115,16 @@ func (s Store) ClearActAs() (*ActAsSession, error) {
 	if session == nil && err == nil {
 		return nil, nil
 	}
-	key, keyErr := s.actAsKey()
-	if keyErr != nil {
-		return nil, keyErr
-	}
-	store, openErr := s.Open()
-	if openErr != nil {
-		return nil, openErr
-	}
-	if removeErr := store.Remove(key); removeErr != nil && !errors.Is(removeErr, keyring.ErrKeyNotFound) {
-		return nil, errors.New("could not remove the agent token from OS credential store")
+	if session != nil && session.TokenKey != "" {
+		store, openErr := s.Open()
+		if openErr != nil {
+			return nil, openErr
+		}
+		if owned, _ := s.ownsActAsKey(session.TokenKey); owned {
+			if removeErr := store.Remove(session.TokenKey); removeErr != nil && !errors.Is(removeErr, keyring.ErrKeyNotFound) {
+				return nil, errors.New("could not remove the agent token from OS credential store")
+			}
+		}
 	}
 	if removeErr := os.Remove(s.ActAsPath()); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
 		return nil, removeErr
@@ -121,13 +135,55 @@ func (s Store) ClearActAs() (*ActAsSession, error) {
 	return session, nil
 }
 
-func (s Store) actAsKey() (string, error) {
+// WithActAsLock serialises session changes across bruin processes.
+func (s Store) WithActAsLock(ctx context.Context, fn func() error) error {
+	if err := os.MkdirAll(filepath.Dir(s.Path), 0o700); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	lock := flock.New(filepath.Join(filepath.Dir(s.Path), "cloud-act-as.lock"))
+	locked, err := lock.TryLockContext(ctx, 20*time.Millisecond)
+	if err != nil || !locked {
+		return errors.New("another bruin command is changing the act-as session; try again")
+	}
+	defer func() { _ = lock.Unlock() }()
+	return fn()
+}
+
+func (s Store) removeActAsToken(store SecretStore, key string) {
+	if owned, _ := s.ownsActAsKey(key); owned {
+		_ = store.Remove(key)
+	}
+}
+
+func (s Store) newActAsKey() (string, error) {
+	prefix, err := s.actAsKeyPrefix()
+	if err != nil {
+		return "", err
+	}
+	suffix := make([]byte, 8)
+	if _, err := rand.Read(suffix); err != nil {
+		return "", err
+	}
+	return prefix + hex.EncodeToString(suffix), nil
+}
+
+func (s Store) ownsActAsKey(key string) (bool, error) {
+	prefix, err := s.actAsKeyPrefix()
+	if err != nil {
+		return false, err
+	}
+	return strings.HasPrefix(key, prefix) && len(key) > len(prefix), nil
+}
+
+func (s Store) actAsKeyPrefix() (string, error) {
 	path, err := filepath.Abs(s.ActAsPath())
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256([]byte(path))
-	return "bruin-cloud-act-as-" + hex.EncodeToString(sum[:]), nil
+	return "bruin-cloud-act-as-" + hex.EncodeToString(sum[:]) + "-", nil
 }
 
 func writePrivateFile(path string, data []byte) error {
