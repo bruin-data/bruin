@@ -38,8 +38,8 @@ const (
 func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
 	if raw := strings.TrimSpace(os.Getenv(MaxBillableBytesByConnectionEnv)); raw != "" {
 		var limits map[string]int64
-		if err := json.Unmarshal([]byte(raw), &limits); err != nil {
-			return nil, fmt.Errorf("%s must be a JSON object of connection name to bytes: %w", MaxBillableBytesByConnectionEnv, err)
+		if err := json.Unmarshal([]byte(raw), &limits); err != nil || limits == nil {
+			return nil, fmt.Errorf("%s must be a JSON object of connection name to bytes, got %q", MaxBillableBytesByConnectionEnv, raw)
 		}
 		if limit, ok := limits[connectionName]; ok {
 			if limit <= 0 {

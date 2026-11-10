@@ -222,6 +222,8 @@ func TestMaxBillableBytesFromEnv(t *testing.T) { //nolint:paralleltest // uses t
 		{name: "a connection missing from the map falls back to the shared cap", env: "1000", byConnection: `{"bq-dev": 900}`, want: int64Ptr(1000)},
 		{name: "a connection missing from the map has no cap", byConnection: `{"bq-dev": 900}`},
 		{name: "invalid map fails closed", byConnection: `{"bq-prod": "lots"}`, wantErr: true},
+		{name: "null map fails closed", byConnection: `null`, wantErr: true},
+		{name: "empty map is no per-connection cap", env: "1000", byConnection: `{}`, want: int64Ptr(1000)},
 		{name: "non-positive map value fails closed", byConnection: `{"bq-prod": 0}`, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
