@@ -3124,3 +3124,88 @@ func TestEnvMaxBillableBytesIsSentWithEachQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_DropTableOnMismatch_TableFormat(t *testing.T) {
+	t.Parallel()
+
+	const icebergTable = `{"type": "TABLE", "biglakeConfiguration": {"tableFormat": "ICEBERG", "fileFormat": "PARQUET"}}`
+	tests := []struct {
+		name         string
+		existing     string
+		strategy     pipeline.MaterializationStrategy
+		format       pipeline.MaterializationTableFormat
+		wantDeletion bool
+	}{
+		{
+			name:         "regular table for an Iceberg asset",
+			existing:     `{"type": "TABLE"}`,
+			strategy:     pipeline.MaterializationStrategyCreateReplace,
+			format:       pipeline.MaterializationTableFormatIceberg,
+			wantDeletion: true,
+		},
+		{
+			name:         "Iceberg table for a regular asset",
+			existing:     icebergTable,
+			strategy:     pipeline.MaterializationStrategyMerge,
+			wantDeletion: true,
+		},
+		{
+			name:         "Iceberg table for a regular ddl asset",
+			existing:     icebergTable,
+			strategy:     pipeline.MaterializationStrategyDDL,
+			wantDeletion: true,
+		},
+		{
+			name:     "Iceberg table for an Iceberg asset",
+			existing: icebergTable,
+			strategy: pipeline.MaterializationStrategyCreateReplace,
+			format:   pipeline.MaterializationTableFormatIceberg,
+		},
+		{
+			name:     "view for a ddl asset is left as before",
+			existing: `{"type": "VIEW"}`,
+			strategy: pipeline.MaterializationStrategyDDL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var deleted atomic.Bool
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodDelete {
+					deleted.Store(true)
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tt.existing))
+			}))
+			defer srv.Close()
+
+			client, err := bigquery.NewClient(
+				t.Context(),
+				testProjectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   testProjectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{client: client, config: &Config{ProjectID: testProjectID}}
+			err = d.DropTableOnMismatch(t.Context(), "dataset.table", &pipeline.Asset{
+				Name: "dataset.table",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    tt.strategy,
+					TableFormat: tt.format,
+				},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantDeletion, deleted.Load())
+		})
+	}
+}

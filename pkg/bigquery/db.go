@@ -61,6 +61,7 @@ type TableManager interface {
 	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
 	IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool
 	DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
+	EnsureIcebergTable(ctx context.Context, tableName string, asset *pipeline.Asset) error
 	BuildTableExistsQuery(tableName string) (string, error)
 }
 
@@ -985,12 +986,56 @@ func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asse
 		}
 		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
-	if d.IsMaterializationTypeMismatch(ctx, meta, asset) || d.IsPartitioningOrClusteringMismatch(ctx, meta, asset) {
+	// DDL assets keep their table unless its table format has to change.
+	layoutMismatch := asset.Materialization.Strategy != pipeline.MaterializationStrategyDDL &&
+		(d.IsMaterializationTypeMismatch(ctx, meta, asset) || d.IsPartitioningOrClusteringMismatch(ctx, meta, asset))
+	if layoutMismatch || isTableFormatMismatch(meta, asset) {
 		if err := tableRef.Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
 		}
 	}
 	return nil
+}
+
+func isIcebergTable(meta *bigquery.TableMetadata) bool {
+	return meta.BigLakeConfiguration != nil && meta.BigLakeConfiguration.TableFormat == bigquery.IcebergBigLakeTableFormat
+}
+
+// isTableFormatMismatch reports whether an existing table is Iceberg and the table asset isn't, or the other way around.
+func isTableFormatMismatch(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	return asset.Materialization.Type == pipeline.MaterializationTypeTable && meta.Type == bigquery.RegularTable &&
+		isIcebergTable(meta) != asset.Materialization.IsIceberg()
+}
+
+// EnsureIcebergTable fails when an Iceberg asset's name is taken by a regular table or a view,
+// since BigQuery can't convert them in place. Replacing them is left to a full refresh.
+func (d *Client) EnsureIcebergTable(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	tableRef, err := d.getTableRef(ctx, tableName)
+	if err != nil {
+		return err
+	}
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil
+		}
+		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+	}
+	if isIcebergTable(meta) {
+		return nil
+	}
+
+	existing := "a regular table"
+	if meta.Type != bigquery.RegularTable {
+		existing = "a " + strings.ToLower(strings.ReplaceAll(string(meta.Type), "_", " "))
+	}
+	// Refresh-restricted assets don't run a full refresh.
+	fix := "run the asset with --full-refresh to replace it with an Iceberg table"
+	if asset.RefreshRestricted != nil && *asset.RefreshRestricted {
+		fix = "drop it yourself to recreate it as an Iceberg table"
+	}
+	return fmt.Errorf("'%s' already exists as %s; %s", tableName, existing, fix)
 }
 
 func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -557,4 +558,152 @@ func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
 	assert.Contains(t, executedQuery.Query, `"owner":"data_team"`)
 	assert.Contains(t, executedQuery.Query, `"version":"1.0"`)
 	assert.Contains(t, executedQuery.Query, "SELECT * FROM orders")
+}
+
+func TestBasicOperator_RunTask_IcebergExistingTable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		materialization   pipeline.Materialization
+		fullRefresh       bool
+		refreshRestricted bool
+		wantEnsure        bool
+		wantDrop          bool
+	}{
+		{
+			name: "Iceberg merge checks the existing table",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyMerge,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			wantEnsure: true,
+		},
+		{
+			name: "Iceberg full refresh replaces a mismatched table",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyCreateReplace,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			fullRefresh: true,
+			wantDrop:    true,
+		},
+		{
+			name: "ddl full refresh checks for a mismatched table",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyDDL,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			fullRefresh: true,
+			wantDrop:    true,
+		},
+		{
+			name: "refresh-restricted Iceberg asset checks the existing table on full refresh",
+			materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    pipeline.MaterializationStrategyCreateReplace,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			fullRefresh:       true,
+			refreshRestricted: true,
+			wantEnsure:        true,
+		},
+		{
+			name: "regular create+replace leaves the check to full refresh",
+			materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyCreateReplace,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := new(mockQuerierWithResult)
+			client.On("CreateDataSetIfNotExist", mock.Anything, mock.Anything).Return(nil)
+			client.On("DropTableOnMismatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			client.On("EnsureIcebergTable", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			client.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "materialized"}).Return(nil)
+
+			extractor := new(mockExtractor)
+			extractor.On("ExtractQueriesFromString", "some content").Return([]*query.Query{{Query: "select 1"}}, nil)
+			mat := new(mockMaterializer)
+			mat.On("Render", mock.Anything, "select 1").Return("materialized", nil)
+			mat.On("IsFullRefresh").Return(tt.fullRefresh)
+			mat.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).Return(nil)
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "gcp-default").Return(client)
+
+			o := BasicOperator{connection: conn, extractor: extractor, materializer: mat}
+			require.NoError(t, o.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
+				Name:              "dataset.table",
+				Type:              pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile:    pipeline.ExecutableFile{Path: "test-file.sql", Content: "some content"},
+				Materialization:   tt.materialization,
+				RefreshRestricted: &tt.refreshRestricted,
+			}))
+
+			if tt.wantEnsure {
+				client.AssertCalled(t, "EnsureIcebergTable", mock.Anything, mock.Anything, mock.Anything)
+			} else {
+				client.AssertNotCalled(t, "EnsureIcebergTable", mock.Anything, mock.Anything, mock.Anything)
+			}
+			if tt.wantDrop {
+				client.AssertCalled(t, "DropTableOnMismatch", mock.Anything, mock.Anything, mock.Anything)
+			} else {
+				client.AssertNotCalled(t, "DropTableOnMismatch", mock.Anything, mock.Anything, mock.Anything)
+			}
+		})
+	}
+}
+
+func TestIsTableFormatMismatch(t *testing.T) {
+	t.Parallel()
+
+	iceberg := &bigquery.BigLakeConfiguration{TableFormat: bigquery.IcebergBigLakeTableFormat}
+	tests := []struct {
+		name  string
+		meta  *bigquery.TableMetadata
+		asset pipeline.Materialization
+		want  bool
+	}{
+		{
+			name:  "regular table for an Iceberg asset",
+			meta:  &bigquery.TableMetadata{Type: bigquery.RegularTable},
+			asset: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, TableFormat: pipeline.MaterializationTableFormatIceberg},
+			want:  true,
+		},
+		{
+			name:  "Iceberg table for a regular asset",
+			meta:  &bigquery.TableMetadata{Type: bigquery.RegularTable, BigLakeConfiguration: iceberg},
+			asset: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
+			want:  true,
+		},
+		{
+			name:  "Iceberg table for an Iceberg asset",
+			meta:  &bigquery.TableMetadata{Type: bigquery.RegularTable, BigLakeConfiguration: iceberg},
+			asset: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, TableFormat: pipeline.MaterializationTableFormatIceberg},
+		},
+		{
+			name: "Iceberg table for an asset without a materialization",
+			meta: &bigquery.TableMetadata{Type: bigquery.RegularTable, BigLakeConfiguration: iceberg},
+		},
+		{
+			name:  "view for an Iceberg asset is a type mismatch, not a format one",
+			meta:  &bigquery.TableMetadata{Type: bigquery.ViewTable},
+			asset: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, TableFormat: pipeline.MaterializationTableFormatIceberg},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isTableFormatMismatch(tt.meta, &pipeline.Asset{Materialization: tt.asset}))
+		})
+	}
 }
