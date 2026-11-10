@@ -415,11 +415,16 @@ type: sf.sql
 materialization:
   type: table
   table_format: Iceberg
+snowflake:
+  external_volume: my_vol
+  base_location: analytics/events
 `)
 	task, err := pipeline.ConvertYamlToTask([]byte(definition))
 	require.NoError(t, err)
 	require.Equal(t, pipeline.MaterializationTableFormatIceberg, task.Materialization.TableFormat)
 	require.True(t, task.Materialization.IsIceberg())
+	require.Equal(t, "my_vol", task.Snowflake.ExternalVolume)
+	require.Equal(t, "analytics/events", task.Snowflake.BaseLocation)
 
 	fs := afero.NewMemMapFs()
 	content := "/* @bruin\n" + definition + "\n@bruin */\n\nSELECT 1"

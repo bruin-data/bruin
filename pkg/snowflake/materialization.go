@@ -46,6 +46,40 @@ func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
 }
 
+// tableKeyword returns the object keyword used when Bruin creates the asset's table.
+func tableKeyword(asset *pipeline.Asset) string {
+	if asset.Materialization.IsIceberg() {
+		return "ICEBERG TABLE"
+	}
+	return "TABLE"
+}
+
+// icebergTableOptions returns the options for a Snowflake-managed Iceberg table. Without them, Snowflake
+// uses the default external volume and builds the base location from the table name.
+func icebergTableOptions(asset *pipeline.Asset) string {
+	if !asset.Materialization.IsIceberg() {
+		return ""
+	}
+
+	options := []string{"CATALOG = 'SNOWFLAKE'"}
+	if asset.Snowflake.ExternalVolume != "" {
+		options = append(options, fmt.Sprintf("EXTERNAL_VOLUME = '%s'", escapeSQLString(asset.Snowflake.ExternalVolume)))
+	}
+	if asset.Snowflake.BaseLocation != "" {
+		options = append(options, fmt.Sprintf("BASE_LOCATION = '%s'", escapeSQLString(asset.Snowflake.BaseLocation)))
+	}
+	return " " + strings.Join(options, " ")
+}
+
+// scd2TimestampTypes returns the SCD2 validity column type and the open-ended _valid_until value.
+// Iceberg tables don't support TIMESTAMP_TZ, so they use TIMESTAMP_LTZ(6) with the session in UTC.
+func scd2TimestampTypes(asset *pipeline.Asset) (string, string) {
+	if asset.Materialization.IsIceberg() {
+		return "TIMESTAMP_LTZ(6)", "CAST('9999-12-31 23:59:59' AS TIMESTAMP_LTZ(6))"
+	}
+	return "TIMESTAMP_TZ", "TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')"
+}
+
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
@@ -87,7 +121,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(mat.ClusterBy, ", "))
 	}
 
-	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s AS\n%s", task.Name, clusterByClause, query), nil
+	return fmt.Sprintf("CREATE OR REPLACE %s %s %s%s AS\n%s", tableKeyword(task), task.Name, clusterByClause, icebergTableOptions(task), query), nil
 }
 
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -212,14 +246,16 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		foreignKeyClause = ",\n" + strings.Join(foreignKeys, ",\n")
 	}
 	ddl := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s %s(\n"+
+		"CREATE %s IF NOT EXISTS %s %s(\n"+
 			"%s%s%s\n"+
-			")",
+			")%s",
+		tableKeyword(asset),
 		asset.Name,
 		clusterByClause,
 		strings.Join(columnDefs, ",\n"),
 		primaryKeyClause,
 		foreignKeyClause,
+		icebergTableOptions(asset),
 	)
 
 	return ddl, nil
@@ -269,10 +305,11 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 
 	tbl := asset.Name
+	timestampType, maxValidUntil := scd2TimestampTypes(asset)
 
 	if incrementalKey != "" {
-		validFromExpr := fmt.Sprintf("CAST(source.%s AS TIMESTAMP_TZ)", incrementalKey)
-		insertValues = append(insertValues, validFromExpr, "TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+		validFromExpr := fmt.Sprintf("CAST(source.%s AS %s)", incrementalKey, timestampType)
+		insertValues = append(insertValues, validFromExpr, maxValidUntil, "TRUE")
 
 		queryStr := fmt.Sprintf(
 			`
@@ -289,7 +326,7 @@ WHERE target._is_current = TRUE
 
 -- Step 2: Update existing records that have changes
 UPDATE %s AS target
-SET _valid_until = (SELECT CAST(source.%s AS TIMESTAMP_TZ) FROM (%s) AS source WHERE %s LIMIT 1), _is_current = FALSE
+SET _valid_until = (SELECT CAST(source.%s AS %s) FROM (%s) AS source WHERE %s LIMIT 1), _is_current = FALSE
 WHERE target._is_current = TRUE
   AND EXISTS (
     SELECT 1 FROM (%s) AS source
@@ -311,6 +348,7 @@ COMMIT;`,
 			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
 			tbl,
 			incrementalKey,
+			timestampType,
 			strings.TrimSpace(query),
 			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
 			strings.TrimSpace(query),
@@ -327,7 +365,7 @@ COMMIT;`,
 		return "ALTER SESSION SET TIMEZONE = 'UTC';\n" + strings.TrimSpace(queryStr), nil
 	}
 
-	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+	insertValues = append(insertValues, "$current_scd2_ts", maxValidUntil, "TRUE")
 
 	queryStr := fmt.Sprintf(
 		`
@@ -404,24 +442,28 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		clusterByClause = fmt.Sprintf("CLUSTER BY (_is_current, %s)", cluster)
 	}
 
-	validFromExpr := "CAST(CURRENT_TIMESTAMP() AS TIMESTAMP_TZ)"
+	timestampType, maxValidUntil := scd2TimestampTypes(asset)
+	validFromExpr := fmt.Sprintf("CAST(CURRENT_TIMESTAMP() AS %s)", timestampType)
 	if asset.Materialization.IncrementalKey != "" {
-		validFromExpr = fmt.Sprintf("CAST(%s AS TIMESTAMP_TZ)", asset.Materialization.IncrementalKey)
+		validFromExpr = fmt.Sprintf("CAST(%s AS %s)", asset.Materialization.IncrementalKey, timestampType)
 	}
 
 	stmt := fmt.Sprintf(
-		`CREATE OR REPLACE TABLE %s %s AS
+		`CREATE OR REPLACE %s %s %s%s AS
 SELECT
   %s AS _valid_from,
   src.*,
-  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
+  %s AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
 ) AS src`,
+		tableKeyword(asset),
 		tbl,
 		clusterByClause,
+		icebergTableOptions(asset),
 		validFromExpr,
+		maxValidUntil,
 		strings.TrimSpace(query),
 	)
 
@@ -467,11 +509,12 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		)
 	}
 	pkList := strings.Join(primaryKeys, ", ")
+	timestampType, maxValidUntil := scd2TimestampTypes(asset)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(
 		insertValues,
-		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP_TZ)",
-		"TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')",
+		"CAST(source."+asset.Materialization.IncrementalKey+" AS "+timestampType+")",
+		maxValidUntil,
 		"TRUE",
 	)
 
@@ -510,15 +553,15 @@ USING (
   SELECT s1.*, FALSE AS _is_current
   FROM s1
   JOIN   %s AS t1 USING (%s)
-  WHERE  t1._valid_from < CAST(s1.%s AS TIMESTAMP_TZ) AND t1._is_current
+  WHERE  t1._valid_from < CAST(s1.%s AS %s) AND t1._is_current
 ) AS source
 ON  %s
 
 WHEN MATCHED AND (
-  target._valid_from < CAST(source.%s AS TIMESTAMP_TZ)
+  target._valid_from < CAST(source.%s AS %s)
 ) THEN
   UPDATE SET
-    target._valid_until = CAST(source.%s AS TIMESTAMP_TZ),
+    target._valid_until = CAST(source.%s AS %s),
     target._is_current  = FALSE
 
 WHEN NOT MATCHED THEN
@@ -534,9 +577,12 @@ COMMIT;`,
 		tbl,
 		pkList,
 		asset.Materialization.IncrementalKey,
+		timestampType,
 		onCondition,
 		asset.Materialization.IncrementalKey,
+		timestampType,
 		asset.Materialization.IncrementalKey,
+		timestampType,
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 	)
@@ -564,19 +610,24 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		clusterByClause = fmt.Sprintf("CLUSTER BY (_is_current, %s)", cluster)
 	}
 
+	timestampType, maxValidUntil := scd2TimestampTypes(asset)
 	stmt := fmt.Sprintf(
-		`CREATE OR REPLACE TABLE %s %s AS
+		`CREATE OR REPLACE %s %s %s%s AS
 SELECT
-  CAST(%s AS TIMESTAMP_TZ) AS _valid_from,
+  CAST(%s AS %s) AS _valid_from,
   src.*,
-  TO_TIMESTAMP_TZ('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
+  %s AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
 ) AS src`,
+		tableKeyword(asset),
 		tbl,
 		clusterByClause,
+		icebergTableOptions(asset),
 		asset.Materialization.IncrementalKey,
+		timestampType,
+		maxValidUntil,
 		strings.TrimSpace(query),
 	)
 

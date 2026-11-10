@@ -1397,6 +1397,32 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 		},
 
 		{
+			name: "Iceberg table uses ALTER ICEBERG TABLE for comments",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "Table description",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					TableFormat: pipeline.MaterializationTableFormatIceberg,
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "Description 1"},
+				},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT
+             FROM MYDB.INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "COMMENT"}).AddRow("COL1", ""))
+
+				mock.ExpectQuery(`ALTER ICEBERG TABLE MYDB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col1 COMMENT 'Description 1'`).
+					WillReturnRows(sqlmock.NewRows(nil))
+				mock.ExpectQuery(`ALTER ICEBERG TABLE MYDB.TEST_SCHEMA.TEST_TABLE SET COMMENT = 'Table description'`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+		},
+		{
 			name: "three-part name pushes metadata to the named database",
 			asset: &pipeline.Asset{
 				Name:        "other_db.test_schema.test_table",

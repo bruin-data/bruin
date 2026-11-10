@@ -653,7 +653,9 @@ const (
 )
 
 // tableFormatAssetTypes lists the asset types that can create tables in a non-default table format.
-var tableFormatAssetTypes = map[AssetType]bool{}
+var tableFormatAssetTypes = map[AssetType]bool{
+	AssetTypeSnowflakeQuery: true,
+}
 
 // SupportsTableFormat reports whether assets of this type can set materialization.table_format.
 func (a AssetType) SupportsTableFormat() bool {
@@ -1256,10 +1258,13 @@ func (u Upstream) MarshalYAML() (interface{}, error) {
 
 type SnowflakeConfig struct {
 	Warehouse string `json:"warehouse"  yaml:"warehouse" `
+	// ExternalVolume and BaseLocation only apply to Iceberg tables.
+	ExternalVolume string `json:"external_volume,omitempty" yaml:"external_volume,omitempty"`
+	BaseLocation   string `json:"base_location,omitempty" yaml:"base_location,omitempty"`
 }
 
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
-	if s.Warehouse == "" {
+	if s == (SnowflakeConfig{}) {
 		return []byte("null"), nil
 	}
 
@@ -3507,6 +3512,12 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if asset.Snowflake.Warehouse == "" {
 		asset.Snowflake.Warehouse = defaults.Snowflake.Warehouse
+	}
+	if asset.Snowflake.ExternalVolume == "" {
+		asset.Snowflake.ExternalVolume = defaults.Snowflake.ExternalVolume
+	}
+	if asset.Snowflake.BaseLocation == "" {
+		asset.Snowflake.BaseLocation = defaults.Snowflake.BaseLocation
 	}
 	if asset.Athena.Location == "" {
 		asset.Athena.Location = defaults.Athena.Location

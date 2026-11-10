@@ -719,13 +719,19 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		existingComments[columnName] = comment
 	}
 
+	// Iceberg tables reject plain ALTER TABLE and COMMENT ON TABLE.
+	alterTable := "ALTER TABLE"
+	if asset.Materialization.IsIceberg() {
+		alterTable = "ALTER ICEBERG TABLE"
+	}
+
 	// Find columns that need updates
 	var updateQueries []string
 	for _, col := range asset.Columns {
 		if col.Description != "" && existingComments[col.Name] != col.Description {
 			query := fmt.Sprintf(
-				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
-				databaseName, schemaName, tableName, col.Name, escapeSQLString(col.Description),
+				`%s %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
+				alterTable, databaseName, schemaName, tableName, col.Name, escapeSQLString(col.Description),
 			)
 			updateQueries = append(updateQueries, query)
 		}
@@ -742,6 +748,12 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
 			databaseName, schemaName, tableName, escapeSQLString(asset.Description),
 		)
+		if asset.Materialization.IsIceberg() {
+			updateTableQuery = fmt.Sprintf(
+				`ALTER ICEBERG TABLE %s.%s.%s SET COMMENT = '%s'`,
+				databaseName, schemaName, tableName, escapeSQLString(asset.Description),
+			)
+		}
 		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
 			return errors.Wrap(err, "failed to update table description")
 		}

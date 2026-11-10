@@ -3093,6 +3093,39 @@ default:
 	assert.Equal(t, "default description", got.Description)
 }
 
+func TestBuilder_SetupDefaultsFromPipelineAppliesTableFormatToSnowflakeTables(t *testing.T) {
+	t.Parallel()
+
+	defaults := &pipeline.DefaultValues{
+		Materialization: pipeline.Materialization{
+			Type:        pipeline.MaterializationTypeTable,
+			TableFormat: "Iceberg",
+		},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{Type: pipeline.AssetTypeSnowflakeQuery}, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	assert.Equal(t, pipeline.MaterializationTableFormatIceberg, got.Materialization.TableFormat)
+}
+
+func TestBuilder_SetupDefaultsFromPipelineAppliesSnowflakeIcebergDefaults(t *testing.T) {
+	t.Parallel()
+
+	defaults := &pipeline.DefaultValues{
+		Snowflake: pipeline.SnowflakeConfig{ExternalVolume: "default_vol", BaseLocation: "default/location"},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{
+		Type:      pipeline.AssetTypeSnowflakeQuery,
+		Snowflake: pipeline.SnowflakeConfig{BaseLocation: "asset/location"},
+	}, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	assert.Equal(t, "default_vol", got.Snowflake.ExternalVolume)
+	assert.Equal(t, "asset/location", got.Snowflake.BaseLocation)
+}
+
 func TestBuilder_SetupDefaultsFromPipelineSkipsTableFormatForUnsupportedAssets(t *testing.T) {
 	t.Parallel()
 
