@@ -77,10 +77,33 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 	q := queries[0]
-	if t.Materialization.IsIceberg() && t.BigQuery.StorageURI == "" {
-		return errors.Errorf("asset '%s' is an Iceberg table but has no storage URI, set bigquery.storage_uri on the asset", t.Name)
+
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
 	}
-	materialized, err := o.materializer.Render(t, q.String())
+
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
+	}
+
+	conn, ok := rawConn.(DB)
+	if !ok {
+		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
+	}
+
+	renderAsset := t
+	if preparer, ok := conn.(interface {
+		PrepareAssetForRender(asset *pipeline.Asset) *pipeline.Asset
+	}); ok {
+		renderAsset = preparer.PrepareAssetForRender(t)
+	}
+	if renderAsset.Materialization.IsIceberg() && renderAsset.BigQuery.StorageURI == "" {
+		return errors.Errorf("asset '%s' is an Iceberg table but has no storage URI, set bigquery.storage_uri on the asset or storage_uri on the '%s' connection", t.Name, connName)
+	}
+
+	materialized, err := o.materializer.Render(renderAsset, q.String())
 	if err != nil {
 		return err
 	}
@@ -102,21 +125,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 
 		q.Query = renderedQueries[0].Query
-	}
-
-	connName, err := p.GetConnectionNameForAsset(t)
-	if err != nil {
-		return err
-	}
-
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(DB)
-	if !ok {
-		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
 	}
 
 	queryToRun := q
@@ -181,6 +189,25 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+// withIcebergSettings fills in the storage URI from the connection's prefix when the asset doesn't set one.
+// It becomes <prefix>/<dataset>/<table>, so every table has its own folder.
+func withIcebergSettings(asset *pipeline.Asset, storageURIPrefix string) *pipeline.Asset {
+	if !asset.Materialization.IsIceberg() {
+		return asset
+	}
+
+	withSettings := *asset
+	storageURIPrefix = strings.TrimSuffix(storageURIPrefix, "/")
+	if withSettings.BigQuery.StorageURI == "" && storageURIPrefix != "" {
+		nameParts := strings.Split(asset.Name, ".")
+		if len(nameParts) > 2 {
+			nameParts = nameParts[len(nameParts)-2:]
+		}
+		withSettings.BigQuery.StorageURI = storageURIPrefix + "/" + strings.Join(nameParts, "/")
+	}
+	return &withSettings
 }
 
 type checkRunner interface {

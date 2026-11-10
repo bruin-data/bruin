@@ -3218,6 +3218,9 @@
         },
         "read_only": {
           "type": "boolean"
+        },
+        "storage_uri": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

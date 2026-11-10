@@ -731,3 +731,70 @@ func TestIsTableFormatMismatch(t *testing.T) {
 		})
 	}
 }
+
+func TestWithIcebergSettings(t *testing.T) {
+	t.Parallel()
+
+	icebergAsset := func(name, storageURI string) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name: name,
+			Materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			BigQuery: pipeline.BigQueryConfig{StorageURI: storageURI},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		asset          *pipeline.Asset
+		prefix         string
+		wantStorageURI string
+	}{
+		{
+			name:           "built from the connection and dataset.table",
+			asset:          icebergAsset("sales.orders", ""),
+			prefix:         "gs://bucket/",
+			wantStorageURI: "gs://bucket/sales/orders",
+		},
+		{
+			name:           "project is left out of the path",
+			asset:          icebergAsset("my-project.sales.orders", ""),
+			prefix:         "gs://bucket/lake",
+			wantStorageURI: "gs://bucket/lake/sales/orders",
+		},
+		{
+			name:           "dev environments get their own folder from the prefixed dataset",
+			asset:          icebergAsset("dev_sales.orders", ""),
+			prefix:         "gs://bucket",
+			wantStorageURI: "gs://bucket/dev_sales/orders",
+		},
+		{
+			name:           "the asset's storage URI wins",
+			asset:          icebergAsset("sales.orders", "gs://other/custom"),
+			prefix:         "gs://bucket",
+			wantStorageURI: "gs://other/custom",
+		},
+		{
+			name:  "nothing on the connection",
+			asset: icebergAsset("sales.orders", ""),
+		},
+		{
+			name:   "regular tables are left alone",
+			asset:  &pipeline.Asset{Name: "sales.orders"},
+			prefix: "gs://bucket",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			original := tt.asset.BigQuery
+			got := withIcebergSettings(tt.asset, tt.prefix)
+			assert.Equal(t, tt.wantStorageURI, got.BigQuery.StorageURI)
+			assert.Equal(t, original, tt.asset.BigQuery, "the original asset must not change")
+		})
+	}
+}

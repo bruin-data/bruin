@@ -160,7 +160,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 			})
 			return issues, nil
 		}
-		materialized, err := q.Materializer.Render(materializedAsset, foundQuery.Query)
+		materialized, err := q.Materializer.Render(q.assetForRender(p, materializedAsset), foundQuery.Query)
 		if err != nil {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -216,6 +216,25 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	}
 
 	return issues, nil
+}
+
+// assetForRender lets the asset's connection fill in connection-level settings the materialized query
+// needs, such as the storage URI of a BigQuery Iceberg table.
+func (q *QueryValidatorRule) assetForRender(p *pipeline.Pipeline, asset *pipeline.Asset) *pipeline.Asset {
+	if q.Connections == nil {
+		return asset
+	}
+	connName, err := p.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return asset
+	}
+	preparer, ok := q.Connections.GetConnection(connName).(interface {
+		PrepareAssetForRender(asset *pipeline.Asset) *pipeline.Asset
+	})
+	if !ok {
+		return asset
+	}
+	return preparer.PrepareAssetForRender(asset)
 }
 
 func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
@@ -296,7 +315,7 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 			start := time.Now()
 
 			if q.Materializer != nil {
-				materialized, err := q.Materializer.Render(materializedTask, foundQuery.Query)
+				materialized, err := q.Materializer.Render(q.assetForRender(p, materializedTask), foundQuery.Query)
 				if err != nil {
 					issues = append(issues, &Issue{
 						Task:        task,

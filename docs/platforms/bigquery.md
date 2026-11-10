@@ -42,6 +42,9 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
           # descriptive error unless they pass --dangerously-bypass-soft-limits.
           max_billable_bytes_soft: 100000000000
           max_query_cost_soft: 0.50 # USD
+
+          # Optional Cloud Storage folder for Iceberg tables, see Iceberg tables below.
+          storage_uri: gs://my-bucket/iceberg
 ```
 
 ### Query cost limits
@@ -127,8 +130,10 @@ Read-only mode requires `service_account_file` or `service_account_json`; ADC an
 Set `table_format: iceberg` to create a [BigQuery Iceberg table](https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery). BigQuery keeps the table's files in your Cloud Storage bucket.
 
 ::: warning Required
-Set `storage_uri` in the asset's `bigquery:` block. Without it, the run fails.
+Set `storage_uri` on the connection or in the asset's `bigquery:` block. Without either, the run fails.
 :::
+
+With `storage_uri` on the connection, each table goes to its own folder, `<storage_uri>/<dataset>/<table>`. For the example below and `storage_uri: gs://my-bucket/iceberg`, that's `gs://my-bucket/iceberg/analytics/orders`. Dev environments with a schema prefix get their own folder, such as `gs://my-bucket/iceberg/dev_analytics/orders`.
 
 ```bruin-sql
 /* @bruin
@@ -139,7 +144,7 @@ materialization:
     table_format: iceberg
 
 bigquery:
-    storage_uri: gs://my-bucket/analytics/orders
+    storage_uri: gs://my-bucket/analytics/orders # optional with storage_uri on the connection
     cloud_resource_connection: my-project.europe-west3.my_connection # optional
 @bruin */
 
@@ -148,7 +153,7 @@ select order_id, status from raw.orders
 
 | Field | Description |
 | --- | --- |
-| `storage_uri` | **Required.** The table's folder in Cloud Storage. Give every table its own folder, including dev copies made with a schema prefix: BigQuery rejects a folder another table already uses. |
+| `storage_uri` | The table's folder in Cloud Storage. Required unless the connection sets `storage_uri`, which it overrides. Give every table its own folder, including dev copies made with a schema prefix: BigQuery rejects a folder another table already uses. |
 | `cloud_resource_connection` | Optional. The [Cloud resource connection](https://cloud.google.com/bigquery/docs/create-cloud-resource-connection) BigQuery writes the files with, as `project.region.name`. Defaults to the project's [default connection](https://docs.cloud.google.com/bigquery/docs/default-connections). |
 
 In `pipeline.yml`, `default.bigquery.cloud_resource_connection` applies to every asset; `storage_uri` doesn't, because it must be different for each table.
