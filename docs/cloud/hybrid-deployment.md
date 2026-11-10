@@ -5,7 +5,7 @@ Hybrid mode splits Bruin Cloud into two parts:
 - The **control plane** decides what runs and when. Bruin hosts it.
 - The **data plane** does the actual work: it runs your assets, connects to your data platforms, and uses your credentials. You host it in your own infrastructure.
 
-You still manage, schedule, and monitor pipelines from the Bruin Cloud UI as usual. The difference is where the work happens: your data and credentials stay inside your network, and Bruin Cloud only receives run status and logs.
+You still manage, schedule, and monitor pipelines from the Bruin Cloud UI as usual. The difference is where the work happens: your assets run inside your network with your credentials, and Bruin Cloud receives run status and logs.
 
 ## Architecture
 
@@ -101,7 +101,7 @@ It also needs access to the systems your pipelines use, such as your Git provide
 
 Connection credentials stay in your infrastructure. Bruin Cloud never stores them. Keep them in one of the [supported secret providers](/secrets/overview), and the data plane reads them when a job runs.
 
-Assets run inside your network, so your data is processed there. Run logs are sent to Bruin Cloud so you can view them in the UI along with the rest of your runs.
+Assets run inside your network, so your data is processed there. Run logs are sent to Bruin Cloud so you can view them in the UI along with the rest of your runs. Logs include anything your assets print, such as the output of Python assets, so avoid printing sensitive data.
 
 ## Related
 
