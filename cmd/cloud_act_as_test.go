@@ -143,7 +143,7 @@ func TestActAsStartStatusStop(t *testing.T) { //nolint:paralleltest // uses t.Ch
 	session, _, err := store.LoadActAs()
 	require.NoError(t, err)
 	until := actAsClock(session.ExpiresAt)
-	assert.Equal(t, `Acting as agent "Reporter" (12) on team acme until `+until+". Cloud commands now use the agent's permissions: agent:list, dashboard:list. Run 'bruin cloud act-as --stop' to go back.\n", output)
+	assert.Equal(t, `Acting as agent "Reporter" (12) on team acme until `+until+". Cloud commands now use the agent's permissions instead of your login's: agent:list, dashboard:list. Run 'bruin cloud act-as --stop' to go back.\n", output)
 	assert.Equal(t, []string{"POST /agents/12/act-as Bearer person-token team=acme"}, stub.recorded())
 	assert.Equal(t, "agent-token", session.Token)
 	if runtime.GOOS != osWindows {
