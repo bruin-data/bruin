@@ -1654,7 +1654,7 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		if asset.Materialization.IncrementalPredicate != "" && !supportsIncrementalPredicate(asset) {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres and Databricks.",
+				Description: "Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres, Databricks and MySQL.",
 			})
 		}
 
@@ -1803,7 +1803,7 @@ func supportsIncrementalPredicate(asset *pipeline.Asset) bool {
 	case pipeline.MaterializationStrategyDeleteInsert:
 		switch asset.Type {
 		case pipeline.AssetTypeDuckDBQuery, pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery, pipeline.AssetTypePostgresQuery,
-			pipeline.AssetTypeDatabricksQuery:
+			pipeline.AssetTypeDatabricksQuery, pipeline.AssetTypeMySQLQuery:
 			return true
 		default:
 			return false
