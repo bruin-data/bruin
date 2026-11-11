@@ -48,16 +48,10 @@ func mergeAnnotations(annotations string, baseline map[string]interface{}) (stri
 }
 
 // BuildAnnotationJSON builds the annotation JSON string by merging standard fields
-// and the run ID with any user-provided annotations from the context. Returns empty
-// string if annotations are not enabled.
+// with any user-provided annotations from the context. Returns empty string if
+// annotations are not enabled.
 func BuildAnnotationJSON(ctx context.Context, fields map[string]interface{}) (string, error) {
 	annotations, _ := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
-	if runID, _ := ctx.Value(pipeline.RunConfigRunID).(string); runID != "" {
-		withRunID := make(map[string]interface{}, len(fields)+1)
-		maps.Copy(withRunID, fields)
-		withRunID["run_id"] = runID
-		fields = withRunID
-	}
 	return mergeAnnotations(annotations, fields)
 }
 

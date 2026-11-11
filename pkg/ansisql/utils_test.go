@@ -135,12 +135,10 @@ func TestBuildAnnotationJSON(t *testing.T) {
 	tests := []struct {
 		name        string
 		annotations string
-		runID       string
 		fields      map[string]interface{}
 		expectError bool
 		expectEmpty bool
 		contains    []string
-		notContains []string
 	}{
 		{
 			name:        "default annotations with standard fields",
@@ -153,21 +151,6 @@ func TestBuildAnnotationJSON(t *testing.T) {
 			annotations: `{"project": "test"}`,
 			fields:      map[string]interface{}{"asset": "test-asset", "type": "main"},
 			contains:    []string{`"asset":"test-asset"`, `"type":"main"`, `"project":"test"`},
-		},
-		{
-			name:        "run ID from the context is included",
-			annotations: "default",
-			runID:       "2026_11_11_14_00_00",
-			fields:      map[string]interface{}{"asset": "test-asset"},
-			contains:    []string{`"asset":"test-asset"`, `"run_id":"2026_11_11_14_00_00"`},
-		},
-		{
-			name:        "user-provided run ID wins",
-			annotations: `{"run_id": "scheduled__2026-11-11T08:00:00"}`,
-			runID:       "2026_11_11_14_00_00",
-			fields:      map[string]interface{}{"asset": "test-asset"},
-			contains:    []string{`"run_id":"scheduled__2026-11-11T08:00:00"`},
-			notContains: []string{"2026_11_11_14_00_00"},
 		},
 		{
 			name:        "no annotations returns empty",
@@ -191,9 +174,6 @@ func TestBuildAnnotationJSON(t *testing.T) {
 			if tt.annotations != "" {
 				ctx = context.WithValue(ctx, pipeline.RunConfigQueryAnnotations, tt.annotations)
 			}
-			if tt.runID != "" {
-				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, tt.runID)
-			}
 
 			result, err := BuildAnnotationJSON(ctx, tt.fields)
 
@@ -210,9 +190,6 @@ func TestBuildAnnotationJSON(t *testing.T) {
 
 			for _, s := range tt.contains {
 				assert.Contains(t, result, s)
-			}
-			for _, s := range tt.notContains {
-				assert.NotContains(t, result, s)
 			}
 			assert.NotContains(t, result, "-- @bruin.config")
 		})

@@ -13,7 +13,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,17 +58,8 @@ func TestApplyRunScopedJobID(t *testing.T) {
 		assert.NotEqual(t, base, id, name)
 	}
 
-	// A local run with annotations enabled uses bruin's own run ID.
-	localCtx := context.WithValue(mainCtx, pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
-	localCtx = context.WithValue(localCtx, pipeline.RunConfigRunID, "2026_11_11_14_00_00")
-	local, err := ansisql.AddAnnotationComment(localCtx, &query.Query{Query: "select 1"}, "a.b", "main", "p")
-	require.NoError(t, err)
-	id, suffix := runScopedJobID(localCtx, local)
-	assert.Regexp(t, "^bruin_main-[0-9a-f]{32}$", id)
-	assert.False(t, suffix)
-
 	// Left to the library without a run ID, for other query types and in read-only mode.
-	id, suffix = runScopedJobID(mainCtx, &query.Query{Query: "select 1"})
+	id, suffix := runScopedJobID(mainCtx, &query.Query{Query: "select 1"})
 	assert.Equal(t, "bruin_main", id)
 	assert.True(t, suffix)
 
