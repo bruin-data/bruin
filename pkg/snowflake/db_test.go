@@ -1005,6 +1005,15 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			expectedError: "unable to retrieve table metadata for 'TEST_SCHEMA.TEST_TABLE': query error",
 		},
 		{
+			name: "existing table is left alone for an asset without a materialization",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No query expected: Bruin doesn't manage the object.
+			},
+		},
+		{
 			name: "materialization type matches, no action taken",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Mock the SELECT query to return the same type

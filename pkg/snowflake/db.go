@@ -633,6 +633,11 @@ func (db *DB) existingObject(ctx context.Context, asset *pipeline.Asset) (fqn st
 // RecreateTableOnMaterializationTypeMismatch drops the existing object when its type or table format
 // doesn't match the asset, since Snowflake can't CREATE OR REPLACE across them.
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
+	// Assets without a materialization manage their own objects.
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+
 	fqn, objectType, dbMaterializationType, isIceberg, err := db.existingObject(ctx, asset)
 	if err != nil || objectType == "" {
 		return err

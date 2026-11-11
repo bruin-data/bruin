@@ -1562,6 +1562,8 @@ During a full refresh, table assets are rebuilt with `create+replace` instead of
 | Data Vault | On PostgreSQL and DuckDB, the table is dropped and recreated, then loaded with the Data Vault rules. |
 | `type: view` | Unchanged. Views are always replaced. |
 
+Assets without a `materialization` run their query as written, and Bruin doesn't drop or recreate any table for them. To rebuild a table on a full refresh, drop it in the query, for example inside `{% if full_refresh %}`.
+
 Because the full query result is loaded, remember to widen or remove date filters in incremental queries when `full_refresh` is set. The `{{ full_refresh }}` [Jinja variable](../variables/built-in.md) lets the query branch on it:
 
 ```sql
