@@ -86,3 +86,16 @@ func TestBuildIncrementalDelete(t *testing.T) {
 		BuildIncrementalDelete("my.asset", "id in (1)", " target.region = 'eu' "),
 	)
 }
+
+func TestRejectDeleteInsertPredicate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{}
+	require.NoError(t, RejectDeleteInsertPredicate(asset, "Trino"))
+
+	asset.Materialization.IncrementalPredicate = "  "
+	require.NoError(t, RejectDeleteInsertPredicate(asset, "Trino"))
+
+	asset.Materialization.IncrementalPredicate = "dt >= '2026-07-01'"
+	require.EqualError(t, RejectDeleteInsertPredicate(asset, "Trino"), "incremental_predicate is not supported for Trino delete+insert materialization")
+}

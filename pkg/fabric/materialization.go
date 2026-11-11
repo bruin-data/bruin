@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -74,6 +75,10 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error) {
+	if err := ansisql.RejectDeleteInsertPredicate(asset, "Fabric"); err != nil {
+		return "", err
+	}
+
 	if len(asset.Columns) == 0 {
 		return "", errors.New("delete+insert strategy requires columns to be defined")
 	}

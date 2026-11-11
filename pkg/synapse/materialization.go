@@ -71,6 +71,10 @@ func buildAppendQuery(asset *pipeline.Asset, query string) ([]string, error) {
 }
 
 func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error) {
+	if err := ansisql.RejectDeleteInsertPredicate(task, "Synapse"); err != nil {
+		return nil, err
+	}
+
 	mat := task.Materialization
 	strategy := pipeline.MaterializationStrategyDeleteInsert
 
