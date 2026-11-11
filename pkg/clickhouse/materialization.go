@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -49,6 +50,10 @@ func buildAppendQuery(asset *pipeline.Asset, query string) ([]string, error) {
 }
 
 func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error) {
+	if err := ansisql.RejectDeleteInsertPredicate(task, "ClickHouse"); err != nil {
+		return nil, err
+	}
+
 	mat := task.Materialization
 	strategy := pipeline.MaterializationStrategyDeleteInsert
 
