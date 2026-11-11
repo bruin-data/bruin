@@ -75,8 +75,8 @@ func existingJobRef(err error) (jobRef, bool) {
 	if i := strings.LastIndex(full, ":"); i >= 0 {
 		ref.projectID, full = full[:i], full[i+1:]
 	}
-	if i := strings.Index(full, "."); i >= 0 {
-		ref.location, full = full[:i], full[i+1:]
+	if location, jobID, found := strings.Cut(full, "."); found {
+		ref.location, full = location, jobID
 	}
 	ref.jobID = full
 	if ref.jobID == "" {
