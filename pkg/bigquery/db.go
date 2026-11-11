@@ -979,6 +979,11 @@ func (d *Client) IsMaterializationTypeMismatch(ctx context.Context, meta *bigque
 }
 
 func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	// Assets without a materialization manage their own objects.
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+
 	tableRef, err := d.getTableRef(ctx, tableName)
 	if err != nil {
 		return err

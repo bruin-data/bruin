@@ -3135,6 +3135,7 @@ func TestClient_DropTableOnMismatch_TableFormat(t *testing.T) {
 		existing     string
 		strategy     pipeline.MaterializationStrategy
 		format       pipeline.MaterializationTableFormat
+		unmanaged    bool
 		wantDeletion bool
 	}{
 		{
@@ -3167,6 +3168,16 @@ func TestClient_DropTableOnMismatch_TableFormat(t *testing.T) {
 			existing: `{"type": "VIEW"}`,
 			strategy: pipeline.MaterializationStrategyDDL,
 		},
+		{
+			name:      "partitioned table for an asset without a materialization",
+			existing:  `{"type": "TABLE", "timePartitioning": {"type": "DAY", "field": "dt"}}`,
+			unmanaged: true,
+		},
+		{
+			name:      "Iceberg table for an asset without a materialization",
+			existing:  icebergTable,
+			unmanaged: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -3196,15 +3207,20 @@ func TestClient_DropTableOnMismatch_TableFormat(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			d := Client{client: client, config: &Config{ProjectID: testProjectID}}
-			err = d.DropTableOnMismatch(t.Context(), "dataset.table", &pipeline.Asset{
+			asset := &pipeline.Asset{
 				Name: "dataset.table",
 				Materialization: pipeline.Materialization{
 					Type:        pipeline.MaterializationTypeTable,
 					Strategy:    tt.strategy,
 					TableFormat: tt.format,
 				},
-			})
+			}
+			if tt.unmanaged {
+				asset.Materialization = pipeline.Materialization{}
+			}
+
+			d := Client{client: client, config: &Config{ProjectID: testProjectID}}
+			err = d.DropTableOnMismatch(t.Context(), "dataset.table", asset)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantDeletion, deleted.Load())
 		})
