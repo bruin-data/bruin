@@ -25,6 +25,7 @@ type actAsStatus struct {
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	Expired     bool       `json:"expired,omitempty"`
 	Permissions []string   `json:"permissions,omitempty"`
+	Warning     string     `json:"warning,omitempty"`
 }
 
 func CloudActAs() *cli.Command {
@@ -70,7 +71,7 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 			return err
 		}
 		if output == "json" {
-			return printActAsJSON(nil, nil)
+			return printActAsJSON(nil, nil, "")
 		}
 		if session == nil {
 			fmt.Println("Not acting as an agent.")
@@ -91,11 +92,15 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 		if err := store.SaveActAs(*session, current); err != nil {
 			return err
 		}
+		warning := ""
 		if os.Getenv("BRUIN_CLOUD_API_KEY") != "" {
-			printWarningForOutput(output, "BRUIN_CLOUD_API_KEY is set and takes precedence over acting as the agent.")
+			warning = "BRUIN_CLOUD_API_KEY is set and takes precedence over acting as the agent."
 		}
 		if output == "json" {
-			return printActAsJSON(session, permissions)
+			return printActAsJSON(session, permissions, warning)
+		}
+		if warning != "" {
+			printWarningForOutput(output, warning)
 		}
 		fmt.Printf("Acting as agent %s on team %s until %s. Cloud commands now use the agent's permissions: %s. Run 'bruin cloud act-as --stop' to go back.\n", actAsLabel(session), session.Team, actAsClock(session.ExpiresAt), strings.Join(permissions, ", "))
 	default:
@@ -104,7 +109,7 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 			return err
 		}
 		if output == "json" {
-			return printActAsJSON(session, nil)
+			return printActAsJSON(session, nil, "")
 		}
 		switch {
 		case session == nil:
@@ -118,10 +123,10 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 	return nil
 }
 
-func printActAsJSON(session *cloudauth.ActAsSession, permissions []string) error {
-	status := actAsStatus{}
+func printActAsJSON(session *cloudauth.ActAsSession, permissions []string, warning string) error {
+	status := actAsStatus{Warning: warning}
 	if session != nil {
-		status = actAsStatus{Active: true, AgentID: session.AgentID, AgentName: session.AgentName, Team: session.Team, ExpiresAt: &session.ExpiresAt, Expired: time.Now().After(session.ExpiresAt), Permissions: permissions}
+		status = actAsStatus{Active: true, AgentID: session.AgentID, AgentName: session.AgentName, Team: session.Team, ExpiresAt: &session.ExpiresAt, Expired: time.Now().After(session.ExpiresAt), Permissions: permissions, Warning: warning}
 	}
 	data, err := json.MarshalIndent(status, "", "  ")
 	if err != nil {

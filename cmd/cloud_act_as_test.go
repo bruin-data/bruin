@@ -210,6 +210,12 @@ func TestActAsStartWarnsWhenAPIKeyIsSet(t *testing.T) { //nolint:paralleltest //
 	output, err := runActAsCLI(t, store, "--agent-id", "12")
 	require.NoError(t, err)
 	assert.Contains(t, output, "BRUIN_CLOUD_API_KEY is set and takes precedence over acting as the agent.")
+
+	output, err = runActAsCLI(t, store, "--agent-id", "12", "--output", "json")
+	require.NoError(t, err)
+	var status actAsStatus
+	require.NoError(t, json.Unmarshal([]byte(output), &status), "JSON output must be one document")
+	assert.Equal(t, "BRUIN_CLOUD_API_KEY is set and takes precedence over acting as the agent.", status.Warning)
 }
 
 //nolint:paralleltest // uses t.Chdir/t.Setenv
