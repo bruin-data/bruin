@@ -1709,7 +1709,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}
 	}
 
-	opts = append(opts, pipeline.WithMutate())
+	opts = append(opts, pipeline.WithMutate(), pipeline.WithGitMetadata())
 	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		errorPrinter.Println("Failed to build pipeline: ", err.Error())
@@ -1765,6 +1765,10 @@ func buildStandalonePythonPipeline(ctx context.Context, inputPath string) (*pipe
 			Path: filepath.Join(scriptDir, "pipeline.yml"),
 		},
 		MacrosPath: filepath.Join(scriptDir, "macros"),
+	}
+	// Set before mutation so rendered parameters see commit_hash; left empty when HEAD is unavailable.
+	if commit, commitErr := git.CurrentCommit(scriptDir); commitErr == nil {
+		pl.Commit = commit
 	}
 
 	pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)

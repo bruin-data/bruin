@@ -228,7 +228,7 @@ The following environment variables are available in every Python asset executio
 | `BRUIN_PIPELINE`        | The name of the pipeline being executed                                                                           |
 | `BRUIN_ENVIRONMENT`     | The name of the selected environment for the run (e.g. `default`)                                                |
 | `BRUIN_FULL_REFRESH`    | Set to `1` when the run uses `--full-refresh` or the asset sets `parameters.full_refresh: true`, empty otherwise |
-| `BRUIN_COMMIT_HASH`    | The current git commit hash (`git rev-parse HEAD`) of the repository containing the pipeline                     |
+| `BRUIN_COMMIT_HASH`    | The current git commit hash (`git rev-parse HEAD`) of the repository containing the pipeline. Empty when the commit cannot be determined, e.g. a repository with no commits yet |
 | `BRUIN_ASSET`            | The name of the current Python asset (alias for `BRUIN_THIS`)                                                      |
 | `BRUIN_THIS`             | The name of the current Python asset                                                                              |
 | `BRUIN_CONNECTION`       | The connection name configured for the asset (only set if the asset has a `connection` defined)                   |

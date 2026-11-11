@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -601,6 +603,53 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	}
 	assert.Equal(t, "git-metadata", pipeline.LegacyID)
 	assert.Equal(t, commit, pipeline.Commit)
+}
+
+func Test_Builder_GitMetadataIsSetBeforeAssetMutators(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "pipeline.yml"), []byte("name: commit-mutator\n"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, "assets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "assets", "probe.sql"), []byte("/* @bruin\nname: probe\ntype: duckdb.sql\n@bruin */\nselect 1\n"), 0o644))
+
+	runGit := func(args ...string) string {
+		t.Helper()
+		gitCmd := exec.CommandContext(t.Context(), "git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+		gitCmd.Dir = repoRoot
+		out, err := gitCmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		return strings.TrimSpace(string(out))
+	}
+	runGit("init", "-q")
+
+	newBuilder := func(seen *string) *pipeline.Builder {
+		b := pipeline.NewBuilder(pipeline.BuilderConfig{
+			PipelineFileName:    []string{"pipeline.yml"},
+			TasksDirectoryNames: []string{"assets"},
+		}, pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs()), pipeline.CreateTaskFromFileComments(afero.NewOsFs()), afero.NewOsFs(), nil, nil)
+		b.AddAssetMutator(func(_ context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
+			*seen = p.Commit
+			return a, nil
+		})
+		return b
+	}
+
+	// No commits yet: HEAD cannot be resolved, which must not fail the build.
+	var seen string
+	p, err := newBuilder(&seen).CreatePipelineFromPath(t.Context(), repoRoot, pipeline.WithMutate(), pipeline.WithGitMetadata())
+	require.NoError(t, err)
+	assert.Empty(t, p.Commit)
+
+	runGit("add", ".")
+	runGit("commit", "-q", "-m", "init")
+	head := runGit("rev-parse", "HEAD")
+
+	p, err = newBuilder(&seen).CreatePipelineFromPath(t.Context(), repoRoot, pipeline.WithMutate(), pipeline.WithGitMetadata())
+	require.NoError(t, err)
+	require.Len(t, p.Assets, 1)
+	assert.Equal(t, head, p.Commit)
+	assert.Equal(t, head, seen, "asset mutators must see the commit")
 }
 
 func Test_pipelineBuilder_DoesNotLoadPipelineSemanticModels(t *testing.T) {
