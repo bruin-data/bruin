@@ -212,8 +212,9 @@ func TestCachedSecretBackend_GetConnectionsConfig(t *testing.T) {
 		require.Equal(t, "a-generic", connections.Generic[0].Name)
 		require.Len(t, connections.Postgres, 1)
 		require.Equal(t, "b-postgres", connections.Postgres[0].Name)
-		require.Len(t, log.warns, 1)
-		require.Contains(t, log.warns[0], "unrelated")
+		require.Empty(t, log.warns)
+		require.Len(t, log.debugs, 1)
+		require.Contains(t, log.debugs[0], "unrelated")
 	})
 
 	t.Run("skips secrets deleted after listing", func(t *testing.T) {

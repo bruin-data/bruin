@@ -153,7 +153,8 @@ func (b *cachedSecretBackend) GetConnectionsConfig() (*config.Connections, error
 				b.logger.Debugf("%v", err)
 				continue
 			case errors.As(err, &formatErr):
-				b.logger.Warnf("skipping secret for connection '%s': %v", name, formatErr.err)
+				// Debug, not warn: logs go to stdout and would corrupt `connections list -o json`.
+				b.logger.Debugf("skipping secret for connection '%s': %v", name, formatErr.err)
 				continue
 			}
 			return nil, err

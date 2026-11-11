@@ -23,10 +23,10 @@ const defaultAzureRequestTimeout = 30 * time.Second
 
 // azureKeyVaultHostSuffixes are the Key Vault DNS suffixes of the public and sovereign Azure clouds.
 var azureKeyVaultHostSuffixes = []string{
-	".vault.azure.net",          // Azure public cloud
-	".vault.azure.cn",           // Azure China (21Vianet)
-	".vault.usgovcloudapi.net",  // Azure US Government
-	".vault.microsoftazure.de",  // Azure Germany
+	".vault.azure.net",         // Azure public cloud
+	".vault.azure.cn",          // Azure China (21Vianet)
+	".vault.usgovcloudapi.net", // Azure US Government
+	".vault.microsoftazure.de", // Azure Germany
 }
 
 var (
