@@ -699,7 +699,7 @@ materialization:
 | `strategy` | String | How Bruin loads a table. One of the [strategies](#strategies). **Default:** `create+replace`. |
 | `incremental_key` | String | Column used to decide which rows to replace or how to version them. Required by `delete+insert`, `time_interval`, and `scd2_by_time`; optional for `scd2_by_column`. Setting it with any other explicit `strategy` is a validation error. |
 | `time_granularity` | `date` \| `timestamp` | Whether the `time_interval` window is applied to a `DATE` or a `TIMESTAMP` column. Required by `time_interval`. |
-| `incremental_predicate` | String | Extra SQL condition that limits which destination rows a `merge` considers, or which rows a `delete+insert` deletes on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL. Valid with `merge`, and with `delete+insert` on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL. See [`incremental_predicate`](#incremental-predicate). |
+| `incremental_predicate` | String | Extra SQL condition that limits which destination rows a `merge` considers, or which rows a `delete+insert` deletes on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle. Valid with `merge`, and with `delete+insert` on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle. See [`incremental_predicate`](#incremental-predicate). |
 | `partition_by` | String | Column or expression used to partition the table. See [Partitioning and clustering](#partitioning-and-clustering). |
 | `cluster_by` | String[] | Columns used to cluster or sort the table. See [Partitioning and clustering](#partitioning-and-clustering). |
 | `table_format` | `iceberg` | Creates the table as an Iceberg table instead of a native table. Only supported for `sf.sql` and `bq.sql` assets with `type: table`; as a pipeline default, other assets ignore it. See [Snowflake Iceberg tables](../platforms/snowflake.md#iceberg-tables) and [BigQuery Iceberg tables](../platforms/bigquery.md#iceberg-tables). |
@@ -944,7 +944,7 @@ Some platforms do this differently. See [platform notes](#platform-notes).
 
 - Only keys present in the new result are touched. If the result contains no rows for `2024-03-01`, the existing rows for that date stay.
 - Because the batch is deleted and reinserted, rows that disappeared from the source within a batch are removed from the target. `merge` cannot do that.
-- On DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL, `incremental_predicate` narrows the delete. See [`incremental_predicate` with `delete+insert`](#incremental-predicate-delete-insert).
+- On DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle, `incremental_predicate` narrows the delete. See [`incremental_predicate` with `delete+insert`](#incremental-predicate-delete-insert).
 - On Fabric, `delete+insert` matches on the primary key columns. `incremental_key` is still required by validation but is not used.
 
 #### `merge`
@@ -1082,9 +1082,9 @@ In one BigQuery benchmark, merging a 5,000-row source into a 1.8-million-row des
 - On ClickHouse, the predicate is added to the `DELETE` that removes matched rows, so it must reference the target's columns directly, without the `target.` or `source.` aliases.
 - Redshift and Fabric reject it. Redshift's `MERGE` only accepts equality predicates in its match condition. StarRocks ignores it, and Python and ingestr assets fail validation.
 
-###### With `delete+insert` on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL {#incremental-predicate-delete-insert}
+###### With `delete+insert` on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle {#incremental-predicate-delete-insert}
 
-On DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL, `incremental_predicate` also works with `delete+insert`. Bruin adds it to the `DELETE` that removes the batch, so the delete only removes target rows that match both the key and the predicate. When the key's values are spread across the table, as a random load ID is, the database can't skip files, row groups or partitions on the key alone. A predicate on the table's partition or sort columns lets it skip them.
+On DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle, `incremental_predicate` also works with `delete+insert`. Bruin adds it to the `DELETE` that removes the batch, so the delete only removes target rows that match both the key and the predicate. When the key's values are spread across the table, as a random load ID is, the database can't skip files, row groups or partitions on the key alone. A predicate on the table's partition or sort columns lets it skip them.
 
 The target table is aliased as `target`, and unqualified columns also refer to it. The staged query result has a generated name, so the predicate can't reference it.
 
@@ -1661,7 +1661,7 @@ For `merge`:
 For `delete+insert`:
 
 - **ClickHouse** requires exactly one `primary_key` column.
-- **DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL** add `incremental_predicate` to the delete when it is set. See [`incremental_predicate` with `delete+insert`](#incremental-predicate-delete-insert).
+- **DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle** add `incremental_predicate` to the delete when it is set. See [`incremental_predicate` with `delete+insert`](#incremental-predicate-delete-insert).
 - **Redshift** rejects `incremental_predicate`, because its `DELETE` cannot alias the target table.
 - **Fabric** matches on the primary key columns and does not use `incremental_key`.
 - **Doris and StarRocks** build a new table from the remaining and new rows and swap it in. The new table does not keep your partitioning or distribution.

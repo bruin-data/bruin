@@ -135,6 +135,27 @@ SELECT 1 as dt
 END;`,
 		},
 		{
+			name: "delete+insert adds the incremental predicate to the delete",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "batch_id",
+					IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+				},
+			},
+			query: "SELECT 1 as batch_id",
+			want: `BEGIN
+   DELETE FROM my.asset target WHERE EXISTS (
+      SELECT 1 FROM (SELECT 1 as batch_id) s WHERE s.batch_id = target.batch_id
+   ) AND (target.dt >= DATE '2026-07-01');
+   INSERT INTO my.asset
+SELECT 1 as batch_id
+;
+END;`,
+		},
+		{
 			name: "merge without columns",
 			task: &pipeline.Asset{
 				Name: "my.asset",
