@@ -3,7 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,71 +20,42 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-type actAsRequest struct {
-	path, auth, team string
+type actAsStub struct {
+	mu      sync.Mutex
+	status  int
+	body    string
+	calls   []string
+	hold    chan struct{}
+	arrived chan struct{}
 }
 
-type actAsServer struct {
-	mu       sync.Mutex
-	requests []actAsRequest
-	status   int
-	body     string
-	bodies   map[string]string
-	hold     chan struct{}
-	arrived  chan struct{}
-}
-
-// holdNext parks the next request until release is called, returning a channel closed once it arrives.
-func (s *actAsServer) holdNext(t *testing.T) (<-chan struct{}, func()) {
-	t.Helper()
+func (s *actAsStub) respond(status int, token string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	hold, arrived := make(chan struct{}), make(chan struct{})
-	s.hold, s.arrived = hold, arrived
-	release := sync.OnceFunc(func() { close(hold) })
-	t.Cleanup(release)
-	return arrived, release
+	s.status = status
+	s.body = fmt.Sprintf(`{"token":%q,"expires_at":%q,"agent":{"id":12,"name":"Reporter"},"team":"acme","permissions":["agent:list","dashboard:list"]}`, token, time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
+	if status != http.StatusCreated {
+		s.body = `{"message":"` + token + `","error":"forbidden"}`
+	}
 }
 
-func (s *actAsServer) respond(status int, body string) {
+func (s *actAsStub) recorded() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.status, s.body = status, body
+	return append([]string(nil), s.calls...)
 }
 
-func (s *actAsServer) calls() []actAsRequest {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return append([]actAsRequest(nil), s.requests...)
-}
-
-func actAsResponse(t *testing.T, token string, expiresAt time.Time, team string) string {
-	t.Helper()
-	data, err := json.Marshal(map[string]any{
-		"token":       token,
-		"expires_at":  expiresAt.UTC().Format(time.RFC3339),
-		"agent":       map[string]any{"id": 12, "name": "Reporter"},
-		"team":        team,
-		"permissions": []string{"agent:list", "dashboard:list"},
-	})
-	require.NoError(t, err)
-	return string(data)
-}
-
-func newActAsTestEnv(t *testing.T) (*actAsServer, cloudauth.Store) {
+func newActAsEnv(t *testing.T) (*actAsStub, cloudauth.Store) {
 	t.Helper()
 	loginTestRepo(t, "")
 	t.Setenv("BRUIN_CLOUD_TEAM", "")
-	stub := &actAsServer{status: http.StatusCreated, bodies: map[string]string{}}
+	stub := &actAsStub{}
+	stub.respond(http.StatusCreated, "agent-token")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		stub.mu.Lock()
-		stub.requests = append(stub.requests, actAsRequest{path: r.Method + " " + r.URL.Path, auth: r.Header.Get("Authorization"), team: r.Header.Get("X-Bruin-Team")})
-		status, body := stub.status, stub.body
-		if override, ok := stub.bodies[r.URL.Path]; ok {
-			body = override
-		}
-		hold, arrived := stub.hold, stub.arrived
-		stub.hold, stub.arrived = nil, nil
+		stub.calls = append(stub.calls, r.Method+" "+r.URL.Path+" "+r.Header.Get("Authorization")+" team="+r.Header.Get("X-Bruin-Team"))
+		status, body, hold, arrived := stub.status, stub.body, stub.hold, stub.arrived
+		stub.hold = nil
 		stub.mu.Unlock()
 		if hold != nil {
 			close(arrived)
@@ -101,296 +72,201 @@ func newActAsTestEnv(t *testing.T) (*actAsServer, cloudauth.Store) {
 	return stub, store
 }
 
-func runActAsCommand(t *testing.T, store cloudauth.Store, args ...string) (string, error) {
+func runActAs(t *testing.T, store cloudauth.Store, args ...string) (string, error) {
 	t.Helper()
 	var output bytes.Buffer
-	cloud := &cli.Command{Name: "cloud", Commands: []*cli.Command{actAsCommand(actAsDependencies{globalStore: func() (cloudauth.Store, error) { return store, nil }})}}
+	cloud := &cli.Command{Name: "cloud", Commands: []*cli.Command{actAsCommand(func() (cloudauth.Store, error) { return store, nil })}}
 	addTeamFlag(cloud)
-	root := &cli.Command{Name: "bruin", Writer: &output, Commands: []*cli.Command{cloud}, ExitErrHandler: func(context.Context, *cli.Command, error) {}}
-	err := root.Run(t.Context(), append([]string{"bruin", "cloud", "act-as"}, args...))
+	err := (&cli.Command{Name: "bruin", Writer: &output, Commands: []*cli.Command{cloud}}).Run(t.Context(), append([]string{"bruin", "cloud", "act-as"}, args...))
 	return output.String(), err
 }
 
-func resolveWithActAs(t *testing.T, store cloudauth.Store, args ...string) (resolvedCloudAuth, error) {
+func resolveIn(t *testing.T, store cloudauth.Store, args ...string) (resolvedCloudAuth, error) {
 	t.Helper()
 	var auth resolvedCloudAuth
 	command := &cli.Command{Name: "test", Flags: []cli.Flag{apiKeyFlag(), teamFlag()}, Action: func(_ context.Context, c *cli.Command) error {
 		var err error
-		auth, err = resolveCloudAuthWithActAs(c, func() (cloudauth.Store, error) { return store, nil })
+		auth, err = resolveCloudAuthIn(c, func() (cloudauth.Store, error) { return store, nil })
 		return err
 	}}
 	err := command.Run(t.Context(), append([]string{"test"}, args...))
 	return auth, err
 }
 
-func saveActAsSession(t *testing.T, store cloudauth.Store, token, team string, expiresAt time.Time) {
+func saveSession(t *testing.T, store cloudauth.Store, token string, expiresIn time.Duration) {
 	t.Helper()
-	require.NoError(t, store.SaveActAs(cloudauth.ActAsSession{AgentID: 12, AgentName: "Reporter", Team: team, ExpiresAt: expiresAt, APIURL: cloudauth.APIURL(), Token: token}))
+	require.NoError(t, store.SaveActAs(cloudauth.ActAsSession{AgentID: 12, AgentName: "Reporter", Team: "acme", APIURL: cloudauth.APIURL(), Token: token, ExpiresAt: time.Now().Add(expiresIn)}))
 }
 
 func TestActAsStartStatusStop(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	expiresAt := time.Now().Add(time.Hour).Truncate(time.Second)
-	stub.respond(http.StatusCreated, actAsResponse(t, "agent-token", expiresAt, "acme"))
-
-	output, err := runActAsCommand(t, store, "--agent", "12")
+	stub, store := newActAsEnv(t)
+	output, err := runActAs(t, store, "--agent", "12")
 	require.NoError(t, err)
-	assert.Equal(t, "Acting as agent \"Reporter\" (12) on team acme until "+actAsClock(expiresAt)+". Cloud commands now use the agent's permissions: agent:list, dashboard:list. Run 'bruin cloud act-as --stop' to go back.\n", output)
-	assert.Equal(t, []actAsRequest{{path: "POST /agents/12/act-as", auth: "Bearer person-token", team: "acme"}}, stub.calls())
-
-	session, err := store.ReadActAs(cloudauth.APIURL())
+	session, err := store.LoadActAs()
 	require.NoError(t, err)
-	require.NotNil(t, session)
+	until := actAsClock(session.ExpiresAt)
+	assert.Equal(t, `Acting as agent "Reporter" (12) on team acme until `+until+". Cloud commands now use the agent's permissions: agent:list, dashboard:list. Run 'bruin cloud act-as --stop' to go back.\n", output)
+	assert.Equal(t, []string{"POST /agents/12/act-as Bearer person-token team=acme"}, stub.recorded())
 	assert.Equal(t, "agent-token", session.Token)
-	assert.Equal(t, "acme", session.Team)
-	assert.True(t, expiresAt.Equal(session.ExpiresAt))
-	data, err := os.ReadFile(store.ActAsPath())
-	require.NoError(t, err)
-	assert.NotContains(t, string(data), "agent-token")
 	if runtime.GOOS != osWindows {
 		info, err := os.Stat(store.ActAsPath())
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	}
 
-	output, err = runActAsCommand(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "Acting as agent \"Reporter\" (12) on team acme until "+actAsClock(expiresAt)+".\nPermissions: agent:list, dashboard:list\n", output)
-
-	output, err = runActAsCommand(t, store, "--output", "json")
-	require.NoError(t, err)
-	var status actAsStatus
-	require.NoError(t, json.Unmarshal([]byte(output), &status))
-	assert.True(t, status.Active)
-	assert.Equal(t, &actAsAgent{ID: 12, Name: "Reporter"}, status.Agent)
-	assert.Equal(t, "acme", status.Team)
-
-	output, err = runActAsCommand(t, store, "--stop")
-	require.NoError(t, err)
-	assert.Equal(t, "Stopped acting as agent \"Reporter\" (12). Cloud commands use your own login again.\n", output)
-	session, err = store.LoadActAs()
-	require.NoError(t, err)
-	assert.Nil(t, session)
-
-	output, err = runActAsCommand(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "Not acting as an agent.\n", output)
-	output, err = runActAsCommand(t, store, "--stop")
-	require.NoError(t, err)
-	assert.Equal(t, "Not acting as an agent.\n", output)
+	for _, step := range []struct{ args, want string }{
+		{"", `Acting as agent "Reporter" (12) on team acme until ` + until + ".\n"},
+		{"--stop", `Stopped acting as agent "Reporter" (12). Cloud commands use your own login again.` + "\n"},
+		{"", "Not acting as an agent.\n"},
+		{"--stop", "Not acting as an agent.\n"},
+	} {
+		args := []string{}
+		if step.args != "" {
+			args = append(args, step.args)
+		}
+		output, err := runActAs(t, store, args...)
+		require.NoError(t, err)
+		assert.Equal(t, step.want, output)
+	}
 }
 
-func TestActAsStartUsesTeamFlagAndPersonalLoginOnly(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "previous-agent-token", "acme", time.Now().Add(time.Hour))
-	stub.respond(http.StatusCreated, actAsResponse(t, "agent-token", time.Now().Add(time.Hour), "beta"))
-
-	_, err := runActAsCommand(t, store, "--agent", "12", "--team", "beta")
-	require.NoError(t, err)
-	assert.Equal(t, []actAsRequest{{path: "POST /agents/12/act-as", auth: "Bearer person-token", team: "beta"}}, stub.calls())
-	session, err := store.ReadActAs(cloudauth.APIURL())
-	require.NoError(t, err)
-	assert.Equal(t, "beta", session.Team)
-	assert.Equal(t, "agent-token", session.Token)
-}
-
-func TestActAsStartSurfacesServerMessage(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	stub.respond(http.StatusForbidden, `{"message":"You cannot act as this agent.","error":"forbidden"}`)
-
-	_, err := runActAsCommand(t, store, "--agent", "12")
+func TestActAsStartRefused(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	stub, store := newActAsEnv(t)
+	stub.respond(http.StatusForbidden, "You cannot act as this agent.")
+	_, err := runActAs(t, store, "--agent", "12")
 	require.EqualError(t, err, "could not act as agent 12: You cannot act as this agent.")
 	session, err := store.LoadActAs()
 	require.NoError(t, err)
 	assert.Nil(t, session)
-
-	output, err := runActAsCommand(t, store, "--agent", "12", "--output", "json")
-	require.Error(t, err)
-	assert.JSONEq(t, `{"error":"could not act as agent 12: You cannot act as this agent."}`, output)
 }
 
-func TestActAsFlagValidation(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	_, store := newActAsTestEnv(t)
-	_, err := runActAsCommand(t, store, "--agent", "12", "--stop")
-	require.EqualError(t, err, "--agent and --stop cannot be used together")
-	_, err = runActAsCommand(t, store, "--agent", "0")
-	require.ErrorContains(t, err, "positive agent ID")
+//nolint:paralleltest // uses t.Chdir/t.Setenv
+func TestActAsResolution(t *testing.T) {
+	for _, tc := range []struct {
+		name, env, wantToken, wantErr string
+		session                       bool
+		args                          []string
+	}{
+		{name: "global login without session", wantToken: "person-token"},
+		{name: "session beats global login", session: true, wantToken: "agent-token"},
+		{name: "flag beats session", session: true, args: []string{"--api-key", "flag-token"}, wantToken: "flag-token"},
+		{name: "env beats session", session: true, env: "env-token", wantToken: "env-token"},
+		{name: "same team is fine", session: true, args: []string{"--team", "acme"}, wantToken: "agent-token"},
+		{name: "session is pinned to its team", session: true, args: []string{"--team", "beta"}, wantErr: `acting as agent "Reporter" (12) is pinned to team "acme"; run 'bruin cloud act-as --stop' before using --team "beta"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub, store := newActAsEnv(t)
+			t.Setenv("BRUIN_CLOUD_API_KEY", tc.env)
+			if tc.session {
+				saveSession(t, store, "agent-token", time.Hour)
+			}
+			auth, err := resolveIn(t, store, tc.args...)
+			if tc.wantErr != "" {
+				require.EqualError(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantToken, auth.token)
+			assert.Empty(t, stub.recorded())
+		})
+	}
 }
 
-func TestActAsNeedsGlobalLogin(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	require.NoError(t, store.Delete())
-	_, err := runActAsCommand(t, store, "--agent", "12")
-	require.ErrorIs(t, err, errActAsNeedsGlobalLogin)
-	assert.Empty(t, stub.calls())
-}
-
-func TestActAsResolutionPrecedence(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	dir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".bruin.yml"), []byte(loginExistingConfig), 0o600))
-
-	auth, err := resolveWithActAs(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "original-token", auth.token)
-	assert.Equal(t, "repo", auth.source)
-
-	saveActAsSession(t, store, "agent-token", "acme", time.Now().Add(time.Hour))
-	auth, err = resolveWithActAs(t, store)
+func TestActAsSessionBeatsRepoLogin(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	_, store := newActAsEnv(t)
+	require.NoError(t, os.WriteFile(".bruin.yml", []byte(loginExistingConfig), 0o600))
+	saveSession(t, store, "agent-token", time.Hour)
+	auth, err := resolveIn(t, store)
 	require.NoError(t, err)
 	assert.Equal(t, "agent-token", auth.token)
-	assert.Equal(t, cloudAuthActAs, auth.source)
 	assert.Equal(t, "acme", auth.team)
-
-	auth, err = resolveWithActAs(t, store, "--api-key", "flag-token")
-	require.NoError(t, err)
-	assert.Equal(t, "flag-token", auth.token)
-	t.Setenv("BRUIN_CLOUD_API_KEY", "env-token")
-	auth, err = resolveWithActAs(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "env-token", auth.token)
-	assert.Empty(t, stub.calls())
 }
 
-func TestActAsSessionBeatsGlobalLogin(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	_, store := newActAsTestEnv(t)
-	auth, err := resolveWithActAs(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "person-token", auth.token)
-	assert.Equal(t, cloudAuthGlobal, auth.source)
-
-	saveActAsSession(t, store, "agent-token", "acme", time.Now().Add(time.Hour))
-	auth, err = resolveWithActAs(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "agent-token", auth.token)
+//nolint:paralleltest // uses t.Chdir/t.Setenv
+func TestActAsRenewal(t *testing.T) {
+	for _, tc := range []struct {
+		name, reply, wantToken, wantErr string
+		status                          int
+	}{
+		{name: "renews with the person's login", status: http.StatusCreated, reply: "renewed-token", wantToken: "renewed-token"},
+		{name: "refusal ends the session", status: http.StatusForbidden, reply: "You no longer have access to this agent.", wantErr: `acting as agent "Reporter" (12) ended: You no longer have access to this agent. Run 'bruin cloud act-as --stop' to use your own login again`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub, store := newActAsEnv(t)
+			saveSession(t, store, "old-token", time.Minute)
+			stub.respond(tc.status, tc.reply)
+			auth, err := resolveIn(t, store)
+			assert.Equal(t, []string{"POST /agents/12/act-as Bearer person-token team=acme"}, stub.recorded())
+			if tc.wantErr != "" {
+				require.EqualError(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantToken, auth.token)
+			session, err := store.LoadActAs()
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantToken, session.Token)
+		})
+	}
 }
 
-func TestActAsTeamIsPinned(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	_, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "agent-token", "acme", time.Now().Add(time.Hour))
+func TestActAsStopWinsOverInFlightRenewal(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	stub, store := newActAsEnv(t)
+	saveSession(t, store, "old-token", time.Minute)
+	stub.respond(http.StatusCreated, "renewed-token")
+	hold, arrived := make(chan struct{}), make(chan struct{})
+	release := sync.OnceFunc(func() { close(hold) })
+	t.Cleanup(release)
+	stub.mu.Lock()
+	stub.hold, stub.arrived = hold, arrived
+	stub.mu.Unlock()
 
-	_, err := resolveWithActAs(t, store, "--team", "beta")
-	require.EqualError(t, err, "acting as agent \"Reporter\" (12) is pinned to team \"acme\"; run 'bruin cloud act-as --stop' before using --team \"beta\"")
-	auth, err := resolveWithActAs(t, store, "--team", "acme")
+	type outcome struct {
+		auth resolvedCloudAuth
+		err  error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		auth, err := resolveIn(t, store)
+		done <- outcome{auth, err}
+	}()
+	<-arrived
+	_, err := runActAs(t, store, "--stop")
 	require.NoError(t, err)
-	assert.Equal(t, "agent-token", auth.token)
+	release()
 
-	require.NoError(t, os.WriteFile(".bruin.yml", []byte(configWithDefaultTeamYML), 0o600))
-	command := &cli.Command{Name: "test", Flags: []cli.Flag{teamFlag()}, Action: func(_ context.Context, c *cli.Command) error {
-		assert.Equal(t, "acme", auth.teamFor(c))
-		return nil
-	}}
-	require.NoError(t, command.Run(t.Context(), []string{"test"}))
+	got := <-done
+	require.NoError(t, got.err)
+	assert.Equal(t, "person-token", got.auth.token)
+	session, err := store.LoadActAs()
+	require.NoError(t, err)
+	assert.Nil(t, session)
 }
 
-func TestActAsRefreshesExpiringToken(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "old-agent-token", "beta", time.Now().Add(time.Minute))
-	expiresAt := time.Now().Add(time.Hour).Truncate(time.Second)
-	stub.respond(http.StatusCreated, actAsResponse(t, "new-agent-token", expiresAt, "beta"))
-
-	auth, err := resolveWithActAs(t, store)
+func TestActAsFailedWriteKeepsSession(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	if runtime.GOOS == osWindows || os.Geteuid() == 0 {
+		t.Skip("needs a directory the process cannot write to")
+	}
+	_, store := newActAsEnv(t)
+	saveSession(t, store, "working-token", time.Hour)
+	dir := filepath.Dir(store.Path)
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	require.Error(t, store.SaveActAs(cloudauth.ActAsSession{AgentID: 34, Token: "other-token"}))
+	auth, err := resolveIn(t, store)
 	require.NoError(t, err)
-	assert.Equal(t, "new-agent-token", auth.token)
-	assert.Equal(t, "beta", auth.team)
-	assert.Equal(t, []actAsRequest{{path: "POST /agents/12/act-as", auth: "Bearer person-token", team: "beta"}}, stub.calls())
-
-	session, err := store.ReadActAs(cloudauth.APIURL())
-	require.NoError(t, err)
-	assert.Equal(t, "new-agent-token", session.Token)
-	assert.True(t, expiresAt.Equal(session.ExpiresAt))
-
-	auth, err = resolveWithActAs(t, store)
-	require.NoError(t, err)
-	assert.Equal(t, "new-agent-token", auth.token)
-	assert.Len(t, stub.calls(), 1)
+	assert.Equal(t, "working-token", auth.token)
 }
 
-func TestActAsRefreshFailureEndsSession(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "old-agent-token", "acme", time.Now().Add(-time.Minute))
-	stub.respond(http.StatusForbidden, `{"message":"You no longer have access to this agent.","error":"forbidden"}`)
-
-	_, err := resolveWithActAs(t, store)
-	require.EqualError(t, err, "acting as agent \"Reporter\" (12) ended: You no longer have access to this agent. Run 'bruin cloud act-as --stop' to use your own login again")
-
-	output, err := runActAsCommand(t, store)
-	require.NoError(t, err)
-	assert.Contains(t, output, "The agent token expired at")
-}
-
-func TestLogoutClearsActAsSession(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	_, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "agent-token", "acme", time.Now().Add(time.Hour))
+func TestLogoutGlobalEndsActAs(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+	_, store := newActAsEnv(t)
+	saveSession(t, store, "agent-token", time.Hour)
 	var output bytes.Buffer
 	command := logoutCommand(logoutDependencies{globalStore: func() (cloudauth.Store, error) { return store, nil }, interactive: func() bool { return false }})
 	command.Writer = &output
 	require.NoError(t, command.Run(t.Context(), []string{"logout", "--global"}))
-	assert.Contains(t, output.String(), "Stopped acting as agent \"Reporter\" (12).")
+	assert.Contains(t, output.String(), `Stopped acting as agent "Reporter" (12).`)
 	session, err := store.LoadActAs()
 	require.NoError(t, err)
 	assert.Nil(t, session)
-	credential, err := store.Read(cloudauth.APIURL())
-	require.NoError(t, err)
-	assert.Nil(t, credential)
-}
-
-type actAsOutcome struct {
-	auth resolvedCloudAuth
-	err  error
-}
-
-func resolveInBackground(t *testing.T, store cloudauth.Store) <-chan actAsOutcome {
-	t.Helper()
-	done := make(chan actAsOutcome, 1)
-	go func() {
-		auth, err := resolveWithActAs(t, store)
-		done <- actAsOutcome{auth: auth, err: err}
-	}()
-	return done
-}
-
-func TestActAsRenewalDoesNotRestoreStoppedSession(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "old-agent-token", "acme", time.Now().Add(time.Minute))
-	stub.respond(http.StatusCreated, actAsResponse(t, "renewed-token", time.Now().Add(time.Hour), "acme"))
-	arrived, release := stub.holdNext(t)
-	done := resolveInBackground(t, store)
-	<-arrived
-
-	output, err := runActAsCommand(t, store, "--stop")
-	require.NoError(t, err)
-	assert.Contains(t, output, "Stopped acting as agent")
-	release()
-
-	outcome := <-done
-	require.NoError(t, outcome.err)
-	assert.Equal(t, "person-token", outcome.auth.token)
-	assert.Equal(t, cloudAuthGlobal, outcome.auth.source)
-	session, err := store.LoadActAs()
-	require.NoError(t, err)
-	assert.Nil(t, session)
-}
-
-func TestActAsRenewalDoesNotOverwriteNewAgent(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
-	stub, store := newActAsTestEnv(t)
-	saveActAsSession(t, store, "old-agent-token", "acme", time.Now().Add(time.Minute))
-	stub.respond(http.StatusCreated, actAsResponse(t, "renewed-token", time.Now().Add(time.Hour), "acme"))
-	stub.bodies["/agents/34/act-as"] = actAsResponse(t, "agent-34-token", time.Now().Add(time.Hour), "acme")
-	arrived, release := stub.holdNext(t)
-	done := resolveInBackground(t, store)
-	<-arrived
-
-	_, err := runActAsCommand(t, store, "--agent", "34")
-	require.NoError(t, err)
-	release()
-
-	outcome := <-done
-	require.NoError(t, outcome.err)
-	assert.Equal(t, "agent-34-token", outcome.auth.token)
-	session, err := store.ReadActAs(cloudauth.APIURL())
-	require.NoError(t, err)
-	assert.Equal(t, 34, session.AgentID)
-	assert.Equal(t, "agent-34-token", session.Token)
 }

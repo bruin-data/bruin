@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/bruin-data/bruin/pkg/cloudauth"
@@ -26,10 +25,11 @@ func CloudAuth() *cli.Command {
 			if auth.connection != "" {
 				_, _ = fmt.Fprintf(writer, "Connection: %s/%s\n", auth.environment, auth.connection)
 			}
-			if auth.actAs != nil {
-				_, _ = fmt.Fprintf(writer, "Acting as agent: %s\n", actAsLabel(auth.actAs))
+			team := resolveTeam(c)
+			if team == "" && auth.source == cloudAuthGlobal {
+				team = auth.team
 			}
-			if team := auth.teamFor(c); team != "" {
+			if team != "" {
 				_, _ = fmt.Fprintf(writer, "Default team: %s\n", team)
 			}
 			_, _ = fmt.Fprintln(writer, "Local credential found. API validity and permissions are checked by Cloud on each request.")
@@ -148,8 +148,10 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 			}
 			_, _ = fmt.Fprintln(output, "Token revoked in Bruin Cloud. Other copies of this token are now invalid.")
 		}
-		if err := stopActAsOnLogout(ctx, store, output); err != nil {
+		if session, err := store.ClearActAs(ctx); err != nil {
 			return err
+		} else if session != nil {
+			_, _ = fmt.Fprintf(output, "Stopped acting as agent %s.\n", actAsLabel(session))
 		}
 		if err := store.Delete(); err != nil {
 			return err
@@ -157,20 +159,4 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 		_, _ = fmt.Fprintln(output, "Global login removed. Repository connections and environment variables are unchanged.")
 		return nil
 	}}
-}
-
-func stopActAsOnLogout(ctx context.Context, store cloudauth.Store, output io.Writer) error {
-	var session *cloudauth.ActAsSession
-	err := store.WithActAsLock(ctx, func() error {
-		var clearErr error
-		session, clearErr = store.ClearActAs()
-		return clearErr
-	})
-	if err != nil {
-		return err
-	}
-	if session != nil {
-		_, _ = fmt.Fprintf(output, "Stopped acting as agent %s.\n", actAsLabel(session))
-	}
-	return nil
 }
