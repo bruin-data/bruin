@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -220,17 +221,15 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 	return client, nil
 }
 
-// applyJobIDPrefix tags the BigQuery job with a "bruin_<type>" prefix so the
-// resulting jobId is recognizable in the BigQuery console / job history.
-// AddJobIDSuffix appends a random suffix so repeated calls (e.g. sensors)
-// don't collide.
-func applyJobIDPrefix(ctx context.Context, bqQuery *bigquery.Query) {
+// applyJobID names the BigQuery job "bruin_<type>-<random>" so it is recognizable in the
+// BigQuery console / job history. We generate the whole ID rather than letting the library
+// add the suffix, so a failed insert can be followed up by looking the job up by its ID.
+func applyJobID(ctx context.Context, bqQuery *bigquery.Query) {
 	queryType := query.QueryTypeFromContext(ctx)
 	if queryType == "" {
 		return
 	}
-	bqQuery.JobID = "bruin_" + queryType
-	bqQuery.AddJobIDSuffix = true
+	bqQuery.JobID = "bruin_" + queryType + "-" + rand.Text()
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
@@ -544,7 +543,7 @@ func (d *Client) queryForExecution(ctx context.Context, queryString string) *big
 	if d.isReadOnly() {
 		bqQuery.Location = d.client.Location
 	} else {
-		applyJobIDPrefix(ctx, bqQuery)
+		applyJobID(ctx, bqQuery)
 	}
 	return bqQuery
 }

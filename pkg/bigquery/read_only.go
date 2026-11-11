@@ -3,14 +3,11 @@ package bigquery
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"strings"
-	"unicode"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/pkg/errors"
 	bigqueryapi "google.golang.org/api/bigquery/v2"
-	"google.golang.org/api/googleapi"
 )
 
 func (d *Client) isReadOnly() bool {
@@ -19,12 +16,15 @@ func (d *Client) isReadOnly() bool {
 
 func (d *Client) startQuery(ctx context.Context, q *bigquery.Query) (*bigquery.Job, *bigquery.RowIterator, error) {
 	if !d.isReadOnly() {
+		started := time.Now()
 		job, err := q.Run(ctx)
-		if id, location, ok := duplicateJob(err, q.JobID); ok {
-			// The client library retries a failed insert with the same job ID. If the first
-			// insert reached BigQuery, the retry gets 409 duplicate although our job exists,
-			// so follow that job instead of failing and running the query again.
-			job, err = d.client.JobFromIDLocation(ctx, id, location)
+		if err != nil && q.JobID != "" {
+			// The library retries a failed insert with the same job ID, so the job can exist even
+			// though Run failed (e.g. the first response was lost and the retry got 409 duplicate).
+			// Follow that job instead of failing and running the query again.
+			if existing, lookupErr := d.existingJob(ctx, q, started); lookupErr == nil {
+				return existing, nil, nil
+			}
 		}
 		return job, nil, err
 	}
@@ -33,6 +33,30 @@ func (d *Client) startQuery(ctx context.Context, q *bigquery.Query) (*bigquery.J
 		return nil, nil, err
 	}
 	return rows.SourceJob(), rows, nil
+}
+
+// existingJob looks up the job q tried to create. A job in a single region can't be fetched
+// without its location, so when none is configured the job is found among the jobs created
+// since the insert started.
+func (d *Client) existingJob(ctx context.Context, q *bigquery.Query, started time.Time) (*bigquery.Job, error) {
+	location := q.Location
+	if location == "" {
+		location = d.client.Location
+	}
+	if location != "" {
+		return d.client.JobFromIDLocation(ctx, q.JobID, location)
+	}
+	it := d.client.Jobs(ctx)
+	it.MinCreationTime = started.Add(-time.Minute) // leeway for clock skew
+	for {
+		job, err := it.Next()
+		if err != nil {
+			return nil, err
+		}
+		if job.ID() == q.JobID {
+			return d.client.JobFromIDLocation(ctx, job.ID(), job.Location())
+		}
+	}
 }
 
 func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.QueryStatistics, error) {
@@ -69,30 +93,4 @@ func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.Quer
 		}
 	}
 	return stats, nil
-}
-
-// duplicateJob returns the job a 409 "Already Exists: Job <project>:<location>.<id>" error
-// refers to, if it is one of ours: the library appends a random suffix to our prefix, and
-// only hands the generated ID back through this message. Anything else, including a message
-// in a format we don't recognize, is left as the original error.
-func duplicateJob(err error, prefix string) (id, location string, ok bool) {
-	var apiErr *googleapi.Error
-	if prefix == "" || !errors.As(err, &apiErr) || apiErr.Code != http.StatusConflict {
-		return "", "", false
-	}
-	const marker = "Already Exists: Job "
-	i := strings.Index(apiErr.Message, marker)
-	if i < 0 {
-		return "", "", false
-	}
-	ref := strings.FieldsFunc(apiErr.Message[i+len(marker):], func(r rune) bool { return r == ',' || unicode.IsSpace(r) })
-	if len(ref) == 0 {
-		return "", "", false
-	}
-	// The project may be domain-scoped ("example.com:project"), so split after its last colon.
-	location, id, found := strings.Cut(ref[0][strings.LastIndex(ref[0], ":")+1:], ".")
-	if !found || location == "" || !strings.HasPrefix(id, prefix+"-") {
-		return "", "", false
-	}
-	return id, location, true
 }

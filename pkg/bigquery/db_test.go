@@ -358,99 +358,135 @@ func TestDB_RunQueryWithoutResultCancelsJobOnContextCancellation(t *testing.T) {
 
 // The client library retries a failed jobs.insert with the same job ID. When the first insert
 // reached BigQuery, the retry gets 409 duplicate; the run should attach to the existing job.
-func TestDB_RunQueryWithoutResultAttachesToDuplicateJob(t *testing.T) {
+func TestDB_RunQueryWithoutResultFollowsJobOfFailedInsert(t *testing.T) {
 	t.Parallel()
 
-	projectID := testProjectID
-	var mu sync.Mutex
-	created := map[string]bool{}
-	var insertedIDs []string
-	lookups := 0
-
-	writeJSON := func(w http.ResponseWriter, status int, v any) {
-		resp, err := json.Marshal(v)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
-		_, _ = w.Write(resp)
+	tests := []struct {
+		name           string
+		clientLocation string
+		// insertLands is false when the insert is rejected and no job is created.
+		insertLands bool
+		wantLists   int
+		wantErr     string
+	}{
+		{name: "location configured, job fetched by ID", clientLocation: "europe-west1", insertLands: true},
+		{name: "no location configured, job found in the job list", insertLands: true, wantLists: 1},
+		{name: "insert rejected, original error kept", clientLocation: "europe-west1", wantErr: "Invalid job configuration"},
 	}
-	job := func(id string) *bigquery2.Job {
-		return &bigquery2.Job{
-			Configuration: &bigquery2.JobConfiguration{
-				Query: &bigquery2.JobConfigurationQuery{
-					Query:            "select * from users",
-					DestinationTable: &bigquery2.TableReference{ProjectId: projectID, DatasetId: "test-dataset"},
-				},
-			},
-			JobReference: &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: "US"},
-			Status:       &bigquery2.JobStatus{State: "DONE"},
-		}
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/projects/"+projectID+"/jobs":
-			var body bigquery2.Job
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			id := body.JobReference.JobId
-			insertedIDs = append(insertedIDs, id)
-			if created[id] {
-				writeJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{
-					"code": 409, "message": "Already Exists: Job " + projectID + ":US." + id,
-					"errors": []map[string]string{{"reason": "duplicate", "message": "Already Exists: Job " + projectID + ":US." + id}},
+			projectID := testProjectID
+			var mu sync.Mutex
+			jobs := map[string]string{} // job ID -> location
+			var insertedIDs []string
+			lists := 0
+
+			writeJSON := func(w http.ResponseWriter, status int, v any) {
+				resp, err := json.Marshal(v)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(status)
+				_, _ = w.Write(resp)
+			}
+			apiError := func(w http.ResponseWriter, code int, reason, message string) {
+				writeJSON(w, code, map[string]any{"error": map[string]any{
+					"code": code, "message": message, "errors": []map[string]string{{"reason": reason, "message": message}},
 				}})
+			}
+			ref := func(id string) *bigquery2.JobReference {
+				return &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: jobs[id]}
+			}
+			config := &bigquery2.JobConfiguration{Query: &bigquery2.JobConfigurationQuery{
+				Query:            "select * from users",
+				DestinationTable: &bigquery2.TableReference{ProjectId: projectID, DatasetId: "test-dataset"},
+			}}
+			done := &bigquery2.JobStatus{State: "DONE"}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				defer mu.Unlock()
+				jobsPath := "/projects/" + projectID + "/jobs"
+				switch {
+				case r.Method == http.MethodPost && r.URL.Path == jobsPath:
+					var body bigquery2.Job
+					_ = json.NewDecoder(r.Body).Decode(&body)
+					id := body.JobReference.JobId
+					insertedIDs = append(insertedIDs, id)
+					switch {
+					case !tt.insertLands:
+						apiError(w, http.StatusBadRequest, "invalid", "Invalid job configuration")
+					case jobs[id] != "":
+						apiError(w, http.StatusConflict, "duplicate", "Already Exists: Job "+projectID+":"+jobs[id]+"."+id)
+					default:
+						// The job is created, but the response is lost behind a retryable error.
+						// Without a location BigQuery picks the dataset's, here a single region.
+						jobs[id] = body.JobReference.Location
+						if jobs[id] == "" {
+							jobs[id] = "europe-west1"
+						}
+						apiError(w, http.StatusInternalServerError, "backendError", "Backend error")
+					}
+				case r.Method == http.MethodGet && r.URL.Path == jobsPath:
+					lists++
+					list := &bigquery2.JobList{}
+					for id := range jobs {
+						list.Jobs = append(list.Jobs, &bigquery2.JobListJobs{JobReference: ref(id), Configuration: config, Status: done})
+					}
+					writeJSON(w, http.StatusOK, list)
+				case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, jobsPath+"/"):
+					// Like BigQuery, a single-region job is only found with its location.
+					id := strings.TrimPrefix(r.URL.Path, jobsPath+"/")
+					if jobs[id] == "" || r.URL.Query().Get("location") != jobs[id] {
+						apiError(w, http.StatusNotFound, "notFound", "Not found: Job "+projectID+":"+id)
+						return
+					}
+					writeJSON(w, http.StatusOK, &bigquery2.Job{JobReference: ref(id), Configuration: config, Status: done})
+				case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/queries/"):
+					id := strings.TrimPrefix(r.URL.Path, "/projects/"+projectID+"/queries/")
+					writeJSON(w, http.StatusOK, &bigquery2.GetQueryResultsResponse{JobReference: ref(id), JobComplete: true})
+				default:
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte("unexpected request: " + r.Method + " " + r.URL.Path))
+				}
+			}))
+			defer server.Close()
+
+			client, err := bigquery.NewClient(
+				t.Context(),
+				projectID,
+				option.WithEndpoint(server.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+				}),
+			)
+			require.NoError(t, err)
+			client.Location = tt.clientLocation
+
+			d := Client{client: client}
+			ctx := query.WithQueryType(t.Context(), query.QueryTypeMain)
+
+			err = d.RunQueryWithoutResult(ctx, &query.Query{Query: "select * from users"})
+
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, tt.wantLists, lists)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.Empty(t, jobs)
 				return
 			}
-			// The job is created, but the response is lost behind a retryable error.
-			created[id] = true
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": map[string]any{
-				"code": 500, "message": "Backend error", "errors": []map[string]string{{"reason": "backendError", "message": "Backend error"}},
-			}})
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/jobs/"):
-			lookups++
-			writeJSON(w, http.StatusOK, job(strings.TrimPrefix(r.URL.Path, "/projects/"+projectID+"/jobs/")))
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/queries/"):
-			id := strings.TrimPrefix(r.URL.Path, "/projects/"+projectID+"/queries/")
-			writeJSON(w, http.StatusOK, &bigquery2.GetQueryResultsResponse{
-				JobReference: &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: "US"},
-				JobComplete:  true,
-			})
-		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("unexpected request: " + r.Method + " " + r.URL.Path))
-		}
-	}))
-	defer server.Close()
-
-	client, err := bigquery.NewClient(
-		t.Context(),
-		projectID,
-		option.WithEndpoint(server.URL),
-		option.WithCredentials(&google.Credentials{
-			ProjectID:   projectID,
-			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
-		}),
-	)
-	require.NoError(t, err)
-	client.Location = "US"
-
-	d := Client{client: client}
-	ctx := query.WithQueryType(t.Context(), query.QueryTypeMain)
-
-	err = d.RunQueryWithoutResult(ctx, &query.Query{Query: "select * from users"})
-	require.NoError(t, err)
-
-	mu.Lock()
-	defer mu.Unlock()
-	require.Len(t, insertedIDs, 2, "the library should have retried the insert once")
-	assert.Equal(t, insertedIDs[0], insertedIDs[1], "the retry must reuse the job ID")
-	assert.Len(t, created, 1, "only one job must exist in BigQuery")
-	assert.Equal(t, 1, lookups, "the run should have attached to the existing job")
+			require.NoError(t, err)
+			require.Len(t, insertedIDs, 2, "the library should have retried the insert once")
+			assert.Equal(t, insertedIDs[0], insertedIDs[1], "the retry must reuse the job ID")
+			assert.Len(t, jobs, 1, "only one job must exist in BigQuery")
+		})
+	}
 }
 
 func TestClientValidateQueryLimits(t *testing.T) {
