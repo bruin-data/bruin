@@ -3,10 +3,12 @@ package bigquery
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/pkg/errors"
 	bigqueryapi "google.golang.org/api/bigquery/v2"
+	"google.golang.org/api/googleapi"
 )
 
 func (d *Client) isReadOnly() bool {
@@ -16,6 +18,16 @@ func (d *Client) isReadOnly() bool {
 func (d *Client) startQuery(ctx context.Context, q *bigquery.Query) (*bigquery.Job, *bigquery.RowIterator, error) {
 	if !d.isReadOnly() {
 		job, err := q.Run(ctx)
+		if err != nil && q.JobID != "" && isDuplicateJobError(err) {
+			// The client library retries a failed insert with the same job ID. If the first
+			// insert reached BigQuery, the retry gets 409 duplicate although our job exists,
+			// so attach to it instead of failing and running the query again.
+			location := q.Location
+			if location == "" {
+				location = d.client.Location
+			}
+			job, err = d.client.JobFromIDLocation(ctx, q.JobID, location)
+		}
 		return job, nil, err
 	}
 	rows, err := q.Read(ctx)
@@ -59,4 +71,9 @@ func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.Quer
 		}
 	}
 	return stats, nil
+}
+
+func isDuplicateJobError(err error) bool {
+	var apiErr *googleapi.Error
+	return errors.As(err, &apiErr) && apiErr.Code == http.StatusConflict
 }

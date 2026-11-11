@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -353,6 +354,100 @@ func TestDB_RunQueryWithoutResultCancelsJobOnContextCancellation(t *testing.T) {
 
 	require.Eventually(t, cancelRequested.Load, 2*time.Second, 10*time.Millisecond,
 		"aborting the run should trigger a server-side BigQuery job cancel")
+}
+
+// The client library retries a failed jobs.insert with the same job ID. When the first insert
+// reached BigQuery, the retry gets 409 duplicate; the run should attach to the existing job.
+func TestDB_RunQueryWithoutResultAttachesToDuplicateJob(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	var mu sync.Mutex
+	created := map[string]bool{}
+	inserts, lookups := 0, 0
+
+	writeJSON := func(w http.ResponseWriter, status int, v any) {
+		resp, err := json.Marshal(v)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write(resp)
+	}
+	job := func(id string) *bigquery2.Job {
+		return &bigquery2.Job{
+			Configuration: &bigquery2.JobConfiguration{
+				Query: &bigquery2.JobConfigurationQuery{
+					Query:            "select * from users",
+					DestinationTable: &bigquery2.TableReference{ProjectId: projectID, DatasetId: "test-dataset"},
+				},
+			},
+			JobReference: &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: "US"},
+			Status:       &bigquery2.JobStatus{State: "DONE"},
+		}
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/projects/"+projectID+"/jobs":
+			inserts++
+			var body bigquery2.Job
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			id := body.JobReference.JobId
+			if created[id] {
+				writeJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{
+					"code": 409, "message": "Already Exists: Job " + projectID + ":US." + id,
+					"errors": []map[string]string{{"reason": "duplicate", "message": "Already Exists: Job " + projectID + ":US." + id}},
+				}})
+				return
+			}
+			// The job is created, but the response is lost behind a retryable error.
+			created[id] = true
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": map[string]any{
+				"code": 500, "message": "Backend error", "errors": []map[string]string{{"reason": "backendError", "message": "Backend error"}},
+			}})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/jobs/"):
+			lookups++
+			writeJSON(w, http.StatusOK, job(strings.TrimPrefix(r.URL.Path, "/projects/"+projectID+"/jobs/")))
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/projects/"+projectID+"/queries/"):
+			id := strings.TrimPrefix(r.URL.Path, "/projects/"+projectID+"/queries/")
+			writeJSON(w, http.StatusOK, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: "US"},
+				JobComplete:  true,
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("unexpected request: " + r.Method + " " + r.URL.Path))
+		}
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID:   projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+	ctx := query.WithQueryType(t.Context(), query.QueryTypeMain)
+
+	err = d.RunQueryWithoutResult(ctx, &query.Query{Query: "select * from users"})
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, 2, inserts, "the library should have retried the insert once")
+	assert.Equal(t, 1, lookups, "the run should have attached to the existing job")
 }
 
 func TestClientValidateQueryLimits(t *testing.T) {
