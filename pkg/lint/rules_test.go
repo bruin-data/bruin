@@ -1784,7 +1784,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			want: []string{
-				"Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL.",
+				"Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle.",
 			},
 		},
 		{
@@ -1900,6 +1900,22 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "oracle delete+insert accepts an incremental predicate",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Type: pipeline.AssetTypeOracleQuery,
+					Materialization: pipeline.Materialization{
+						Type:                 pipeline.MaterializationTypeTable,
+						Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+						IncrementalKey:       "batch_id",
+						IncrementalPredicate: "target.dt >= DATE '2026-07-01'",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "delete+insert on an unsupported platform rejects an incremental predicate",
 			assets: []*pipeline.Asset{
 				{
@@ -1915,7 +1931,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			want: []string{
-				"Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL and MS SQL.",
+				"Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle.",
 			},
 		},
 		{

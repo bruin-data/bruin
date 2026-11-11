@@ -273,14 +273,21 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	// execute atomically through the Go driver in one ExecContext call.
 	// Uses EXISTS instead of IN (SELECT DISTINCT ...) to let Oracle's optimizer
 	// choose the best semi-join strategy without forcing a full DISTINCT sort.
+	// With an incremental_predicate, the target is aliased as `target` like on other platforms.
+	alias := "t"
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		alias = "target"
+	}
+	conditions := ansisql.AddIncrementalPredicate(
+		[]string{fmt.Sprintf("EXISTS (\n      SELECT 1 FROM (%s) s WHERE s.%s = %s.%s\n   )", query, mat.IncrementalKey, alias, mat.IncrementalKey)},
+		mat.IncrementalPredicate,
+	)
 	return fmt.Sprintf(`BEGIN
-   DELETE FROM %s t WHERE EXISTS (
-      SELECT 1 FROM (%s) s WHERE s.%s = t.%s
-   );
+   DELETE FROM %s %s WHERE %s;
    INSERT INTO %s
 %s
 ;
-END;`, task.Name, query, mat.IncrementalKey, mat.IncrementalKey, task.Name, query), nil
+END;`, task.Name, alias, strings.Join(conditions, " AND "), task.Name, query), nil
 }
 
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
