@@ -111,8 +111,6 @@ bruin cloud act-as --stop          # use your own login again
 
 The session stays on the team it started on and renews automatically with your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
 
-The agent token lives for 1 hour and is stored in `~/.config/bruin/cloud-act-as.yml` (mode 0600). `--stop` and `logout --global` only delete it locally; Bruin Cloud still checks the agent's access on every request.
-
 ### `teams`
 
 List the teams your token can act on. Run this to discover the company prefix to pass to `--team` (or `BRUIN_CLOUD_TEAM`) — needed when your personal API key belongs to more than one team.
