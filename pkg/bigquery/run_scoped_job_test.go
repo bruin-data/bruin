@@ -13,6 +13,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,8 +59,17 @@ func TestApplyRunScopedJobID(t *testing.T) {
 		assert.NotEqual(t, base, id, name)
 	}
 
-	// Left to the library outside a cloud run, for other query types and in read-only mode.
-	id, suffix := runScopedJobID(mainCtx, &query.Query{Query: "select 1"})
+	// A local run with annotations enabled uses bruin's own run ID.
+	localCtx := context.WithValue(mainCtx, pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+	localCtx = context.WithValue(localCtx, pipeline.RunConfigRunID, "2026_11_11_14_00_00")
+	local, err := ansisql.AddAnnotationComment(localCtx, &query.Query{Query: "select 1"}, "a.b", "main", "p")
+	require.NoError(t, err)
+	id, suffix := runScopedJobID(localCtx, local)
+	assert.Regexp(t, "^bruin_main-[0-9a-f]{32}$", id)
+	assert.False(t, suffix)
+
+	// Left to the library without a run ID, for other query types and in read-only mode.
+	id, suffix = runScopedJobID(mainCtx, &query.Query{Query: "select 1"})
 	assert.Equal(t, "bruin_main", id)
 	assert.True(t, suffix)
 
@@ -76,13 +86,46 @@ func TestApplyRunScopedJobID(t *testing.T) {
 func TestClient_RunQueryWithoutResult_EarlierAttemptJob(t *testing.T) {
 	t.Parallel()
 
+	type fakeJob struct {
+		state   string
+		created time.Time
+		labels  map[string]string
+	}
+	earlierAttempt := map[string]string{attemptLabel: "earlier"}
+
 	tests := []struct {
-		name         string
-		earlierState string
-		wantNewJob   bool
+		name string
+		// earlier is the job an earlier attempt left under the run-scoped ID, if any.
+		earlier *fakeJob
+		// loseFirstResponse creates the job on the first insert but answers 503.
+		loseFirstResponse bool
+		wantInserts       int
+		wantJobs          int
 	}{
-		{name: "still running: wait for it", earlierState: "RUNNING"},
-		{name: "finished: run the query again", earlierState: "DONE", wantNewJob: true},
+		{
+			name:        "earlier attempt still running: wait for it",
+			earlier:     &fakeJob{state: "RUNNING", created: time.Now().Add(-time.Hour), labels: earlierAttempt},
+			wantInserts: 1,
+			wantJobs:    1,
+		},
+		{
+			name:        "earlier attempt finished: run the query again",
+			earlier:     &fakeJob{state: "DONE", created: time.Now().Add(-time.Hour), labels: earlierAttempt},
+			wantInserts: 2,
+			wantJobs:    2,
+		},
+		{
+			name:        "earlier attempt finished a moment ago: run the query again",
+			earlier:     &fakeJob{state: "DONE", created: time.Now(), labels: earlierAttempt},
+			wantInserts: 2,
+			wantJobs:    2,
+		},
+		{
+			name:              "own insert's response lost: follow the job even if it finished",
+			loseFirstResponse: true,
+			wantInserts:       2,
+			wantJobs:          1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,14 +133,13 @@ func TestClient_RunQueryWithoutResult_EarlierAttemptJob(t *testing.T) {
 
 			projectID := "test-project"
 			ctx := query.WithQueryType(t.Context(), query.QueryTypeMain)
-			earlierID, _ := runScopedJobID(ctx, cloudQuery(t, "select 1", "run-1", "a.b", 1))
+			runScopedID, _ := runScopedJobID(ctx, cloudQuery(t, "select 1", "run-1", "a.b", 1))
 
-			type fakeJob struct {
-				state   string
-				created time.Time
-			}
 			var mu sync.Mutex
-			jobs := map[string]*fakeJob{earlierID: {state: tt.earlierState, created: time.Now().Add(-time.Hour)}}
+			jobs := map[string]*fakeJob{}
+			if tt.earlier != nil {
+				jobs[runScopedID] = tt.earlier
+			}
 			var inserted []string
 
 			writeJSON := func(w http.ResponseWriter, status int, v any) {
@@ -105,12 +147,20 @@ func TestClient_RunQueryWithoutResult_EarlierAttemptJob(t *testing.T) {
 				w.WriteHeader(status)
 				_ = json.NewEncoder(w).Encode(v)
 			}
+			apiError := func(w http.ResponseWriter, code int, reason, message string) {
+				writeJSON(w, code, map[string]any{"error": map[string]any{
+					"code": code, "message": message, "errors": []map[string]any{{"reason": reason, "message": message}},
+				}})
+			}
 			bqJob := func(id string) *bigquery2.Job {
 				return &bigquery2.Job{
-					Configuration: &bigquery2.JobConfiguration{Query: &bigquery2.JobConfigurationQuery{Query: "select 1"}},
-					JobReference:  &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: "europe-west1"},
-					Status:        &bigquery2.JobStatus{State: jobs[id].state},
-					Statistics:    &bigquery2.JobStatistics{CreationTime: jobs[id].created.UnixMilli()},
+					Configuration: &bigquery2.JobConfiguration{
+						Query:  &bigquery2.JobConfigurationQuery{Query: "select 1"},
+						Labels: jobs[id].labels,
+					},
+					JobReference: &bigquery2.JobReference{JobId: id, ProjectId: projectID, Location: "europe-west1"},
+					Status:       &bigquery2.JobStatus{State: jobs[id].state},
+					Statistics:   &bigquery2.JobStatistics{CreationTime: jobs[id].created.UnixMilli()},
 				}
 			}
 
@@ -125,18 +175,19 @@ func TestClient_RunQueryWithoutResult_EarlierAttemptJob(t *testing.T) {
 					id := body.JobReference.JobId
 					inserted = append(inserted, id)
 					if jobs[id] != nil {
-						writeJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{
-							"code": 409, "message": "Already Exists: Job " + projectID + ":europe-west1." + id,
-							"errors": []map[string]any{{"reason": "duplicate"}},
-						}})
+						apiError(w, http.StatusConflict, "duplicate", "Already Exists: Job "+projectID+":europe-west1."+id)
 						return
 					}
-					jobs[id] = &fakeJob{state: "DONE", created: time.Now()}
+					jobs[id] = &fakeJob{state: "DONE", created: time.Now(), labels: body.Configuration.Labels}
+					if tt.loseFirstResponse && len(inserted) == 1 {
+						apiError(w, http.StatusServiceUnavailable, "backendError", "Backend error")
+						return
+					}
 					writeJSON(w, http.StatusOK, bqJob(id))
 				case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, jobsPath+"/"):
 					id := strings.TrimPrefix(r.URL.Path, jobsPath+"/")
 					if jobs[id] == nil {
-						writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]any{"code": 404, "message": "Not found"}})
+						apiError(w, http.StatusNotFound, "notFound", "Not found")
 						return
 					}
 					writeJSON(w, http.StatusOK, bqJob(id))
@@ -170,16 +221,12 @@ func TestClient_RunQueryWithoutResult_EarlierAttemptJob(t *testing.T) {
 
 			mu.Lock()
 			defer mu.Unlock()
-			require.NotEmpty(t, inserted)
-			assert.Equal(t, earlierID, inserted[0], "the retry must use the earlier attempt's job ID")
-			if !tt.wantNewJob {
-				assert.Len(t, inserted, 1)
-				assert.Len(t, jobs, 1, "no second job may be started while the earlier one runs")
-				return
+			require.Len(t, inserted, tt.wantInserts)
+			assert.Equal(t, runScopedID, inserted[0], "the retry must use the run-scoped job ID")
+			assert.Len(t, jobs, tt.wantJobs)
+			if tt.wantJobs == 2 {
+				assert.True(t, strings.HasPrefix(inserted[1], runScopedID+"-"), "the new job should get a fresh suffix")
 			}
-			require.Len(t, inserted, 2)
-			assert.True(t, strings.HasPrefix(inserted[1], earlierID+"-"), "the new job should get a fresh suffix")
-			assert.Len(t, jobs, 2)
 		})
 	}
 }

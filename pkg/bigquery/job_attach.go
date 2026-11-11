@@ -2,54 +2,71 @@ package bigquery
 
 import (
 	"context"
+	"crypto/rand"
+	"maps"
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/pkg/errors"
 	"google.golang.org/api/googleapi"
 )
 
-// clockSkew allows for the difference between our clock and BigQuery's when telling a job
-// created by this call apart from one created by an earlier attempt.
-const clockSkew = 10 * time.Second
+// attemptLabel marks a run-scoped job with the call that started it, so a 409 on that ID can
+// tell this call's own job (the library retried the insert) from an earlier attempt's job.
+const attemptLabel = "bruin_attempt"
 
 // runQueryJob starts q. A run-scoped job ID (see applyRunScopedJobID) may already belong to
 // an earlier attempt of the asset: if that job is still running we wait for it instead of
 // running the query a second time; if it has finished we run the query again under a fresh ID.
 func (d *Client) runQueryJob(ctx context.Context, q *bigquery.Query) (*bigquery.Job, error) {
-	started := time.Now()
-	job, err := d.insertOrAttach(ctx, q)
-	if err != nil || !createdBefore(job, started.Add(-clockSkew)) {
+	if q.JobID == "" || q.AddJobIDSuffix {
+		// A random job ID can only collide with this call's own insert.
+		job, _, err := d.insertOrAttach(ctx, q)
+		return job, err
+	}
+	attempt := strings.ToLower(rand.Text())
+	labels := make(map[string]string, len(q.Labels)+1)
+	maps.Copy(labels, q.Labels)
+	labels[attemptLabel] = attempt
+	q.Labels = labels
+
+	job, attached, err := d.insertOrAttach(ctx, q)
+	if err != nil || !attached || startedBy(job, attempt) {
 		return job, err
 	}
 	if job.LastStatus().State != bigquery.Done {
 		return job, nil
 	}
 	q.AddJobIDSuffix = true
-	return d.insertOrAttach(ctx, q)
+	job, _, err = d.insertOrAttach(ctx, q)
+	return job, err
 }
 
-func createdBefore(job *bigquery.Job, t time.Time) bool {
-	status := job.LastStatus()
-	return status != nil && status.Statistics != nil && status.Statistics.CreationTime.Before(t)
+func startedBy(job *bigquery.Job, attempt string) bool {
+	config, err := job.Config()
+	if err != nil {
+		return false
+	}
+	qc, ok := config.(*bigquery.QueryConfig)
+	return ok && qc.Labels[attemptLabel] == attempt
 }
 
 // The client library retries jobs.insert on transient errors using the same
 // job ID. When the first attempt reached BigQuery but its response was lost,
 // the retry fails with 409 "Already Exists" even though the job is running.
-// insertOrAttach attaches to the job named in that error instead of failing.
-func (d *Client) insertOrAttach(ctx context.Context, q *bigquery.Query) (*bigquery.Job, error) {
+// insertOrAttach attaches to the job named in that error instead of failing, and
+// reports whether it did.
+func (d *Client) insertOrAttach(ctx context.Context, q *bigquery.Query) (*bigquery.Job, bool, error) {
 	job, err := q.Run(ctx)
 	if err == nil {
-		return job, nil
+		return job, false, nil
 	}
 
 	ref, ok := existingJobRef(err)
 	if !ok {
-		return nil, err
+		return nil, false, err
 	}
 	if ref.projectID == "" {
 		ref.projectID = q.ProjectID
@@ -66,9 +83,9 @@ func (d *Client) insertOrAttach(ctx context.Context, q *bigquery.Query) (*bigque
 
 	existing, getErr := d.client.JobFromProject(ctx, ref.projectID, ref.jobID, ref.location)
 	if getErr != nil {
-		return nil, errors.Wrapf(err, "BigQuery job %s already exists but bruin could not attach to it: %v", ref.jobID, getErr)
+		return nil, false, errors.Wrapf(err, "BigQuery job %s already exists but bruin could not attach to it: %v", ref.jobID, getErr)
 	}
-	return existing, nil
+	return existing, true, nil
 }
 
 type jobRef struct {
