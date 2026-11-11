@@ -25,11 +25,7 @@ func CloudAuth() *cli.Command {
 			if auth.connection != "" {
 				_, _ = fmt.Fprintf(writer, "Connection: %s/%s\n", auth.environment, auth.connection)
 			}
-			team := resolveTeam(c)
-			if team == "" && auth.source == cloudAuthGlobal {
-				team = auth.team
-			}
-			if team != "" {
+			if team := effectiveTeam(c, auth); team != "" {
 				_, _ = fmt.Fprintf(writer, "Default team: %s\n", team)
 			}
 			_, _ = fmt.Fprintln(writer, "Local credential found. API validity and permissions are checked by Cloud on each request.")
@@ -151,7 +147,7 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 		if session, err := store.ClearActAs(ctx); err != nil {
 			return err
 		} else if session != nil {
-			_, _ = fmt.Fprintf(output, "Stopped acting as agent %s.\n", actAsLabel(session))
+			_, _ = fmt.Fprintln(output, actAsStoppedMessage(session))
 		}
 		if err := store.Delete(); err != nil {
 			return err

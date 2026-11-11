@@ -104,12 +104,14 @@ Use `--api-key` or `--team` to inspect an explicit override. This checks local c
 Run cloud commands as one of your team's agents, with its permissions; Cloud logs the actions as the agent. Needs a global login.
 
 ```bash
-bruin cloud act-as --agent 12   # start
-bruin cloud act-as              # show the session
-bruin cloud act-as --stop       # use your own login again
+bruin cloud act-as --agent-id 12   # start
+bruin cloud act-as                 # show the session
+bruin cloud act-as --stop          # use your own login again
 ```
 
-The session stays on the team it started on and renews automatically with your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session.
+The session stays on the team it started on and renews automatically with your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
+
+The agent token lives for 1 hour and is stored in `~/.config/bruin/cloud-act-as.yml` (mode 0600). `--stop` and `logout --global` only delete it locally; Bruin Cloud still checks the agent's access on every request.
 
 ### `teams`
 

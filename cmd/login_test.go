@@ -143,7 +143,7 @@ func TestLoginInWorktree(t *testing.T) {
 				auth, err := resolveCloudAuthWithStore(&cli.Command{}, func() (*cloudauth.Credential, error) {
 					t.Fatal("must prefer the worktree login over the global login")
 					return nil, nil
-				})
+				}, nil)
 				require.NoError(t, err)
 				assert.Equal(t, "repo", auth.source)
 				assert.Equal(t, "worktree-token", auth.token)
@@ -243,7 +243,7 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	resolve := func(args ...string) (string, error) {
 		var value string
 		command := &cli.Command{Name: "test", Flags: []cli.Flag{apiKeyFlag()}, Action: func(_ context.Context, c *cli.Command) error {
-			auth, err := resolveCloudAuthWithStore(c, global)
+			auth, err := resolveCloudAuthWithStore(c, global, nil)
 			value = auth.token
 			return err
 		}}

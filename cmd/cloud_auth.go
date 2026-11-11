@@ -29,25 +29,29 @@ func resolveCloudAuth(c *cli.Command) (resolvedCloudAuth, error) {
 
 func resolveCloudAuthIn(c *cli.Command, openStore func() (cloudauth.Store, error)) (resolvedCloudAuth, error) {
 	store, storeErr := openStore()
-	if storeErr == nil && c.String("api-key") == "" && os.Getenv("BRUIN_CLOUD_API_KEY") == "" {
-		if auth, ok, err := resolveActAs(c, store); ok || err != nil {
-			return auth, err
-		}
+	var actAs func() (resolvedCloudAuth, bool, error)
+	if storeErr == nil {
+		actAs = func() (resolvedCloudAuth, bool, error) { return resolveActAs(c, store) }
 	}
 	return resolveCloudAuthWithStore(c, func() (*cloudauth.Credential, error) {
 		if storeErr != nil {
 			return nil, storeErr
 		}
 		return store.Read(cloudauth.APIURL())
-	})
+	}, actAs)
 }
 
-func resolveCloudAuthWithStore(c *cli.Command, global func() (*cloudauth.Credential, error)) (resolvedCloudAuth, error) {
+func resolveCloudAuthWithStore(c *cli.Command, global func() (*cloudauth.Credential, error), actAs func() (resolvedCloudAuth, bool, error)) (resolvedCloudAuth, error) {
 	if token := c.String("api-key"); token != "" {
 		return resolvedCloudAuth{token: token, source: "flag or environment"}, nil
 	}
 	if token := os.Getenv("BRUIN_CLOUD_API_KEY"); token != "" {
 		return resolvedCloudAuth{token: token, source: "environment"}, nil
+	}
+	if actAs != nil {
+		if auth, ok, err := actAs(); ok {
+			return auth, err
+		}
 	}
 	cm, err := loadCloudConfig()
 	if err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, git.ErrNoGitRepoFound) {
@@ -73,6 +77,19 @@ func resolveCloudAuthWithStore(c *cli.Command, global func() (*cloudauth.Credent
 		return resolvedCloudAuth{token: credential.Token, source: cloudAuthGlobal, team: credential.DefaultTeam}, nil
 	}
 	return resolvedCloudAuth{}, errors.New("API key is required: run 'bruin cloud login', use --api-key or BRUIN_CLOUD_API_KEY, or configure a bruin connection in .bruin.yml")
+}
+
+func effectiveTeam(c *cli.Command, auth resolvedCloudAuth) string {
+	if auth.source == cloudAuthActAs {
+		return auth.team
+	}
+	if team := resolveTeam(c); team != "" {
+		return team
+	}
+	if auth.source == cloudAuthGlobal {
+		return auth.team
+	}
+	return ""
 }
 
 func emptyCloudConfig() *config.Config {
