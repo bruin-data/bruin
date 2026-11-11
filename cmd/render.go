@@ -238,6 +238,11 @@ func Render() *cli.Command {
 				printError(err, c.String("output"), "Failed to get the connection name for the asset:")
 				return cli.Exit("", 1)
 			}
+			asset, err = bigQueryAssetForRender(cm, pl, asset)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to get the connection name for the asset:")
+				return cli.Exit("", 1)
+			}
 
 			resultsLocation := "s3://{destination-bucket}"
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
@@ -386,6 +391,23 @@ func clickHouseClusterForRender(cm *config.Config, pl *pipeline.Pipeline, asset 
 		return "", nil
 	}
 	return conn.Cluster, nil
+}
+
+// bigQueryAssetForRender fills in an Iceberg asset's storage folder from its connection, as `bruin run` does.
+func bigQueryAssetForRender(cm *config.Config, pl *pipeline.Pipeline, asset *pipeline.Asset) (*pipeline.Asset, error) {
+	if cm == nil || cm.SelectedEnvironment == nil || cm.SelectedEnvironment.Connections == nil ||
+		asset.Type != pipeline.AssetTypeBigqueryQuery || !asset.Materialization.IsIceberg() {
+		return asset, nil
+	}
+	connName, err := pl.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return nil, err
+	}
+	conn, ok := cm.SelectedEnvironment.Connections.GetConnection(connName).(*config.GoogleCloudPlatformConnection)
+	if !ok {
+		return asset, nil
+	}
+	return bigquery.WithIcebergSettings(asset, conn.StorageURI), nil
 }
 
 func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath string, createIfMissing bool) (*config.Config, error) {

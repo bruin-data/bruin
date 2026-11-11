@@ -121,7 +121,7 @@ func (d *Client) Location() string {
 
 // PrepareAssetForRender fills in connection-level settings that the materialized query needs.
 func (d *Client) PrepareAssetForRender(asset *pipeline.Asset) *pipeline.Asset {
-	return withIcebergSettings(asset, d.config.StorageURI)
+	return WithIcebergSettings(asset, d.config.StorageURI)
 }
 
 func (d *Client) UsesApplicationDefaultCredentials() bool {

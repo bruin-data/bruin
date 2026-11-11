@@ -196,6 +196,9 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	if c.MaxQueryCostSoft != nil {
 		payload["max_query_cost_soft"] = *c.MaxQueryCostSoft
 	}
+	if c.StorageURI != "" {
+		payload["storage_uri"] = c.StorageURI
+	}
 
 	return json.Marshal(payload)
 }

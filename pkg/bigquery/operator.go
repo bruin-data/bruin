@@ -191,9 +191,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return nil
 }
 
-// withIcebergSettings fills in the storage URI from the connection's prefix when the asset doesn't set one.
+// WithIcebergSettings fills in the storage URI from the connection's prefix when the asset doesn't set one.
 // It becomes <prefix>/<dataset>/<table>, so every table has its own folder.
-func withIcebergSettings(asset *pipeline.Asset, storageURIPrefix string) *pipeline.Asset {
+func WithIcebergSettings(asset *pipeline.Asset, storageURIPrefix string) *pipeline.Asset {
 	if !asset.Materialization.IsIceberg() {
 		return asset
 	}

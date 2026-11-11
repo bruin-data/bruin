@@ -792,7 +792,7 @@ func TestWithIcebergSettings(t *testing.T) {
 			t.Parallel()
 
 			original := tt.asset.BigQuery
-			got := withIcebergSettings(tt.asset, tt.prefix)
+			got := WithIcebergSettings(tt.asset, tt.prefix)
 			assert.Equal(t, tt.wantStorageURI, got.BigQuery.StorageURI)
 			assert.Equal(t, original, tt.asset.BigQuery, "the original asset must not change")
 		})
