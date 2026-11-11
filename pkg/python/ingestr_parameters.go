@@ -3,6 +3,7 @@ package python
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -101,10 +102,10 @@ func ValidateIngestrCDCParameters(asset *pipeline.Asset) error {
 	if raw, present := params["postgres_snapshot"]; present {
 		value, ok := raw.(string)
 		if !ok || !postgresSnapshotPattern.MatchString(value) {
-			return fmt.Errorf("invalid postgres_snapshot: expected an exported PostgreSQL snapshot ID such as 00000003-0000001B-1")
+			return errors.New("invalid postgres_snapshot: expected an exported PostgreSQL snapshot ID such as 00000003-0000001B-1")
 		}
 		if cdc, _ := params.GetString("cdc"); cdc == "true" {
-			return fmt.Errorf("postgres_snapshot requires ordinary PostgreSQL ingestion without cdc: true")
+			return errors.New("postgres_snapshot requires ordinary PostgreSQL ingestion without cdc: true")
 		}
 	}
 	return nil
@@ -151,7 +152,7 @@ func ValidateIngestrLoadParameters(params pipeline.ParameterMap, version string)
 			return fmt.Errorf("invalid %s: must be a positive integer", name)
 		}
 		if name == "batch_size" && number > math.MaxInt64>>20 {
-			return fmt.Errorf("invalid batch_size: MiB value exceeds the signed 64-bit byte range")
+			return errors.New("invalid batch_size: MiB value exceeds the signed 64-bit byte range")
 		}
 	}
 	for _, name := range []string{"no_load_timestamp", "no_run_id"} {

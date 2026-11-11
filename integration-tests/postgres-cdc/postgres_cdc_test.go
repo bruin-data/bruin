@@ -194,7 +194,7 @@ func testExportedBaseline(t *testing.T, host, binary string) {
 
 	expired := f.start(t, false)
 	require.Error(t, expired.wait(t))
-	require.Contains(t, expired.output(t), "invalid snapshot identifier")
+	require.Contains(t, expired.output(t), "failed to import postgres snapshot "+snapshot)
 	f.assertRows(t, map[int]string{1: "one", 2: "two", 3: "three", 4: "four"})
 	f.params = cdcParameters()
 	f.params["cdc_publication"] = "bruin_publication"
@@ -211,25 +211,32 @@ func testExportedBaseline(t *testing.T, host, binary string) {
 func testStreamShutdown(t *testing.T, host, binary string) {
 	t.Helper()
 	f := newFixture(t, host, binary)
-	f.params["stream"] = true
 	f.params["cdc_snapshot_spool"] = true
 	f.params["cdc_wal_staging"] = "destination"
-	f.params["cdc_stream_flush_interval"] = "100ms"
-	f.params["cdc_stream_flush_records"] = 1
+	f.run(t)
+	f.params["stream"] = true
+	f.params["page_size"] = 1
+	f.params["cdc_stream_flush_interval"] = "1h"
+	f.params["cdc_stream_flush_records"] = 1000000
 	run := f.start(t, true)
-	waitForValue := func(id int, expected string) {
-		t.Helper()
-		require.Eventually(t, func() bool {
-			run.requireRunning(t)
-			var value string
-			return f.dest.QueryRowContext(t.Context(), "SELECT value FROM public.items WHERE id = $1", id).Scan(&value) == nil && value == expected
-		}, time.Minute, 100*time.Millisecond)
-	}
-	waitForValue(1, "one")
+	require.Eventually(t, func() bool {
+		run.requireRunning(t)
+		var active bool
+		return f.source.QueryRowContext(t.Context(), "SELECT active FROM pg_replication_slots WHERE slot_name = $1", f.slot).Scan(&active) == nil && active
+	}, time.Minute, 100*time.Millisecond)
 	execSQL(t, f.source, "UPDATE public.items SET value = 'streamed' WHERE id = 1")
-	waitForValue(1, "streamed")
+	// Page size forces the source to emit the update, while destination flush
+	// thresholds leave it pending until the stream receives its stop signal.
+	require.Eventually(t, func() bool {
+		run.requireRunning(t)
+		return strings.Contains(run.output(t), "[CDC] Batch 1: 1 rows (total: 1)")
+	}, time.Minute, 100*time.Millisecond, "stream did not emit the pending change")
+	f.assertRows(t, map[int]string{1: "one", 2: "two", 3: "three", 4: "four"})
 	run.interrupt(t)
 	f.waitForInactiveSlot(t)
+	require.Contains(t, run.output(t), "[STREAM] Final flush: 1 buffered rows")
+	require.Contains(t, run.output(t), "Streaming ingestion stopped.")
+	f.assertRows(t, map[int]string{1: "streamed", 2: "two", 3: "three", 4: "four"})
 	f.params["stream"] = false
 	delete(f.params, "cdc_stream_flush_interval")
 	delete(f.params, "cdc_stream_flush_records")
@@ -262,6 +269,7 @@ func newFixture(t *testing.T, host, binary string) *fixture {
 	}
 	f.params["cdc_slot"] = f.slot
 	execSQL(t, f.source, `CREATE TABLE public.items (id integer PRIMARY KEY, value text);
+		ALTER TABLE public.items REPLICA IDENTITY FULL;
 		INSERT INTO public.items VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')`)
 	address, port, err := net.SplitHostPort(host)
 	require.NoError(t, err)
@@ -380,6 +388,7 @@ func (f *fixture) start(t *testing.T, stream bool) *process {
 	require.NoError(t, os.WriteFile(assetPath, asset, 0o600))
 	args := []string{"run", "--config-file", filepath.Join(f.root, ".bruin.yml"), "--env", "test", "--workers", "1", "--no-log-file", "--no-color"}
 	if stream {
+		args = append([]string{"--debug"}, args...)
 		args = append(args, "--stream")
 	}
 	args = append(args, assetPath)
