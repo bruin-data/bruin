@@ -46,3 +46,17 @@ func TestGoogleCloudPlatformConnectionReadOnlySchema(t *testing.T) {
 		require.NotContains(t, def.Required, "read_only")
 	}
 }
+
+func TestGoogleCloudPlatformConnectionStorageURIRoundTrip(t *testing.T) {
+	t.Parallel()
+	conn := &GoogleCloudPlatformConnection{}
+	require.NoError(t, yaml.Unmarshal([]byte("name: lake\nstorage_uri: gs://bucket/iceberg\n"), conn))
+	data, err := json.Marshal(conn)
+	require.NoError(t, err)
+	var values map[string]any
+	require.NoError(t, json.Unmarshal(data, &values))
+	require.Equal(t, "gs://bucket/iceberg", values["storage_uri"])
+	data, err = yaml.Marshal(conn)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "storage_uri: gs://bucket/iceberg")
+}

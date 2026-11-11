@@ -367,7 +367,7 @@ bigquery:
 | `require_partition_filter` | Boolean | `false` | Requires queries to filter the partitioning column. |
 | `partition_expiration_days` | Number | unset | Number of days before each partition expires. Must be positive. Set `0` to disable an inherited pipeline default. |
 | `partition_key_immutable` | Boolean | `false` | Declares that the partition value cannot change for a given merge primary key. |
-| `storage_uri` | String | unset | Cloud Storage folder for an Iceberg table. See [BigQuery Iceberg tables](../platforms/bigquery.md#iceberg-tables). |
+| `storage_uri` | String | unset | Cloud Storage folder for an Iceberg table. Overrides the connection's `storage_uri`. See [BigQuery Iceberg tables](../platforms/bigquery.md#iceberg-tables). |
 | `cloud_resource_connection` | String | unset | Cloud resource connection for an Iceberg table, as `project.region.name`. See [BigQuery Iceberg tables](../platforms/bigquery.md#iceberg-tables). |
 
 Enabling a required partition filter or a positive partition expiration requires a partitioned table. Partition expiration is not supported for integer-range partitions, and required partition filters have additional restrictions for incremental materializations. See [BigQuery table options](../platforms/bigquery.md#bigquery-table-options) for details.

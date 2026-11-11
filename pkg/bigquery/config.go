@@ -26,6 +26,8 @@ type Config struct {
 	MaxQueryCostSoft                 *float64
 	EnvMaxBillableBytes              *int64
 	ReadOnly                         bool
+	// StorageURI is the Cloud Storage prefix that Iceberg tables are stored under, e.g. gs://bucket.
+	StorageURI string
 }
 
 // MaxBillableBytesByConnectionEnv lets Bruin Cloud cap an agent run's BigQuery connections: a JSON object of connection name to bytes.
