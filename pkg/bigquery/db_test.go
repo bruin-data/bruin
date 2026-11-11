@@ -364,7 +364,8 @@ func TestDB_RunQueryWithoutResultAttachesToDuplicateJob(t *testing.T) {
 	projectID := testProjectID
 	var mu sync.Mutex
 	created := map[string]bool{}
-	inserts, lookups := 0, 0
+	var insertedIDs []string
+	lookups := 0
 
 	writeJSON := func(w http.ResponseWriter, status int, v any) {
 		resp, err := json.Marshal(v)
@@ -394,10 +395,10 @@ func TestDB_RunQueryWithoutResultAttachesToDuplicateJob(t *testing.T) {
 		defer mu.Unlock()
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/projects/"+projectID+"/jobs":
-			inserts++
 			var body bigquery2.Job
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			id := body.JobReference.JobId
+			insertedIDs = append(insertedIDs, id)
 			if created[id] {
 				writeJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{
 					"code": 409, "message": "Already Exists: Job " + projectID + ":US." + id,
@@ -446,7 +447,9 @@ func TestDB_RunQueryWithoutResultAttachesToDuplicateJob(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	assert.Equal(t, 2, inserts, "the library should have retried the insert once")
+	require.Len(t, insertedIDs, 2, "the library should have retried the insert once")
+	assert.Equal(t, insertedIDs[0], insertedIDs[1], "the retry must reuse the job ID")
+	assert.Len(t, created, 1, "only one job must exist in BigQuery")
 	assert.Equal(t, 1, lookups, "the run should have attached to the existing job")
 }
 
