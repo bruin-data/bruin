@@ -2,42 +2,71 @@ package secrets
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
+)
+
+const defaultAzureRequestTimeout = 30 * time.Second
+
+// azureKeyVaultHostSuffixes are the Key Vault DNS suffixes of the public and sovereign Azure clouds.
+var azureKeyVaultHostSuffixes = []string{
+	".vault.azure.net",          // Azure public cloud
+	".vault.azure.cn",           // Azure China (21Vianet)
+	".vault.usgovcloudapi.net",  // Azure US Government
+	".vault.microsoftazure.de",  // Azure Germany
+}
+
+var (
+	// azureKeyVaultSecretName matches the names Key Vault accepts for secrets.
+	azureKeyVaultSecretName = regexp.MustCompile(`^[0-9a-zA-Z-]{1,127}$`)
+	azureKeyVaultNameChars  = regexp.MustCompile(`^[0-9a-zA-Z-]+$`)
 )
 
 // azureKeyVaultSecretsClient defines the interface for Azure Key Vault operations.
 type azureKeyVaultSecretsClient interface {
 	GetSecret(ctx context.Context, name string, version string, options *azsecrets.GetSecretOptions) (azsecrets.GetSecretResponse, error)
+	NewListSecretPropertiesPager(options *azsecrets.ListSecretPropertiesOptions) *runtime.Pager[azsecrets.ListSecretPropertiesResponse]
 }
 
 // AzureKeyVaultClient manages secrets from Azure Key Vault.
 type AzureKeyVaultClient struct {
-	client                  azureKeyVaultSecretsClient
-	logger                  logger.Logger
-	cacheMu                 sync.RWMutex
-	cacheConnections        map[string]any
-	cacheConnectionsDetails map[string]any
+	*cachedSecretBackend
+
+	client azureKeyVaultSecretsClient
+	// prefix is prepended to connection names to form secret names, e.g. "bruin-prod-".
+	prefix string
 }
 
 // NewAzureKeyVaultClientFromEnv creates a new Azure Key Vault client from environment variables.
+//
+// BRUIN_AZURE_AUTH_METHOD picks the credential: client_credentials, managed_identity,
+// workload_identity, cli, or default (DefaultAzureCredential, which itself tries
+// environment credentials, AKS workload identity, managed identity and the Azure CLI).
 func NewAzureKeyVaultClientFromEnv(logger logger.Logger) (*AzureKeyVaultClient, error) {
 	vaultURL := os.Getenv("BRUIN_AZURE_KEYVAULT_URL")
 	if vaultURL == "" {
 		return nil, errors.New("BRUIN_AZURE_KEYVAULT_URL env variable not set")
+	}
+	if err := validateVaultURL(vaultURL); err != nil {
+		return nil, err
+	}
+
+	prefix := os.Getenv("BRUIN_AZURE_SECRET_PREFIX")
+	if prefix != "" && !azureKeyVaultNameChars.MatchString(prefix) {
+		return nil, errors.Errorf("BRUIN_AZURE_SECRET_PREFIX '%s' is not valid: Azure Key Vault secret names may only contain letters, digits and hyphens", prefix)
 	}
 
 	authMethod := os.Getenv("BRUIN_AZURE_AUTH_METHOD")
@@ -45,6 +74,25 @@ func NewAzureKeyVaultClientFromEnv(logger logger.Logger) (*AzureKeyVaultClient, 
 		authMethod = "default"
 	}
 
+	cred, err := azureCredentialFromEnv(authMethod, azureClientOptionsForVault(vaultURL))
+	if err != nil {
+		return nil, err
+	}
+	logger.Debugf("Azure Key Vault: authenticating with the '%s' auth method", authMethod)
+
+	client, err := newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
+	if err != nil {
+		return nil, err
+	}
+	client.prefix = prefix
+	if prefix != "" {
+		logger.Debugf("Azure Key Vault: reading connections from secrets prefixed with '%s'", prefix)
+	}
+
+	return client, nil
+}
+
+func azureCredentialFromEnv(authMethod string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
 	switch authMethod {
 	case "client_credentials":
 		tenantID := os.Getenv("BRUIN_AZURE_TENANT_ID")
@@ -59,20 +107,24 @@ func NewAzureKeyVaultClientFromEnv(logger logger.Logger) (*AzureKeyVaultClient, 
 		if clientSecret == "" {
 			return nil, errors.New("BRUIN_AZURE_CLIENT_SECRET env variable not set for client_credentials auth")
 		}
-		return NewAzureKeyVaultClient(logger, vaultURL, tenantID, clientID, clientSecret)
+		return newAzureClientSecretCredential(tenantID, clientID, clientSecret, clientOptions)
 
 	case "managed_identity":
-		clientID := os.Getenv("BRUIN_AZURE_CLIENT_ID") // Optional for user-assigned identity
-		return NewAzureKeyVaultClientWithManagedIdentity(logger, vaultURL, clientID)
+		// Optional, selects a user-assigned identity.
+		return newAzureManagedIdentityCredential(os.Getenv("BRUIN_AZURE_CLIENT_ID"), clientOptions)
+
+	case "workload_identity":
+		// Optional overrides; the AKS webhook injects AZURE_CLIENT_ID and AZURE_TENANT_ID.
+		return newAzureWorkloadIdentityCredential(os.Getenv("BRUIN_AZURE_CLIENT_ID"), os.Getenv("BRUIN_AZURE_TENANT_ID"), clientOptions)
 
 	case "cli":
-		return NewAzureKeyVaultClientWithCLI(logger, vaultURL)
+		return newAzureCLICredential()
 
 	case "default":
-		return NewAzureKeyVaultClientWithDefaultCredential(logger, vaultURL)
+		return newAzureDefaultCredential(clientOptions)
 
 	default:
-		return nil, errors.Errorf("unsupported Azure auth method: %s", authMethod)
+		return nil, errors.Errorf("unsupported Azure auth method: %s (supported: client_credentials, managed_identity, workload_identity, cli, default)", authMethod)
 	}
 }
 
@@ -81,19 +133,10 @@ func NewAzureKeyVaultClient(logger logger.Logger, vaultURL, tenantID, clientID, 
 	if err := validateVaultURL(vaultURL); err != nil {
 		return nil, err
 	}
-	if tenantID == "" {
-		return nil, errors.New("tenant ID required for client credentials authentication")
-	}
-	if clientID == "" {
-		return nil, errors.New("client ID required for client credentials authentication")
-	}
-	if clientSecret == "" {
-		return nil, errors.New("client secret required for client credentials authentication")
-	}
 
-	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
+	cred, err := newAzureClientSecretCredential(tenantID, clientID, clientSecret, azureClientOptionsForVault(vaultURL))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Azure client secret credential")
+		return nil, err
 	}
 
 	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
@@ -105,16 +148,24 @@ func NewAzureKeyVaultClientWithManagedIdentity(logger logger.Logger, vaultURL, c
 		return nil, err
 	}
 
-	var opts *azidentity.ManagedIdentityCredentialOptions
-	if clientID != "" {
-		opts = &azidentity.ManagedIdentityCredentialOptions{
-			ID: azidentity.ClientID(clientID),
-		}
+	cred, err := newAzureManagedIdentityCredential(clientID, azureClientOptionsForVault(vaultURL))
+	if err != nil {
+		return nil, err
 	}
 
-	cred, err := azidentity.NewManagedIdentityCredential(opts)
+	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
+}
+
+// NewAzureKeyVaultClientWithWorkloadIdentity creates client using AKS workload identity.
+// Empty clientID and tenantID fall back to AZURE_CLIENT_ID and AZURE_TENANT_ID.
+func NewAzureKeyVaultClientWithWorkloadIdentity(logger logger.Logger, vaultURL, clientID, tenantID string) (*AzureKeyVaultClient, error) {
+	if err := validateVaultURL(vaultURL); err != nil {
+		return nil, err
+	}
+
+	cred, err := newAzureWorkloadIdentityCredential(clientID, tenantID, azureClientOptionsForVault(vaultURL))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Azure managed identity credential")
+		return nil, err
 	}
 
 	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
@@ -126,9 +177,9 @@ func NewAzureKeyVaultClientWithCLI(logger logger.Logger, vaultURL string) (*Azur
 		return nil, err
 	}
 
-	cred, err := azidentity.NewAzureCLICredential(nil)
+	cred, err := newAzureCLICredential()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Azure CLI credential")
+		return nil, err
 	}
 
 	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
@@ -140,23 +191,120 @@ func NewAzureKeyVaultClientWithDefaultCredential(logger logger.Logger, vaultURL 
 		return nil, err
 	}
 
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	cred, err := newAzureDefaultCredential(azureClientOptionsForVault(vaultURL))
+	if err != nil {
+		return nil, err
+	}
+
+	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
+}
+
+func newAzureClientSecretCredential(tenantID, clientID, clientSecret string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+	if tenantID == "" {
+		return nil, errors.New("tenant ID required for client credentials authentication")
+	}
+	if clientID == "" {
+		return nil, errors.New("client ID required for client credentials authentication")
+	}
+	if clientSecret == "" {
+		return nil, errors.New("client secret required for client credentials authentication")
+	}
+
+	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &azidentity.ClientSecretCredentialOptions{ClientOptions: clientOptions})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Azure client secret credential")
+	}
+
+	return cred, nil
+}
+
+func newAzureManagedIdentityCredential(clientID string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+	opts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: clientOptions}
+	if clientID != "" {
+		opts.ID = azidentity.ClientID(clientID)
+	}
+
+	cred, err := azidentity.NewManagedIdentityCredential(opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Azure managed identity credential")
+	}
+
+	return cred, nil
+}
+
+func newAzureWorkloadIdentityCredential(clientID, tenantID string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+	cred, err := azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
+		ClientOptions: clientOptions,
+		ClientID:      clientID,
+		TenantID:      tenantID,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Azure workload identity credential; it needs AZURE_CLIENT_ID, AZURE_TENANT_ID and "+
+			"AZURE_FEDERATED_TOKEN_FILE, which the AKS workload identity webhook injects into pods labelled azure.workload.identity/use: \"true\"")
+	}
+
+	return cred, nil
+}
+
+func newAzureCLICredential() (azcore.TokenCredential, error) {
+	cred, err := azidentity.NewAzureCLICredential(nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Azure CLI credential")
+	}
+
+	return cred, nil
+}
+
+func newAzureDefaultCredential(clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+	cred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOptions})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create Azure default credential")
 	}
 
-	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
+	return cred, nil
+}
+
+// azureClientOptionsForVault points Microsoft Entra authentication at the cloud the
+// vault lives in, so a sovereign-cloud vault works without extra settings.
+// AZURE_AUTHORITY_HOST, when set, takes precedence.
+func azureClientOptionsForVault(vaultURL string) azcore.ClientOptions {
+	if os.Getenv("AZURE_AUTHORITY_HOST") != "" {
+		return azcore.ClientOptions{}
+	}
+
+	parsed, err := url.Parse(vaultURL)
+	if err != nil {
+		return azcore.ClientOptions{}
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	switch {
+	case strings.HasSuffix(host, ".vault.azure.cn"):
+		return azcore.ClientOptions{Cloud: cloud.AzureChina}
+	case strings.HasSuffix(host, ".vault.usgovcloudapi.net"):
+		return azcore.ClientOptions{Cloud: cloud.AzureGovernment}
+	default:
+		return azcore.ClientOptions{}
+	}
 }
 
 func validateVaultURL(vaultURL string) error {
 	if vaultURL == "" {
 		return errors.New("empty Azure Key Vault URL provided")
 	}
+
 	parsed, err := url.Parse(vaultURL)
-	if err != nil || parsed.Scheme != "https" || !strings.HasSuffix(parsed.Host, ".vault.azure.net") {
-		return errors.New("invalid Azure Key Vault URL: must be https://<name>.vault.azure.net")
+	if err == nil && parsed.Scheme == "https" {
+		host := strings.ToLower(parsed.Hostname())
+		for _, suffix := range azureKeyVaultHostSuffixes {
+			if strings.HasSuffix(host, suffix) {
+				return nil
+			}
+		}
 	}
-	return nil
+
+	return errors.New("invalid Azure Key Vault URL: must be https://<name>.vault.azure.net, or for sovereign clouds " +
+		"https://<name>.vault.azure.cn, https://<name>.vault.usgovcloudapi.net or https://<name>.vault.microsoftazure.de")
 }
 
 func newAzureKeyVaultClientWithCredential(logger logger.Logger, vaultURL string, cred azcore.TokenCredential) (*AzureKeyVaultClient, error) {
@@ -165,147 +313,77 @@ func newAzureKeyVaultClientWithCredential(logger logger.Logger, vaultURL string,
 		return nil, errors.Wrap(err, "failed to create Azure Key Vault secrets client")
 	}
 
-	return &AzureKeyVaultClient{
-		client:                  client,
-		logger:                  logger,
-		cacheConnections:        make(map[string]any),
-		cacheConnectionsDetails: make(map[string]any),
-	}, nil
+	return newAzureKeyVaultClient(logger, client, ""), nil
 }
 
-// GetConnection retrieves a connection by name from Azure Key Vault.
-func (c *AzureKeyVaultClient) GetConnection(name string) any {
-	conn, err := c.ResolveConnection(name)
-	if err != nil {
-		logLookupFailure(c.logger, err)
-		return nil
+func newAzureKeyVaultClient(logger logger.Logger, client azureKeyVaultSecretsClient, prefix string) *AzureKeyVaultClient {
+	c := &AzureKeyVaultClient{
+		client: client,
+		prefix: prefix,
 	}
+	c.cachedSecretBackend = newCachedSecretBackend(c, logger)
 
-	return conn
+	return c
 }
 
-// ResolveConnection implements config.ConnectionResolver.
-func (c *AzureKeyVaultClient) ResolveConnection(name string) (any, error) {
-	c.cacheMu.RLock()
-	if conn, ok := c.cacheConnections[name]; ok {
-		c.cacheMu.RUnlock()
-		return conn, nil
-	}
-	c.cacheMu.RUnlock()
-
-	manager, err := c.getAzureKeyVaultManager(name)
-	if err != nil {
-		return nil, err
+func (c *AzureKeyVaultClient) readConnections(name string) (*config.Connections, error) {
+	secretName := c.prefix + name
+	if !azureKeyVaultSecretName.MatchString(secretName) {
+		return nil, errors.Errorf(
+			"connection '%s' can't be read from Azure Key Vault: secret '%s' is not a valid Key Vault secret name, which may only contain "+
+				"letters, digits and hyphens (0-9, a-z, A-Z, -) and be at most 127 characters; rename the connection to match",
+			name, secretName,
+		)
 	}
 
-	conn := manager.GetConnection(name)
-
-	c.cacheMu.Lock()
-	c.cacheConnections[name] = conn
-	c.cacheMu.Unlock()
-
-	return conn, nil
-}
-
-// GetConnectionDetails retrieves connection details by name from Azure Key Vault.
-func (c *AzureKeyVaultClient) GetConnectionDetails(name string) any {
-	c.cacheMu.RLock()
-	if deets, ok := c.cacheConnectionsDetails[name]; ok {
-		c.cacheMu.RUnlock()
-		return deets
-	}
-	c.cacheMu.RUnlock()
-
-	manager, err := c.getAzureKeyVaultManager(name)
-	if err != nil {
-		logLookupFailure(c.logger, err)
-		return nil
-	}
-
-	deets := manager.GetConnectionDetails(name)
-
-	c.cacheMu.Lock()
-	c.cacheConnectionsDetails[name] = deets
-	c.cacheMu.Unlock()
-
-	return deets
-}
-
-func (c *AzureKeyVaultClient) GetConnectionType(name string) string {
-	manager, err := c.getAzureKeyVaultManager(name)
-	if err != nil {
-		return ""
-	}
-	return manager.GetConnectionType(name)
-}
-
-func (c *AzureKeyVaultClient) getAzureKeyVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancelFunc()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultAzureRequestTimeout)
+	defer cancel()
 
 	// Empty string for version gets the latest version
-	result, err := c.client.GetSecret(ctx, name, "", nil)
+	result, err := c.client.GetSecret(ctx, secretName, "", nil)
 	if err != nil {
 		var respErr *azcore.ResponseError
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
-			return nil, newSecretNotFoundError("secret '%s' not found in Azure Key Vault", name)
+			return nil, newSecretNotFoundError("secret '%s' not found in Azure Key Vault", secretName)
 		}
-		return nil, errors.Wrapf(err, "failed to read secret '%s' from Azure Key Vault", name)
+		return nil, errors.Wrapf(err, "failed to read secret '%s' from Azure Key Vault", secretName)
 	}
 
-	if result.Value == nil {
-		return nil, errors.Errorf("secret '%s' has no value", name)
+	return readConnectionSecret(name, result.Value)
+}
+
+// listConnectionNames lists the enabled secrets under the configured prefix and returns their names with the prefix removed.
+func (c *AzureKeyVaultClient) listConnectionNames() ([]string, error) {
+	var names []string
+	pager := c.client.NewListSecretPropertiesPager(nil)
+	for pager.More() {
+		ctx, cancel := context.WithTimeout(context.Background(), defaultAzureRequestTimeout)
+		page, err := pager.NextPage(ctx)
+		cancel()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to list secrets in Azure Key Vault")
+		}
+
+		for _, secret := range page.Value {
+			if secret == nil || secret.ID == nil {
+				continue
+			}
+			// Disabled secrets can't be read, and managed secrets back Key Vault certificates.
+			if secret.Attributes != nil && secret.Attributes.Enabled != nil && !*secret.Attributes.Enabled {
+				continue
+			}
+			if secret.Managed != nil && *secret.Managed {
+				continue
+			}
+
+			// Key Vault secret names are case-insensitive, so the prefix is too.
+			secretName := secret.ID.Name()
+			if len(secretName) <= len(c.prefix) || !strings.EqualFold(secretName[:len(c.prefix)], c.prefix) {
+				continue
+			}
+			names = append(names, secretName[len(c.prefix):])
+		}
 	}
 
-	var secretData map[string]any
-	if err := json.Unmarshal([]byte(*result.Value), &secretData); err != nil {
-		return nil, errors.Wrap(err, "failed to parse secret as JSON")
-	}
-
-	detailsRaw, okDetails := secretData["details"]
-	secretType, okType := secretData["type"].(string)
-
-	details, detailsIsMap := detailsRaw.(map[string]any)
-	if !okDetails || !detailsIsMap || !okType || secretType == "" {
-		return nil, errors.Errorf("secret '%s' must contain both 'type' (non-empty string) and 'details' (object)", name)
-	}
-
-	details["name"] = name
-
-	connectionsMap := map[string][]map[string]any{
-		secretType: {
-			details,
-		},
-	}
-
-	serialized, err := json.Marshal(connectionsMap)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to process secret '%s'", name)
-	}
-
-	var connections config.Connections
-
-	if err := json.Unmarshal(serialized, &connections); err != nil {
-		return nil, errors.Wrapf(err, "failed to parse secret '%s' configuration", name)
-	}
-
-	environment := config.Environment{
-		Connections: &connections,
-	}
-
-	cfg := config.Config{
-		Environments: map[string]config.Environment{
-			"default": environment,
-		},
-		SelectedEnvironmentName: "default",
-		SelectedEnvironment:     &environment,
-		DefaultEnvironmentName:  "default",
-	}
-
-	manager, errs := connection.NewManagerFromConfig(&cfg)
-	if len(errs) > 0 {
-		return nil, errors.Wrapf(errs[0], "failed to configure connection '%s'", name)
-	}
-
-	return manager, nil
+	return names, nil
 }
