@@ -2,6 +2,8 @@ package bigquery
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -233,6 +235,30 @@ func applyJobIDPrefix(ctx context.Context, bqQuery *bigquery.Query) {
 	bqQuery.AddJobIDSuffix = true
 }
 
+// applyRunScopedJobID gives the main query of a Bruin Cloud run a job ID derived from the run,
+// the asset and the SQL, so a retry of the asset uses the same ID and can find the job of an
+// earlier attempt (see runQueryJob). Other queries keep the library's random suffix.
+func applyRunScopedJobID(ctx context.Context, bqQuery *bigquery.Query, q *query.Query) {
+	runID, asset := q.Annotations["run_id"], q.Annotations["asset"]
+	if bqQuery.JobID == "" || runID == "" || asset == "" || query.QueryTypeFromContext(ctx) != query.QueryTypeMain {
+		return
+	}
+	sql := q.Query
+	// The annotation comment carries the try number, which changes on every attempt.
+	if rest, ok := strings.CutPrefix(sql, ansisql.AnnotationCommentPrefix); ok {
+		if _, body, found := strings.Cut(rest, "\n"); found {
+			sql = body
+		}
+	}
+	h := sha256.New()
+	for _, part := range []string{runID, asset, sql} {
+		h.Write([]byte(part))
+		h.Write([]byte{0})
+	}
+	bqQuery.JobID += "-" + hex.EncodeToString(h.Sum(nil))[:32]
+	bqQuery.AddJobIDSuffix = false
+}
+
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return false, err
@@ -290,6 +316,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 		return err
 	}
 	bqQuery := d.queryForExecution(ctx, q.String())
+	applyRunScopedJobID(ctx, bqQuery, q)
 	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
 		return formatError(err)
