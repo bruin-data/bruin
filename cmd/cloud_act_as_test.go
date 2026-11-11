@@ -186,6 +186,7 @@ func TestActAsStartErrors(t *testing.T) {
 		args                []string
 	}{
 		{name: "server refusal", refusal: "You cannot act as this agent.", args: []string{"--agent-id", "12"}, want: "could not act as agent 12: You cannot act as this agent."},
+		{name: "login without act-as permission", refusal: "Insufficient token permissions. Required ability: agent:act-as", args: []string{"--agent-id", "12"}, want: "run 'bruin cloud login --global --reauth'"},
 		{name: "invalid id", args: []string{"--agent-id", "0"}, want: "--agent-id must be a positive integer, got 0"},
 		{name: "start and stop", args: []string{"--agent-id", "12", "--stop"}, want: "--agent-id and --stop cannot be used together"},
 	} {

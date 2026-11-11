@@ -81,6 +81,9 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 	case c.IsSet("agent-id"):
 		session, permissions, err := fetchActAs(ctx, store, agentID, resolveTeam(c))
 		if err != nil {
+			if strings.Contains(err.Error(), "agent:act-as") {
+				return fmt.Errorf("could not act as agent %d: your login doesn't allow acting as agents; run 'bruin cloud login --global --reauth' and choose read and write, or tick agent:act-as", agentID)
+			}
 			return fmt.Errorf("could not act as agent %d: %w", agentID, err)
 		}
 		unlock, err := store.LockActAs(ctx)
