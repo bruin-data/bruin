@@ -3,6 +3,7 @@ package bruincloud
 import (
 	"encoding/json"
 	"strings"
+	"time"
 )
 
 // Team is a team the caller's token can act on. CompanyPrefix is what you pass
@@ -152,6 +153,18 @@ type AgentMcpServersResponse struct {
 	MCPIntegrations      []AgentMcpServer    `json:"mcp_integrations"`
 	MCPKinds             map[string]string   `json:"mcp_kinds"`
 	ConnectionsByMcpKind map[string][]string `json:"connections_by_mcp_kind"`
+}
+
+type ActAsAgentResult struct {
+	Token       string        `json:"token"`
+	ExpiresAt   time.Time     `json:"expires_at"`
+	Agent       ActAsAgentRef `json:"agent"`
+	Team        string        `json:"team"`
+	Permissions []string      `json:"permissions"`
+}
+
+type ActAsAgentRef struct {
+	Name string `json:"name"`
 }
 
 // AgentConnection is one connection available to an agent — name and type only
