@@ -33,7 +33,7 @@ LINT_TIMEOUT ?= 10m
 LINT_BUILD_TAGS ?= no_duckdb_arrow
 LINT_FAST_LINTERS ?= errcheck,govet,ineffassign
 TEST_CONCURRENCY ?= 4
-GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go integration-tests/backfill_test.go main.go
+GO_FORMAT_PATHS := cmd pkg semantic-engine integration-tests/integration_test.go integration-tests/backfill_test.go integration-tests/postgres-cdc main.go
 LINT_MODULES := . $(patsubst %/go.mod,%,$(filter-out go.mod,$(shell git ls-files '*go.mod')))
 
 # Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
@@ -45,7 +45,7 @@ endif
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 SPARK_INTEGRATION_TEST = cd integration-tests/cloud-integration-tests/spark && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v -timeout 30m .
 
-.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-backfill integration-test-cloud integration-test-spark integration-test-mssql validate-links sync-template-docs setup tools-update
+.PHONY: all clean test test-full test-unit build build-no-duckdb docs-app format format-ci lint lint-fast lint-full lint-ci pre-commit refresh-integration-expectations integration-test integration-test-light integration-test-backfill integration-test-cloud integration-test-spark integration-test-mssql integration-test-postgres-cdc validate-links sync-template-docs setup tools-update
 all: clean deps test build
 
 deps: ingestr-hashes
@@ -128,6 +128,10 @@ integration-test-mssql: build
 	@echo "$(OK_COLOR)==> Running MSSQL integration tests...$(NO_COLOR)"
 	@cd integration-tests/mssql && env SILENT=1 SF_DISABLE_MINICORE=true go test -count=1 -v -timeout 15m .
 
+integration-test-postgres-cdc: build
+	@echo "$(OK_COLOR)==> Running PostgreSQL CDC integration tests...$(NO_COLOR)"
+	@cd integration-tests/postgres-cdc && env BRUIN_POSTGRES_CDC_TEST=1 go test -count=1 -v -timeout 15m .
+
 clean:
 	@rm -rf ./bin
 
@@ -136,6 +140,7 @@ test: test-unit
 test-unit: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (fast)$(NO_COLOR)"
 	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
+	@python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/... ./docs/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
@@ -143,6 +148,7 @@ test-unit: ingestr-hashes
 test-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
 	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
+	@python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/... ./docs/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...

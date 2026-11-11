@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -22,11 +21,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/mod/semver"
 )
-
-// versionPattern matches the bare family marker (vMAJOR) or a fully-qualified
-// vMAJOR.MINOR.PATCH. MAJOR is any non-negative integer with no leading zero
-// (other than the literal "0").
-var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 
 const (
 	versionFamilyV0 = "v0"
@@ -47,30 +41,15 @@ type resolvedEngine struct {
 // Bare family markers (v0, v1, ...) resolve to the corresponding pinned
 // version; fully-qualified vMAJOR.MINOR.PATCH overrides to an exact release.
 func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
-	versionRaw, _ := asset.Parameters.GetString("version")
-	versionParam := strings.TrimSpace(versionRaw)
-
-	if versionParam == "" {
-		return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
+	version, err := python.ResolveIngestrVersion(asset)
+	if err != nil {
+		return resolvedEngine{}, err
 	}
-
-	match := versionPattern.FindStringSubmatch(versionParam)
-	if match == nil {
-		return resolvedEngine{}, fmt.Errorf("invalid parameters.version %q: expected vMAJOR or vMAJOR.MINOR.PATCH", versionParam)
+	family := versionFamilyV1
+	if strings.HasPrefix(version, "0.") {
+		family = versionFamilyV0
 	}
-
-	if match[2] != "" {
-		family := versionFamilyV1
-		if match[1] == "0" {
-			family = versionFamilyV0
-		}
-		return resolvedEngine{family: family, ingestrVersion: strings.TrimPrefix(versionParam, "v")}, nil
-	}
-
-	if match[1] == "0" {
-		return resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}, nil
-	}
-	return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
+	return resolvedEngine{family: family, ingestrVersion: version}, nil
 }
 
 // appendQueryAnnotations adds the --query-annotations flag carrying the
@@ -258,6 +237,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if err != nil {
 		return err
 	}
+	ctx = applyIngestrEngine(ctx, engine)
+
+	if err := python.ValidateIngestrCDCParameters(asset); err != nil {
+		return err
+	}
 
 	deleteBehavior, _ := asset.Parameters.GetString("cdc_delete_behavior")
 	_, hasDeleteBehavior := asset.Parameters["cdc_delete_behavior"]
@@ -325,6 +309,14 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		}
 
 		q := parsedURI.Query()
+		for _, param := range []string{"cdc_discover_interval", "cdc_binary"} {
+			if value, present := asset.Parameters.GetString(param); present {
+				if parsedURI.Scheme != "postgres+cdc" && parsedURI.Scheme != "postgresql+cdc" {
+					return fmt.Errorf("%s is only supported for PostgreSQL CDC sources", param)
+				}
+				q.Set(strings.TrimPrefix(param, "cdc_"), value)
+			}
+		}
 		// PostgreSQL logical-replication parameters.
 		if pub, _ := asset.Parameters.GetString("cdc_publication"); pub != "" {
 			q.Set("publication", pub)
@@ -407,6 +399,23 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		}
 	}
 
+	if err := python.ValidateIngestrCDCParameterVersion(asset, engine.ingestrVersion); err != nil {
+		return err
+	}
+	if snapshot, present := asset.Parameters.GetString("postgres_snapshot"); present {
+		parsed, err := ingestruri.Parse(sourceURI)
+		if err != nil {
+			return err
+		}
+		if parsed.Scheme != "postgres" && parsed.Scheme != "postgresql" {
+			return errors.New("postgres_snapshot is only supported for ordinary PostgreSQL sources")
+		}
+		query := parsed.Query()
+		query.Set("snapshot", snapshot)
+		parsed.RawQuery = query.Encode()
+		sourceURI = parsed.String()
+	}
+
 	sourceTable, ok := asset.Parameters.GetString("source_table")
 	if !ok {
 		return errors.New("source table not configured")
@@ -475,13 +484,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
-	// ingestr serves the stream metrics over HTTP for the lifetime of the run,
-	// and rejects --metrics-addr unless --stream is set as well, so only emit it
-	// for a streaming asset.
-	if IsStreamingAsset(asset) {
-		if metricsAddr, _ := asset.Parameters.GetString("cdc_stream_metrics_addr"); metricsAddr != "" {
-			baseArgs = append(baseArgs, "--metrics-addr", metricsAddr)
-		}
+	if naming, present := asset.Parameters.GetString("cdc_table_naming"); present {
+		baseArgs = append(baseArgs, "--cdc-table-naming", naming)
 	}
 
 	if executor.IsDebugMode(ctx) {
@@ -522,7 +526,6 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if err := ensureStarRocksEngineSupport(engine, sourceURI, destURI); err != nil {
 		return err
 	}
-	ctx = applyIngestrEngine(ctx, engine)
 
 	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 	if err != nil {
@@ -911,6 +914,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return err
 	}
+	ctx = applyIngestrEngine(ctx, engine)
 
 	destURI = adaptURIForEngine(destURI, engine)
 
@@ -960,7 +964,6 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err := ensureStarRocksEngineSupport(engine, destURI); err != nil {
 		return err
 	}
-	ctx = applyIngestrEngine(ctx, engine)
 
 	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 	if err != nil {

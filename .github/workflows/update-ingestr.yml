@@ -81,6 +81,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/generate_ingestr_hashes.py
 
+      - name: Check PostgreSQL CDC capability parity
+        if: steps.check.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
+          python3 scripts/check_ingestr_cdc_parity.py --version "${{ steps.check.outputs.version }}"
+
       - name: Create Pull Request
         id: create-pr
         if: steps.check.outputs.new == 'true'

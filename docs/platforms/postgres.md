@@ -191,8 +191,13 @@ Bruin supports PostgreSQL CDC via the `ingestr` asset type. CDC uses PostgreSQL'
 Your source PostgreSQL database must be configured for logical replication:
 
 - `wal_level` set to `logical`
-- A [publication](https://www.postgresql.org/docs/current/sql-createpublication.html) created for the tables you want to replicate
-- A [replication slot](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html#LOGICALDECODING-REPLICATION-SLOTS) allocated for the CDC consumer
+- A source user with `REPLICATION`, schema access, and `SELECT` on the complete source tables
+- Enough replication slots and WAL sender connections for the consumer
+- Tables with usable primary keys or replica identity, and a publication covering inserts, updates, deletes, and truncates
+
+When publication and slot names are omitted, ingestr creates/manages them when the source user has permission. Its managed publication covers eligible logged tables; selecting one table does not narrow that shared publication. Set `cdc_publication` to use a publication you manage. Ingestr never adds tables to a user-managed publication. Snapshot policy `never` requires an existing slot.
+
+PostgreSQL 16+ standbys are supported. Create the publication on the primary; enable `wal_level=logical` on both servers and `hot_standby_feedback=on` on the standby, with a physical replication slot for its upstream connection. Temporary chunk slots can wait for a running-transactions record from the primary; see [ingestr's standby guide](https://getbruin.com/docs/ingestr/supported-sources/postgres.html#reading-from-a-standby).
 
 Refer to the [PostgreSQL logical replication documentation](https://www.postgresql.org/docs/current/logical-replication.html) for detailed setup instructions.
 
@@ -205,22 +210,34 @@ CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL 
 | `cdc` | Yes | Set to `"true"` to enable CDC mode |
 | `cdc_delete_behavior` | No | `soft` (default) retains deleted rows with `_cdc_deleted = true`; `hard` removes them from the destination. Applies to batch and streaming CDC. Requires ingestr v1.1.77 or later; see [Delete behavior](#delete-behavior) |
 | `cdc_snapshot_mode` | No | `auto` allows snapshots and backfills; `never` prohibits them. Omission inherits the saved policy; new connectors default to `auto`. Requires ingestr v1.1.78 or later; see [CDC without snapshots](#cdc-without-snapshots) |
-| `cdc_start_lsn` | No | Nonzero PostgreSQL LSN for bootstrapping preloaded destination tables with `cdc_snapshot_mode: never`. Remove after successful bootstrap. Requires ingestr v1.1.78 or later |
+| `cdc_start_lsn` | No | Nonzero PostgreSQL LSN for bootstrapping preloaded destination tables with `cdc_snapshot_mode: never`. Requires ingestr v1.1.78 or later; v1.1.79+ allows retaining the same boundary across subsequent runs |
+| `cdc_snapshot_spool` | No | Captures changes while a normal initial/full-refresh snapshot copies, then applies them. Defaults to `false`; requires ingestr v1.1.86 or later. See [Spooling normal snapshots](#spooling-normal-snapshots) |
 | `cdc_snapshot_chunked` | No | Enables resumable snapshots in short transactions; defaults to `false`. Requires ingestr v1.1.81 or later. See [Large initial snapshots](#large-initial-snapshots) |
 | `cdc_snapshot_execution` | No | `serial` (default) copies all selected tables before replaying retained WAL; `parallel` decodes changes while copying chunks |
 | `cdc_snapshot_chunk_size` | No | Positive maximum row count per chunk; defaults to `10000` |
 | `cdc_snapshot_chunk_timeout` | No | Positive duration per chunk, including temporary replication-slot creation; defaults to `30s` |
-| `cdc_wal_staging` | No | `inmemory` (default) or `destination`. Destination staging requires `cdc_snapshot_execution: parallel` |
+| `cdc_wal_staging` | No | `inmemory`, `memory` (alias), `destination`, or `disk`. Defaults to `destination` with normal spooling and `inmemory` otherwise. Chunked destination staging requires parallel execution; disk requires normal spooling. `memory` and `disk` require ingestr v1.1.86+ |
+| `cdc_wal_spool_dir` | No | Persistent directory required with normal spooling and `cdc_wal_staging: disk`; reuse it across restarts. Requires ingestr v1.1.86+ |
 | `cdc_wal_buffer_bytes` | No | Positive decoded-event buffering threshold in bytes; defaults to `67108864` (64 MiB). Does not bound total process memory or retained source WAL |
 | `stream` | No | Set to `true` for continuous (real-time) streaming. Omit for batch replication (read up to the current WAL position and exit) |
 | `cdc_mode` | No | **Deprecated** — use `stream` instead. `cdc_mode: stream` is equivalent to `stream: true` |
 | `cdc_publication` | No | Name of the PostgreSQL publication to use |
 | `cdc_slot` | No | Name of the PostgreSQL replication slot to use |
 | `cdc_dest_schema` | No | Schema to use when running multi-table CDC |
-| `cdc_stream_metrics_addr` | No | Address to serve streaming metrics on, such as `127.0.0.1:6060`. Only valid for a streaming asset (`stream: true`) |
+| `cdc_table_naming` | No | Multi-table naming within `cdc_dest_schema`: `schema_table` (default) includes the source schema in the table name; `table` keeps only the table name. Requires ingestr v1.1.49+ |
+| `cdc_state_id` | No | Stable connector identity for destination-managed resume state. Keep it unchanged across restarts |
+| `cdc_discover_interval` | No | Streaming discovery interval, default `30s`. Nonnegative duration, or `0`/`off` to disable. Requires ingestr v1.0.71+; see [Table discovery and naming](#table-discovery-and-naming) |
+| `cdc_binary` | No | Opt into binary pgoutput decoding, default `false`. Requires PostgreSQL 14+, supported column types, and ingestr v1.0.72+ |
+| `metrics_addr` | No | Address serving Prometheus metrics at `/metrics`, such as `127.0.0.1:6060`. Finite runs require ingestr v1.1.87+ |
+| `cdc_stream_metrics_addr` | No | Compatibility alias for `metrics_addr`; the canonical value takes precedence. Also works for finite runs with ingestr v1.1.87+ |
 | `cdc_stream_flush_interval` | No | How often buffered records are written to the destination, such as `30s`. Takes precedence over `flush_interval` |
 | `cdc_stream_flush_records` | No | Number of buffered records that triggers a write to the destination. Takes precedence over `flush_records` |
-| `source_table` | Yes | Source table in `schema.table` format, or `"*"` to replicate all tables in the publication |
+| `source_table` | Yes | One table, a comma-separated list, or `"*"` for all eligible publication tables |
+| `extract_parallelism` | No | Source reader workers. An explicit value also controls destination workers unless overridden; separate from chunk execution order |
+| `destination_parallelism` | No | Positive write-worker count, independent of extraction workers. Omission preserves ingestr defaults; requires v1.1.85+ |
+| `page_size` | No | Source page row ceiling; chunked snapshots apply it alongside their byte target when explicitly set |
+| `batch_size` | No | Positive source batch size in **MiB**, default `512`; requires ingestr v1.1.30+. Chunked pages use approximately 16 MiB or this value if smaller |
+| `no_load_timestamp` / `no_run_id` | No | Disable `_ingestr_loaded_at` / `_ingestr_run_id` metadata. Both default to `false`; require ingestr v1.0.39+ / v1.1.31+ respectively |
 | `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled. CDC assets must use `"merge"`; Bruin rejects other strategies. |
 
 > [!NOTE]
@@ -238,6 +255,44 @@ The setting requires ingestr v1.1.77 or later and applies to tables with a usabl
 Switching an existing asset from `soft` to `hard` leaves previously written tombstones in place until their keys change again. To remove them, rebuild the destination with `bruin run --full-refresh`; for a streaming asset, use [streaming full refresh](../assets/ingestr.md#refreshing-a-stream).
 
 Full refresh is unavailable for connectors using `cdc_snapshot_mode: never`; remove existing tombstones explicitly if you change their delete behavior.
+
+### Spooling normal snapshots
+
+With ingestr v1.1.86+, `cdc_snapshot_spool: true` captures changes while the normal initial or full-refresh snapshot copies. Once copying finishes, ingestr replays those changes and either exits or continues streaming. The normal snapshot transaction remains open throughout copying. Use [chunked snapshots](#large-initial-snapshots) when you need shorter source transactions.
+
+```yaml
+name: public.orders
+type: ingestr
+connection: warehouse
+parameters:
+  source_connection: my_pg
+  source_table: public.orders
+  cdc: true
+  cdc_snapshot_spool: true
+  metrics_addr: 127.0.0.1:6060
+```
+
+Run this with `bruin run assets/public.orders.asset.yml`. Add `stream: true` and launch with `bruin run --stream` to keep processing changes after the snapshot. Both single-table and multi-table selections are supported.
+
+| `cdc_wal_staging` | Changes captured during copying | Recovery storage |
+| --- | --- | --- |
+| `destination` (default with spooling) | Acknowledged once durably staged | Managed destination `cdc_snapshot_wal` table |
+| `disk` | Acknowledged once changes and metadata are synced | Persistent local spool plus destination checkpoints |
+| `memory` or `inmemory` | Source WAL is retained until changes are applied | Source WAL rebuilds volatile buffers after restart |
+
+For local disk storage, add:
+
+```yaml
+cdc_wal_staging: disk
+cdc_wal_spool_dir: /persistent/ingestr-spool
+cdc_wal_buffer_bytes: 67108864
+```
+
+Size durable storage for all changes captured during the copy; it does not compact changes to each key's latest value. `cdc_wal_buffer_bytes` is a buffering threshold, not a limit on spool size, process memory, or source WAL. Durable staging allows acknowledgment during copying, but PostgreSQL's `restart_lsn` can still lag behind acknowledged progress.
+
+Keep the same staging namespace, storage mode, persistent disk directory, table selection, and source/destination identities across retries. Do not remove an incomplete spool or disable spooling mid-bootstrap. Ingestr rejects incompatible recovery state; use full refresh to establish a new baseline. Finite snapshot cancellation can terminate the process abruptly, so recovery must retain this durable state. Streaming runs receive a graceful stop request before forced termination if needed.
+
+Spooling requires non-null primary keys and a destination supporting CDC keyed merges, truncation, and managed state. It cannot be combined with chunking, snapshot policy `never`, `cdc_start_lsn`, SQL limits/excluded columns, incremental filters, interval bounds, or extraction partitioning. Bruin omits automatically supplied run date bounds for spooling. Flush options remain streaming-only even for a finite spooled snapshot. Later schema-change and newly discovered-table backfills use the ordinary snapshot behavior.
 
 ### Large initial snapshots
 
@@ -281,9 +336,13 @@ cdc_wal_staging: destination
 
 Serial execution requires `cdc_wal_staging: inmemory`. It does not collect decoded events while copying; the source retains WAL instead. Combining serial execution with destination staging is rejected.
 
+With ingestr v1.1.86+, `memory` is an alias for `inmemory`. Disk staging is available only for normal snapshot spooling and cannot be used with chunking.
+
 All execution and staging choices save chunk cursors and recovery metadata in the destination's managed `cdc_snapshot_wal` table. Parallel execution with destination staging also stores pending logical change events there, not PostgreSQL WAL segment files. Preserve this table and the connector's other managed CDC state across restarts.
 
 Short transactions limit the snapshot horizon held on the source, but do not limit WAL retention. Serial execution needs enough source disk space for WAL retained throughout copying, then advances its checkpoint through catch-up. Parallel execution with memory staging also retains WAL needed for recovery; destination staging trades extra destination writes and storage for durable pending events. The memory budget is a buffering threshold, not a limit on total process memory or source WAL size. A table is certified complete only after its required catch-up finishes.
+
+Snapshot pages are bounded by approximately 16 MiB, or a smaller `batch_size` value in MiB. An explicit `page_size` also limits rows per page. Pages use temporary Arrow files; allow disk space for up to two chunks and set `TMPDIR` to disk-backed storage when necessary. A single large row can exceed the byte target. Parallel execution may prefetch one chunk while destination checkpointing completes. These reader controls are separate from `cdc_snapshot_execution`, which chooses when WAL is decoded.
 
 Requirements and recovery:
 
@@ -291,7 +350,7 @@ Requirements and recovery:
 - Every selected table needs non-null keys backed by a compatible unique B-tree index. Composite keys are supported. For tables containing text, binary, JSON, array, decimal, or unknown column types, set `REPLICA IDENTITY FULL` before bootstrapping, for example `ALTER TABLE public.orders REPLICA IDENTITY FULL`.
 - The destination must support CDC merges, truncation, and managed CDC state. Chunked snapshots use checkpointed merges for batch and full-refresh runs.
 - Chunk size, timeout, and memory budget must be positive. An expired chunk fails safely and can be retried on the next run.
-- Do not combine chunking with `cdc_snapshot_mode: never`, `cdc_start_lsn`, `sql_limit`, `sql_exclude_columns`, an incremental key or predicate, asset-level interval bounds, or `extract_partition_by`.
+- Do not combine chunking with `cdc_snapshot_spool: true`, `cdc_snapshot_mode: never`, `cdc_start_lsn`, `sql_limit`, `sql_exclude_columns`, an incremental key or predicate, asset-level interval bounds, or `extract_partition_by`.
 - Keep the slot, table selection, staging namespace, execution mode, and WAL staging mode unchanged when resuming. Changing them requires a new baseline with `bruin run --full-refresh`; streaming assets use [streaming full refresh](../assets/ingestr.md#refreshing-a-stream).
 - Schema changes, replaced destinations, and source `TRUNCATE` during an unfinished bootstrap stop the run. Establish a new baseline with full refresh. After bootstrap, ordinary CDC truncate handling applies.
 
@@ -330,7 +389,7 @@ parameters:
 
 Launch it with `bruin run --stream assets/public.orders.asset.yml`. For a batch run, omit `stream: true` and run the asset without `--stream`.
 
-After bootstrap succeeds, remove `cdc_start_lsn` before the next run: supplying it again is rejected because it cannot reset existing checkpoints. The snapshot policy is saved with the connector, so subsequent runs can omit both snapshot options. Keep the same asset and replace its parameters with:
+With ingestr v1.1.79 or later, keep the same `cdc_start_lsn` on subsequent runs or omit it: ingestr resumes from its latest managed checkpoint, not the original boundary. A different boundary cannot reset progress. With v1.1.78, remove the LSN after a successful bootstrap. The snapshot policy is saved with the connector, so subsequent runs can omit both snapshot options. For example:
 
 ```yaml
 parameters:
@@ -352,6 +411,86 @@ For a new connector, omitting `cdc_snapshot_mode` defaults to `auto`, which perm
 Ingestr adds CDC metadata columns without rewriting the preloaded rows, so untouched rows initially have NULL metadata. To include those live rows, filter with `COALESCE(_cdc_deleted, false) = false`. Source WAL `TRUNCATE` events still clear the destination table even under `never`.
 
 See the [ingestr snapshot-free CDC guide](https://getbruin.com/docs/ingestr/supported-sources/postgres.html#cdc-without-snapshots) for the full setup and recovery requirements.
+
+### Loading an external baseline
+
+Use `postgres_snapshot` on an ordinary PostgreSQL ingestr asset to load a snapshot before adopting it into CDC. This requires ingestr v1.1.83+. Configure `my_pg` and `warehouse` as source and destination PostgreSQL connections, and use a new destination table and dedicated replication slot for the handoff. Keep source schema, replica identity, and publication membership fixed; postpone `TRUNCATE` and table-rewriting DDL until adoption finishes.
+
+1. In a normal source SQL session, create a publication containing the complete table:
+
+   ```sql
+   CREATE PUBLICATION orders_pub FOR TABLE public.orders;
+   ```
+
+2. In a separate terminal, open an interactive replication connection to the same source primary:
+
+   ```bash
+   psql -X 'postgresql://replicator@source-host/source_db?replication=database'
+   ```
+
+   At its prompt, outside a transaction, run:
+
+   ```sql
+   CREATE_REPLICATION_SLOT orders_slot LOGICAL pgoutput EXPORT_SNAPSHOT;
+   ```
+
+   Record the returned `snapshot_name` and `consistent_point`. Leave this session **connected and idle** until every load finishes. Running another command or disconnecting expires the exported snapshot; avoid `psql -c` here.
+
+3. Replace the example snapshot ID below with the returned `snapshot_name`, then run this asset with `bruin run assets/public.orders.asset.yml`:
+
+   ```yaml
+   name: public.orders
+   type: ingestr
+   connection: warehouse
+   parameters:
+     source_connection: my_pg
+     source_table: public.orders
+     incremental_strategy: replace
+     postgres_snapshot: "00000003-0000001B-1"
+   ```
+
+   Copy every row and data column without limits, incremental filters, masking, or transformations. The reader imports the snapshot into its source transactions and fails if it has expired. For multiple tables, use the same snapshot ID for every load and keep the exporting session open until all succeed.
+
+4. After successful loading, close the export session. Keep the slot, and verify from a normal SQL connection that it is an inactive, persistent `pgoutput` slot in the source database with all WAL from `consistent_point` still available. Do not consume or advance that slot during loading.
+
+5. Replace the asset's parameters with the CDC configuration below. Use the returned `consistent_point` as `cdc_start_lsn`, replacing the example value:
+
+   ```yaml
+   parameters:
+     source_connection: my_pg
+     source_table: public.orders
+     cdc: true
+     cdc_publication: orders_pub
+     cdc_slot: orders_slot
+     cdc_snapshot_mode: never
+     cdc_start_lsn: "0/16B6C50"
+     stream: true
+   ```
+
+   Keep the same destination and launch `bruin run --stream assets/public.orders.asset.yml`. Rerunning this asset uses the latest saved checkpoint. For multiple tables loaded into their original table names, use a comma-separated selection, `cdc_dest_schema: public`, and `cdc_table_naming: table` so the CDC targets match the baseline.
+
+The returned snapshot/LSN pair establishes one consistent boundary; a later `pg_current_wal_lsn()` value does not. Keep sufficient source space for WAL throughout copying and catch-up. Ingestr verifies schemas and slot availability but cannot prove that baseline rows came from the supplied snapshot. An expired snapshot or lost WAL requires a new coordinated baseline, not substituting a current snapshot ID or LSN. See the [upstream baseline walkthrough](https://getbruin.com/docs/ingestr/tutorials/cdc-postgres-snapshot.html) for source privileges, slot inspection queries, and recovery details.
+
+### Table discovery and naming
+
+For multiple selected tables, `cdc_dest_schema` chooses the target schema/dataset and `cdc_table_naming` chooses names inside it:
+
+| Source | `cdc_dest_schema: replica`, naming `schema_table` | Naming `table` |
+| --- | --- | --- |
+| `sales.orders` | `replica.sales_orders` | `replica.orders` |
+| `public.users` | `replica.public_users` | `replica.users` |
+
+`schema_table` is the default. Ingestr rejects collisions before copying. A single-table asset uses its asset name or `destination_table`; `cdc_dest_schema` is ignored there, and `cdc_table_naming: table` is rejected. Changing naming, selected tables, or target namespaces can change connector identity, its slot, and its initial snapshot. Keep these settings stable when resuming.
+
+With `source_table: "*"`, batch runs discover new eligible tables on their next run. A running stream checks every `cdc_discover_interval` (default `30s`); use a nonnegative duration or `0`/`off` to disable mid-stream discovery. When new tables appear, ingestr exits with a restart request. Rerun the Bruin asset to backfill them and resume replication; Bruin does not supervise restarts. An explicit table list never grows automatically.
+
+For a custom publication, add new tables to it yourself unless it publishes all tables. Chunked checkpoints fix the selected table set: adding tables requires full refresh. Snapshot policy `never` prohibits automatic backfills. Retain the same connector state and source WAL across restarts.
+
+### Replica identity and schema changes
+
+Ingestr derives merge keys from the source's replica identity. `REPLICA IDENTITY USING INDEX` uses that index's key columns, excluding `INCLUDE` columns. Tables without usable replica identity are skipped; keyless tables with `REPLICA IDENTITY FULL` produce an append-only change log. Set `REPLICA IDENTITY FULL` before changing merge-key values when PostgreSQL could omit unchanged TOAST values from the new row image. Incomplete key changes fail rather than silently replacing missing values.
+
+Publication coverage must include inserts, updates, deletes, and truncates; this is checked even when discovery is disabled. Restore missing publication coverage before establishing a new baseline with full refresh. Stored generated columns require PostgreSQL 18+ and `publish_generated_columns = stored` on the publication. Ingestr configures managed publications; configure custom ones yourself. Earlier server versions and virtual generated columns are rejected. With snapshot policy `never`, schema/identity changes require recovery of the existing valid state or a new external baseline and connector.
 
 ### Examples
 
@@ -425,9 +564,12 @@ bruin run --stream assets/public.orders.asset.yml
 The stream runs in the foreground until you stop it with `Ctrl+C`, then flushes and exits cleanly. See [Streaming assets](../assets/ingestr.md#streaming-assets) for the full behaviour and restrictions.
 
 #### Tuning and observing a stream
-The `cdc_stream_*` parameters configure a running stream. `cdc_stream_flush_interval` and `cdc_stream_flush_records` control how often buffered changes reach the destination, and `cdc_stream_metrics_addr` serves replication lag, rows synced, and the last synced timestamp over HTTP for as long as the stream runs. The metrics are [expvar](https://pkg.go.dev/expvar) variables served at `/debug/vars`, and Postgres reports its lag as `bytes_behind`: the WAL the source has produced but the replication slot has not confirmed as durable.
 
-Nothing is served unless `cdc_stream_metrics_addr` is set, and it requires a streaming asset (`stream: true`) — ingestr rejects the address otherwise.
+`cdc_stream_flush_interval` and `cdc_stream_flush_records` control when buffered changes are written; defaults are `30s` and `50000`. These aliases override generic `flush_interval` and `flush_records`, and apply only to streaming runs. `extract_parallelism` controls snapshot readers; `destination_parallelism` independently controls writes where the destination supports concurrency. Normal parallel snapshot readers and eligible direct StarRocks snapshot loading are included in ingestr v1.1.85+ without an additional CDC switch.
+
+Set `metrics_addr` to expose Prometheus metrics at `/metrics` for the process lifetime. With ingestr v1.1.87+, this also works while a finite batch snapshot is copying. The compatibility alias `cdc_stream_metrics_addr` works in both modes; `metrics_addr` takes precedence when both are supplied.
+
+Streaming metrics require ingestr v1.0.73+. Exact pins before v1.1.10 expose the legacy `/debug/vars` endpoint instead of Prometheus; current bundled versions use `/metrics`.
 
 ```yaml
 name: public.orders
@@ -442,12 +584,16 @@ parameters:
   stream: true
   cdc_stream_flush_interval: 30s
   cdc_stream_flush_records: 10000
-  cdc_stream_metrics_addr: 127.0.0.1:6060
+  metrics_addr: 127.0.0.1:6060
 ```
 
 ```bash
-curl -s localhost:6060/debug/vars | jq '.ingestr_replication, .ingestr_stream_tables'
+curl -s http://localhost:6060/metrics
 ```
+
+PostgreSQL slot metrics include `ingestr_replication_slot_retained_wal_bytes`, `ingestr_replication_slot_safe_wal_bytes`, `ingestr_replication_slot_max_wal_keep_bytes`, `ingestr_replication_slot_wal_status`, and `ingestr_replication_slot_collection_success`. Retained WAL measures the span from `restart_lsn` to the server WAL head. Acknowledged progress (`confirmed_flush_lsn`) can advance while the slot still retains older WAL. The safe allowance can be absent when undefined, and a retention limit of `-1` means unlimited. Check collection success before interpreting missing values. Metrics observe retention; they do not cap disk use or stop snapshots automatically.
+
+`cdc_binary: true` enables PostgreSQL's binary pgoutput format on PostgreSQL 14+. It requires column types supported by ingestr's binary decoder; keep the default `false` for tables using unsupported or extension-specific types.
 
 #### Wildcard CDC — replicate all tables
 When `source_table` is set to `"*"`, all tables in the publication are replicated to the destination.

@@ -1,13 +1,13 @@
 {
-  "1.1.86": {
+  "1.1.87": {
     "archives": {
-      "ingestr_Darwin_arm64.tar.gz": "20ad216373f006516c6a139fb8c9d0e2f4c7a63dbff5c20dad2544f4cfbb8535",
-      "ingestr_Darwin_x86_64.tar.gz": "e469df989a4e195d8c143e360f71ef181e36940c296ce566d9fb51a823f539af",
-      "ingestr_Linux_arm64.tar.gz": "e31e02bdd98a8567d5cdbfcee368e3bb38cea82dae57c22f943c692016de6785",
-      "ingestr_Linux_x86_64.tar.gz": "da8fdec2e46fe4b46ebdaecd69cc4daeecde1aedd229c48e8643a1baaeac5f86",
-      "ingestr_Windows_x86_64.zip": "6cfb7ed008e0f1ccfac051cef25b6ad5241ac88c25dfb8b87a6c199e44711251"
+      "ingestr_Darwin_arm64.tar.gz": "0dadab7a58ccdbffcd5415934e410069a3cac022c84ab1c3855c30e7f8117ea2",
+      "ingestr_Darwin_x86_64.tar.gz": "46e889137b56aca003935fb26e80a033569574cda5e275b0c227d4d8424f32ec",
+      "ingestr_Linux_arm64.tar.gz": "cf459e68bf8822e0ef826c81e5de755622fec1110ffcd2b192ab63f8b32858d8",
+      "ingestr_Linux_x86_64.tar.gz": "4eb7c2af847fff18b8cfe3e5442e2e03d0e9a48b7f31e6b97b143bea511878f8",
+      "ingestr_Windows_x86_64.zip": "bdb080b4e667d64af0a2e4b8f2698356e26be8fb8fe8d83f0054e92ace875f87"
     },
-    "installer_commit": "c4de3c602ce5052be9d488104646a255d08ba605",
+    "installer_commit": "809ca80a2cbe14b254e1972c51e05fd232f2a718",
     "installer_sha256": "a03cba4a6961c31f122d832e3d402f1151c0bfcfab61bad142037171cb19c3d6"
   }
 }

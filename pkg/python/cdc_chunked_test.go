@@ -72,7 +72,8 @@ func TestCDCChunkedSnapshotParameterTypes(t *testing.T) {
 		{name: "unknown execution", key: "cdc_snapshot_execution", value: "concurrent"},
 		{name: "integer execution", key: "cdc_snapshot_execution", value: 1},
 		{name: "memory staging", key: "cdc_wal_staging", value: "inmemory", valid: true},
-		{name: "unknown staging", key: "cdc_wal_staging", value: "disk"},
+		{name: "memory staging alias", key: "cdc_wal_staging", value: "memory", valid: true},
+		{name: "unknown staging", key: "cdc_wal_staging", value: "remote"},
 		{name: "boolean staging", key: "cdc_wal_staging", value: false},
 		{name: "integer size", key: "cdc_snapshot_chunk_size", value: 10000, valid: true},
 		{name: "quoted size", key: "cdc_snapshot_chunk_size", value: "123", valid: true},
@@ -133,9 +134,11 @@ func TestCDCChunkedSnapshotRejectsExtractionFilters(t *testing.T) {
 	for _, key := range []string{"sql_limit", "sql_exclude_columns", "incremental_key", "incremental_predicate", "interval_start", "interval_end", "extract_partition_by"} {
 		t.Run(key, func(t *testing.T) {
 			t.Parallel()
-			params := pipeline.ParameterMap{"cdc": true, "cdc_snapshot_chunked": true, key: "1"}
-			err := ValidateCDCChunkedSnapshotParameters(&pipeline.Asset{Parameters: params})
-			require.ErrorContains(t, err, "cannot be combined with "+key)
+			for _, mode := range []string{"cdc_snapshot_chunked", "cdc_snapshot_spool"} {
+				params := pipeline.ParameterMap{"cdc": true, mode: true, key: "1"}
+				err := ValidateCDCChunkedSnapshotParameters(&pipeline.Asset{Parameters: params})
+				require.ErrorContains(t, err, mode+" cannot be combined with "+key)
+			}
 		})
 	}
 }
