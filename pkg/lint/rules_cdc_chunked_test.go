@@ -20,7 +20,7 @@ func TestEnsureIngestrAssetCDCChunkedSnapshotParameters(t *testing.T) {
 		{name: "default serial", parameters: pipeline.ParameterMap{"cdc_snapshot_chunked": true}},
 		{name: "finite parallel destination", parameters: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc_snapshot_execution": "parallel", "cdc_wal_staging": "destination"}},
 		{name: "streaming serial", parameters: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "stream": true}},
-		{name: "requires CDC", parameters: pipeline.ParameterMap{"cdc": false, "cdc_snapshot_chunked": true}, wantIssue: "chunked CDC snapshot parameters require cdc: true"},
+		{name: "requires CDC", parameters: pipeline.ParameterMap{"cdc": false, "cdc_snapshot_chunked": true}, wantIssue: "CDC snapshot parameters require cdc: true"},
 		{name: "invalid boolean", parameters: pipeline.ParameterMap{"cdc_snapshot_chunked": "yes"}, wantIssue: "invalid cdc_snapshot_chunked: must be true or false"},
 		{name: "invalid execution while disabled", parameters: pipeline.ParameterMap{"cdc_snapshot_execution": nil}, wantIssue: "invalid cdc_snapshot_execution: must be \"serial\" or \"parallel\""},
 		{name: "zero size", parameters: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc_snapshot_chunk_size": 0}, wantIssue: "invalid cdc_snapshot_chunk_size: must be positive when cdc_snapshot_chunked is true"},

@@ -358,6 +358,17 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
 		})
 	}
+	if err := python.ValidateIngestrCDCParameters(asset); err != nil {
+		issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+	}
+	if version, err := python.ResolveIngestrVersion(asset); err == nil {
+		if err := python.ValidateIngestrCDCParameterVersion(asset, version); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+		if err := python.ValidateIngestrLoadParameters(asset.Parameters, version); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+	}
 	if mode, exists := asset.Parameters.GetString("cdc_mode"); exists && mode != "stream" && mode != "batch" {
 		issues = append(issues, &Issue{
 			Task:        asset,

@@ -130,6 +130,8 @@ jobs:
         run: make integration-test
       - name: Run MSSQL developer environment integration test
         run: make integration-test-mssql
+      - name: Run PostgreSQL CDC integration tests
+        run: make integration-test-postgres-cdc
   dockerBuild:
     # Depot build for pushes and internally-created PRs. Fork PRs cannot
     # authenticate with Depot, so they are handled by dockerBuildFork instead.
