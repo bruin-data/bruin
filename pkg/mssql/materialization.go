@@ -115,10 +115,20 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	// SQL Server's DELETE can't alias its target directly, so the predicate uses the DELETE ... FROM form.
+	deleteQuery := fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName)
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		conditions := ansisql.AddIncrementalPredicate(
+			[]string{fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName)},
+			mat.IncrementalPredicate,
+		)
+		deleteQuery = fmt.Sprintf("DELETE target FROM %s AS target WHERE %s", task.Name, strings.Join(conditions, " AND "))
+	}
+
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("SELECT alias.* INTO %s FROM (%s\n) AS alias", tempTableName, query),
-		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		deleteQuery,
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
