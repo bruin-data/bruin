@@ -2,7 +2,6 @@ package bigquery
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -21,7 +20,7 @@ func TestApplyJobIDPrefix(t *testing.T) {
 		assert.False(t, bqQuery.AddJobIDSuffix)
 	})
 
-	t.Run("sets a bruin_<type>-<random> job ID", func(t *testing.T) {
+	t.Run("sets bruin_<type> prefix and enables suffix", func(t *testing.T) {
 		t.Parallel()
 		cases := []struct {
 			queryType string
@@ -46,19 +45,9 @@ func TestApplyJobIDPrefix(t *testing.T) {
 				ctx := query.WithQueryType(context.Background(), tc.queryType)
 				bqQuery := &bigquery.Query{}
 				applyJobIDPrefix(ctx, bqQuery)
-				assert.True(t, strings.HasPrefix(bqQuery.JobID, tc.wantID+"-"), bqQuery.JobID)
-				assert.Greater(t, len(bqQuery.JobID), len(tc.wantID)+1)
-				assert.False(t, bqQuery.AddJobIDSuffix)
+				assert.Equal(t, tc.wantID, bqQuery.JobID)
+				assert.True(t, bqQuery.AddJobIDSuffix)
 			})
 		}
-	})
-
-	t.Run("generates a new ID on each call", func(t *testing.T) {
-		t.Parallel()
-		ctx := query.WithQueryType(context.Background(), query.QueryTypeMain)
-		first, second := &bigquery.Query{}, &bigquery.Query{}
-		applyJobIDPrefix(ctx, first)
-		applyJobIDPrefix(ctx, second)
-		assert.NotEqual(t, first.JobID, second.JobID)
 	})
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/pkg/errors"
@@ -18,15 +20,11 @@ func (d *Client) isReadOnly() bool {
 func (d *Client) startQuery(ctx context.Context, q *bigquery.Query) (*bigquery.Job, *bigquery.RowIterator, error) {
 	if !d.isReadOnly() {
 		job, err := q.Run(ctx)
-		if err != nil && q.JobID != "" && isDuplicateJobError(err) {
+		if id, location, ok := duplicateJob(err, q.JobID); ok {
 			// The client library retries a failed insert with the same job ID. If the first
 			// insert reached BigQuery, the retry gets 409 duplicate although our job exists,
-			// so attach to it instead of failing and running the query again.
-			location := q.Location
-			if location == "" {
-				location = d.client.Location
-			}
-			job, err = d.client.JobFromIDLocation(ctx, q.JobID, location)
+			// so follow that job instead of failing and running the query again.
+			job, err = d.client.JobFromIDLocation(ctx, id, location)
 		}
 		return job, nil, err
 	}
@@ -73,7 +71,28 @@ func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.Quer
 	return stats, nil
 }
 
-func isDuplicateJobError(err error) bool {
+// duplicateJob returns the job a 409 "Already Exists: Job <project>:<location>.<id>" error
+// refers to, if it is one of ours: the library appends a random suffix to our prefix, and
+// only hands the generated ID back through this message. Anything else, including a message
+// in a format we don't recognize, is left as the original error.
+func duplicateJob(err error, prefix string) (id, location string, ok bool) {
 	var apiErr *googleapi.Error
-	return errors.As(err, &apiErr) && apiErr.Code == http.StatusConflict
+	if prefix == "" || !errors.As(err, &apiErr) || apiErr.Code != http.StatusConflict {
+		return "", "", false
+	}
+	const marker = "Already Exists: Job "
+	i := strings.Index(apiErr.Message, marker)
+	if i < 0 {
+		return "", "", false
+	}
+	ref := strings.FieldsFunc(apiErr.Message[i+len(marker):], func(r rune) bool { return r == ',' || unicode.IsSpace(r) })
+	if len(ref) == 0 {
+		return "", "", false
+	}
+	// The project may be domain-scoped ("example.com:project"), so split after its last colon.
+	location, id, found := strings.Cut(ref[0][strings.LastIndex(ref[0], ":")+1:], ".")
+	if !found || location == "" || !strings.HasPrefix(id, prefix+"-") {
+		return "", "", false
+	}
+	return id, location, true
 }
