@@ -671,9 +671,11 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// GitHub - Developer platform
 	"github": {
 		{Name: "commits", PrimaryKey: "sha", IncKey: "committed_at", IncStrategy: "merge"},
+		{Name: "commits:<repo>,<owner>/<repo>,<owner>/*", PrimaryKey: "repo, sha", IncKey: "committed_at", IncStrategy: "merge"},
 		{Name: "issues", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "pull_requests", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "repo_events", PrimaryKey: "id", IncKey: "created_at", IncStrategy: "merge"},
+		{Name: "repositories", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "stargazers", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
