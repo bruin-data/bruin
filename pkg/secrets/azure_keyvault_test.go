@@ -170,6 +170,7 @@ func TestValidateVaultURL(t *testing.T) {
 }
 
 func TestAzureClientOptionsForVault(t *testing.T) {
+	//nolint:paralleltest // mutates process env vars, which parallel subtests would race on.
 	t.Run("picks the vault's cloud", func(t *testing.T) {
 		unsetenv(t, "AZURE_AUTHORITY_HOST")
 
@@ -243,6 +244,7 @@ func TestNewAzureKeyVaultClientFromEnv(t *testing.T) {
 func TestAzureCredentials_WorkloadAndManagedIdentity(t *testing.T) {
 	const vaultScope = "https://vault.azure.net/.default"
 
+	//nolint:paralleltest // mutates process env vars, which parallel subtests would race on.
 	t.Run("workload_identity exchanges the federated token", func(t *testing.T) {
 		clearAzureKeyVaultEnv(t)
 		setAKSWorkloadIdentityEnv(t)
@@ -273,6 +275,7 @@ func TestAzureCredentials_WorkloadAndManagedIdentity(t *testing.T) {
 		require.Equal(t, "bruin-client-id", entra.lastTokenForm("client_id"))
 	})
 
+	//nolint:paralleltest // mutates process env vars, which parallel subtests would race on.
 	t.Run("workload_identity authenticates against a sovereign cloud vault's authority", func(t *testing.T) {
 		clearAzureKeyVaultEnv(t)
 		setAKSWorkloadIdentityEnv(t)
@@ -288,6 +291,7 @@ func TestAzureCredentials_WorkloadAndManagedIdentity(t *testing.T) {
 		require.Equal(t, "login.chinacloudapi.cn", entra.lastTokenHost())
 	})
 
+	//nolint:paralleltest // mutates process env vars, which parallel subtests would race on.
 	t.Run("default picks up AKS workload identity", func(t *testing.T) {
 		clearAzureKeyVaultEnv(t)
 		setAKSWorkloadIdentityEnv(t)
@@ -303,6 +307,7 @@ func TestAzureCredentials_WorkloadAndManagedIdentity(t *testing.T) {
 		require.Zero(t, entra.imdsCalls())
 	})
 
+	//nolint:paralleltest // mutates process env vars, which parallel subtests would race on.
 	t.Run("default falls back to managed identity", func(t *testing.T) {
 		clearAzureKeyVaultEnv(t)
 		entra := &fakeEntra{}

@@ -556,7 +556,7 @@ func (m *mockAWSSecretsManagerClient) ListSecrets(ctx context.Context, params *s
 }
 
 func newTestAWSClient(mock *mockAWSSecretsManagerClient, prefix string) *AWSSecretsManagerClient {
-	return newAWSSecretsManagerClient(context.Background(), &mockLogger{}, mock, prefix)
+	return newAWSSecretsManagerClient(&mockLogger{}, mock, prefix)
 }
 
 func TestAWSSecretsManagerClient_GetConnection_ReturnsConnection(t *testing.T) {

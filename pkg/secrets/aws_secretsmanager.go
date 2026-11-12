@@ -36,8 +36,8 @@ type AWSSecretsManagerClient struct {
 
 	client awsSecretsManagerClient
 	// prefix is prepended to connection names to form secret names, e.g. "bruin/prod/".
-	prefix string
-	ctx    context.Context
+	prefix          string
+	contextProvider func() context.Context
 }
 
 // awsAssumeRole holds the optional BRUIN_AWS_ROLE_ARN settings. These are deliberately
@@ -64,7 +64,8 @@ func NewAWSSecretsManagerClientFromEnv(ctx context.Context, logger logger.Logger
 		return nil, err
 	}
 
-	client := newAWSSecretsManagerClient(ctx, logger, secretsmanager.NewFromConfig(cfg), os.Getenv("BRUIN_AWS_SECRET_PREFIX"))
+	client := newAWSSecretsManagerClient(logger, secretsmanager.NewFromConfig(cfg), os.Getenv("BRUIN_AWS_SECRET_PREFIX"))
+	client.contextProvider = func() context.Context { return ctx }
 	if client.prefix != "" {
 		logger.Debugf("AWS Secrets Manager: reading connections from secrets prefixed with '%s'", client.prefix)
 	}
@@ -206,25 +207,32 @@ func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessK
 		),
 	}
 
-	return newAWSSecretsManagerClient(context.Background(), logger, secretsmanager.NewFromConfig(cfg), ""), nil
+	return newAWSSecretsManagerClient(logger, secretsmanager.NewFromConfig(cfg), ""), nil
 }
 
-func newAWSSecretsManagerClient(ctx context.Context, logger logger.Logger, client awsSecretsManagerClient, prefix string) *AWSSecretsManagerClient {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+func newAWSSecretsManagerClient(logger logger.Logger, client awsSecretsManagerClient, prefix string) *AWSSecretsManagerClient {
 	c := &AWSSecretsManagerClient{
 		client: client,
 		prefix: prefix,
-		ctx:    ctx,
 	}
 	c.cachedSecretBackend = newCachedSecretBackend(c, logger)
 
 	return c
 }
 
+// baseContext is the context requests derive from, so cancelling the command cancels in-flight reads.
+func (c *AWSSecretsManagerClient) baseContext() context.Context {
+	if c.contextProvider != nil {
+		if ctx := c.contextProvider(); ctx != nil {
+			return ctx
+		}
+	}
+
+	return context.Background()
+}
+
 func (c *AWSSecretsManagerClient) readConnections(name string) (*config.Connections, error) {
-	ctx, cancel := context.WithTimeout(c.ctx, defaultAWSRequestTimeout)
+	ctx, cancel := context.WithTimeout(c.baseContext(), defaultAWSRequestTimeout)
 	defer cancel()
 
 	secretName := c.prefix + name
@@ -253,7 +261,7 @@ func (c *AWSSecretsManagerClient) listConnectionNames() ([]string, error) {
 	var names []string
 	paginator := secretsmanager.NewListSecretsPaginator(c.client, input)
 	for paginator.HasMorePages() {
-		ctx, cancel := context.WithTimeout(c.ctx, defaultAWSRequestTimeout)
+		ctx, cancel := context.WithTimeout(c.baseContext(), defaultAWSRequestTimeout)
 		page, err := paginator.NextPage(ctx)
 		cancel()
 		if err != nil {

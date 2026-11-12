@@ -92,6 +92,7 @@ func NewAzureKeyVaultClientFromEnv(logger logger.Logger) (*AzureKeyVaultClient, 
 	return client, nil
 }
 
+//nolint:ireturn // picks one of several credential types depending on the auth method.
 func azureCredentialFromEnv(authMethod string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
 	switch authMethod {
 	case "client_credentials":
@@ -107,21 +108,41 @@ func azureCredentialFromEnv(authMethod string, clientOptions azcore.ClientOption
 		if clientSecret == "" {
 			return nil, errors.New("BRUIN_AZURE_CLIENT_SECRET env variable not set for client_credentials auth")
 		}
-		return newAzureClientSecretCredential(tenantID, clientID, clientSecret, clientOptions)
+		cred, err := newAzureClientSecretCredential(tenantID, clientID, clientSecret, clientOptions)
+		if err != nil {
+			return nil, err
+		}
+		return cred, nil
 
 	case "managed_identity":
 		// Optional, selects a user-assigned identity.
-		return newAzureManagedIdentityCredential(os.Getenv("BRUIN_AZURE_CLIENT_ID"), clientOptions)
+		cred, err := newAzureManagedIdentityCredential(os.Getenv("BRUIN_AZURE_CLIENT_ID"), clientOptions)
+		if err != nil {
+			return nil, err
+		}
+		return cred, nil
 
 	case "workload_identity":
 		// Optional overrides; the AKS webhook injects AZURE_CLIENT_ID and AZURE_TENANT_ID.
-		return newAzureWorkloadIdentityCredential(os.Getenv("BRUIN_AZURE_CLIENT_ID"), os.Getenv("BRUIN_AZURE_TENANT_ID"), clientOptions)
+		cred, err := newAzureWorkloadIdentityCredential(os.Getenv("BRUIN_AZURE_CLIENT_ID"), os.Getenv("BRUIN_AZURE_TENANT_ID"), clientOptions)
+		if err != nil {
+			return nil, err
+		}
+		return cred, nil
 
 	case "cli":
-		return newAzureCLICredential()
+		cred, err := newAzureCLICredential()
+		if err != nil {
+			return nil, err
+		}
+		return cred, nil
 
 	case "default":
-		return newAzureDefaultCredential(clientOptions)
+		cred, err := newAzureDefaultCredential(clientOptions)
+		if err != nil {
+			return nil, err
+		}
+		return cred, nil
 
 	default:
 		return nil, errors.Errorf("unsupported Azure auth method: %s (supported: client_credentials, managed_identity, workload_identity, cli, default)", authMethod)
@@ -199,7 +220,7 @@ func NewAzureKeyVaultClientWithDefaultCredential(logger logger.Logger, vaultURL 
 	return newAzureKeyVaultClientWithCredential(logger, vaultURL, cred)
 }
 
-func newAzureClientSecretCredential(tenantID, clientID, clientSecret string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+func newAzureClientSecretCredential(tenantID, clientID, clientSecret string, clientOptions azcore.ClientOptions) (*azidentity.ClientSecretCredential, error) {
 	if tenantID == "" {
 		return nil, errors.New("tenant ID required for client credentials authentication")
 	}
@@ -218,7 +239,7 @@ func newAzureClientSecretCredential(tenantID, clientID, clientSecret string, cli
 	return cred, nil
 }
 
-func newAzureManagedIdentityCredential(clientID string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+func newAzureManagedIdentityCredential(clientID string, clientOptions azcore.ClientOptions) (*azidentity.ManagedIdentityCredential, error) {
 	opts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: clientOptions}
 	if clientID != "" {
 		opts.ID = azidentity.ClientID(clientID)
@@ -232,7 +253,7 @@ func newAzureManagedIdentityCredential(clientID string, clientOptions azcore.Cli
 	return cred, nil
 }
 
-func newAzureWorkloadIdentityCredential(clientID, tenantID string, clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+func newAzureWorkloadIdentityCredential(clientID, tenantID string, clientOptions azcore.ClientOptions) (*azidentity.WorkloadIdentityCredential, error) {
 	cred, err := azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
 		ClientOptions: clientOptions,
 		ClientID:      clientID,
@@ -246,7 +267,7 @@ func newAzureWorkloadIdentityCredential(clientID, tenantID string, clientOptions
 	return cred, nil
 }
 
-func newAzureCLICredential() (azcore.TokenCredential, error) {
+func newAzureCLICredential() (*azidentity.AzureCLICredential, error) {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create Azure CLI credential")
@@ -255,7 +276,7 @@ func newAzureCLICredential() (azcore.TokenCredential, error) {
 	return cred, nil
 }
 
-func newAzureDefaultCredential(clientOptions azcore.ClientOptions) (azcore.TokenCredential, error) {
+func newAzureDefaultCredential(clientOptions azcore.ClientOptions) (*azidentity.DefaultAzureCredential, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOptions})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create Azure default credential")
