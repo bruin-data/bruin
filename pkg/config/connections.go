@@ -1404,8 +1404,8 @@ func (c SnapchatAdsConnection) GetName() string {
 type GitHubConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
-	Owner              string `yaml:"owner,omitempty" json:"owner" mapstructure:"owner"`
-	Repo               string `yaml:"repo,omitempty" json:"repo" mapstructure:"repo"`
+	Owner              string `yaml:"owner,omitempty" json:"owner,omitempty" mapstructure:"owner"`
+	Repo               string `yaml:"repo,omitempty" json:"repo,omitempty" mapstructure:"repo"`
 }
 
 func (c GitHubConnection) GetName() string {
