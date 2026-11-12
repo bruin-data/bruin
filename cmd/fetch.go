@@ -13,6 +13,7 @@ import (
 	path2 "path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -1721,6 +1722,8 @@ type QueryLog struct {
 	Limit               int64           `json:"limit,omitempty"`
 	Timeout             int             `json:"timeout,omitempty"`
 	Description         string          `json:"description,omitempty"`
+	RowCount            int             `json:"row_count,omitempty"`
+	RowsTruncated       bool            `json:"rows_truncated,omitempty"`
 }
 
 // QueryLogOptions contains optional parameters for query logging.
@@ -1753,11 +1756,13 @@ type queryLogWriter struct {
 	logDir   string
 	fields   int
 	rowsOpen bool
+	rows     int
+	maxRows  int
 	err      error
 }
 
 func openQueryLog(queryStr string, connName string, opts QueryLogOptions) *queryLogWriter {
-	l := &queryLogWriter{}
+	l := &queryLogWriter{maxRows: queryLogMaxRows()}
 	basePath := opts.Asset
 	if basePath == "" {
 		basePath = "."
@@ -1842,7 +1847,8 @@ func (l *queryLogWriter) writeColumns(columns []string) {
 }
 
 func (l *queryLogWriter) writeRow(row []interface{}) {
-	if l.err != nil {
+	l.rows++
+	if l.err != nil || l.truncated() {
 		return
 	}
 	data, err := json.Marshal(formatQueryRowForJSON(row))
@@ -1863,6 +1869,10 @@ func (l *queryLogWriter) writeRow(row []interface{}) {
 func (l *queryLogWriter) finish(queryErr error) error {
 	if l.rowsOpen {
 		l.write("\n  ]")
+	}
+	if l.truncated() {
+		l.field("row_count", l.rows)
+		l.field("rows_truncated", true)
 	}
 	l.field("timestamp", time.Now())
 	l.field("success", queryErr == nil)
@@ -1900,7 +1910,22 @@ func (l *queryLogWriter) finish(queryErr error) error {
 
 const aggregatedQueryLogPathEnv = "BRUIN_QUERY_LOG_FILE"
 
-// aggregatedQueryLogMaxRows caps rows per query in the aggregated log; the per-query files under logs/queries keep every row.
+// queryLogMaxRowsEnv caps rows kept in each per-query log; unset or non-positive keeps every row.
+const queryLogMaxRowsEnv = "BRUIN_QUERY_LOG_MAX_ROWS"
+
+func queryLogMaxRows() int {
+	n, err := strconv.Atoi(os.Getenv(queryLogMaxRowsEnv))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+func (l *queryLogWriter) truncated() bool {
+	return l.maxRows > 0 && l.rows > l.maxRows
+}
+
+// aggregatedQueryLogMaxRows caps rows per query in the aggregated log; the per-query files keep up to BRUIN_QUERY_LOG_MAX_ROWS.
 const aggregatedQueryLogMaxRows = 20
 
 var queryLogAggregateMu sync.Mutex
