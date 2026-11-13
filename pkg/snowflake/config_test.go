@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/snowflakedb/gosnowflake"
@@ -17,11 +18,19 @@ func TestConfig_DSNEndpoint(t *testing.T) {
 		port     int
 		wantHost string
 		wantPort int
+
+		wantOCSPDisabled bool
 	}{
 		{name: "defaults", wantHost: "my-account.eu-west-1.snowflakecomputing.com", wantPort: 443},
 		{name: "host only", host: "snowflake.example.com", wantHost: "snowflake.example.com", wantPort: 443},
 		{name: "port only", port: 8443, wantHost: "my-account.eu-west-1.snowflakecomputing.com", wantPort: 8443},
 		{name: "host and port", host: "127.0.0.1", port: 8443, wantHost: "127.0.0.1", wantPort: 8443},
+		{name: "privatelink host", host: "my-account.privatelink.snowflakecomputing.com", wantHost: "my-account.privatelink.eu-west-1.snowflakecomputing.com", wantPort: 443},
+		{name: "host merely containing the localstack domain", host: "snowflake.localhost.localstack.cloud.example.com", wantHost: "snowflake.localhost.localstack.cloud.example.com", wantPort: 443},
+		{name: "host merely ending in the localstack name", host: "mylocalhost.localstack.cloud", wantHost: "mylocalhost.localstack.cloud", wantPort: 443},
+		{name: "bare localstack host", host: "localhost.localstack.cloud", wantHost: "localhost.localstack.cloud", wantPort: 443, wantOCSPDisabled: true},
+		{name: "localstack host", host: "snowflake.localhost.localstack.cloud", port: 4566, wantHost: "snowflake.localhost.localstack.cloud", wantPort: 4566, wantOCSPDisabled: true},
+		{name: "localstack host in mixed case", host: "Snowflake.LocalHost.LocalStack.Cloud", wantHost: "Snowflake.LocalHost.LocalStack.Cloud", wantPort: 443, wantOCSPDisabled: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -43,6 +52,10 @@ func TestConfig_DSNEndpoint(t *testing.T) {
 			require.Equal(t, "my-account", parsed.Account)
 			require.Equal(t, "eu-west-1", parsed.Region)
 			require.Equal(t, "https", parsed.Protocol)
+			require.Equal(t, tt.wantOCSPDisabled, parsed.DisableOCSPChecks)
+			require.Equal(t, tt.wantOCSPDisabled, strings.Contains(dsn, "disableOCSPChecks"))
+			require.Equal(t, gosnowflake.OCSPFailOpenTrue, parsed.OCSPFailOpen)
+			require.Equal(t, gosnowflake.CertRevocationCheckDisabled, parsed.CertRevocationCheckMode)
 		})
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/youmark/pkcs8"
@@ -60,9 +61,18 @@ func (c Config) DSN() (string, error) {
 		Warehouse:     c.Warehouse,
 		PrivateKey:    privateKey,
 		Token:         c.Token,
+		// The LocalStack emulator has no OCSP cache server and its certificate names no OCSP
+		// responder, so OCSP would only retry ocsp.<host>:80 for seconds before failing open.
+		// gosnowflake can only turn off the cache server process-wide, so skip OCSP for these hosts.
+		DisableOCSPChecks: isLocalStackHost(c.Host),
 	}
 
 	return gosnowflake.DSN(&snowflakeConfig)
+}
+
+func isLocalStackHost(host string) bool {
+	host = strings.ToLower(host)
+	return host == "localhost.localstack.cloud" || strings.HasSuffix(host, ".localhost.localstack.cloud")
 }
 
 func (c Config) GetIngestrURI() (string, error) {
