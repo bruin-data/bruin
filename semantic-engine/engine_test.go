@@ -2243,6 +2243,19 @@ func TestJoinGraphQualifiesRootFieldsWhenJoined(t *testing.T) {
 	expectContains(t, sql, "SELECT base.country AS country, customers.segment AS customers_segment, sum(base.order_total) AS revenue")
 	expectContains(t, sql, "WHERE base.country = 'US' AND base.status = 'completed'")
 	expectContains(t, sql, "GROUP BY 1, 2")
+	for _, dialect := range []string{"bigquery", "google_cloud_platform"} {
+		engine.Dialect = dialect
+		for _, tc := range [][2]string{{`a"b`, `"a\"b"`}, {`a"b {country}`, `"a\"b {country}"`}} {
+			sql, err := engine.GenerateSQL(&Query{
+				Dimensions: []DimensionRef{{Name: "country"}, {Name: "customers.segment"}},
+				Filters:    []Filter{{Dimension: "country", Operator: "equals", Value: tc[0]}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectContains(t, sql, "WHERE base.country = "+tc[1])
+		}
+	}
 }
 
 func TestWindowSortOnlyDimensionIsAvailableInOuterOrder(t *testing.T) {
@@ -2343,6 +2356,7 @@ func TestGenerateSQLWithColumns_JoinedDimensionAlias(t *testing.T) {
 }
 
 func TestBigQueryFilterLiterals(t *testing.T) {
+	t.Parallel()
 	e := minimalEngine(t, richTestModel())
 	values := []string{"Summer's End", "Kids' Toys", "x\\'); SELECT 1 --", "line\nend", `x") OR 1=1 --`}
 	for _, dialect := range []string{"bigquery", "google_cloud_platform"} {

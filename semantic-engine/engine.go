@@ -737,13 +737,12 @@ func (e *Engine) buildWhereHaving(q *Query, plan *queryPlan) (where, having stri
 	var whereParts, havingParts []string
 
 	for _, f := range q.Filters {
-		var raw string
-		if f.Expression != "" {
-			raw = f.Expression
-		} else {
-			raw = e.filterToSQL(f, plan)
+		if f.Expression == "" {
+			// The plan resolves dimensions; keep literal values out of expression rewriting.
+			whereParts = append(whereParts, e.filterToSQL(f, plan))
+			continue
 		}
-		expanded, needsHaving, err := e.expandFilterExpr(raw, plan)
+		expanded, needsHaving, err := e.expandFilterExpr(f.Expression, plan)
 		if err != nil {
 			return "", "", err
 		}
