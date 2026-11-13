@@ -596,3 +596,61 @@ type ScheduledAgentPipelineTrigger struct {
 type ScheduledAgentPipelineTriggerResponse struct {
 	PipelineTrigger *ScheduledAgentPipelineTrigger `json:"pipeline_trigger"`
 }
+
+// DataAppGuide is the skill a coding agent follows to build a Bruin Cloud data app.
+// Content is markdown; Version changes whenever Content does.
+type DataAppGuide struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Version     string `json:"version"`
+	Content     string `json:"content"`
+}
+
+// DataAppGuideRef is the pointer every data-app API response carries to the guide.
+type DataAppGuideRef struct {
+	URL     string `json:"url"`
+	Version string `json:"version"`
+	Note    string `json:"note,omitempty"`
+}
+
+// DataApp is a Bruin Cloud data app. Code and the manifests are only set by GetDataApp;
+// the manifests stay raw JSON so pull writes them back exactly as stored.
+type DataApp struct {
+	ID           int              `json:"id"`
+	Title        *string          `json:"title"`
+	AgentID      *int             `json:"agent_id"`
+	Visibility   string           `json:"visibility"`
+	UpdatedAt    *string          `json:"updated_at"`
+	Version      string           `json:"version,omitempty"`
+	Code         *string          `json:"code,omitempty"`
+	Queries      json.RawMessage  `json:"queries,omitempty"`
+	HTTPRequests json.RawMessage  `json:"http_requests,omitempty"`
+	Guide        *DataAppGuideRef `json:"guide,omitempty"`
+}
+
+// DataAppSettings is what a team allows its data apps (read-only; admins change it in the UI).
+type DataAppSettings struct {
+	ReadOnly                bool             `json:"read_only"`
+	RestrictCredentialHosts bool             `json:"restrict_credential_hosts"`
+	AllowedHosts            []string         `json:"allowed_hosts"`
+	Guide                   *DataAppGuideRef `json:"guide,omitempty"`
+}
+
+// DataAppSaveInput is a push. Nil fields are left as stored; ExpectedVersion, when set,
+// makes the save fail with 409 if the app changed since that version.
+type DataAppSaveInput struct {
+	Code            *string         `json:"code,omitempty"`
+	Queries         json.RawMessage `json:"queries,omitempty"`
+	HTTPRequests    json.RawMessage `json:"http_requests,omitempty"`
+	ExpectedVersion string          `json:"expected_version,omitempty"`
+}
+
+// DataAppSaveResult is the response to a push.
+type DataAppSaveResult struct {
+	ID        int              `json:"id"`
+	Title     *string          `json:"title"`
+	UpdatedAt *string          `json:"updated_at"`
+	Version   string           `json:"version"`
+	Warnings  []string         `json:"warnings,omitempty"`
+	Guide     *DataAppGuideRef `json:"guide,omitempty"`
+}
