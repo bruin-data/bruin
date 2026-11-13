@@ -26,6 +26,9 @@ func containsAggregateOutsideRefs(expr string) bool {
 
 // Engine generates SQL from a Model and a Query.
 type Engine struct {
+	// Dialect selects warehouse-specific string escaping; empty uses SQL quote doubling.
+	Dialect string
+
 	model    *Model
 	models   map[string]*Model
 	metrics  map[string]*Metric
@@ -734,13 +737,12 @@ func (e *Engine) buildWhereHaving(q *Query, plan *queryPlan) (where, having stri
 	var whereParts, havingParts []string
 
 	for _, f := range q.Filters {
-		var raw string
-		if f.Expression != "" {
-			raw = f.Expression
-		} else {
-			raw = e.filterToSQL(f, plan)
+		if f.Expression == "" {
+			// The plan resolves dimensions; keep literal values out of expression rewriting.
+			whereParts = append(whereParts, e.filterToSQL(f, plan))
+			continue
 		}
-		expanded, needsHaving, err := e.expandFilterExpr(raw, plan)
+		expanded, needsHaving, err := e.expandFilterExpr(f.Expression, plan)
 		if err != nil {
 			return "", "", err
 		}
@@ -868,27 +870,27 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	}
 	switch f.Operator {
 	case "equals":
-		return fmt.Sprintf("%s = %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s = %s", dim, formatValue(f.Value, e.Dialect))
 	case "not_equals":
-		return fmt.Sprintf("%s != %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s != %s", dim, formatValue(f.Value, e.Dialect))
 	case "gt":
-		return fmt.Sprintf("%s > %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s > %s", dim, formatValue(f.Value, e.Dialect))
 	case "gte":
-		return fmt.Sprintf("%s >= %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s >= %s", dim, formatValue(f.Value, e.Dialect))
 	case "lt":
-		return fmt.Sprintf("%s < %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s < %s", dim, formatValue(f.Value, e.Dialect))
 	case "lte":
-		return fmt.Sprintf("%s <= %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s <= %s", dim, formatValue(f.Value, e.Dialect))
 	case "in":
-		return fmt.Sprintf("%s IN (%s)", dim, formatList(f.Value))
+		return fmt.Sprintf("%s IN (%s)", dim, formatList(f.Value, e.Dialect))
 	case "not_in":
-		return fmt.Sprintf("%s NOT IN (%s)", dim, formatList(f.Value))
+		return fmt.Sprintf("%s NOT IN (%s)", dim, formatList(f.Value, e.Dialect))
 	case "between":
 		start, end, ok := betweenValues(f.Value)
 		if !ok {
 			return ""
 		}
-		return fmt.Sprintf("%s BETWEEN %s AND %s", dim, formatValue(start), formatValue(end))
+		return fmt.Sprintf("%s BETWEEN %s AND %s", dim, formatValue(start, e.Dialect), formatValue(end, e.Dialect))
 	case "is_null":
 		return dim + " IS NULL"
 	case "is_not_null":
@@ -919,9 +921,13 @@ func betweenValues(v interface{}) (interface{}, interface{}, bool) {
 	}
 }
 
-func formatValue(v interface{}) string {
+func formatValue(v interface{}, dialect ...string) string {
 	switch val := v.(type) {
 	case string:
+		if len(dialect) > 0 && (dialect[0] == "bigquery" || dialect[0] == "google_cloud_platform") {
+			// GoogleSQL accepts double-quoted strings and Go's escape sequences.
+			return strconv.Quote(val)
+		}
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
 	case int:
 		return strconv.Itoa(val)
@@ -939,22 +945,22 @@ func formatValue(v interface{}) string {
 	}
 }
 
-func formatList(v interface{}) string {
+func formatList(v interface{}, dialect ...string) string {
 	switch val := v.(type) {
 	case []string:
 		quoted := make([]string, len(val))
 		for i, s := range val {
-			quoted[i] = "'" + strings.ReplaceAll(s, "'", "''") + "'"
+			quoted[i] = formatValue(s, dialect...)
 		}
 		return strings.Join(quoted, ", ")
 	case []interface{}:
 		parts := make([]string, len(val))
 		for i, item := range val {
-			parts[i] = formatValue(item)
+			parts[i] = formatValue(item, dialect...)
 		}
 		return strings.Join(parts, ", ")
 	default:
-		return formatValue(v)
+		return formatValue(v, dialect...)
 	}
 }
 
