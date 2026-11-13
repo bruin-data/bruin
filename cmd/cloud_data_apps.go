@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
@@ -23,6 +24,11 @@ const (
 	dataAppQueriesFile = "data-app.queries.json"
 	dataAppHTTPFile    = "data-app.http.json"
 	dataAppStateFile   = ".bruin-data-app.json"
+)
+
+const (
+	dataAppVisibilityTeam    = "team"
+	dataAppVisibilityPrivate = "private"
 )
 
 type dataAppState struct {
@@ -69,16 +75,20 @@ func printDataAppGuideRef(ref *bruincloud.DataAppGuideRef) {
 }
 
 func printDataAppJSON(v any) {
-	data, _ := json.MarshalIndent(v, "", "  ")
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		printErrorJSON(err)
+		return
+	}
 	fmt.Println(string(data))
 }
 
-func deref[T any](p *T) T {
-	var zero T
-	if p == nil {
-		return zero
+// dataAppAgent renders an app's agent id, or fallback when it has none.
+func dataAppAgent(id *int, fallback string) string {
+	if id == nil {
+		return fallback
 	}
-	return *p
+	return strconv.Itoa(*id)
 }
 
 func cloudDataAppsGuide() *cli.Command {
@@ -143,11 +153,7 @@ func cloudDataAppsList() *cli.Command {
 			t.SetOutputMirror(os.Stdout)
 			t.AppendHeader(table.Row{"ID", "Title", "Agent ID", "Visibility", "Updated At"})
 			for _, a := range apps {
-				agent := "-"
-				if a.AgentID != nil {
-					agent = fmt.Sprint(*a.AgentID)
-				}
-				t.AppendRow(table.Row{a.ID, deref(a.Title), agent, a.Visibility, deref(a.UpdatedAt)})
+				t.AppendRow(table.Row{a.ID, derefString(a.Title), dataAppAgent(a.AgentID, "-"), a.Visibility, derefString(a.UpdatedAt)})
 			}
 			t.Render()
 			return nil
@@ -212,7 +218,7 @@ func cloudDataAppsCreate() *cli.Command {
 			output := c.String("output")
 
 			visibility := c.String("visibility")
-			if visibility != "" && visibility != "team" && visibility != "private" {
+			if visibility != "" && visibility != dataAppVisibilityTeam && visibility != dataAppVisibilityPrivate {
 				printError(fmt.Errorf("visibility must be 'team' or 'private', got %q", visibility), output, "Invalid --visibility")
 				return cli.Exit("", 1)
 			}
@@ -239,7 +245,7 @@ func cloudDataAppsCreate() *cli.Command {
 			}
 
 			successPrinter.Printf("Created data app %d", app.ID)
-			if title := deref(app.Title); title != "" {
+			if title := derefString(app.Title); title != "" {
 				successPrinter.Printf(" (%s)", title)
 			}
 			fmt.Println()
@@ -282,13 +288,10 @@ func cloudDataAppsGet() *cli.Command {
 				return nil
 			}
 
-			agent := "none (set one with 'bruin cloud data-apps update --agent-id')"
-			if app.AgentID != nil {
-				agent = fmt.Sprint(*app.AgentID)
-			}
+			agent := dataAppAgent(app.AgentID, "none (set one with 'bruin cloud data-apps update --agent-id')")
 			fmt.Printf("ID:         %d\nTitle:      %s\nAgent:      %s\nVisibility: %s\nUpdated:    %s\nVersion:    %s\n",
-				app.ID, deref(app.Title), agent, app.Visibility, deref(app.UpdatedAt), app.Version)
-			fmt.Printf("HTML:       %d bytes\n", len(deref(app.Code)))
+				app.ID, derefString(app.Title), agent, app.Visibility, derefString(app.UpdatedAt), app.Version)
+			fmt.Printf("HTML:       %d bytes\n", len(derefString(app.Code)))
 			fmt.Printf("Queries:    %s\n", strings.Join(manifestNames(app.Queries), ", "))
 			fmt.Printf("Requests:   %s\n", strings.Join(manifestNames(app.HTTPRequests), ", "))
 			return nil
@@ -345,7 +348,7 @@ func cloudDataAppsPull() *cli.Command {
 			}
 
 			files := map[string][]byte{
-				dataAppHTMLFile:    []byte(deref(app.Code)),
+				dataAppHTMLFile:    []byte(derefString(app.Code)),
 				dataAppQueriesFile: indentManifest(app.Queries),
 				dataAppHTTPFile:    indentManifest(app.HTTPRequests),
 			}
@@ -355,6 +358,10 @@ func cloudDataAppsPull() *cli.Command {
 				var changed []string
 				for name, content := range files {
 					existing, err := os.ReadFile(filepath.Join(dir, name))
+					if err != nil && !errors.Is(err, os.ErrNotExist) {
+						printError(err, output, "Failed to read "+name)
+						return cli.Exit("", 1)
+					}
 					if err == nil && !sameDataAppFile(name, existing, content) {
 						changed = append(changed, name)
 					}
@@ -370,7 +377,7 @@ func cloudDataAppsPull() *cli.Command {
 				return cli.Exit("", 1)
 			}
 			for name, content := range files {
-				if err := os.WriteFile(filepath.Join(dir, name), content, 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(dir, name), content, 0o600); err != nil {
 					printError(err, output, "Failed to write "+name)
 					return cli.Exit("", 1)
 				}
@@ -401,11 +408,24 @@ func sameDataAppFile(name string, local, pulled []byte) bool {
 	if name == dataAppHTMLFile {
 		return false
 	}
-	var a, b any
-	if json.Unmarshal(local, &a) != nil || json.Unmarshal(pulled, &b) != nil {
+	// UseNumber: as float64, two different large integers can compare equal.
+	a, errA := decodeJSONWithNumbers(local)
+	b, errB := decodeJSONWithNumbers(pulled)
+	if errA != nil || errB != nil {
 		return false
 	}
 	return reflect.DeepEqual(a, b)
+}
+
+func decodeJSONWithNumbers(data []byte) (any, error) {
+	if !json.Valid(data) {
+		return nil, errors.New("invalid JSON")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var v any
+	err := decoder.Decode(&v)
+	return v, err
 }
 
 // indentManifest pretty-prints a manifest for editing; an absent one becomes [].
@@ -437,8 +457,11 @@ func readDataAppState(dir string) (*dataAppState, error) {
 }
 
 func writeDataAppState(dir string, state dataAppState) error {
-	data, _ := json.MarshalIndent(state, "", "  ")
-	return os.WriteFile(filepath.Join(dir, dataAppStateFile), append(data, '\n'), 0o644)
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, dataAppStateFile), append(data, '\n'), 0o600)
 }
 
 // readManifest reads a manifest file and checks it is a JSON array.
@@ -450,6 +473,9 @@ func readManifest(path string) (json.RawMessage, error) {
 	var entries []json.RawMessage
 	if err := json.Unmarshal(data, &entries); err != nil {
 		return nil, fmt.Errorf("%s must be a JSON array: %w", path, err)
+	}
+	if entries == nil { // `null` unmarshals into a nil slice without error
+		return nil, fmt.Errorf("%s must be a JSON array, not null", path)
 	}
 	return json.RawMessage(bytes.TrimSpace(data)), nil
 }

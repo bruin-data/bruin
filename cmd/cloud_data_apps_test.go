@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func fakeDataAppAPI(t *testing.T, responses map[string]string) *[]dataAppRequest
 		assert.Equal(t, "Bearer user-key", r.Header.Get("Authorization"))
 		req := dataAppRequest{Method: r.Method, Path: r.URL.Path}
 		if data, _ := io.ReadAll(r.Body); len(data) > 0 {
-			require.NoError(t, json.Unmarshal(data, &req.Body))
+			assert.NoError(t, json.Unmarshal(data, &req.Body))
 		}
 		seen = append(seen, req)
 
@@ -71,6 +72,7 @@ func runDataApps(t *testing.T, args ...string) (string, error) {
 	return runCloudCLI(t, append(append([]string{"data-apps"}, args...), "--api-key", "user-key")...)
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsGuidePrintsTheMarkdown(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{"GET /data-apps/guide": dataAppGuideResponse})
 
@@ -79,6 +81,7 @@ func TestCloudDataAppsGuidePrintsTheMarkdown(t *testing.T) {
 	assert.Equal(t, "# Data Apps\n\nPull it first.\n", out)
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsGuideJSON(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{"GET /data-apps/guide": dataAppGuideResponse})
 
@@ -91,6 +94,7 @@ func TestCloudDataAppsGuideJSON(t *testing.T) {
 	assert.Equal(t, "# Data Apps\n\nPull it first.", got["content"])
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsList(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{
 		"GET /data-apps": `{"data_apps":[{"id":42,"title":"Sales","agent_id":7,"visibility":"team","updated_at":"2026-11-13"},{"id":43,"title":"Draft","agent_id":null,"visibility":"private","updated_at":"2026-11-12"}]}`,
@@ -102,6 +106,7 @@ func TestCloudDataAppsList(t *testing.T) {
 	assert.Contains(t, out, "Draft")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsSettings(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{
 		"GET /data-apps/settings": `{"read_only":true,"restrict_credential_hosts":true,"allowed_hosts":["api.stripe.com"]}`,
@@ -113,6 +118,7 @@ func TestCloudDataAppsSettings(t *testing.T) {
 	assert.Contains(t, out, "api.stripe.com")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsCreateWithoutAnAgentWarns(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{
 		"POST /data-apps": `201|{"id":44,"title":"Sales","agent_id":null,"visibility":"private","version":"v0","guide":{"url":"u","version":"g1"}}`,
@@ -126,6 +132,7 @@ func TestCloudDataAppsCreateWithoutAnAgentWarns(t *testing.T) {
 	assert.Contains(t, out, "bruin cloud data-apps guide")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsCreateSendsTheAgent(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{
 		"POST /data-apps": `201|{"id":44,"title":"Sales","agent_id":7,"visibility":"team","version":"v0"}`,
@@ -136,6 +143,7 @@ func TestCloudDataAppsCreateSendsTheAgent(t *testing.T) {
 	assert.Equal(t, map[string]any{"title": "Sales", "agent_id": float64(7), "visibility": "team"}, (*seen)[0].Body)
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsGetListsDeclaredNames(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{"GET /data-apps/42": dataAppResponse})
 
@@ -145,6 +153,7 @@ func TestCloudDataAppsGetListsDeclaredNames(t *testing.T) {
 	assert.Contains(t, out, "Queries:    revenue")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPullWritesTheFilesAndVersion(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{"GET /data-apps/42": dataAppResponse})
 	dir := t.TempDir()
@@ -160,10 +169,11 @@ func TestCloudDataAppsPullWritesTheFilesAndVersion(t *testing.T) {
 	assert.JSONEq(t, `{"id":42,"version":"v1"}`, string(state))
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPullKeepsLocalChangesWithoutForce(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{"GET /data-apps/42": dataAppResponse})
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>my edit</html>"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>my edit</html>"), 0o600))
 
 	_, err := runDataApps(t, "pull", "--data-app-id", "42", "--dir", dir, "--output", "plain")
 	require.Error(t, err)
@@ -176,13 +186,14 @@ func TestCloudDataAppsPullKeepsLocalChangesWithoutForce(t *testing.T) {
 	assert.Equal(t, "<html>app</html>", string(html))
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPushFromADirSendsThePulledVersion(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{
 		"POST /data-apps/42": `{"id":42,"version":"v2","warnings":["This data app has no agent yet."]}`,
 	})
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>new</html>"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.queries.json"), []byte(`[{"name":"q"}]`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>new</html>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.queries.json"), []byte(`[{"name":"q"}]`), 0o600))
 	require.NoError(t, writeDataAppState(dir, dataAppState{ID: 42, Version: "v1"}))
 
 	out, err := runDataApps(t, "push", "--data-app-id", "42", "--dir", dir, "--output", "plain")
@@ -199,10 +210,11 @@ func TestCloudDataAppsPushFromADirSendsThePulledVersion(t *testing.T) {
 	assert.Equal(t, "v2", state.Version, "the next push builds on the version this one saved")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPushForceSkipsTheVersionCheck(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{"POST /data-apps/42": `{"id":42,"version":"v2"}`})
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>new</html>"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>new</html>"), 0o600))
 	require.NoError(t, writeDataAppState(dir, dataAppState{ID: 42, Version: "v1"}))
 
 	_, err := runDataApps(t, "push", "--data-app-id", "42", "--dir", dir, "--force", "--output", "plain")
@@ -210,12 +222,13 @@ func TestCloudDataAppsPushForceSkipsTheVersionCheck(t *testing.T) {
 	assert.NotContains(t, (*seen)[0].Body, "expected_version")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPushExplainsAConflict(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{
 		"POST /data-apps/42": `409|{"message":"This data app changed since that version.","error":"version_conflict","version":"v9"}`,
 	})
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>new</html>"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>new</html>"), 0o600))
 	require.NoError(t, writeDataAppState(dir, dataAppState{ID: 42, Version: "v1"}))
 
 	out, err := runDataApps(t, "push", "--data-app-id", "42", "--dir", dir, "--output", "plain")
@@ -225,10 +238,11 @@ func TestCloudDataAppsPushExplainsAConflict(t *testing.T) {
 	assert.Equal(t, "v1", state.Version, "a refused push doesn't move the recorded version")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPushRejectsADirFromAnotherApp(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{})
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>x</html>"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.html"), []byte("<html>x</html>"), 0o600))
 	require.NoError(t, writeDataAppState(dir, dataAppState{ID: 7, Version: "v1"}))
 
 	_, err := runDataApps(t, "push", "--data-app-id", "42", "--dir", dir, "--output", "plain")
@@ -236,16 +250,18 @@ func TestCloudDataAppsPushRejectsADirFromAnotherApp(t *testing.T) {
 	assert.Empty(t, *seen)
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPushChecksManifestsAreArrays(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{})
 	file := filepath.Join(t.TempDir(), "q.json")
-	require.NoError(t, os.WriteFile(file, []byte(`{"name":"q"}`), 0o644))
+	require.NoError(t, os.WriteFile(file, []byte(`{"name":"q"}`), 0o600))
 
 	_, err := runDataApps(t, "push", "--data-app-id", "42", "--queries", file, "--output", "plain")
 	require.Error(t, err)
 	assert.Empty(t, *seen)
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsUpdate(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{"PATCH /data-apps/42": `{"id":42,"title":"Renamed","agent_id":8,"visibility":"team"}`})
 
@@ -257,6 +273,7 @@ func TestCloudDataAppsUpdate(t *testing.T) {
 	require.Error(t, err, "nothing to update")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsDelete(t *testing.T) {
 	seen := fakeDataAppAPI(t, map[string]string{"DELETE /data-apps/42": `{"success":true}`})
 
@@ -266,11 +283,55 @@ func TestCloudDataAppsDelete(t *testing.T) {
 	assert.Contains(t, out, "Deleted data app 42.")
 }
 
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
 func TestCloudDataAppsPullIgnoresAReformattedManifest(t *testing.T) {
 	fakeDataAppAPI(t, map[string]string{"GET /data-apps/42": dataAppResponse})
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.queries.json"), []byte(`[{"sql":"select 1","name":"revenue","connection":"pg"}]`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.queries.json"), []byte(`[{"sql":"select 1","name":"revenue","connection":"pg"}]`), 0o600))
 
 	_, err := runDataApps(t, "pull", "--data-app-id", "42", "--dir", dir, "--output", "plain")
 	require.NoError(t, err, "same queries, different formatting: not a local change")
+}
+
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
+func TestCloudDataAppsPullComparesLargeNumbersExactly(t *testing.T) {
+	fakeDataAppAPI(t, map[string]string{
+		"GET /data-apps/42": `{"id":42,"version":"v1","code":"<html>app</html>","queries":[{"name":"q","limit":9007199254740992}],"http_requests":[]}`,
+	})
+	dir := t.TempDir()
+	// Equal as float64, different as integers: a real local edit.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data-app.queries.json"), []byte(`[{"name":"q","limit":9007199254740993}]`), 0o600))
+
+	_, err := runDataApps(t, "pull", "--data-app-id", "42", "--dir", dir, "--output", "plain")
+	require.Error(t, err)
+	queries, _ := os.ReadFile(filepath.Join(dir, "data-app.queries.json"))
+	assert.Contains(t, string(queries), "9007199254740993")
+}
+
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
+func TestCloudDataAppsPullStopsOnAnUnreadableFile(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("file modes don't make a file unreadable on Windows")
+	}
+	fakeDataAppAPI(t, map[string]string{"GET /data-apps/42": dataAppResponse})
+	dir := t.TempDir()
+	path := filepath.Join(dir, "data-app.html")
+	require.NoError(t, os.WriteFile(path, []byte("<html>my edit</html>"), 0o200))
+
+	_, err := runDataApps(t, "pull", "--data-app-id", "42", "--dir", dir, "--output", "plain")
+	require.Error(t, err)
+	require.NoError(t, os.Chmod(path, 0o600))
+	html, _ := os.ReadFile(path)
+	assert.Equal(t, "<html>my edit</html>", string(html))
+}
+
+//nolint:paralleltest // CLI runs share process-wide stdout and environment.
+func TestCloudDataAppsPushRejectsANullManifest(t *testing.T) {
+	seen := fakeDataAppAPI(t, map[string]string{})
+	file := filepath.Join(t.TempDir(), "q.json")
+	require.NoError(t, os.WriteFile(file, []byte("null"), 0o600))
+
+	_, err := runDataApps(t, "push", "--data-app-id", "42", "--queries", file, "--output", "plain")
+	require.Error(t, err)
+	assert.Empty(t, *seen)
 }
