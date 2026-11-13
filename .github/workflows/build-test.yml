@@ -41,14 +41,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4.4.0
       - name: Test authenticated hash generation
         run: python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
       - name: Authenticate pinned ingestr and generate embedded hashes
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/generate_ingestr_hashes.py
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: ingestr-hashes
           path: pkg/python/ingestr_hashes.json
@@ -62,16 +62,16 @@ jobs:
         platform: [blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4.4.0
         with:
           fetch-depth: 1
           fetch-tags: true
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v4.3.0
         with:
           name: ingestr-hashes
           path: pkg/python
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@v6.5.0
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
@@ -96,16 +96,16 @@ jobs:
       - name: Install R (background)
         run: |
           nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4.4.0
         with:
           fetch-depth: 1
           fetch-tags: true
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v4.3.0
         with:
           name: ingestr-hashes
           path: pkg/python
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@v6.5.0
         with:
           go-version-file: 'go.mod'
           # Blacksmith caches Go builds through GOCACHEPROG.
@@ -146,26 +146,26 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/download-artifact@v4.3.0
         with:
           name: ingestr-hashes
           path: pkg/python
       - name: Log in to the Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: bruin-data
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Set up Depot
-        uses: depot/setup-action@15c09a5f77a0840ad4bce955686522a257853461 # v1
+        uses: depot/setup-action@v1.7.1
       - name: Build Docker image
-        uses: depot/build-push-action@98e78adca7817480b8185f474a400b451d74e287 # v1
+        uses: depot/build-push-action@v1.18.0
         with:
           context: .
           platforms: linux/amd64
@@ -186,20 +186,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/download-artifact@v4.3.0
         with:
           name: ingestr-hashes
           path: pkg/python
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@v3.12.0
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build Docker image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           platforms: linux/amd64
@@ -213,18 +213,18 @@ jobs:
     needs: [verify-ingestr]
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/download-artifact@v4.3.0
         with:
           name: ingestr-hashes
           path: pkg/python
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@v6.5.0
         with:
           go-version-file: 'go.mod'
           # Blacksmith caches Go builds through GOCACHEPROG.
           cache: false
       - name: Cache golangci-lint analysis
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.cache/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}

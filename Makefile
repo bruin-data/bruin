@@ -76,6 +76,16 @@ sync-template-docs:
 	@echo "$(OK_COLOR)==> Regenerating template docs pages...$(NO_COLOR)"
 	@python3 scripts/sync_template_docs.py
 
+# Requires gh extension install github/gh-actions-lock.
+.PHONY: actions-lock actions-lock-verify
+actions-lock:
+	@echo "$(OK_COLOR)==> Updating GitHub Actions lockfile...$(NO_COLOR)"
+	@gh actions-lock
+
+actions-lock-verify:
+	@echo "$(OK_COLOR)==> Verifying GitHub Actions lockfile...$(NO_COLOR)"
+	@gh actions-lock --verify
+
 integration-test: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
