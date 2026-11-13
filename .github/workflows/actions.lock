@@ -52,12 +52,9 @@ workflows:
         - 'docker/metadata-action@v6.2.0'
         - 'goreleaser/goreleaser-action@v7.3.0'
         - 'msys2/setup-msys2@v2.33.0'
-        - 'softprops/action-gh-release@v3.0.4'
-        - 'svenstaro/upload-release-action@2.11.5'
     '.github/workflows/test-installer.yml': []
     '.github/workflows/update-ingestr.yml':
         - 'actions/checkout@v7.0.1'
-        - 'peter-evans/create-pull-request@v8.1.3'
 dependencies:
     'actions/cache@v6.1.0':
         ref: 'v6.1.0'
@@ -161,18 +158,3 @@ dependencies:
         commit: 'sha1-ec48f7c5447b3140e2b088413ae3a55687bccb6e'
         owner_id: 6759993
         repo_id: 213203501
-    'peter-evans/create-pull-request@v8.1.3':
-        ref: 'v8.1.3'
-        commit: 'sha1-3ffccacd46053766916f087ce41d627c0b8cf2d1'
-        owner_id: 18365890
-        repo_id: 197176365
-    'softprops/action-gh-release@v3.0.4':
-        ref: 'v3.0.4'
-        commit: 'sha1-8a0cd651e5b2365bd640854a3fa5dfc70e4875f3'
-        owner_id: 2242
-        repo_id: 204253808
-    'svenstaro/upload-release-action@2.11.5':
-        ref: '2.11.5'
-        commit: 'sha1-29e53e917877a24fad85510ded594ab3c9ca12de'
-        owner_id: 1664
-        repo_id: 203697873

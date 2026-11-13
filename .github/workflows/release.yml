@@ -278,15 +278,19 @@ jobs:
           CGO_LDFLAGS: "-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
 
       - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@2.11.5
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/windows/bruin_Windows_x86_64.zip
-          asset_name: bruin_Windows_x86_64.zip
-          tag: ${{ github.ref }}
-          overwrite: false
-          make_latest: false
-          prerelease: false
+        # Use the host shell/PATH, not the job's MSYS2 shell, for GitHub CLI.
+        shell: bash
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Windows can finish before the Unix job creates the release.
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --latest=false \
+              --title "$GITHUB_REF_NAME" --notes "" || gh release view "$GITHUB_REF_NAME" >/dev/null
+          fi
+          # Deliberately omit --clobber: an existing asset must not be replaced.
+          gh release upload "$GITHUB_REF_NAME" dist/windows/bruin_Windows_x86_64.zip
 
   dockerBuild:
     needs: [verify-ingestr]
@@ -483,18 +487,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [install-unix, install-windows]
     steps:
-      - uses: actions/checkout@v7.0.1
-      - name: Extract tag from ref
-        id: extract_tag
-        run: |
-          ref_name="${GITHUB_REF##*/}"
-          echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Release promote to latest
-        uses: softprops/action-gh-release@v3.0.4
         if: startsWith(github.ref, 'refs/tags/')
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ env.tag }}
-          prerelease: false
-          make_latest: true
-          clear_attachments: false
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --prerelease=false --latest

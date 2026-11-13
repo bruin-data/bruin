@@ -8,6 +8,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: update-ingestr-version
+  cancel-in-progress: false
+
 jobs:
   update:
     # GitHub's maintained image supplies the authenticated release verifier.
@@ -89,19 +93,43 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
           python3 scripts/check_ingestr_cdc_parity.py --version "${{ steps.check.outputs.version }}"
 
-      - name: Create Pull Request
+      - name: Create or update Pull Request
         id: create-pr
         if: steps.check.outputs.new == 'true'
-        uses: peter-evans/create-pull-request@v8.1.3
-        with:
-          branch: update-ingestr-${{ steps.check.outputs.version }}
-          commit-message: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
-          title: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
-          body: "Automated update of ingestr to v${{ steps.check.outputs.version }}"
-          # Keep regenerated real hashes out of the commit; only the version bump.
-          add-paths: pkg/python/uv.go
-          delete-branch: true
-          labels: automated-update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.version }}
+          BASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          branch="update-ingestr-${VERSION}"
+          title="chore: bump ingestr to v${VERSION}"
+          body="Automated update of ingestr to v${VERSION}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          remote_sha=$(git ls-remote --heads origin "refs/heads/${branch}" | cut -f1)
+          if [ -n "$remote_sha" ]; then
+            git fetch --no-tags origin "$remote_sha"
+          fi
+          git switch -C "$branch"
+          # Compare the staged tree so identical reruns don't create new commits.
+          # Keep regenerated hashes out of the commit; only the version bump.
+          if [ -z "$remote_sha" ] || ! git diff --cached --quiet "$remote_sha" --; then
+            git commit --only -m "$title" -- pkg/python/uv.go
+            git push --force-with-lease="refs/heads/${branch}:${remote_sha}" origin "HEAD:refs/heads/${branch}"
+          fi
+
+          number=$(gh pr list --state open --base "$BASE_BRANCH" --head "$branch" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body "$body" --add-label automated-update
+          else
+            url=$(gh pr create --base "$BASE_BRANCH" --head "$branch" \
+              --title "$title" --body "$body" --label automated-update)
+            number=$(gh pr view "$url" --json number --jq .number)
+          fi
+          echo "pull-request-number=$number" >> "$GITHUB_OUTPUT"
 
       - name: Close older ingestr bump PRs
         if: steps.create-pr.outputs.pull-request-number
