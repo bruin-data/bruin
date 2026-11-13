@@ -1427,3 +1427,78 @@ func (c *APIClient) GetCostExplorer(ctx context.Context, req CostExplorerRequest
 	err := c.doRequest(ctx, http.MethodPost, "/cost-explorer", req, &resp)
 	return &resp, err
 }
+
+// --- Data Apps ---
+
+func (c *APIClient) GetDataAppGuide(ctx context.Context) (*DataAppGuide, error) {
+	var guide DataAppGuide
+	if err := c.doRequest(ctx, http.MethodGet, "/data-apps/guide", nil, &guide); err != nil {
+		return nil, err
+	}
+	return &guide, nil
+}
+
+func (c *APIClient) ListDataApps(ctx context.Context) ([]DataApp, error) {
+	var resp struct {
+		DataApps []DataApp `json:"data_apps"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/data-apps", nil, &resp)
+	return resp.DataApps, err
+}
+
+func (c *APIClient) GetDataAppSettings(ctx context.Context) (*DataAppSettings, error) {
+	var settings DataAppSettings
+	if err := c.doRequest(ctx, http.MethodGet, "/data-apps/settings", nil, &settings); err != nil {
+		return nil, err
+	}
+	return &settings, nil
+}
+
+// CreateDataApp creates an empty app. agentID 0 leaves it without an agent (set one later
+// with UpdateDataApp); an empty visibility takes the server default.
+func (c *APIClient) CreateDataApp(ctx context.Context, title string, agentID int, visibility string) (*DataApp, error) {
+	body := map[string]any{}
+	if title != "" {
+		body["title"] = title
+	}
+	if agentID > 0 {
+		body["agent_id"] = agentID
+	}
+	if visibility != "" {
+		body["visibility"] = visibility
+	}
+	var app DataApp
+	if err := c.doRequest(ctx, http.MethodPost, "/data-apps", body, &app); err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *APIClient) GetDataApp(ctx context.Context, id int) (*DataApp, error) {
+	var app DataApp
+	if err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/data-apps/%d", id), nil, &app); err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *APIClient) SaveDataApp(ctx context.Context, id int, input DataAppSaveInput) (*DataAppSaveResult, error) {
+	var result DataAppSaveResult
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/data-apps/%d", id), input, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateDataApp changes an app's title and/or agent; fields holds only what to change.
+func (c *APIClient) UpdateDataApp(ctx context.Context, id int, fields map[string]any) (*DataApp, error) {
+	var app DataApp
+	if err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/data-apps/%d", id), fields, &app); err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *APIClient) DeleteDataApp(ctx context.Context, id int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/data-apps/%d", id), nil, nil)
+}

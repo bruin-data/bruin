@@ -165,6 +165,10 @@ func apiErrorHint(err error) string {
 		return "hint: the GitHub request failed; retry, or pass --git-token"
 	case "user_token_required":
 		return "hint: use a personal Bruin Cloud API token, or pass --git-token"
+	case "version_conflict":
+		return "hint: someone saved the data app since your pull; pull again (--force), re-apply your change on top, and push — or push --force to overwrite their change"
+	case "domain_not_approved":
+		return "hint: a team admin approves domains in Bruin Cloud → AI settings → Data Apps; 'bruin cloud data-apps settings' lists the approved ones"
 	}
 	return ""
 }
