@@ -8,18 +8,18 @@ jobs:
     name: Bump Version
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: '0'
       - name: Set branch name
         id: extract_branch
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}})"
+        run: echo "branch_name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
       - name: Bump version and push tag
         id: bump_version
-        uses: anothrNick/github-tag-action@ce4b5ffa38e072fa7a901e417253c438fcc2ccce # 1.36.0
+        uses: anothrNick/github-tag-action@1.75.0
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          WITH_V: true
+          TAG_PREFIX: v
           DEFAULT_BUMP: patch
           PRERELEASE: true
           RELEASE_BRANCHES: ${{ steps.extract_branch.outputs.branch_name }}
