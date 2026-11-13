@@ -29,14 +29,14 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v4.4.0
+        uses: actions/checkout@v7.0.1
         with:
           # VitePress lastUpdated is disabled; pages and sitemap need no history.
           fetch-depth: 1
 
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '22.14.0'
           cache: npm
