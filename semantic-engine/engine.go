@@ -382,7 +382,10 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	// Keep an aggregate grain even when every requested metric is a constant.
 	// The outer projection hides the helper metric from the result.
 	rowCount := "__grand_total_row_count"
-	for grandTotalEngine.metrics[rowCount] != nil {
+	for {
+		if _, err := e.resolveDimension(DimensionRef{Name: rowCount}); e.metrics[rowCount] == nil && err != nil {
+			break
+		}
 		rowCount += "_"
 	}
 	grandTotalEngine.metrics[rowCount] = &Metric{Name: rowCount, Expression: "COUNT(*)"}

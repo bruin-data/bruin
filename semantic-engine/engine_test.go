@@ -2378,6 +2378,8 @@ func TestBigQueryFilterLiterals(t *testing.T) {
 }
 
 func TestGenerateGrandTotalSQL(t *testing.T) {
+	t.Parallel()
+
 	model := richTestModel()
 	model.Segments = append(model.Segments, Segment{Name: "small", Filter: "{revenue} < 1000"})
 	e := minimalEngine(t, model)
@@ -2387,7 +2389,10 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 		Filters:    []Filter{{Dimension: "status", Operator: "equals", Value: "completed"}, {Expression: "{revenue} < 1000"}, {Expression: "COUNT(*) > 1"}},
 		Segments:   []string{"us", "small"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 1,
 	}
-	before, _ := json.Marshal(q)
+	before, err := json.Marshal(q)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sql, err := e.GenerateGrandTotalSQL(q)
 	if err != nil {
 		t.Fatal(err)
@@ -2398,7 +2403,10 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 	for _, unwanted := range []string{"GROUP BY", "HAVING", "ORDER BY", "LIMIT", "< 1000", "> 1", "date_trunc"} {
 		expectNotContains(t, sql, unwanted)
 	}
-	after, _ := json.Marshal(q)
+	after, err := json.Marshal(q)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if string(before) != string(after) {
 		t.Fatal("mutated the detail query")
 	}
@@ -2411,6 +2419,8 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 }
 
 func TestGenerateGrandTotalSQLRejectsUnsupportedQueries(t *testing.T) {
+	t.Parallel()
+
 	e := minimalEngine(t, richTestModel())
 	for _, q := range []*Query{
 		{Dimensions: []DimensionRef{{Name: "country"}}},
@@ -2425,6 +2435,8 @@ func TestGenerateGrandTotalSQLRejectsUnsupportedQueries(t *testing.T) {
 }
 
 func TestGenerateGrandTotalSQLOnlyRetainsRowFilterJoins(t *testing.T) {
+	t.Parallel()
+
 	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{{Name: "country", Type: "string"}}}
 	orders := &Model{Name: "orders", Source: Source{Table: "orders"}, PrimaryKey: "id", Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}}}
 	e, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
@@ -2448,6 +2460,8 @@ func TestGenerateGrandTotalSQLOnlyRetainsRowFilterJoins(t *testing.T) {
 }
 
 func TestGenerateGrandTotalSQLWindowColumnsAreNull(t *testing.T) {
+	t.Parallel()
+
 	e := minimalEngine(t, richTestModel())
 	for _, metrics := range [][]string{
 		{"revenue", "running_revenue", "revenue_growth"},
@@ -2476,6 +2490,8 @@ func TestGenerateGrandTotalSQLWindowColumnsAreNull(t *testing.T) {
 }
 
 func TestGenerateGrandTotalSQLMetricFilterJoins(t *testing.T) {
+	t.Parallel()
+
 	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{{Name: "country", Type: "string"}}}
 	orders := &Model{Name: "orders", Source: Source{Table: "orders"}, PrimaryKey: "id", Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Metrics: []Metric{
 		{Name: "revenue", Expression: "sum(amount)"},
@@ -2499,6 +2515,8 @@ func TestGenerateGrandTotalSQLMetricFilterJoins(t *testing.T) {
 }
 
 func TestGenerateGrandTotalSQLConstantMetrics(t *testing.T) {
+	t.Parallel()
+
 	e := minimalEngine(t, &Model{Name: "orders", Source: Source{Table: "orders"}, Metrics: []Metric{
 		{Name: "target", Expression: "100"},
 		{Name: "label", Expression: "'Target'"},
@@ -2516,4 +2534,25 @@ func TestGenerateGrandTotalSQLConstantMetrics(t *testing.T) {
 	if len(q.Metrics) != 2 || len(e.metrics) != 3 {
 		t.Fatal("mutated the query or engine")
 	}
+}
+
+func TestGenerateGrandTotalSQLHelperDoesNotHideJoinedDimension(t *testing.T) {
+	t.Parallel()
+	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{
+		{Name: "country", Type: "string"},
+		{Name: "__grand_total_row_count", Type: "string", Expression: "country"},
+	}}
+	orders := &Model{Name: "orders", Source: Source{Table: "orders"}, Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}}}
+	e, err := NewEngineWithModels(orders, map[string]*Model{"customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := &Query{Dimensions: []DimensionRef{{Name: "customers.country"}}, Metrics: []string{"revenue"}, Filters: []Filter{{Expression: "{__grand_total_row_count} = 'US'"}}}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "LEFT JOIN")
+	expectContains(t, sql, "WHERE customers.country = 'US'")
+	expectContains(t, sql, "COUNT(*) AS __grand_total_row_count_")
 }
