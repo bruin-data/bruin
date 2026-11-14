@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -104,11 +105,62 @@ func TestCloudPipelineTriggerInvalidFlags(t *testing.T) {
 		{"set", "--scheduled-agent-id", "42", "--project-id", "analytics"},
 		{"set", "--scheduled-agent-id", "42", "--pipeline", "daily-etl"},
 		{"set", "--scheduled-agent-id", "42", "--pipeline", " ", "--project-id", "analytics"},
+		{"set", "--scheduled-agent-id", "42", "--pipeline", "daily-etl", "--project-id", "analytics", "--subscriptions-file", "subscriptions.json"},
+		{"set", "--scheduled-agent-id", "42", "--subscriptions-file", "missing.json"},
 	} {
 		cmd := cloudPipelineTriggerCommand(args[0], "test")
 		cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
 		require.Error(t, runCLI(t.Context(), cmd, args))
 	}
+}
+
+func TestCloudPipelineTriggerSetSelections(t *testing.T) {
+	subscriptions := `[{"event_types":["asset_failed"],"selector":{"field":"step.type","operator":"equals","value":"custom_check"}}]`
+	subscriptionsFile := t.TempDir() + "/subscriptions.json"
+	require.NoError(t, os.WriteFile(subscriptionsFile, []byte(subscriptions), 0o600))
+	invalidFile := t.TempDir() + "/invalid.json"
+	require.NoError(t, os.WriteFile(invalidFile, []byte(`{"event_types":["run_failed"]}`), 0o600))
+
+	for name, tc := range map[string]struct {
+		args []string
+		body string
+	}{
+		"single":        {[]string{"--project-id", "analytics", "--pipeline", "daily-etl"}, `{"id":"daily-etl","project_id":"analytics"}`},
+		"multiple":      {[]string{"--project-id", "analytics", "--pipeline", "daily-etl", "--pipeline", "hourly-etl"}, `{"pipelines":[{"id":"daily-etl","project_id":"analytics"},{"id":"hourly-etl","project_id":"analytics"}]}`},
+		"subscriptions": {[]string{"--subscriptions-file", subscriptionsFile}, `{"subscriptions":` + subscriptions + `}`},
+		"not an array":  {[]string{"--subscriptions-file", invalidFile}, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var body []byte
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, _ = io.ReadAll(r.Body)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"pipeline_trigger":` + string(body) + `}`))
+			}))
+			defer server.Close()
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+			cmd := cloudPipelineTriggerCommand("set", "test")
+			cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			err := runCLI(t.Context(), cmd, append([]string{"set", "--scheduled-agent-id", "42", "--api-key", "test-key", "--output", "json"}, tc.args...))
+			if tc.body == "" {
+				require.Error(t, err)
+				assert.Nil(t, body)
+				return
+			}
+			require.NoError(t, err)
+			assert.JSONEq(t, tc.body, string(body))
+		})
+	}
+}
+
+func TestDescribePipelineTrigger(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "analytics/daily-etl", describePipelineTrigger(&bruincloud.ScheduledAgentPipelineTrigger{ID: "daily-etl", ProjectID: "analytics"}))
+	assert.Equal(t, "analytics/daily-etl, ops/hourly-etl", describePipelineTrigger(&bruincloud.ScheduledAgentPipelineTrigger{Pipelines: []bruincloud.ScheduledAgentTriggerPipeline{
+		{ID: "daily-etl", ProjectID: "analytics"},
+		{ID: "hourly-etl", ProjectID: "ops"},
+	}}))
+	assert.Equal(t, "custom conditions (see --output json)", describePipelineTrigger(&bruincloud.ScheduledAgentPipelineTrigger{Subscriptions: json.RawMessage(`[{}]`)}))
 }
 
 func TestScheduledAgentPlanRejectsPipelineTrigger(t *testing.T) {

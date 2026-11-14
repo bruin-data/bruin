@@ -589,6 +589,13 @@ type CostExplorerResponse struct {
 }
 
 type ScheduledAgentPipelineTrigger struct {
+	ID            string                          `json:"id,omitempty"`
+	ProjectID     string                          `json:"project_id,omitempty"`
+	Pipelines     []ScheduledAgentTriggerPipeline `json:"pipelines,omitempty"`
+	Subscriptions json.RawMessage                 `json:"subscriptions,omitempty"`
+}
+
+type ScheduledAgentTriggerPipeline struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"project_id"`
 }
