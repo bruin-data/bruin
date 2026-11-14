@@ -36,8 +36,24 @@ jobs:
             '*.md' 'docs/**/*.md' 'templates/**/*.md'
 
 
-      - name: Open or update the broken links issue
+      # Lychee 0.24.2 does not retry rejected HTTP 5xx responses.
+      - name: Retry failed external link check
+        id: retry
         if: steps.lychee.outputs.exit_code != '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sleep 30
+          if scripts/check_docs_links.sh --external --format markdown --output lychee-report.md \
+            --exclude-path lychee-report.md; then
+            echo "exit_code=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          fi
+
+
+      - name: Open or update the broken links issue
+        if: steps.retry.outputs.exit_code != '' && steps.retry.outputs.exit_code != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TITLE: 'Broken external links in docs'
@@ -62,7 +78,7 @@ jobs:
 
 
       - name: Close the broken links issue
-        if: steps.lychee.outputs.exit_code == '0'
+        if: steps.lychee.outputs.exit_code == '0' || steps.retry.outputs.exit_code == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TITLE: 'Broken external links in docs'
