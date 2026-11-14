@@ -3,6 +3,7 @@ package semantic
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"strconv"
 	"strings"
@@ -325,6 +326,76 @@ func (e *Engine) validateRefs(name string, visited map[string]bool) error {
 func (e *Engine) GenerateSQL(q *Query) (string, error) {
 	sql, _, err := e.GenerateSQLWithColumns(q)
 	return sql, err
+}
+
+// GenerateGrandTotalSQL recalculates metrics over all source rows matching the
+// query's row filters. Grouping, sorting, limits, and aggregate filters/segments
+// are excluded. Window metrics and their dependents return NULL. The input
+// query and engine are not modified.
+func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
+	if len(q.Metrics) == 0 {
+		return "", errors.New("grand totals require at least one metric")
+	}
+	plan, err := e.planQuery(q)
+	if err != nil {
+		return "", err
+	}
+	if err := e.validateQuery(q, plan); err != nil {
+		return "", err
+	}
+
+	grandTotal := *q
+	grandTotal.Dimensions, grandTotal.Sort, grandTotal.Limit = nil, nil, 0
+	grandTotal.Filters = nil
+	for _, filter := range q.Filters {
+		if filter.Expression != "" {
+			_, having, err := e.expandFilterExpr(filter.Expression, plan)
+			if err != nil {
+				return "", err
+			}
+			if having {
+				continue
+			}
+		}
+		grandTotal.Filters = append(grandTotal.Filters, filter)
+	}
+	grandTotal.Segments = nil
+	for _, name := range q.Segments {
+		_, having, err := e.expandFilterExpr(e.segments[name].Filter, plan)
+		if err != nil {
+			return "", err
+		}
+		if !having {
+			grandTotal.Segments = append(grandTotal.Segments, name)
+		}
+	}
+	grandTotalEngine := *e
+	grandTotalEngine.metrics = maps.Clone(e.metrics)
+	for _, name := range q.Metrics {
+		if e.needsWindowWrap([]string{name}) {
+			metric := *e.metrics[name]
+			// An aggregate NULL also returns one row for window-only queries.
+			metric.Expression, metric.Filter, metric.Window = "SUM(NULLIF(0, 0))", "", nil
+			grandTotalEngine.metrics[name] = &metric
+		}
+	}
+	// Keep an aggregate grain even when every requested metric is a constant.
+	// The outer projection hides the helper metric from the result.
+	rowCount := "__grand_total_row_count"
+	for {
+		if _, err := e.resolveDimension(DimensionRef{Name: rowCount}); e.metrics[rowCount] == nil && err != nil {
+			break
+		}
+		rowCount += "_"
+	}
+	grandTotalEngine.metrics[rowCount] = &Metric{Name: rowCount, Expression: "COUNT(*)"}
+	grandTotal.Metrics = append(append([]string(nil), q.Metrics...), rowCount)
+	// Replan without excluded filters so HAVING-only joins cannot affect totals.
+	sql, err := grandTotalEngine.GenerateSQL(&grandTotal)
+	if err != nil {
+		return "", err
+	}
+	return "SELECT " + strings.Join(q.Metrics, ", ") + " FROM (" + sql + ") grand_total", nil
 }
 
 // GenerateSQLWithColumns compiles the query and also returns the result set's

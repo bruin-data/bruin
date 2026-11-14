@@ -91,6 +91,12 @@ func (e *Engine) planQuery(q *Query) (*queryPlan, error) {
 		}
 	}
 
+	for _, name := range e.collectInnerMetrics(q.Metrics) {
+		if err := plan.addFilterRefs(e.metrics[name].Filter); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, sort := range q.Sort {
 		if e.metrics[sort.Name] != nil {
 			continue
