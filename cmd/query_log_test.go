@@ -586,3 +586,44 @@ func TestQueryLogWriterAggregateFailureDoesNotFailQueryLog(t *testing.T) {
 	require.NoError(t, log.finish(nil))
 	assert.True(t, decodeTestQueryLog(t, log.path).Success)
 }
+
+func TestQueryLogWriterCapsRowsFromEnv(t *testing.T) {
+	t.Setenv(queryLogMaxRowsEnv, "2")
+
+	dir := newQueryLogTestRepo(t)
+	log := openTestQueryLog(t, dir)
+	for i := range 5 {
+		log.writeRow([]any{i})
+	}
+	require.NoError(t, log.finish(nil))
+
+	got := decodeTestQueryLog(t, log.path)
+	assert.Equal(t, [][]any{{json.Number("0")}, {json.Number("1")}}, got.Rows)
+	assert.Equal(t, 5, got.RowCount)
+	assert.True(t, got.RowsTruncated)
+	assert.True(t, got.Success)
+
+	preview, err := readQueryLogPreview(log.path)
+	require.NoError(t, err)
+	assert.Equal(t, 5, preview.RowCount)
+	assert.True(t, preview.RowsTruncated)
+}
+
+func TestQueryLogWriterKeepsRowsUnderEnvCap(t *testing.T) {
+	for _, value := range []string{"", "0", "-1", "abc", "5"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv(queryLogMaxRowsEnv, value)
+
+			log := openTestQueryLog(t, newQueryLogTestRepo(t))
+			log.writeRow([]any{1})
+			log.writeRow([]any{2})
+			require.NoError(t, log.finish(nil))
+
+			raw, err := os.ReadFile(log.path)
+			require.NoError(t, err)
+			assert.NotContains(t, string(raw), "row_count")
+			assert.NotContains(t, string(raw), "rows_truncated")
+			assert.Len(t, decodeTestQueryLog(t, log.path).Rows, 2)
+		})
+	}
+}

@@ -76,6 +76,14 @@ If your query returns 1,000,000 rows with `--split-rows 400000`, you'll get 3 fi
 
 Each file includes the header row with column names.
 
+## Query logs
+
+Every query is logged to `logs/queries/` in the repository root, including all result rows. Set `BRUIN_QUERY_LOG_MAX_ROWS` to keep only the first N rows per log; a capped log also records `row_count` and `rows_truncated: true`. Unset, `0`, or an invalid value keeps every row. The query output itself is never capped.
+
+```bash
+BRUIN_QUERY_LOG_MAX_ROWS=25 bruin query --connection my_connection --query "SELECT * FROM large_table"
+```
+
 ## Template variables
 
 You can inject Jinja template variables into a query with `--var`. The flag can be passed multiple times and supports flat, nested, and JSON values, so you can test dashboard-style SQL — including nested `filters.*` variables — directly from the CLI.
