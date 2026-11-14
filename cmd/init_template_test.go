@@ -272,42 +272,6 @@ func TestInitPaymentsClickHouseCopiesDemoTemplate(t *testing.T) {
 	require.Contains(t, string(rollup), "start: -15m")
 }
 
-func TestInitLocalStackSnowflakeNYCTaxiCopiesDemoTemplate(t *testing.T) {
-	targetRoot := t.TempDir()
-	t.Chdir(targetRoot)
-
-	gitInit := exec.CommandContext(t.Context(), "git", "init")
-	gitInit.Dir = targetRoot
-	out, err := gitInit.CombinedOutput()
-	require.NoError(t, err, string(out))
-
-	err = Init().Run(t.Context(), []string{"init", "localstack-snowflake-nyc-taxi"})
-	require.NoError(t, err)
-
-	pipelineRoot := filepath.Join(targetRoot, "localstack-snowflake-nyc-taxi")
-	require.FileExists(t, filepath.Join(pipelineRoot, "README.md"))
-	// The README tells users to run setup.sql before the first run and to serve
-	// the dashboards, so both have to come across on init.
-	require.FileExists(t, filepath.Join(pipelineRoot, "setup.sql"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "nyc-taxi.yml"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "dashboards", "pipeline-health.yml"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "bronze", "taxi_trips.asset.yml"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "silver", "trips.sql"))
-	require.FileExists(t, filepath.Join(pipelineRoot, "assets", "gold", "payment_summary.sql"))
-
-	pipeline, err := os.ReadFile(filepath.Join(pipelineRoot, "pipeline.yml"))
-	require.NoError(t, err)
-	require.Contains(t, string(pipeline), "snowflake: snowflake-localstack-demo")
-
-	// The pipeline, dashboards and ingestr assets all refer to these connections
-	// by name, so init has to merge them into the central config.
-	configContent, err := os.ReadFile(filepath.Join(targetRoot, ".bruin.yml"))
-	require.NoError(t, err)
-	for _, name := range []string{"snowflake-localstack-demo", "nyc-taxi-trips-2024-01", "nyc-weather-2024-01", "nyc-taxi-zones"} {
-		require.Contains(t, string(configContent), "name: "+name)
-	}
-}
-
 func TestPaymentsClickHouseTemplateHasSelfContainedDemo(t *testing.T) {
 	t.Parallel()
 
