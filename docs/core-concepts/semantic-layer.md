@@ -227,10 +227,6 @@ metrics:
     filter: "status = 'completed'"
 ```
 
-Metric filters can reference joined dimensions, such as
-`filter: "{customers.country} = 'US'"`, including in queries with window metrics.
-The required join is included even when the dimension is not displayed.
-
 Metric metadata is optional:
 
 ```yaml
