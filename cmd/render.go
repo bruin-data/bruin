@@ -97,8 +97,30 @@ func Render() *cli.Command {
 				Aliases: []string{"e", "env"},
 				Usage:   "the environment to render for, which also applies its schema_prefix",
 			},
+			&cli.BoolFlag{
+				Name:  "stdin",
+				Usage: "render the SQL read from standard input instead of an asset file, the way bruin query would run it; requires --connection",
+			},
+			&cli.StringFlag{
+				Name:    "connection",
+				Aliases: []string{"c"},
+				Usage:   "the connection to render --stdin SQL for",
+			},
+			&cli.StringFlag{
+				Name:    "this",
+				Sources: cli.EnvVars("BRUIN_THIS"),
+				Usage:   "with --stdin, the name of the asset the SQL belongs to, as bruin run names it in the environment; references to its unprefixed table are pointed at it",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			if c.Bool("stdin") {
+				return runRenderStdin(ctx, c)
+			}
+			if c.String("connection") != "" {
+				printError(errors.New("--connection is only used with --stdin"), c.String("output"), "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
 			fullRefresh := c.Bool("full-refresh")
 
 			variantName := c.String("variant")

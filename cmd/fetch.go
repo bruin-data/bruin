@@ -605,12 +605,6 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		return "", nil, "", "", nil, err
 	}
 
-	renderer := newQueryRenderer(startDate, endDate, "your-pipeline-name", vars, "")
-	extractor := &query.WholeFileExtractor{
-		Fs:       fs,
-		Renderer: renderer,
-	}
-
 	if c.String("semantic-model") != "" {
 		return prepareSemanticQueryExecution(ctx, c, fs, vars, startDate, endDate)
 	}
@@ -632,10 +626,8 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		if cm.SelectedEnvironment != nil {
-			renderer.SetContextValue("schema_prefix", cm.SelectedEnvironment.SchemaPrefix)
-		}
-		queryStr, err = extractQuery(queryStr, extractor)
+		renderer := newQueryRenderer(startDate, endDate, directQueryPipelineName, vars, "")
+		queryStr, err = renderDirectQuery(queryStr, renderer, cm.SelectedEnvironment)
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
@@ -657,7 +649,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 		// Auto-detect mode (both asset path and query)
 		autoRenderer := newQueryRenderer(startDate, endDate, pipelineInfo.Pipeline.Name, vars, pipelineMacroContent(pipelineInfo.Pipeline))
-		extractor = &query.WholeFileExtractor{
+		extractor := &query.WholeFileExtractor{
 			Fs:       fs,
 			Renderer: autoRenderer,
 		}
@@ -701,7 +693,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 	assetRenderer := newQueryRenderer(startDate, endDate, pipelineInfo.Pipeline.Name, vars, pipelineMacroContent(pipelineInfo.Pipeline))
-	extractor = &query.WholeFileExtractor{
+	extractor := &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: assetRenderer,
 	}
@@ -920,6 +912,20 @@ func newSemanticRenderer(pipelineInfo *ppInfo, vars map[string]any, startDate ti
 		renderer.SetContextValue(k, v)
 	}
 	return renderer
+}
+
+// directQueryPipelineName is the {{ pipeline }} value for SQL that has no
+// pipeline, such as `bruin query --query`.
+const directQueryPipelineName = "your-pipeline-name"
+
+// renderDirectQuery renders SQL that has no asset the way `bruin query --query`
+// does: the whole text is one template, and {{ schema_prefix }} is the prefix of
+// the selected environment.
+func renderDirectQuery(sql string, renderer *jinja.Renderer, env *config.Environment) (string, error) {
+	if env != nil {
+		renderer.SetContextValue("schema_prefix", env.SchemaPrefix)
+	}
+	return extractQuery(sql, &query.WholeFileExtractor{Renderer: renderer})
 }
 
 func newQueryRenderer(startDate, endDate time.Time, pipelineName string, vars map[string]any, macroContent string) *jinja.Renderer {
@@ -2146,6 +2152,12 @@ func injectAgentName(annotations string) string {
 // Scalar values are kept as literal strings (matching how pipeline variables work
 // in YAML); only values that look like a JSON object or array are parsed as JSON.
 func parseQueryVars(rawVars []string) (map[string]any, error) {
+	return parseVars(rawVars, parseQueryVarValue)
+}
+
+// parseVars parses --var key=value pairs, with dot-notation keys, using
+// parseValue to decode each value.
+func parseVars(rawVars []string, parseValue func(string) any) (map[string]any, error) {
 	vars := make(map[string]any)
 
 	for _, v := range rawVars {
@@ -2158,7 +2170,7 @@ func parseQueryVars(rawVars []string) (map[string]any, error) {
 			return nil, fmt.Errorf("invalid variable %q: key must not be empty", v)
 		}
 
-		value := parseQueryVarValue(strings.TrimSpace(parts[1]))
+		value := parseValue(strings.TrimSpace(parts[1]))
 		if err := setNestedVar(vars, key, value); err != nil {
 			return nil, fmt.Errorf("invalid variable %q: %w", v, err)
 		}

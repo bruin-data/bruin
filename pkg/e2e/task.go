@@ -20,6 +20,7 @@ type Task struct {
 	Retries       int
 	Args          []string
 	Env           []string
+	Stdin         string
 	WorkingDir    string
 	Expected      Output
 	Actual        Output
@@ -73,6 +74,9 @@ func (s *Task) runAttempt() error {
 	cmd.Env = append(os.Environ(), s.Env...)
 	if s.WorkingDir != "" {
 		cmd.Dir = s.WorkingDir
+	}
+	if s.Stdin != "" {
+		cmd.Stdin = strings.NewReader(s.Stdin)
 	}
 
 	var stdout, stderr bytes.Buffer

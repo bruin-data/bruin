@@ -2516,6 +2516,34 @@ func TestWorkflowTasks(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 					},
 					{
+						Name:    "query_with_schema_prefix: render --stdin returns the SQL the direct query ran",
+						Command: binary,
+						Args: []string{
+							"render", "--stdin", "--env", "env-schema-prefix-query", "--connection", "duckdb-schema-prefix-query", "--raw-query", "--output", "json",
+						},
+						Stdin: "SELECT a.src AS a_src, b.src AS b_src FROM sp_raw.dev_and_prod a CROSS JOIN sp_raw.prod_only b",
+						Env:   []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   `{"query":"SELECT a.src AS a_src, b.src AS b_src FROM test_sp_raw.dev_and_prod AS a CROSS JOIN sp_raw.prod_only AS b"}`,
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByOutputJSON},
+					},
+					{
+						Name:    "query_with_schema_prefix: render --stdin renders schema_prefix for the given environment",
+						Command: binary,
+						Args: []string{
+							"render", "--stdin", "--env", "env-schema-prefix-query", "--connection", "duckdb-schema-prefix-query", "--raw-query", "--output", "json",
+						},
+						Stdin: "SELECT '{{ schema_prefix }}' AS prefix",
+						Env:   []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   `{"query":"SELECT 'test_' AS prefix"}`,
+						},
+						Asserts: []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByOutputJSON},
+					},
+					{
 						Name:    "query_with_schema_prefix: asset query renders and rewrites for the given environment",
 						Command: binary,
 						Args: []string{
