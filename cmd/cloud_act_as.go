@@ -82,7 +82,7 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 		session, permissions, err := fetchActAs(ctx, store, agentID, resolveTeam(c))
 		if err != nil {
 			if strings.Contains(err.Error(), "agent:act-as") {
-				return fmt.Errorf("could not act as agent %d: your login doesn't allow acting as agents; run 'bruin cloud login --global --reauth' and keep \"Allow acting as agents\" ticked", agentID)
+				return fmt.Errorf("could not act as agent %d: your login doesn't allow acting as agents; run 'bruin cloud login --global --reauth' and tick \"Allow acting as agents\"", agentID)
 			}
 			return fmt.Errorf("could not act as agent %d: %w", agentID, err)
 		}
