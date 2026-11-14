@@ -538,6 +538,10 @@ environments:
           host: "host-123"
           port: "1234"
           database: "dbname-123"
+          schema: "schema-123"
+          ssl: true
+          timeout: 15
+          platform: "ibmi"
       phantombuster:
         - name: "phantombuster-1"
           api_key: "api-key-123"

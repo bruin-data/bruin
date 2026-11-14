@@ -3677,6 +3677,10 @@ func (m *Manager) AddDB2ConnectionFromConfig(connection *config.DB2Connection) e
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Database: connection.Database,
+		Schema:   connection.Schema,
+		SSL:      connection.SSL,
+		Timeout:  connection.Timeout,
+		Platform: connection.Platform,
 	})
 	if err != nil {
 		return err
