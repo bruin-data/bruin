@@ -83,12 +83,13 @@ rows:
         chart: combo
         col: 12
         sql: |
-          SELECT d.day AS "day", COUNT(*)::FLOAT AS "trips", SUM(t.total_amount)::FLOAT AS "revenue"
-          FROM silver.trips t
-          JOIN gold.daily_trips d ON d.day = t.pickup_at::DATE
+          -- Starts from every day so a day with no pickups in the chosen boroughs shows as 0.
+          SELECT d.day AS "day", COUNT(t.pickup_at)::FLOAT AS "trips", COALESCE(SUM(t.total_amount), 0)::FLOAT AS "revenue"
+          FROM gold.daily_trips d
+          LEFT JOIN silver.trips t ON t.pickup_at::DATE = d.day
+            {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           WHERE TRUE
           {% if filters.weather != 'All' %}AND d.weather = '{{ filters.weather }}'{% endif %}
-          {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           GROUP BY 1
           ORDER BY 1
         x: { field: day, type: date }
@@ -103,12 +104,12 @@ rows:
         col: 6
         description: Running total of revenue, day by day.
         sql: |
-          SELECT d.day AS "day", (SUM(SUM(t.total_amount)) OVER (ORDER BY d.day))::FLOAT AS "revenue"
-          FROM silver.trips t
-          JOIN gold.daily_trips d ON d.day = t.pickup_at::DATE
+          SELECT d.day AS "day", (SUM(COALESCE(SUM(t.total_amount), 0)) OVER (ORDER BY d.day))::FLOAT AS "revenue"
+          FROM gold.daily_trips d
+          LEFT JOIN silver.trips t ON t.pickup_at::DATE = d.day
+            {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           WHERE TRUE
           {% if filters.weather != 'All' %}AND d.weather = '{{ filters.weather }}'{% endif %}
-          {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           GROUP BY 1
           ORDER BY 1
         x: { field: day, type: date }
@@ -121,12 +122,12 @@ rows:
         description: A control chart of daily trips. Days outside the dashed limits (average ± 2.66 × the average day-to-day change) are unusual for this month.
         sql: |
           WITH daily AS (
-            SELECT d.day, COUNT(*)::FLOAT AS trips
-            FROM silver.trips t
-            JOIN gold.daily_trips d ON d.day = t.pickup_at::DATE
+            SELECT d.day, COUNT(t.pickup_at)::FLOAT AS trips
+            FROM gold.daily_trips d
+            LEFT JOIN silver.trips t ON t.pickup_at::DATE = d.day
+              {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
             WHERE TRUE
             {% if filters.weather != 'All' %}AND d.weather = '{{ filters.weather }}'{% endif %}
-            {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
             GROUP BY 1
           ), mr AS (
             SELECT day, trips, ABS(trips - LAG(trips) OVER (ORDER BY day)) AS moving_range FROM daily
@@ -157,11 +158,11 @@ rows:
         col: 4
         description: snow = any snowfall; rain = no snow and 5 mm or more of precipitation; dry = everything else.
         sql: |
-          SELECT d.weather AS "weather", (COUNT(*) / COUNT(DISTINCT d.day))::FLOAT AS "avg_daily_trips"
-          FROM silver.trips t
-          JOIN gold.daily_trips d ON d.day = t.pickup_at::DATE
-          WHERE TRUE
-          {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
+          -- Divides by every day of that weather, including days with no pickups in the chosen boroughs.
+          SELECT d.weather AS "weather", (COUNT(t.pickup_at) / COUNT(DISTINCT d.day))::FLOAT AS "avg_daily_trips"
+          FROM gold.daily_trips d
+          LEFT JOIN silver.trips t ON t.pickup_at::DATE = d.day
+            {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           GROUP BY 1
           ORDER BY CASE d.weather WHEN 'dry' THEN 1 WHEN 'rain' THEN 2 ELSE 3 END
         x: { field: weather }
@@ -199,12 +200,12 @@ rows:
         col: 4
         description: One dot per day, the day's max temperature against its trips.
         sql: |
-          SELECT d.temp_max_c::FLOAT AS "temp_max_c", COUNT(*)::FLOAT AS "trips"
-          FROM silver.trips t
-          JOIN gold.daily_trips d ON d.day = t.pickup_at::DATE
+          SELECT d.temp_max_c::FLOAT AS "temp_max_c", COUNT(t.pickup_at)::FLOAT AS "trips"
+          FROM gold.daily_trips d
+          LEFT JOIN silver.trips t ON t.pickup_at::DATE = d.day
+            {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           WHERE TRUE
           {% if filters.weather != 'All' %}AND d.weather = '{{ filters.weather }}'{% endif %}
-          {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
           GROUP BY d.day, d.temp_max_c
         x: { field: temp_max_c, type: number, title: Max temp (°C) }
         y: { field: [trips], format: ",.0f", title: Trips }
@@ -345,15 +346,29 @@ rows:
         col: 7
         description: Average pickups per day, by borough and day of the week.
         sql: |
-          SELECT DAYNAME(t.pickup_at) AS "weekday", t.pickup_borough AS "borough",
-                 (COUNT(*) / COUNT(DISTINCT t.pickup_at::DATE))::FLOAT AS "trips_per_day"
-          FROM silver.trips t
-          JOIN gold.daily_trips d ON d.day = t.pickup_at::DATE
-          WHERE t.pickup_borough IN ('Bronx', 'Brooklyn', 'Manhattan', 'Queens')
-          {% if filters.weather != 'All' %}AND d.weather = '{{ filters.weather }}'{% endif %}
-          {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
-          GROUP BY 1, 2, DAYOFWEEKISO(t.pickup_at)
-          ORDER BY DAYOFWEEKISO(t.pickup_at), 2
+          -- Every borough x day pair, so days with no pickups count as 0 in the average.
+          WITH days AS (
+            SELECT d.day
+            FROM gold.daily_trips d
+            WHERE TRUE
+            {% if filters.weather != 'All' %}AND d.weather = '{{ filters.weather }}'{% endif %}
+          ), boroughs AS (
+            SELECT DISTINCT t.pickup_borough AS borough
+            FROM silver.trips t
+            WHERE t.pickup_borough IN ('Bronx', 'Brooklyn', 'Manhattan', 'Queens')
+            {% if filters.borough and filters.borough | length > 0 %}AND t.pickup_borough IN ('{{ filters.borough | join("','") }}'){% endif %}
+          ), pickups AS (
+            SELECT t.pickup_at::DATE AS day, t.pickup_borough AS borough, COUNT(*) AS trips
+            FROM silver.trips t
+            GROUP BY 1, 2
+          )
+          SELECT DAYNAME(days.day) AS "weekday", boroughs.borough AS "borough",
+                 (COALESCE(SUM(pickups.trips), 0) / COUNT(*))::FLOAT AS "trips_per_day"
+          FROM days
+          CROSS JOIN boroughs
+          LEFT JOIN pickups ON pickups.day = days.day AND pickups.borough = boroughs.borough
+          GROUP BY 1, 2, DAYOFWEEKISO(days.day)
+          ORDER BY DAYOFWEEKISO(days.day), 2
         x: { field: weekday, type: category }
         y: { field: [borough] }
         value: { field: trips_per_day, format: ",.0f" }

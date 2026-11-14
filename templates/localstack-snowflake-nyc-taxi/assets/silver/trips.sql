@@ -48,5 +48,6 @@ LEFT JOIN bronze.taxi_zones z ON z.location_id::INT = t.pu_location_id
 WHERE t.lpep_pickup_datetime >= '2024-01-01'
   AND t.lpep_pickup_datetime < '2024-02-01'
   AND t.lpep_dropoff_datetime >= t.lpep_pickup_datetime
-  AND DATEDIFF('minute', t.lpep_pickup_datetime, t.lpep_dropoff_datetime) <= 360
+  -- Seconds, like trip_minutes: DATEDIFF('minute') counts minute boundaries and would let 6h00m30s through.
+  AND DATEDIFF('second', t.lpep_pickup_datetime, t.lpep_dropoff_datetime) <= 360 * 60
   AND t.total_amount >= 0
