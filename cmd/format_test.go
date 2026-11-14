@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,6 +11,63 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFormatAssetSecrets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "omitted inject_as stays omitted",
+			input: "  - key: MY_API_KEY\n",
+			want:  "  - key: MY_API_KEY\n",
+		},
+		{
+			name:  "redundant inject_as is removed",
+			input: "  - key: MY_API_KEY\n    inject_as: MY_API_KEY\n",
+			want:  "  - key: MY_API_KEY\n",
+		},
+		{
+			name:  "different inject_as is preserved",
+			input: "  - key: my-api-key\n    inject_as: MY_API_KEY\n",
+			want:  "  - key: my-api-key\n    inject_as: MY_API_KEY\n",
+		},
+		{
+			name:  "case difference is preserved",
+			input: "  - key: my_api_key\n    inject_as: MY_API_KEY\n",
+			want:  "  - key: my_api_key\n    inject_as: MY_API_KEY\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assetPath := filepath.Join(t.TempDir(), "secret.py")
+			content := fmt.Sprintf("\"\"\"@bruin\nname: test.secret\nsecrets:\n%s@bruin\"\"\"\n\nprint('hello')\n", tt.input)
+			require.NoError(t, os.WriteFile(assetPath, []byte(content), 0o644))
+
+			asset, err := formatAsset(assetPath)
+			require.NoError(t, err)
+
+			formatted, err := os.ReadFile(assetPath)
+			require.NoError(t, err)
+			assert.Contains(t, string(formatted), "secrets:\n"+tt.want+"\n@bruin")
+			assert.Contains(t, string(formatted), "print('hello')\n")
+
+			reparsed, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
+			require.NoError(t, err)
+			assert.Equal(t, asset.Secrets, reparsed.Secrets)
+
+			changed, err := shouldFileChange(assetPath)
+			require.NoError(t, err)
+			assert.False(t, changed, "formatting should be idempotent")
+		})
+	}
+}
 
 func TestCheckLint(t *testing.T) {
 	t.Parallel()

@@ -1143,7 +1143,11 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 
 	type Alias struct {
 		Key      string `yaml:"key"`
-		InjectAs string `yaml:"inject_as"`
+		InjectAs string `yaml:"inject_as,omitempty"`
+	}
+
+	if s.InjectedKey == s.SecretKey {
+		s.InjectedKey = ""
 	}
 
 	return Alias{
