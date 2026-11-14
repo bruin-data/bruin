@@ -79,6 +79,7 @@ parameters:
   no_load_timestamp: true|false
   no_run_id: true|false
   postgres_snapshot: string # ordinary PostgreSQL source only
+  read_api: storage | rest # BigQuery source only
   full_refresh: true|false
   mask: string
   trim_whitespace: true|false
@@ -161,6 +162,7 @@ parameters:
 | `no_load_timestamp` | No | `--no-load-timestamp` | Disables the `_ingestr_loaded_at` metadata column. Defaults to `false`; requires ingestr v1.0.39 or later. |
 | `no_run_id` | No | `--no-run-id` | Disables the `_ingestr_run_id` metadata column. Defaults to `false`; requires ingestr v1.1.31 or later. |
 | `postgres_snapshot` | No | source URI `snapshot` | Exported snapshot ID for an ordinary PostgreSQL source load. Requires ingestr v1.1.83 or later and cannot be combined with `cdc: true`. Keep the exporting session open until every load finishes; see [Loading an external baseline](../platforms/postgres.md#loading-an-external-baseline). |
+| `read_api` | No | source URI `read_api` | How a BigQuery source is read: `storage` (Storage Read API, the default) or `rest` (BigQuery REST API only). Overrides `read_api` on the source connection. Rejected for other sources. Requires ingestr v1.1.92 or later; see [Ingestr read API](../platforms/bigquery.md#ingestr-read-api). |
 | `full_refresh` | No | `--full-refresh` | Requests a full refresh. For streaming CDC assets, refreshes once before continuing replication. The run-level `--full-refresh` flag still applies to all assets. |
 | `mask` | No | `--mask` | Adds a column masking rule such as `email:hash`. |
 | `pipelines_dir` | No | `--pipelines-dir` | Directory where Ingestr stores pipeline metadata. |
@@ -401,6 +403,20 @@ parameters:
   source_connection: gcp-default
   source_table: <mysheetid>.<sheetname>
   destination: snowflake
+```
+
+### Copy a table from BigQuery without the Storage Read API
+
+This example reads a BigQuery table through the BigQuery REST API only, for credentials that lack the `bigquery.readsessions.*` permissions or projects where the Storage Read API is blocked. See [Ingestr read API](../platforms/bigquery.md#ingestr-read-api).
+
+```yaml
+name: raw.events
+type: ingestr
+parameters:
+  source_connection: gcp-default
+  source_table: analytics.events
+  read_api: rest
+  destination: postgres
 ```
 
 ### Enforce schema with column types

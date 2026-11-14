@@ -3219,6 +3219,9 @@
         },
         "storage_uri": {
           "type": "string"
+        },
+        "read_api": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

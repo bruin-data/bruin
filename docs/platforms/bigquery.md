@@ -45,6 +45,10 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
 
           # Optional Cloud Storage folder for Iceberg tables, see Iceberg tables below.
           storage_uri: gs://my-bucket/iceberg
+
+          # Optional: how ingestr assets read from this connection, `storage` (default) or `rest`.
+          # See Ingestr read API below.
+          read_api: rest
 ```
 
 ### Query cost limits
@@ -126,6 +130,28 @@ connections:
 ```
 
 Read-only mode requires `service_account_file` or `service_account_json`; ADC and access tokens are not supported. Ingestr and BigQuery Data Transfer are unavailable in this mode. Defaults to `false`.
+
+### Ingestr read API
+
+`read_api` picks how [ingestr assets](../assets/ingestr.md) that use this connection as their source read BigQuery:
+
+| Value | Reads through |
+|---|---|
+| `storage` | The BigQuery Storage Read API. This is the default, and the fastest. |
+| `rest` | The BigQuery REST API only. Ingestr never creates a Storage Read API session and doesn't fall back to it. |
+
+```yaml
+connections:
+  google_cloud_platform:
+    - name: bigquery-rest
+      project_id: my-project
+      service_account_file: /path/to/service-account.json
+      read_api: rest
+```
+
+Use `rest` when the credentials lack the `bigquery.readsessions.*` permissions, an organization policy or VPC Service Controls blocks the Storage Read API, or you don't want to pay for Storage Read API usage. It's much slower on large tables. Ingestr's [BigQuery source docs](https://getbruin.com/docs/ingestr/supported-sources/bigquery.html#choosing-the-read-api) describe which REST calls each read uses.
+
+When unset, Bruin leaves the choice to ingestr, which uses the Storage Read API. An ingestr asset can override the connection with its own [`read_api` parameter](../assets/ingestr.md#parameter-reference). The setting only affects ingestr reads: SQL assets, `bruin query` and BigQuery destinations ignore it. It requires ingestr v1.1.92 or later, which is the default; an asset whose `parameters.version` pins an older release fails before it runs.
 
 ## Iceberg tables
 

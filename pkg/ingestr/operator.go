@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -132,6 +133,56 @@ func ensureStarRocksEngineSupport(engine resolvedEngine, uris ...string) error {
 		if strings.TrimSpace(parsed.Query().Get("http_scheme")) != "" && semver.Compare("v"+engine.ingestrVersion, "v1.1.78") < 0 {
 			return fmt.Errorf("starrocks http_scheme requires ingestr 1.1.78 or newer, but parameters.version resolved to %s", engine.ingestrVersion)
 		}
+	}
+	return nil
+}
+
+// bigQueryReadAPIMinIngestrVersion is the first ingestr release whose BigQuery
+// source reads the read_api URI parameter.
+const bigQueryReadAPIMinIngestrVersion = "1.1.92"
+
+// applyBigQueryReadAPI sets read_api on a BigQuery source URI from the asset's
+// read_api parameter, which overrides the value from the connection.
+func applyBigQueryReadAPI(sourceURI string, params pipeline.ParameterMap) (string, error) {
+	raw, present := params["read_api"]
+	if !present {
+		return sourceURI, nil
+	}
+	if !strings.HasPrefix(sourceURI, "bigquery://") {
+		return "", errors.New("read_api is only supported for BigQuery sources")
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("invalid read_api: must be %q or %q", bigquery.ReadAPIStorage, bigquery.ReadAPIREST)
+	}
+	if err := bigquery.ValidateReadAPI(value); err != nil {
+		return "", err
+	}
+
+	parsed, err := url.Parse(sourceURI)
+	if err != nil {
+		return "", errors.Wrap(err, "invalid BigQuery URI")
+	}
+	query := parsed.Query()
+	query.Set("read_api", value)
+	parsed.RawQuery = query.Encode()
+
+	return parsed.String(), nil
+}
+
+// ensureBigQueryReadAPISupport rejects a BigQuery source URI carrying read_api,
+// from the connection or the asset, when the resolved ingestr predates it.
+// Destinations are not checked: the BigQuery destination ignores read_api.
+func ensureBigQueryReadAPISupport(engine resolvedEngine, sourceURI string) error {
+	if !strings.HasPrefix(sourceURI, "bigquery://") {
+		return nil
+	}
+	parsed, err := url.Parse(sourceURI)
+	if err != nil {
+		return errors.Wrap(err, "invalid BigQuery URI")
+	}
+	if parsed.Query().Get("read_api") != "" && semver.Compare("v"+engine.ingestrVersion, "v"+bigQueryReadAPIMinIngestrVersion) < 0 {
+		return fmt.Errorf("bigquery read_api requires ingestr %s or newer, but parameters.version resolved to %s", bigQueryReadAPIMinIngestrVersion, engine.ingestrVersion)
 	}
 	return nil
 }
@@ -285,6 +336,14 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	sourceURI = adaptURIForEngine(sourceURI, engine)
+
+	sourceURI, err = applyBigQueryReadAPI(sourceURI, asset.Parameters)
+	if err != nil {
+		return err
+	}
+	if err := ensureBigQueryReadAPISupport(engine, sourceURI); err != nil {
+		return err
+	}
 
 	// Handle CDC mode - transform the source URI into ingestr's CDC scheme and auto-set merge strategy.
 	if cdcVal, _ := asset.Parameters.GetString("cdc"); cdcVal == "true" {

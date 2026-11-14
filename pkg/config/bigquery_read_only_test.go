@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -44,6 +45,8 @@ func TestGoogleCloudPlatformConnectionReadOnlySchema(t *testing.T) {
 		def := document.Definitions[name]
 		require.Equal(t, "boolean", def.Properties["read_only"].Type)
 		require.NotContains(t, def.Required, "read_only")
+		require.Equal(t, "string", def.Properties["read_api"].Type)
+		require.NotContains(t, def.Required, "read_api")
 	}
 }
 
@@ -59,4 +62,31 @@ func TestGoogleCloudPlatformConnectionStorageURIRoundTrip(t *testing.T) {
 	data, err = yaml.Marshal(conn)
 	require.NoError(t, err)
 	require.Contains(t, string(data), "storage_uri: gs://bucket/iceberg")
+}
+
+func TestGoogleCloudPlatformConnectionReadAPIRoundTrip(t *testing.T) {
+	t.Parallel()
+	conn := &GoogleCloudPlatformConnection{}
+	require.NoError(t, yaml.Unmarshal([]byte("name: reader\nread_api: rest\n"), conn))
+	require.Equal(t, "rest", conn.ReadAPI)
+	data, err := json.Marshal(conn)
+	require.NoError(t, err)
+	var values map[string]any
+	require.NoError(t, json.Unmarshal(data, &values))
+	require.Equal(t, "rest", values["read_api"])
+	data, err = yaml.Marshal(conn)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "read_api: rest")
+
+	decoded := &GoogleCloudPlatformConnection{}
+	require.NoError(t, mapstructure.Decode(map[string]any{"name": "reader", "read_api": "storage"}, decoded))
+	require.Equal(t, "storage", decoded.ReadAPI)
+
+	unset := &GoogleCloudPlatformConnection{ConnectionMetadata: ConnectionMetadata{Name: "reader"}}
+	data, err = json.Marshal(unset)
+	require.NoError(t, err)
+	require.NotContains(t, string(data), "read_api")
+	data, err = yaml.Marshal(unset)
+	require.NoError(t, err)
+	require.NotContains(t, string(data), "read_api")
 }
