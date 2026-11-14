@@ -591,7 +591,7 @@ func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 		groupBy = append(groupBy, strconv.Itoa(i+1))
 	}
 	for _, name := range innerMetrics {
-		if err := e.validateMetricFiltersForWrapped(name, map[string]bool{}); err != nil {
+		if err := e.validateMetricFiltersForWrapped(name, map[string]bool{}, plan); err != nil {
 			return "", err
 		}
 		expr, err := e.expandSimple(name, map[string]bool{}, plan)
@@ -1175,7 +1175,7 @@ func (e *Engine) collectInnerDimensions(q *Query) []DimensionRef {
 	return result
 }
 
-func (e *Engine) validateMetricFiltersForWrapped(name string, visited map[string]bool) error {
+func (e *Engine) validateMetricFiltersForWrapped(name string, visited map[string]bool, plan *queryPlan) error {
 	if visited[name] {
 		return nil
 	}
@@ -1186,7 +1186,7 @@ func (e *Engine) validateMetricFiltersForWrapped(name string, visited map[string
 		return nil
 	}
 	if m.Filter != "" {
-		_, filterNeedsHaving, err := e.expandFilterExpr(m.Filter, nil)
+		_, filterNeedsHaving, err := e.expandFilterExpr(m.Filter, plan)
 		if err != nil {
 			return err
 		}
@@ -1195,7 +1195,7 @@ func (e *Engine) validateMetricFiltersForWrapped(name string, visited map[string
 		}
 	}
 	for _, ref := range extractRefs(m.Expression) {
-		if err := e.validateMetricFiltersForWrapped(ref, copyVisited(visited)); err != nil {
+		if err := e.validateMetricFiltersForWrapped(ref, copyVisited(visited), plan); err != nil {
 			return err
 		}
 	}

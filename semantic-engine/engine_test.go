@@ -2556,3 +2556,36 @@ func TestGenerateGrandTotalSQLHelperDoesNotHideJoinedDimension(t *testing.T) {
 	expectContains(t, sql, "WHERE customers.country = 'US'")
 	expectContains(t, sql, "COUNT(*) AS __grand_total_row_count_")
 }
+
+func TestWindowMetricsWithJoinedMetricFilters(t *testing.T) {
+	t.Parallel()
+
+	for _, ref := range []string{"customers.country", "country"} {
+		t.Run(ref, func(t *testing.T) {
+			t.Parallel()
+
+			customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{{Name: "country", Type: "string"}}}
+			orders := &Model{Name: "orders", Source: Source{Table: "orders"}, Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Dimensions: []Dimension{{Name: "order_date", Type: "time"}}, Metrics: []Metric{
+				{Name: "revenue", Expression: "sum(amount)"},
+				{Name: "us_revenue", Expression: "sum(amount)", Filter: "{" + ref + "} = 'US'"},
+				{Name: "double_us_revenue", Expression: "{us_revenue} * 2"},
+				{Name: "running_revenue", Expression: "{revenue}", Window: &Window{Type: "running_total", OrderBy: "order_date"}},
+				{Name: "running_us_revenue", Expression: "{double_us_revenue}", Window: &Window{Type: "running_total", OrderBy: "order_date"}},
+			}}
+			engine, err := NewEngineWithModels(orders, map[string]*Model{"customers": customers})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, metrics := range [][]string{{"revenue", "us_revenue", "running_revenue"}, {"double_us_revenue", "running_us_revenue"}} {
+				sql, err := engine.GenerateSQL(&Query{Dimensions: []DimensionRef{{Name: "order_date"}}, Metrics: metrics})
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.id")
+				expectContains(t, sql, "sum(CASE WHEN customers.country = 'US' THEN base.amount ELSE NULL END)")
+				expectContains(t, sql, "OVER (ORDER BY base.order_date ROWS UNBOUNDED PRECEDING)")
+				expectContains(t, sql, "GROUP BY 1")
+			}
+		})
+	}
+}
