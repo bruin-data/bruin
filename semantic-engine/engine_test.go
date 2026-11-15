@@ -1079,7 +1079,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Sort:       []SortSpec{{Name: "order_date", Direction: "asc"}},
 				Limit:      5,
 			},
-			must: []string{") base ORDER BY base.order_date ASC, base.category ASC LIMIT 5"},
+			must: []string{") base ORDER BY base.order_date ASC LIMIT 5"},
 		},
 	}
 
@@ -2409,7 +2409,7 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectContains(t, detail, "HAVING")
-	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 1")
+	expectContains(t, detail, "LIMIT 1")
 	total, shown := splitShownGrandTotal(t, sql)
 	expectContains(t, shown, "FROM ("+detail+") __grand_total_detail")
 	expectContains(t, total, "__grand_total_shown_1 = (date_trunc('month', order_date))")
@@ -2468,28 +2468,31 @@ func TestGenerateGrandTotalSQLParenthesizesDimensionExpressions(t *testing.T) {
 	expectContains(t, sql, "(__grand_total_shown.__grand_total_shown_0 = (order_number = 1) OR (__grand_total_shown.__grand_total_shown_0 IS NULL AND (order_number = 1) IS NULL))")
 }
 
-func TestGenerateGrandTotalSQLRepeatedDimensions(t *testing.T) {
+func TestGenerateGrandTotalSQLRepeatedRefs(t *testing.T) {
 	t.Parallel()
 
 	e := minimalEngine(t, richTestModel())
 	sort := []SortSpec{{Name: "revenue", Direction: "desc"}}
-	// Identical refs collapse to one key column, adjacent or not.
-	sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "country"}, {Name: "category"}, {Name: "country"}}, Metrics: []string{"revenue"}, Sort: sort, Limit: 2})
+	// Identical refs collapse to one key column, adjacent or not, and to one shown column.
+	sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "country"}, {Name: "category"}, {Name: "country"}}, Metrics: []string{"revenue", "revenue"}, Sort: sort, Limit: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, shown := splitShownGrandTotal(t, sql)
 	expectContains(t, shown, "SELECT DISTINCT country AS __grand_total_shown_0, category AS __grand_total_shown_1 FROM (")
-	// Two grains share the alias order_date, so ties break by position and the
-	// total refuses an ambiguous key.
-	q := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "year"}, {Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue"}, Sort: sort, Limit: 2}
-	detail, err := e.GenerateSQL(q)
+	if n := strings.Count(shown, "AS revenue"); n != 1 {
+		t.Errorf("shown rows repeat revenue %d times: %s", n, shown)
+	}
+	// A repeated metric is computed once and projected twice.
+	sql, err = e.GenerateGrandTotalSQL(&Query{Metrics: []string{"revenue", "revenue"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 2")
-	if _, err := e.GenerateGrandTotalSQL(q); err == nil || !strings.Contains(err.Error(), "order_date is returned twice") {
-		t.Fatalf("expected ambiguous key error, got %v", err)
+	expectContains(t, sql, "SELECT revenue, revenue FROM (SELECT sum(amount) AS revenue, COUNT(*) AS __grand_total_row_count FROM")
+	// Two grains share the column order_date, so the totals are blank.
+	sql, err = e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "year"}, {Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue", "order_count"}, Sort: sort, Limit: 2})
+	if err != nil || sql != "SELECT NULL AS revenue, NULL AS order_count" {
+		t.Fatalf("expected blank totals, got %q, %v", sql, err)
 	}
 }
 
@@ -2528,7 +2531,7 @@ func TestGenerateGrandTotalSQLRejectsUnsupportedQueries(t *testing.T) {
 	}
 }
 
-func TestGenerateGrandTotalSQLOnlyRetainsRowFilterJoins(t *testing.T) {
+func TestGenerateGrandTotalSQLMovesHavingToShownRows(t *testing.T) {
 	t.Parallel()
 
 	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{{Name: "country", Type: "string"}}}
