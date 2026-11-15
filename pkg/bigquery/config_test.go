@@ -18,6 +18,8 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 		AccessToken         string
 		Credentials         *google.Credentials
 		Location            string
+		UseADC              bool
+		ReadAPI             string
 		wantErr             bool
 		Expected            string
 	}{
@@ -66,18 +68,56 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 			wantErr:             false,
 			Expected:            "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==&location=location",
 		},
+		{
+			Name:            "creds json with read_api",
+			ProjectID:       "project-id",
+			CredentialsJSON: "{\"creds\":\"some-creds\"}",
+			Location:        "location",
+			ReadAPI:         "rest",
+			Expected:        "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==&location=location&read_api=rest",
+		},
+		{
+			Name:      "adc",
+			ProjectID: "project-id",
+			UseADC:    true,
+			Expected:  "bigquery://project-id",
+		},
+		{
+			Name:      "adc with read_api",
+			ProjectID: "project-id",
+			UseADC:    true,
+			ReadAPI:   "storage",
+			Expected:  "bigquery://project-id?read_api=storage",
+		},
+		{
+			Name:      "adc with location and read_api",
+			ProjectID: "project-id",
+			UseADC:    true,
+			Location:  "EU",
+			ReadAPI:   "rest",
+			Expected:  "bigquery://project-id?location=EU&read_api=rest",
+		},
+		{
+			Name:      "invalid read_api",
+			ProjectID: "project-id",
+			UseADC:    true,
+			ReadAPI:   "REST",
+			wantErr:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
 
 			config := Config{
-				ProjectID:           tt.ProjectID,
-				CredentialsFilePath: tt.CredentialsFilePath,
-				CredentialsJSON:     tt.CredentialsJSON,
-				AccessToken:         tt.AccessToken,
-				Credentials:         tt.Credentials,
-				Location:            tt.Location,
+				ProjectID:                        tt.ProjectID,
+				CredentialsFilePath:              tt.CredentialsFilePath,
+				CredentialsJSON:                  tt.CredentialsJSON,
+				AccessToken:                      tt.AccessToken,
+				Credentials:                      tt.Credentials,
+				Location:                         tt.Location,
+				UseApplicationDefaultCredentials: tt.UseADC,
+				ReadAPI:                          tt.ReadAPI,
 			}
 
 			result, err := config.GetConnectionURI()

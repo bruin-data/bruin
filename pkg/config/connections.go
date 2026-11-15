@@ -94,6 +94,7 @@ type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	MaxQueryCostSoft                 *float64 `yaml:"max_query_cost_soft,omitempty" json:"max_query_cost_soft,omitempty" mapstructure:"max_query_cost_soft"`
 	ReadOnly                         bool     `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 	StorageURI                       string   `yaml:"storage_uri,omitempty" json:"storage_uri,omitempty" mapstructure:"storage_uri"`
+	ReadAPI                          string   `yaml:"read_api,omitempty" json:"read_api,omitempty" mapstructure:"read_api"`
 	rawCredentials                   *google.Credentials
 }
 
@@ -135,6 +136,9 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	}
 	if c.StorageURI != "" {
 		m["storage_uri"] = c.StorageURI
+	}
+	if c.ReadAPI != "" {
+		m["read_api"] = c.ReadAPI
 	}
 
 	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
@@ -198,6 +202,9 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	}
 	if c.StorageURI != "" {
 		payload["storage_uri"] = c.StorageURI
+	}
+	if c.ReadAPI != "" {
+		payload["read_api"] = c.ReadAPI
 	}
 
 	return json.Marshal(payload)
