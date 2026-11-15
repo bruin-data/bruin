@@ -436,7 +436,7 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 			keys[i] = columns[i].Name + " AS " + key
 			shown := "__grand_total_shown." + key
 			source := totalPlan.dimensionSQL(totalPlan.dimensionBinding(d))
-			conditions[i] = fmt.Sprintf("(%s = %s OR (%s IS NULL AND %s IS NULL))", shown, source, shown, source)
+			conditions[i] = fmt.Sprintf("(%s = (%s) OR (%s IS NULL AND (%s) IS NULL))", shown, source, shown, source)
 		}
 		if len(keys) == 0 {
 			// A metric-only query's one row may be hidden by an aggregate filter.

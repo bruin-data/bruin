@@ -2412,7 +2412,7 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 1")
 	total, shown := splitShownGrandTotal(t, sql)
 	expectContains(t, shown, "FROM ("+detail+") __grand_total_detail")
-	expectContains(t, total, "__grand_total_shown_1 = date_trunc('month', order_date)")
+	expectContains(t, total, "__grand_total_shown_1 = (date_trunc('month', order_date))")
 	for _, want := range []string{"sum(amount) AS revenue", "count(distinct order_id)", "count(*)", "AS avg_order_value", "CASE WHEN status = 'completed'", "WHERE status = 'completed' AND country = 'US'"} {
 		expectContains(t, total, want)
 	}
@@ -2457,6 +2457,17 @@ func TestGenerateGrandTotalSQLJoinsShownRowsOnlyWhenRowsCanBeHidden(t *testing.T
 	expectContains(t, total, "__grand_total_shown ON 1 = 1")
 }
 
+func TestGenerateGrandTotalSQLParenthesizesDimensionExpressions(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, &Model{Name: "orders", Source: Source{Table: "orders"}, Dimensions: []Dimension{{Name: "is_first", Type: "boolean", Expression: "order_number = 1"}}, Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}}})
+	sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "is_first"}}, Metrics: []string{"revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "(__grand_total_shown.__grand_total_shown_0 = (order_number = 1) OR (__grand_total_shown.__grand_total_shown_0 IS NULL AND (order_number = 1) IS NULL))")
+}
+
 func TestGenerateGrandTotalSQLRepeatedDimensions(t *testing.T) {
 	t.Parallel()
 
@@ -2495,7 +2506,7 @@ func TestGenerateGrandTotalSQLKeysWindowQueriesByInnerDimensions(t *testing.T) {
 	total, shown := splitShownGrandTotal(t, sql)
 	expectContains(t, shown, "SELECT DISTINCT country AS __grand_total_shown_0, category AS __grand_total_shown_1, order_date AS __grand_total_shown_2 FROM (")
 	expectContains(t, shown, "LIMIT 2")
-	for _, want := range []string{"__grand_total_shown_0 = country", "__grand_total_shown_1 = category", "__grand_total_shown_2 = order_date", "SUM(NULLIF(0, 0)) AS running_revenue"} {
+	for _, want := range []string{"__grand_total_shown_0 = (country)", "__grand_total_shown_1 = (category)", "__grand_total_shown_2 = (order_date)", "SUM(NULLIF(0, 0)) AS running_revenue"} {
 		expectContains(t, total, want)
 	}
 	expectNotContains(t, total, "OVER")
@@ -2534,7 +2545,7 @@ func TestGenerateGrandTotalSQLOnlyRetainsRowFilterJoins(t *testing.T) {
 	total, _ := splitShownGrandTotal(t, sql)
 	expectNotContains(t, total, "HAVING")
 	expectNotContains(t, total, "WHERE")
-	expectContains(t, total, "__grand_total_shown_0 = customers.country")
+	expectContains(t, total, "__grand_total_shown_0 = (customers.country)")
 	q.Filters = []Filter{{Dimension: "customers.country", Operator: "equals", Value: "CA"}}
 	sql, err = e.GenerateGrandTotalSQL(q)
 	if err != nil {
