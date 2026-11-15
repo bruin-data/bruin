@@ -1079,7 +1079,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Sort:       []SortSpec{{Name: "order_date", Direction: "asc"}},
 				Limit:      5,
 			},
-			must: []string{") base ORDER BY base.order_date ASC LIMIT 5"},
+			must: []string{") base ORDER BY base.order_date ASC, base.category ASC LIMIT 5"},
 		},
 	}
 
@@ -2409,7 +2409,7 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectContains(t, detail, "HAVING")
-	expectContains(t, detail, "LIMIT 1")
+	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 1")
 	total, shown := splitShownGrandTotal(t, sql)
 	expectContains(t, shown, "FROM ("+detail+") __grand_total_detail")
 	expectContains(t, total, "__grand_total_shown_1 = (date_trunc('month', order_date))")
@@ -2489,8 +2489,15 @@ func TestGenerateGrandTotalSQLRepeatedRefs(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectContains(t, sql, "SELECT revenue, revenue FROM (SELECT sum(amount) AS revenue, COUNT(*) AS __grand_total_row_count FROM")
-	// Two grains share the column order_date, so the totals are blank.
-	sql, err = e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "year"}, {Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue", "order_count"}, Sort: sort, Limit: 2})
+	// Two grains share the column order_date, so ties break by position and
+	// the totals are blank.
+	q := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "year"}, {Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue", "order_count"}, Sort: sort, Limit: 2}
+	detail, err := e.GenerateSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 2")
+	sql, err = e.GenerateGrandTotalSQL(q)
 	if err != nil || sql != "SELECT NULL AS revenue, NULL AS order_count" {
 		t.Fatalf("expected blank totals, got %q, %v", sql, err)
 	}

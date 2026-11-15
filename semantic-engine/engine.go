@@ -958,6 +958,7 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 	var s string
 	if len(q.Sort) > 0 {
 		parts := make([]string, 0, len(q.Sort))
+		sorted := map[string]bool{}
 		for _, sort := range q.Sort {
 			dir := strings.ToUpper(sort.Direction)
 			if dir == "" {
@@ -970,7 +971,32 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 					name = "base." + name
 				}
 			}
+			sorted[name] = true
 			parts = append(parts, name+" "+dir)
+		}
+		// Break ties by the grouping key so reruns of a limited query, such as
+		// the grand total's copy, pick the same rows when sort values tie
+		// exactly. Float aggregates can still differ in their last bits.
+		keys := q.Dimensions
+		if outer {
+			keys = e.collectInnerDimensions(q)
+		}
+		for i, d := range keys {
+			binding := plan.dimensionBinding(d)
+			if q.Limit == 0 || binding == nil {
+				continue
+			}
+			// Dimension i is select column i+1; positions stay unambiguous when
+			// two dimensions share an alias.
+			name, ref := binding.outputAlias, strconv.Itoa(i+1)
+			if outer {
+				name = "base." + name
+				ref = name
+			}
+			if !sorted[name] && !sorted[ref] {
+				sorted[ref] = true
+				parts = append(parts, ref+" ASC")
+			}
 		}
 		s += " ORDER BY " + strings.Join(parts, ", ")
 	}
