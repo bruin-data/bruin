@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -328,10 +329,10 @@ func (e *Engine) GenerateSQL(q *Query) (string, error) {
 	return sql, err
 }
 
-// GenerateGrandTotalSQL recalculates metrics over all source rows matching the
-// query's row filters. Grouping, sorting, limits, and aggregate filters/segments
-// are excluded. Window metrics and their dependents return NULL. The input
-// query and engine are not modified.
+// GenerateGrandTotalSQL recalculates metrics over the source rows behind the
+// rows the query returns, so limits and aggregate filters/segments bound the
+// totals. Window metrics and their dependents return NULL. The input query and
+// engine are not modified.
 func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	if len(q.Metrics) == 0 {
 		return "", errors.New("grand totals require at least one metric")
@@ -391,7 +392,59 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	grandTotalEngine.metrics[rowCount] = &Metric{Name: rowCount, Expression: "COUNT(*)"}
 	grandTotal.Metrics = append(append([]string(nil), q.Metrics...), rowCount)
 	// Replan without excluded filters so HAVING-only joins cannot affect totals.
-	sql, err := grandTotalEngine.GenerateSQL(&grandTotal)
+	// When a limit or aggregate filter can hide rows, join to the rows the
+	// detail query returns. Window queries return one row per inner dimension.
+	shown := *q
+	if e.needsWindowWrap(q.Metrics) {
+		shown.Dimensions = e.collectInnerDimensions(q)
+	}
+	// Identical refs return the same rows; sorting matters only with a limit.
+	seen := map[DimensionRef]bool{}
+	shown.Dimensions = slices.DeleteFunc(slices.Clone(shown.Dimensions), func(d DimensionRef) bool {
+		if seen[d] {
+			return true
+		}
+		seen[d] = true
+		return false
+	})
+	if shown.Limit == 0 {
+		shown.Sort = nil
+	}
+	restrict := len(grandTotal.Filters) < len(q.Filters) || len(grandTotal.Segments) < len(q.Segments) || (len(shown.Dimensions) > 0 && q.Limit > 0)
+	planned := grandTotal
+	if restrict {
+		planned.Dimensions = shown.Dimensions
+	}
+	totalPlan, err := grandTotalEngine.planQuery(&planned)
+	if err != nil {
+		return "", err
+	}
+	if restrict {
+		shownSQL, columns, err := e.GenerateSQLWithColumns(&shown)
+		if err != nil {
+			return "", err
+		}
+		keys := make([]string, len(shown.Dimensions))
+		conditions := make([]string, len(shown.Dimensions))
+		names := map[string]bool{}
+		for i, d := range shown.Dimensions {
+			if names[strings.ToLower(columns[i].Name)] {
+				return "", fmt.Errorf("grand totals need distinct dimension columns: %s is returned twice", columns[i].Name)
+			}
+			names[strings.ToLower(columns[i].Name)] = true
+			key := fmt.Sprintf("__grand_total_shown_%d", i)
+			keys[i] = columns[i].Name + " AS " + key
+			shown := "__grand_total_shown." + key
+			source := totalPlan.dimensionSQL(totalPlan.dimensionBinding(d))
+			conditions[i] = fmt.Sprintf("(%s = %s OR (%s IS NULL AND %s IS NULL))", shown, source, shown, source)
+		}
+		if len(keys) == 0 {
+			// A metric-only query's one row may be hidden by an aggregate filter.
+			keys, conditions = []string{"1 AS __grand_total_shown_0"}, []string{"1 = 1"}
+		}
+		totalPlan.shownJoin = " INNER JOIN (SELECT DISTINCT " + strings.Join(keys, ", ") + " FROM (" + shownSQL + ") __grand_total_detail) __grand_total_shown ON " + strings.Join(conditions, " AND ")
+	}
+	sql, err := grandTotalEngine.generateSimple(&grandTotal, totalPlan)
 	if err != nil {
 		return "", err
 	}
@@ -895,6 +948,7 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 	var s string
 	if len(q.Sort) > 0 {
 		parts := make([]string, 0, len(q.Sort))
+		sorted := map[string]bool{}
 		for _, sort := range q.Sort {
 			dir := strings.ToUpper(sort.Direction)
 			if dir == "" {
@@ -907,7 +961,30 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 					name = "base." + name
 				}
 			}
+			sorted[name] = true
 			parts = append(parts, name+" "+dir)
+		}
+		// Break ties by the grouping key so reruns of a limited query return the same rows.
+		keys := q.Dimensions
+		if outer {
+			keys = e.collectInnerDimensions(q)
+		}
+		for i, d := range keys {
+			binding := plan.dimensionBinding(d)
+			if q.Limit == 0 || binding == nil {
+				continue
+			}
+			// Dimension i is select column i+1; positions stay unambiguous when
+			// two dimensions share an alias.
+			name, ref := binding.outputAlias, strconv.Itoa(i+1)
+			if outer {
+				name = "base." + name
+				ref = name
+			}
+			if !sorted[name] && !sorted[ref] {
+				sorted[ref] = true
+				parts = append(parts, ref+" ASC")
+			}
 		}
 		s += " ORDER BY " + strings.Join(parts, ", ")
 	}

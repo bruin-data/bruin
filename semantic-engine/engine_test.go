@@ -1079,7 +1079,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Sort:       []SortSpec{{Name: "order_date", Direction: "asc"}},
 				Limit:      5,
 			},
-			must: []string{") base ORDER BY base.order_date ASC LIMIT 5"},
+			must: []string{") base ORDER BY base.order_date ASC, base.category ASC LIMIT 5"},
 		},
 	}
 
@@ -2397,12 +2397,6 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"sum(amount) AS revenue", "count(distinct order_id)", "count(*)", "AS avg_order_value", "CASE WHEN status = 'completed'", "status = 'completed'", "country = 'US'"} {
-		expectContains(t, sql, want)
-	}
-	for _, unwanted := range []string{"GROUP BY", "HAVING", "ORDER BY", "LIMIT", "< 1000", "> 1", "date_trunc"} {
-		expectNotContains(t, sql, unwanted)
-	}
 	after, err := json.Marshal(q)
 	if err != nil {
 		t.Fatal(err)
@@ -2415,7 +2409,96 @@ func TestGenerateGrandTotalSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectContains(t, detail, "HAVING")
-	expectContains(t, detail, "LIMIT 1")
+	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 1")
+	total, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "FROM ("+detail+") __grand_total_detail")
+	expectContains(t, total, "__grand_total_shown_1 = date_trunc('month', order_date)")
+	for _, want := range []string{"sum(amount) AS revenue", "count(distinct order_id)", "count(*)", "AS avg_order_value", "CASE WHEN status = 'completed'", "WHERE status = 'completed' AND country = 'US'"} {
+		expectContains(t, total, want)
+	}
+	for _, unwanted := range []string{"GROUP BY", "HAVING", "ORDER BY", "LIMIT", "< 1000", "> 1"} {
+		expectNotContains(t, total, unwanted)
+	}
+}
+
+// splitShownGrandTotal splits a grand-total query into its outer query and its
+// shown-rows subquery.
+func splitShownGrandTotal(t *testing.T, sql string) (total, shown string) {
+	t.Helper()
+	start := strings.Index(sql, " INNER JOIN (")
+	end := strings.Index(sql, " __grand_total_shown ON ")
+	if start < 0 || end < start {
+		t.Fatalf("expected totals restricted to shown rows\nSQL: %s", sql)
+	}
+	return sql[:start] + sql[end:], sql[start:end]
+}
+
+func TestGenerateGrandTotalSQLJoinsShownRowsOnlyWhenRowsCanBeHidden(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	for _, q := range []*Query{
+		{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}},
+		{Metrics: []string{"revenue"}, Limit: 5},
+	} {
+		sql, err := e.GenerateGrandTotalSQL(q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectNotContains(t, sql, "JOIN")
+	}
+	sql, err := e.GenerateGrandTotalSQL(&Query{Metrics: []string{"revenue"}, Filters: []Filter{{Expression: "{revenue} > 10"}}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "HAVING sum(amount) > 10")
+	expectNotContains(t, shown, "ORDER BY")
+	expectContains(t, total, "__grand_total_shown ON 1 = 1")
+}
+
+func TestGenerateGrandTotalSQLRepeatedDimensions(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	sort := []SortSpec{{Name: "revenue", Direction: "desc"}}
+	// Identical refs collapse to one key column, adjacent or not.
+	sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "country"}, {Name: "category"}, {Name: "country"}}, Metrics: []string{"revenue"}, Sort: sort, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "SELECT DISTINCT country AS __grand_total_shown_0, category AS __grand_total_shown_1 FROM (")
+	// Two grains share the alias order_date, so ties break by position and the
+	// total refuses an ambiguous key.
+	q := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "year"}, {Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue"}, Sort: sort, Limit: 2}
+	detail, err := e.GenerateSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 2")
+	if _, err := e.GenerateGrandTotalSQL(q); err == nil || !strings.Contains(err.Error(), "order_date is returned twice") {
+		t.Fatalf("expected ambiguous key error, got %v", err)
+	}
+}
+
+func TestGenerateGrandTotalSQLKeysWindowQueriesByInnerDimensions(t *testing.T) {
+	t.Parallel()
+
+	// running_revenue partitions by category and orders by order_date.
+	e := minimalEngine(t, richTestModel())
+	q := &Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"revenue", "running_revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 2}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "SELECT DISTINCT country AS __grand_total_shown_0, category AS __grand_total_shown_1, order_date AS __grand_total_shown_2 FROM (")
+	expectContains(t, shown, "LIMIT 2")
+	for _, want := range []string{"__grand_total_shown_0 = country", "__grand_total_shown_1 = category", "__grand_total_shown_2 = order_date", "SUM(NULLIF(0, 0)) AS running_revenue"} {
+		expectContains(t, total, want)
+	}
+	expectNotContains(t, total, "OVER")
 }
 
 func TestGenerateGrandTotalSQLRejectsUnsupportedQueries(t *testing.T) {
@@ -2448,8 +2531,10 @@ func TestGenerateGrandTotalSQLOnlyRetainsRowFilterJoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectNotContains(t, sql, "JOIN")
-	expectNotContains(t, sql, "HAVING")
+	total, _ := splitShownGrandTotal(t, sql)
+	expectNotContains(t, total, "HAVING")
+	expectNotContains(t, total, "WHERE")
+	expectContains(t, total, "__grand_total_shown_0 = customers.country")
 	q.Filters = []Filter{{Dimension: "customers.country", Operator: "equals", Value: "CA"}}
 	sql, err = e.GenerateGrandTotalSQL(q)
 	if err != nil {
