@@ -66,6 +66,12 @@ AI agent skills are installed separately with `bruin ai skills`; see [AI Skills]
     <span>Seeds Salesforce CRM demo data, ingests it into Snowflake, and builds relationship, lending, and marketing analytics.</span>
     <span class="template-card__tags"><code>Salesforce</code><code>Snowflake</code><code>CRM</code></span>
   </a>
+  <a class="template-card" href="./templates-docs/localstack-snowflake-nyc-taxi-README.html">
+    <span class="template-card__category">Demo pipeline</span>
+    <strong>localstack-snowflake-nyc-taxi</strong>
+    <span>Loads public NYC taxi, zone and weather data into the LocalStack Snowflake emulator with ingestr, builds bronze, silver and gold tables with checks, and ships two DAC dashboards.</span>
+    <span class="template-card__tags"><code>Snowflake</code><code>LocalStack</code><code>DAC</code></span>
+  </a>
   <a class="template-card" href="./templates-docs/demo-self-heal-pipeline-README.html">
     <span class="template-card__category">Agent test pipeline</span>
     <strong>demo-self-heal-pipeline</strong>
@@ -307,6 +313,7 @@ bruin init nyc-taxi my-taxi-pipeline
 | Build a source-to-warehouse ingestion pipeline | `ai-coding-usage`, `shopify-bigquery`, `shopify-clickhouse`, `stripe-bigquery`, `quickbooks-bigquery`, `posthog-bigquery`, `gsheet-bigquery`, `notion`, or `gorgias` |
 | Migrate one Fivetran connection to a review-gated Bruin project | `migration-fivetran` |
 | Explore a complete demo with generated data | `demo-snowflake-sales-analytics`, `demo-snowflake-salesforce`, or `demo-payments-clickhouse` |
+| Run a Snowflake pipeline and dashboards locally on the LocalStack emulator | `localstack-snowflake-nyc-taxi` |
 | See near-real-time change capture and rollups end to end | `demo-payments-clickhouse` |
 | Scaffold ecommerce reporting | `ecommerce` |
 | Report on organic search using GA4 and Search Console data already in BigQuery | `google-web-analytics` |
