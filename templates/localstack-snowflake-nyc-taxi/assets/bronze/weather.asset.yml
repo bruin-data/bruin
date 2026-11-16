@@ -1,7 +1,5 @@
 name: bronze.weather
 type: ingestr
-depends:
-  - setup.localstack_demo
 description: Daily Central Park weather for January 2024 from the Open-Meteo archive API (one JSON document).
 parameters:
   source_connection: nyc-weather-2024-01
