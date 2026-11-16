@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -373,7 +374,8 @@ func TestLogoutGlobalEndsActAs(t *testing.T) { //nolint:paralleltest // uses t.C
 	assert.Nil(t, session)
 }
 
-func TestActAsSignsInAgainWhenTheLoginCannotActAsAgents(t *testing.T) { //nolint:paralleltest // uses t.Chdir/t.Setenv
+//nolint:paralleltest // uses t.Chdir/t.Setenv
+func TestActAsSignsInAgainWhenTheLoginCannotActAsAgents(t *testing.T) {
 	refusal := "Insufficient token permissions. Required ability: agent:act-as"
 	for _, tc := range []struct {
 		name, want string
@@ -382,7 +384,7 @@ func TestActAsSignsInAgainWhenTheLoginCannotActAsAgents(t *testing.T) { //nolint
 		retried    bool
 	}{
 		{name: "signs in, then acts as the agent", args: []string{"--agent-id", "12"}, retried: true, want: "Acting as agent \"Reporter\" (12)"},
-		{name: "keeps the hint when signing in fails", args: []string{"--agent-id", "12"}, signIn: fmt.Errorf("cancelled"), want: "run 'bruin cloud login --global --reauth'"},
+		{name: "keeps the hint when signing in fails", args: []string{"--agent-id", "12"}, signIn: errors.New("cancelled"), want: "run 'bruin cloud login --global --reauth'"},
 		{name: "never opens a browser for JSON output", args: []string{"--agent-id", "12", "--output", "json"}, want: "run 'bruin cloud login --global --reauth'"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
