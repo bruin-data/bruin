@@ -4674,6 +4674,10 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 // NewManagerFromConfigWithContext creates a connection Manager using the provided context
 // for any connection initializations that support context (e.g., Postgres/Redshift).
 func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
+	if cm.HasExternalVaultConnections() {
+		return newExternalVaultManager(ctx, cm)
+	}
+
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 	connectionManager.AllConnectionDetails = make(map[string]any)

@@ -554,6 +554,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Hashicorp Vault", link: "/secrets/vault"},
                     {text: "Doppler", link: "/secrets/doppler"},
                     {text: "AWS Secrets Manager", link: "/secrets/aws-secrets-manager"},
+                    {text: "1Password", link: "/secrets/1password"},
                 ]
             },
             {

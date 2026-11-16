@@ -130,8 +130,15 @@ func loadCurlConnectionLookup(ctx context.Context, c *cli.Command) (curlConnecti
 	}
 
 	if secretsBackendFromContext(ctx) == "" {
-		connections := cm.SelectedEnvironment.Connections
 		return func(name string) (any, error) {
+			connections := cm.SelectedEnvironment.Connections
+			if cm.UsesExternalVault(name) {
+				resolved, err := cm.ExternalVaultConnection(name)
+				if err != nil {
+					return nil, err
+				}
+				connections = resolved.SelectedEnvironment.Connections
+			}
 			details := connections.GetConnection(name)
 			if details == nil {
 				return nil, config.NewConnectionNotFoundError(ctx, "", name)

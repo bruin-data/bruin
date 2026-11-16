@@ -974,3 +974,28 @@ func TestListConnections_VaultBackend(t *testing.T) {
 	require.NoError(t, app.Run(context.Background(),
 		[]string{"bruin", "--secrets-backend", "vault", "connections", "list", "-o", "json"}))
 }
+
+func TestMarkVaultConnections(t *testing.T) {
+	t.Parallel()
+
+	js := []byte(`{"selected_environment_name":"dev","selected_environment":{"connections":{"postgres":[{"name":"pg","port":5432,"password":""}]}},` +
+		`"environments":{"dev":{"connections":{"postgres":[{"name":"pg","port":5432,"password":""},{"name":"other"}]}},"prod":{"connections":{"postgres":[{"name":"pg"}]}}}}`)
+	environments := func(root map[string]any, env string) []any {
+		found := []any{root["environments"].(map[string]any)[env]}
+		if root["selected_environment_name"] == env {
+			found = append(found, root["selected_environment"])
+		}
+		return found
+	}
+
+	unchanged, err := markVaultConnections(js, nil, environments)
+	require.NoError(t, err)
+	assert.Equal(t, string(js), string(unchanged))
+
+	marked, err := markVaultConnections(js, []config.ExternalVaultReference{
+		{Environment: "dev", Type: "postgres", Name: "pg", Reference: "op://vault/item"},
+	}, environments)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"selected_environment_name":"dev","selected_environment":{"connections":{"postgres":[{"name":"pg","port":5432,"password":"","bruin_external_vault":"op://vault/item"}]}},`+
+		`"environments":{"dev":{"connections":{"postgres":[{"name":"pg","port":5432,"password":"","bruin_external_vault":"op://vault/item"},{"name":"other"}]}},"prod":{"connections":{"postgres":[{"name":"pg"}]}}}}`, string(marked))
+}
