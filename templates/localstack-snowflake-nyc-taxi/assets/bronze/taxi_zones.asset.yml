@@ -1,5 +1,7 @@
 name: bronze.taxi_zones
 type: ingestr
+depends:
+  - setup.localstack_demo
 description: TLC taxi zone lookup (265 zones with their borough), a public CSV.
 parameters:
   source_connection: nyc-taxi-zones
