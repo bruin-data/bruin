@@ -166,14 +166,14 @@ func resolveActAs(c *cli.Command, store cloudauth.Store) (resolvedCloudAuth, boo
 			return resolvedCloudAuth{}, true, errors.New("act-as session belongs to a different Cloud API destination; run 'bruin cloud act-as --stop'")
 		}
 		if time.Until(session.ExpiresAt) >= 2*time.Minute {
-			return resolvedCloudAuth{token: session.Token, source: cloudAuthActAs, team: session.Team}, true, nil
+			return resolvedCloudAuth{token: session.Token, source: cloudAuthActAs, team: session.Team, agent: actAsLabel(session)}, true, nil
 		}
 		renewed, err := renewActAs(store, session, raw)
 		if err != nil {
 			return resolvedCloudAuth{}, true, err
 		}
 		if renewed != nil {
-			return resolvedCloudAuth{token: renewed.Token, source: cloudAuthActAs, team: renewed.Team}, true, nil
+			return resolvedCloudAuth{token: renewed.Token, source: cloudAuthActAs, team: renewed.Team, agent: actAsLabel(renewed)}, true, nil
 		}
 		if attempt > 0 {
 			return resolvedCloudAuth{}, true, errors.New("the act-as session keeps changing; try again")
