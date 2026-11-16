@@ -339,6 +339,18 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey:             "dune-api-key-123",
 				},
 			},
+			Odoo: []OdooConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "odoo-1"},
+					Host:               "mycompany.odoo.com",
+					APIKey:             "odoo-api-key-123",
+					Database:           "mycompany",
+					Username:           "me@example.com",
+					Scheme:             "https",
+					API:                "jsonrpc",
+					PageSize:           500,
+				},
+			},
 			InfluxDB: []InfluxDBConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "influxdb-1"},
@@ -1889,6 +1901,22 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Odoo connection",
+			envName:  "default",
+			connType: "odoo",
+			connName: "odoo-conn",
+			creds: map[string]interface{}{
+				"host":      "mycompany.odoo.com",
+				"api_key":   "key_123",
+				"database":  "mycompany",
+				"username":  "me@example.com",
+				"scheme":    "https",
+				"api":       "json2",
+				"page_size": 500,
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add AbraFlexi connection",
 			envName:  "default",
 			connType: "abraflexi",
@@ -2177,6 +2205,16 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.FundraiseUp, 1)
 					assert.Equal(t, tt.connName, env.Connections.FundraiseUp[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.FundraiseUp[0].APIKey)
+				case "odoo":
+					assert.Len(t, env.Connections.Odoo, 1)
+					assert.Equal(t, tt.connName, env.Connections.Odoo[0].Name)
+					assert.Equal(t, tt.creds["host"], env.Connections.Odoo[0].Host)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Odoo[0].APIKey)
+					assert.Equal(t, tt.creds["database"], env.Connections.Odoo[0].Database)
+					assert.Equal(t, tt.creds["username"], env.Connections.Odoo[0].Username)
+					assert.Equal(t, tt.creds["scheme"], env.Connections.Odoo[0].Scheme)
+					assert.Equal(t, tt.creds["api"], env.Connections.Odoo[0].API)
+					assert.Equal(t, tt.creds["page_size"], env.Connections.Odoo[0].PageSize)
 				case "fireflies":
 					assert.Len(t, env.Connections.Fireflies, 1)
 					assert.Equal(t, tt.connName, env.Connections.Fireflies[0].Name)
@@ -2303,6 +2341,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								CouchDB: []CouchDBConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "couchdb-conn"}, Host: "localhost", Port: 5984},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Odoo connection",
+			envName:  "default",
+			connName: "odoo-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Odoo: []OdooConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "odoo-conn"}, Host: "mycompany.odoo.com", APIKey: "key_123"},
 								},
 							},
 						},
@@ -3459,6 +3516,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				BallDontLie:         []BallDontLieConnection{{ConnectionMetadata: ConnectionMetadata{Name: "balldontlie1"}}},
 				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
 				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
+				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
 			},
 			want: &Connections{
 				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
@@ -3612,6 +3670,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				BallDontLie:         []BallDontLieConnection{{ConnectionMetadata: ConnectionMetadata{Name: "balldontlie1"}}},
 				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
 				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
+				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
 			},
 			expectedErr: false,
 		},

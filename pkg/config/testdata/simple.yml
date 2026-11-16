@@ -206,6 +206,15 @@ environments:
       dune:
         - name: "dune-1"
           api_key: "dune-api-key-123"
+      odoo:
+        - name: "odoo-1"
+          host: "mycompany.odoo.com"
+          api_key: "odoo-api-key-123"
+          database: "mycompany"
+          username: "me@example.com"
+          scheme: "https"
+          api: "jsonrpc"
+          page_size: 500
       appsflyer:
         - name: conn19
           api_key: "appsflyerkey"

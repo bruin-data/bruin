@@ -392,6 +392,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "MongoDB", link: "/ingestion/mongo"},
                                     {text: "MySQL", link: "/ingestion/mysql"},
                                     {text: "Notion", link: "/ingestion/notion"},
+                                    {text: "Odoo", link: "/ingestion/odoo"},
                                     {text: "Okta", link: "/ingestion/okta"},
                                     {text: "Paddle", link: "/ingestion/paddle"},
                                     {text: "Payrails", link: "/ingestion/payrails"},

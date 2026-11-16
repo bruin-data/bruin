@@ -1047,6 +1047,21 @@ func (c DuneConnection) GetName() string {
 	return c.Name
 }
 
+type OdooConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Scheme             string `yaml:"scheme,omitempty" json:"scheme,omitempty" mapstructure:"scheme" jsonschema:"default=https"`
+	API                string `yaml:"api,omitempty" json:"api,omitempty" mapstructure:"api" jsonschema:"default=auto"`
+	PageSize           int    `yaml:"page_size,omitempty" json:"page_size,omitempty" mapstructure:"page_size" jsonschema:"default=1000"`
+}
+
+func (c OdooConnection) GetName() string {
+	return c.Name
+}
+
 type GranolaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
