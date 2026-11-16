@@ -9,6 +9,7 @@ Snowflake schema.
 
 | Layer | Asset | Type | What it is |
 |---|---|---|---|
+| Setup | `setup.localstack_demo` | sf.sql script | creates the warehouse, database and schemas; safe to rerun |
 | Bronze | `bronze.taxi_trips` | ingestr | TLC trip file (~56k trips), loaded as-is |
 | Bronze | `bronze.taxi_zones` | ingestr | TLC zone lookup (265 zones) |
 | Bronze | `bronze.weather` | ingestr | Open-Meteo daily weather (one JSON document) |
@@ -53,6 +54,12 @@ environments:
           port: 4567
           database: LOCALSTACK_DEMO
           warehouse: COMPUTE_WH
+        - name: snowflake-localstack-setup
+          account: test
+          username: test
+          password: test
+          host: snowflake.localhost.localstack.cloud
+          port: 4567
       http:
         - name: nyc-taxi-trips-2024-01
           url: https://d37ci6vzurychx.cloudfront.net/trip-data/green_tripdata_2024-01.parquet
@@ -63,23 +70,25 @@ environments:
 ```
 
 `test`/`test` is the emulator's built-in login. `port` is the host port from `-p` in the `docker run`
-above (4567). If you map a different port, change it here and in the `snow sql` command below.
+above (4567). If you map a different port, change it in both Snowflake connections.
+
+`snowflake-localstack-setup` names no database because a login that names `LOCALSTACK_DEMO` fails
+until the database exists. Only the `setup.localstack_demo` asset uses it.
 
 ## Run
 
-Run these from the generated `localstack-snowflake-nyc-taxi/` folder. `setup.sql` needs the [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/installation/installation) (`snow`):
+Run these from the generated `localstack-snowflake-nyc-taxi/` folder:
 
 ```bash
-# Once: create the warehouse, database and the BRONZE, SILVER and GOLD schemas
-snow sql --temporary-connection --account test --user test \
-  --password test --host snowflake.localhost.localstack.cloud --port 4567 -f setup.sql
-
-# Run
+# Run: setup.localstack_demo creates the warehouse, database and schemas first
 bruin run .
 
 # See what feeds a table
 bruin lineage --full assets/gold/trips_by_weather.sql
 ```
+
+Run `bruin run` before `bruin validate` on a new emulator. Validation test-runs each query against
+`LOCALSTACK_DEMO`, so it fails until the first run has created the database.
 
 ## Dashboards
 
