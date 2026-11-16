@@ -333,6 +333,9 @@ type Config struct {
 	fs   afero.Fs
 	path string
 
+	externalVault []externalVaultConnection
+	vaultFetcher  secretItemFetcher
+
 	DefaultEnvironmentName  string                 `yaml:"default_environment" json:"default_environment_name" mapstructure:"default_environment_name"`
 	SelectedEnvironmentName string                 `yaml:"-" json:"selected_environment_name" mapstructure:"selected_environment_name"`
 	SelectedEnvironment     *Environment           `yaml:"-" json:"selected_environment" mapstructure:"selected_environment"`
@@ -403,6 +406,13 @@ func (c *Config) Persist() error {
 }
 
 func (c *Config) PersistToFs(fs afero.Fs) error {
+	if len(c.externalVault) > 0 {
+		buf, err := c.yamlWithVaultReferences()
+		if err != nil {
+			return err
+		}
+		return path2.WriteSecretFile(fs, c.path, buf)
+	}
 	return path2.WriteSecretYaml(fs, c.path, c)
 }
 
@@ -486,104 +496,7 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 			return nil, fmt.Errorf("environment '%s' has no connections defined", envName)
 		}
 
-		// Make duckdb paths absolute
-		for i, conn := range env.Connections.DuckDB {
-			if conn.Quack || filepath.IsAbs(conn.Path) {
-				continue
-			}
-			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
-		}
-		// Make GoogleCloudPlatform service account file paths absolute
-		for i, conn := range env.Connections.GoogleCloudPlatform {
-			if conn.ServiceAccountFile == "" {
-				continue
-			}
-
-			if isAnchoredLocalPath(conn.ServiceAccountFile) {
-				continue
-			}
-			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
-		}
-		// Make GoogleSheets service account file paths absolute (bruin reads and
-		// embeds these into the ingestr URI, so masking must find the same file).
-		for i, conn := range env.Connections.GoogleSheets {
-			if conn.ServiceAccountFile == "" || isAnchoredLocalPath(conn.ServiceAccountFile) {
-				continue
-			}
-			env.Connections.GoogleSheets[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
-		}
-		// Make MySQL SSL file paths absolute
-		for i, conn := range env.Connections.MySQL {
-			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
-				env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
-			}
-
-			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
-				env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
-			}
-
-			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
-				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
-			}
-		}
-
-		// Make Doris SSL file paths absolute
-		for i, conn := range env.Connections.Doris {
-			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
-				env.Connections.Doris[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
-			}
-
-			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
-				env.Connections.Doris[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
-			}
-
-			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
-				env.Connections.Doris[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
-			}
-		}
-
-		// Make Vitess SSL file paths absolute
-		for i, conn := range env.Connections.Vitess {
-			if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
-				env.Connections.Vitess[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
-			}
-
-			if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
-				env.Connections.Vitess[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
-			}
-
-			if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
-				env.Connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
-			}
-		}
-
-		// Make Iceberg local file paths absolute: a sqlite catalog is a file, a
-		// hadoop catalog without a scheme is a directory, and both are read by the
-		// ingestr subprocess, which does not run from the config's directory.
-		for i, conn := range env.Connections.Iceberg {
-			if conn.Catalog.Path != "" && !isAnchoredLocalPath(conn.Catalog.Path) && !hasURIScheme(conn.Catalog.Path) {
-				env.Connections.Iceberg[i].Catalog.Path = filepath.Join(configLocation, conn.Catalog.Path)
-			}
-			if conn.Storage.Path != "" && !isAnchoredLocalPath(conn.Storage.Path) && !hasURIScheme(conn.Storage.Path) {
-				env.Connections.Iceberg[i].Storage.Path = filepath.Join(configLocation, conn.Storage.Path)
-			}
-			if conn.Storage.KeyFile != "" && !isAnchoredLocalPath(conn.Storage.KeyFile) {
-				env.Connections.Iceberg[i].Storage.KeyFile = filepath.Join(configLocation, conn.Storage.KeyFile)
-			}
-		}
-
-		// Make Snowflake private key path absolute
-		for i, conn := range env.Connections.Snowflake {
-			if conn.PrivateKeyPath == "" {
-				continue
-			}
-
-			if isAnchoredLocalPath(conn.PrivateKeyPath) {
-				continue
-			}
-
-			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
-		}
+		makeConnectionPathsAbsolute(env.Connections, configLocation)
 	}
 
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
@@ -592,6 +505,108 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// makeConnectionPathsAbsolute resolves relative file paths in connection settings against the config file's folder.
+func makeConnectionPathsAbsolute(connections *Connections, configLocation string) {
+	// Make duckdb paths absolute
+	for i, conn := range connections.DuckDB {
+		if conn.Quack || filepath.IsAbs(conn.Path) {
+			continue
+		}
+		connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
+	}
+	// Make GoogleCloudPlatform service account file paths absolute
+	for i, conn := range connections.GoogleCloudPlatform {
+		if conn.ServiceAccountFile == "" {
+			continue
+		}
+
+		if isAnchoredLocalPath(conn.ServiceAccountFile) {
+			continue
+		}
+		connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
+	}
+	// Make GoogleSheets service account file paths absolute (bruin reads and
+	// embeds these into the ingestr URI, so masking must find the same file).
+	for i, conn := range connections.GoogleSheets {
+		if conn.ServiceAccountFile == "" || isAnchoredLocalPath(conn.ServiceAccountFile) {
+			continue
+		}
+		connections.GoogleSheets[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
+	}
+	// Make MySQL SSL file paths absolute
+	for i, conn := range connections.MySQL {
+		if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
+			connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+		}
+
+		if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
+			connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+		}
+
+		if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
+			connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+		}
+	}
+
+	// Make Doris SSL file paths absolute
+	for i, conn := range connections.Doris {
+		if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
+			connections.Doris[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+		}
+
+		if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
+			connections.Doris[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+		}
+
+		if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
+			connections.Doris[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+		}
+	}
+
+	// Make Vitess SSL file paths absolute
+	for i, conn := range connections.Vitess {
+		if conn.SslCaPath != "" && !isAnchoredLocalPath(conn.SslCaPath) {
+			connections.Vitess[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+		}
+
+		if conn.SslCertPath != "" && !isAnchoredLocalPath(conn.SslCertPath) {
+			connections.Vitess[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+		}
+
+		if conn.SslKeyPath != "" && !isAnchoredLocalPath(conn.SslKeyPath) {
+			connections.Vitess[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+		}
+	}
+
+	// Make Iceberg local file paths absolute: a sqlite catalog is a file, a
+	// hadoop catalog without a scheme is a directory, and both are read by the
+	// ingestr subprocess, which does not run from the config's directory.
+	for i, conn := range connections.Iceberg {
+		if conn.Catalog.Path != "" && !isAnchoredLocalPath(conn.Catalog.Path) && !hasURIScheme(conn.Catalog.Path) {
+			connections.Iceberg[i].Catalog.Path = filepath.Join(configLocation, conn.Catalog.Path)
+		}
+		if conn.Storage.Path != "" && !isAnchoredLocalPath(conn.Storage.Path) && !hasURIScheme(conn.Storage.Path) {
+			connections.Iceberg[i].Storage.Path = filepath.Join(configLocation, conn.Storage.Path)
+		}
+		if conn.Storage.KeyFile != "" && !isAnchoredLocalPath(conn.Storage.KeyFile) {
+			connections.Iceberg[i].Storage.KeyFile = filepath.Join(configLocation, conn.Storage.KeyFile)
+		}
+	}
+
+	// Make Snowflake private key path absolute
+	for i, conn := range connections.Snowflake {
+		if conn.PrivateKeyPath == "" {
+			continue
+		}
+
+		if isAnchoredLocalPath(conn.PrivateKeyPath) {
+			continue
+		}
+
+		connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
+	}
 }
 
 func readConfigYAML(fs afero.Fs, path string) ([]byte, error) {
@@ -613,7 +628,17 @@ func decodeConfigYAML(buf []byte, config *Config) error {
 		return err
 	}
 
-	return node.Decode(config)
+	refs, err := collectExternalVaultReferences(&node)
+	if err != nil {
+		return err
+	}
+
+	if err := node.Decode(config); err != nil {
+		return err
+	}
+	config.externalVault = refs
+
+	return nil
 }
 
 func expandEnvVarsInYAMLValues(node *yaml.Node, targetType reflect.Type) error {
@@ -2447,6 +2472,9 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 	}
 
 	delete(env.Connections.typeNameMap, connectionName)
+	c.dropVaultReferences(func(ref externalVaultConnection) bool {
+		return ref.env == environmentName && ref.name == connectionName
+	})
 
 	return nil
 }
@@ -2787,6 +2815,12 @@ func (c *Config) UpdateEnvironment(oldName, newName, schemaPrefix string) error 
 		// Remove old name
 		delete(c.Environments, oldName)
 
+		for i := range c.externalVault {
+			if c.externalVault[i].env == oldName {
+				c.externalVault[i].env = newName
+			}
+		}
+
 		// Update selected environment if it was the one being renamed
 		if c.SelectedEnvironmentName == oldName {
 			c.SelectedEnvironmentName = newName
@@ -2825,6 +2859,7 @@ func (c *Config) DeleteEnvironment(name string) error {
 	}
 
 	delete(c.Environments, name)
+	c.dropVaultReferences(func(ref externalVaultConnection) bool { return ref.env == name })
 
 	// If deleting the selected environment, select the first available one
 	if c.SelectedEnvironmentName == name {
@@ -2901,6 +2936,12 @@ func (c *Config) CloneEnvironment(sourceName, targetName, schemaPrefix string) e
 	}
 
 	c.Environments[targetName] = targetEnv
+	for _, ref := range c.externalVault {
+		if ref.env == sourceName {
+			ref.env = targetName
+			c.externalVault = append(c.externalVault, ref)
+		}
+	}
 
 	return nil
 }
