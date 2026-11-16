@@ -11,12 +11,6 @@ environments:
           port: 4567
           database: LOCALSTACK_DEMO
           warehouse: COMPUTE_WH
-        - name: snowflake-localstack-setup
-          account: test
-          username: test
-          password: test
-          host: snowflake.localhost.localstack.cloud
-          port: 4567
       http:
         - name: nyc-taxi-trips-2024-01
           url: https://d37ci6vzurychx.cloudfront.net/trip-data/green_tripdata_2024-01.parquet
