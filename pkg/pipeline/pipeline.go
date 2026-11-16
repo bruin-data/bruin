@@ -192,6 +192,7 @@ var defaultMapping = map[string]string{
 	"mongo":                 "mongo-default",
 	"mysql":                 "mysql-default",
 	"notion":                "notion-default",
+	"odoo":                  "odoo-default",
 	"hana":                  "hana-default",
 	"shopify":               "shopify-default",
 	"gorgias":               "gorgias-default",

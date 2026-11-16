@@ -1172,6 +1172,37 @@ func TestManager_AddInfluxDBConnectionFromConfigStoresConnectionDetails(t *testi
 	assert.Same(t, configuration, m.GetConnectionDetails("test"))
 }
 
+func TestManager_AddOdooConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	assert.Nil(t, m.GetConnection("test"))
+
+	configuration := &config.OdooConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "mycompany.odoo.com",
+		APIKey:             "key_123",
+		Database:           "mycompany",
+		Username:           "me@example.com",
+	}
+
+	err := m.AddOdooConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.Odoo["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.Odoo["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "odoo://mycompany.odoo.com?api_key=key_123&database=mycompany&username=me%40example.com", uri)
+}
+
 func TestManager_AddCouchDBConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 

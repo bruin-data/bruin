@@ -107,6 +107,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
+	"github.com/bruin-data/bruin/pkg/odoo"
 	"github.com/bruin-data/bruin/pkg/okta"
 	"github.com/bruin-data/bruin/pkg/onelake"
 	"github.com/bruin-data/bruin/pkg/oracle"
@@ -319,6 +320,7 @@ type Manager struct {
 	Sail                 map[string]*sail.Client
 	Spark                map[string]*spark.Client
 	Dune                 map[string]*dune.Client
+	Odoo                 map[string]*odoo.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	CleverTap            map[string]*clevertap.Client
@@ -4252,6 +4254,35 @@ func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection)
 	return nil
 }
 
+func (m *Manager) AddOdooConnectionFromConfig(connection *config.OdooConnection) error {
+	m.mutex.Lock()
+	if m.Odoo == nil {
+		m.Odoo = make(map[string]*odoo.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := odoo.NewClient(&odoo.Config{
+		Host:     connection.Host,
+		APIKey:   connection.APIKey,
+		Database: connection.Database,
+		Username: connection.Username,
+		Scheme:   connection.Scheme,
+		API:      connection.API,
+		PageSize: connection.PageSize,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Odoo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -4789,6 +4820,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.BallDontLie, connectionManager.AddBallDontLieConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Odoo, connectionManager.AddOdooConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
