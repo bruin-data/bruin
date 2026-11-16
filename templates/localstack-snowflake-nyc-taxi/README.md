@@ -70,13 +70,16 @@ above (4567). If you map a different port, change it here and in the `snow sql` 
 A new emulator is empty, and the connection can't log in until its warehouse and database exist.
 Create them once with the [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/installation/installation)
 (`snow`) or any SQL client. Any username and password work, and the statements are safe to rerun.
-Bruin creates the `BRONZE`, `SILVER` and `GOLD` schemas itself on the first run.
+Bruin creates the `BRONZE`, `SILVER` and `GOLD` schemas itself on the first run. The snippet also
+creates `_BRUIN_STAGING`, ingestr's staging schema, because the three bronze assets run in parallel and
+the emulator can reject one of their `CREATE SCHEMA` calls with "Object already exists".
 
 ```bash
 snow sql --temporary-connection --account test --user test --password test \
   --host snowflake.localhost.localstack.cloud --port 4567 -q "
 CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH;
-CREATE DATABASE IF NOT EXISTS LOCALSTACK_DEMO;"
+CREATE DATABASE IF NOT EXISTS LOCALSTACK_DEMO;
+CREATE SCHEMA IF NOT EXISTS LOCALSTACK_DEMO._BRUIN_STAGING;"
 ```
 
 Then run these from the generated `localstack-snowflake-nyc-taxi/` folder:
