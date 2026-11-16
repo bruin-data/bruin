@@ -32,8 +32,9 @@ func (c *Config) GetIngestrURI() (string, error) {
 		return "", fmt.Errorf("odoo: host must not include a scheme, got %q; set scheme to http or https instead", host)
 	}
 
-	apiKey := strings.TrimSpace(c.APIKey)
-	if apiKey == "" {
+	// The key goes into the URI exactly as configured: credential masking registers the configured
+	// value, so a trimmed copy would leak in debug output.
+	if strings.TrimSpace(c.APIKey) == "" {
 		return "", errors.New("odoo: api_key must be provided")
 	}
 
@@ -68,7 +69,7 @@ func (c *Config) GetIngestrURI() (string, error) {
 	}
 
 	params := url.Values{}
-	params.Set("api_key", apiKey)
+	params.Set("api_key", c.APIKey)
 	if database != "" {
 		params.Set("database", database)
 	}

@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,14 +59,14 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			want: "odoo://example.com/odoo?api=json2&api_key=key_123",
 		},
 		{
-			name: "surrounding whitespace is trimmed",
+			name: "surrounding whitespace is trimmed except in the api key",
 			config: Config{
 				Host:     "  mycompany.odoo.com  ",
 				APIKey:   " key_123 ",
 				Database: " mycompany ",
 				Scheme:   " https ",
 			},
-			want: "odoo://mycompany.odoo.com?api_key=key_123&database=mycompany&scheme=https",
+			want: "odoo://mycompany.odoo.com?api_key=+key_123+&database=mycompany&scheme=https",
 		},
 		{
 			name: "auto api",
@@ -94,6 +95,11 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		{
 			name:    "missing api key",
 			config:  Config{Host: "mycompany.odoo.com"},
+			wantErr: "odoo: api_key must be provided",
+		},
+		{
+			name:    "blank api key",
+			config:  Config{Host: "mycompany.odoo.com", APIKey: "   "},
 			wantErr: "odoo: api_key must be provided",
 		},
 		{
@@ -166,4 +172,22 @@ func TestConfig_GetIngestrURI_RoundTrip(t *testing.T) {
 	assert.False(t, q.Has("scheme"))
 	assert.False(t, q.Has("api"))
 	assert.False(t, q.Has("page_size"))
+}
+
+// TestConfig_GetIngestrURI_APIKeyIsMasked checks that the api_key in the URI is redacted by the masker
+// that bruin builds from the configured value, including values with surrounding whitespace.
+func TestConfig_GetIngestrURI_APIKeyIsMasked(t *testing.T) {
+	t.Parallel()
+
+	for _, apiKey := range []string{"key_123", " key_123 ", "a+b/c=d&e?f#g %"} {
+		c := Config{Host: "mycompany.odoo.com", APIKey: apiKey, Database: "mycompany"}
+
+		uri, err := c.GetIngestrURI()
+		require.NoError(t, err)
+
+		masked := mask.New([]string{apiKey}).Mask(uri)
+		assert.NotContains(t, masked, "key_123", apiKey)
+		assert.NotContains(t, masked, url.QueryEscape(apiKey), apiKey)
+		assert.Contains(t, masked, "database=mycompany", apiKey)
+	}
 }
