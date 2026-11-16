@@ -412,6 +412,7 @@ func TestActAsRefusalAsksBeforeUsingYourOwnLogin(t *testing.T) {
 	for _, tc := range []struct {
 		name, output string
 		actingAs     bool
+		args         []string
 		err          error
 		want         []string
 		wantNot      string
@@ -419,13 +420,17 @@ func TestActAsRefusalAsksBeforeUsingYourOwnLogin(t *testing.T) {
 		{name: "acting as the agent", actingAs: true, err: refused, want: []string{`acting as agent "Reporter" (12)`, "it needs dashboard:create", "unless the person asks you to"}},
 		{name: "acting as the agent, JSON", output: "json", actingAs: true, err: refused, want: []string{`"error"`, "it needs dashboard:create"}},
 		{name: "own login", err: refused, want: []string{"Required ability: dashboard:create"}, wantNot: "acting as agent"},
+		{name: "an API key overrides the session", actingAs: true, args: []string{"--api-key", "key"}, err: refused, want: []string{"Required ability: dashboard:create"}, wantNot: "acting as agent"},
 		{name: "another refusal", actingAs: true, err: &bruincloud.APIError{Message: "Agent not found", StatusCode: http.StatusNotFound}, want: []string{"Agent not found"}, wantNot: "acting as agent"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, store := newActAsEnv(t)
+			t.Cleanup(func() { actingAsAgent = "" })
 			if tc.actingAs {
 				saveSession(t, store, cloudauth.ActAsSession{Token: "agent-token", ExpiresAt: time.Now().Add(time.Hour)})
 			}
+			_, err := resolveIn(t, store, tc.args...)
+			require.NoError(t, err)
 			out, _ := captureStdout(t, func() error {
 				printError(tc.err, tc.output, "Failed to create dashboard")
 				return nil

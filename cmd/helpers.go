@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
-	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v3"
@@ -156,18 +155,10 @@ func printError(err error, output string, message string) {
 func actAsRefusalHint(err error) string {
 	var apiErr *bruincloud.APIError
 	_, ability, found := strings.Cut(err.Error(), "Required ability: ")
-	if !found || !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden || os.Getenv("BRUIN_CLOUD_API_KEY") != "" {
+	if actingAsAgent == "" || !found || !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden {
 		return ""
 	}
-	store, storeErr := cloudauth.DefaultStore()
-	if storeErr != nil {
-		return ""
-	}
-	session, _, loadErr := store.LoadActAs()
-	if loadErr != nil || session == nil {
-		return ""
-	}
-	return fmt.Sprintf("hint: you are acting as agent %s, which isn't allowed to do this (it needs %s). Ask the agent's owner to add it to the agent's Cloud CLI permissions. Don't stop acting as the agent to do it with your own login unless the person asks you to.", actAsLabel(session), strings.TrimRight(strings.TrimSpace(ability), "."))
+	return fmt.Sprintf("hint: you are acting as agent %s, which isn't allowed to do this (it needs %s). Ask the agent's owner to add it to the agent's Cloud CLI permissions. Don't stop acting as the agent to do it with your own login unless the person asks you to.", actingAsAgent, strings.TrimRight(strings.TrimSpace(ability), "."))
 }
 
 // apiErrorHint returns an actionable CLI hint for the team-scoping and GitHub
