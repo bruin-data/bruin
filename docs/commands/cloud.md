@@ -101,7 +101,7 @@ Use `--api-key` or `--team` to inspect an explicit override. This checks local c
 
 ### `act-as`
 
-Run cloud commands as one of your team's agents, with its permissions instead of your login's; Cloud logs the actions as the agent. Needs a global login with "Allow acting as agents" ticked on the login page.
+Run cloud commands as one of your team's agents, with its permissions instead of your login's; Cloud logs the actions as the agent. Needs a global login with "Allow acting as agents" ticked on the login page; in a terminal, `act-as` opens that login page for you when your login lacks it.
 
 ```bash
 bruin cloud act-as --agent-id 12   # start

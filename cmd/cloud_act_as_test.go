@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -104,7 +105,12 @@ func captureStdout(t *testing.T, run func() error) (string, error) {
 
 func runActAsCLI(t *testing.T, store cloudauth.Store, args ...string) (string, error) {
 	t.Helper()
-	cloud := &cli.Command{Name: "cloud", Commands: []*cli.Command{actAsCommand(func() (cloudauth.Store, error) { return store, nil })}}
+	return runActAsCLIWith(t, store, nil, args...)
+}
+
+func runActAsCLIWith(t *testing.T, store cloudauth.Store, relogin func(context.Context) error, args ...string) (string, error) {
+	t.Helper()
+	cloud := &cli.Command{Name: "cloud", Commands: []*cli.Command{actAsCommand(func() (cloudauth.Store, error) { return store, nil }, relogin)}}
 	addTeamFlag(cloud)
 	root := &cli.Command{Name: "bruin", Commands: []*cli.Command{cloud}, ExitErrHandler: func(context.Context, *cli.Command, error) {}}
 	return captureStdout(t, func() error {
@@ -366,4 +372,35 @@ func TestLogoutGlobalEndsActAs(t *testing.T) { //nolint:paralleltest // uses t.C
 	session, _, err := store.LoadActAs()
 	require.NoError(t, err)
 	assert.Nil(t, session)
+}
+
+//nolint:paralleltest // uses t.Chdir/t.Setenv
+func TestActAsSignsInAgainWhenTheLoginCannotActAsAgents(t *testing.T) {
+	refusal := "Insufficient token permissions. Required ability: agent:act-as"
+	for _, tc := range []struct {
+		name, want string
+		signIn     error
+		args       []string
+		retried    bool
+	}{
+		{name: "signs in, then acts as the agent", args: []string{"--agent-id", "12"}, retried: true, want: "Acting as agent \"Reporter\" (12)"},
+		{name: "keeps the hint when signing in fails", args: []string{"--agent-id", "12"}, signIn: errors.New("cancelled"), want: "run 'bruin cloud login --global --reauth'"},
+		{name: "never opens a browser for JSON output", args: []string{"--agent-id", "12", "--output", "json"}, want: "run 'bruin cloud login --global --reauth'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub, store := newActAsEnv(t)
+			stub.respond(http.StatusForbidden, "", refusal)
+			signedIn := false
+			out, _ := runActAsCLIWith(t, store, func(context.Context) error {
+				signedIn = true
+				if tc.signIn == nil {
+					stub.respond(http.StatusCreated, "agent-token", "")
+				}
+				return tc.signIn
+			}, tc.args...)
+			assert.Equal(t, tc.args[len(tc.args)-1] != "json", signedIn)
+			assert.Contains(t, out, tc.want)
+			assert.Len(t, stub.recorded(), map[bool]int{true: 2, false: 1}[tc.retried])
+		})
+	}
 }
