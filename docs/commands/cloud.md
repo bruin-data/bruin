@@ -109,7 +109,7 @@ bruin cloud act-as                 # show the session
 bruin cloud act-as --stop          # use your own login again
 ```
 
-The session stays on the team it started on and renews automatically with your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
+The session stays on the team it started on and renews automatically with your own login. When the agent isn't allowed to do something, the error names the missing permission; add it to the agent's Cloud CLI permissions rather than stopping the session, since stopping switches back to your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
 
 ### `teams`
 

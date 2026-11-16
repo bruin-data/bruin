@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/99designs/keyring"
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
@@ -401,6 +402,40 @@ func TestActAsSignsInAgainWhenTheLoginCannotActAsAgents(t *testing.T) {
 			assert.Equal(t, tc.args[len(tc.args)-1] != "json", signedIn)
 			assert.Contains(t, out, tc.want)
 			assert.Len(t, stub.recorded(), map[bool]int{true: 2, false: 1}[tc.retried])
+		})
+	}
+}
+
+//nolint:paralleltest // uses t.Chdir/t.Setenv
+func TestActAsRefusalAsksBeforeUsingYourOwnLogin(t *testing.T) {
+	refused := &bruincloud.APIError{Message: "Insufficient token permissions. Required ability: dashboard:create", StatusCode: http.StatusForbidden}
+	for _, tc := range []struct {
+		name, output string
+		actingAs     bool
+		err          error
+		want         []string
+		wantNot      string
+	}{
+		{name: "acting as the agent", actingAs: true, err: refused, want: []string{`acting as agent "Reporter" (12)`, "it needs dashboard:create", "unless the person asks you to"}},
+		{name: "acting as the agent, JSON", output: "json", actingAs: true, err: refused, want: []string{`"error"`, "it needs dashboard:create"}},
+		{name: "own login", err: refused, want: []string{"Required ability: dashboard:create"}, wantNot: "acting as agent"},
+		{name: "another refusal", actingAs: true, err: &bruincloud.APIError{Message: "Agent not found", StatusCode: http.StatusNotFound}, want: []string{"Agent not found"}, wantNot: "acting as agent"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, store := newActAsEnv(t)
+			if tc.actingAs {
+				saveSession(t, store, cloudauth.ActAsSession{Token: "agent-token", ExpiresAt: time.Now().Add(time.Hour)})
+			}
+			out, _ := captureStdout(t, func() error {
+				printError(tc.err, tc.output, "Failed to create dashboard")
+				return nil
+			})
+			for _, want := range tc.want {
+				assert.Contains(t, out, want)
+			}
+			if tc.wantNot != "" {
+				assert.NotContains(t, out, tc.wantNot)
+			}
 		})
 	}
 }
