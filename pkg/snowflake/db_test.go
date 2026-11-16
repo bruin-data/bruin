@@ -1812,6 +1812,8 @@ func TestNewDB_SilencesDriverLogging(t *testing.T) {
 	// check runs in a subprocess and inspects what actually reached its stderr.
 	const canary = "bruin-snowflake-driver-log-canary"
 	if mode := os.Getenv("BRUIN_SNOWFLAKE_LOG_TEST"); mode != "" {
+		// The driver raises its level to fatal when GITHUB_ACTIONS is set, so pin it.
+		require.NoError(t, gosnowflake.GetLogger().SetLogLevel("error"))
 		if mode == "silenced" {
 			_, err := NewDB(&Config{Account: "my-account", Username: "my-user", Password: "test-password", Region: "eu-west-1"})
 			require.NoError(t, err)
