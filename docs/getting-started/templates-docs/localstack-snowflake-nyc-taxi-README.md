@@ -27,9 +27,9 @@ bruin init localstack-snowflake-nyc-taxi
 
 ```bash
 export LOCALSTACK_AUTH_TOKEN=<your-token>
-docker pull localstack/snowflake-next:latest
+docker pull localstack/snowflake:latest
 docker run -d --name localstack-snowflake -p 127.0.0.1:4567:4566 \
-  -e LOCALSTACK_AUTH_TOKEN localstack/snowflake-next:latest
+  -e LOCALSTACK_AUTH_TOKEN localstack/snowflake:latest
 ```
 
 See LocalStack's [Snowflake installation guide](https://docs.localstack.cloud/snowflake/getting-started/installation/)
