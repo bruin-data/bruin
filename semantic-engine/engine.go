@@ -1008,7 +1008,12 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 
 func validateStructuredFilter(f Filter) error {
 	switch f.Operator {
-	case "equals", "not_equals", "gt", "gte", "lt", "lte", "in", "not_in", "is_null", "is_not_null":
+	case "equals", "not_equals", "gt", "gte", "lt", "lte", "in", "not_in":
+		if f.Value == nil {
+			return fmt.Errorf("filter %s on dimension %s needs a value; use is_null or is_not_null to match null", f.Operator, f.Dimension)
+		}
+		return nil
+	case "is_null", "is_not_null":
 		return nil
 	case "between":
 		if _, _, ok := betweenValues(f.Value); !ok {
@@ -1032,7 +1037,8 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	case "equals":
 		return fmt.Sprintf("%s = %s", dim, formatValue(f.Value, e.Dialect))
 	case "not_equals":
-		return fmt.Sprintf("%s != %s", dim, formatValue(f.Value, e.Dialect))
+		// Keep null rows: "everything except X" should still count rows where the dimension is null.
+		return fmt.Sprintf("(%s != %s OR %s IS NULL)", dim, formatValue(f.Value, e.Dialect), dim)
 	case "gt":
 		return fmt.Sprintf("%s > %s", dim, formatValue(f.Value, e.Dialect))
 	case "gte":
@@ -1041,10 +1047,8 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 		return fmt.Sprintf("%s < %s", dim, formatValue(f.Value, e.Dialect))
 	case "lte":
 		return fmt.Sprintf("%s <= %s", dim, formatValue(f.Value, e.Dialect))
-	case "in":
-		return fmt.Sprintf("%s IN (%s)", dim, formatList(f.Value, e.Dialect))
-	case "not_in":
-		return fmt.Sprintf("%s NOT IN (%s)", dim, formatList(f.Value, e.Dialect))
+	case "in", "not_in":
+		return membershipSQL(dim, f.Operator == "not_in", f.Value, e.Dialect)
 	case "between":
 		start, end, ok := betweenValues(f.Value)
 		if !ok {
@@ -1058,6 +1062,42 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	default:
 		return ""
 	}
+}
+
+// membershipSQL compiles in/not_in. A null in the list selects (in) or excludes
+// (not_in) null rows; without one, not_in still keeps null rows, matching not_equals.
+func membershipSQL(dim string, negate bool, value interface{}, dialect string) string {
+	values, hasNull := value, false
+	if list, ok := value.([]interface{}); ok {
+		var kept []interface{}
+		for _, item := range list {
+			if item == nil {
+				hasNull = true
+				continue
+			}
+			kept = append(kept, item)
+		}
+		if hasNull && len(kept) == 0 {
+			if negate {
+				return dim + " IS NOT NULL"
+			}
+			return dim + " IS NULL"
+		}
+		values = kept
+	}
+
+	op := "IN"
+	if negate {
+		op = "NOT IN"
+	}
+	predicate := fmt.Sprintf("%s %s (%s)", dim, op, formatList(values, dialect))
+	switch {
+	case negate && hasNull:
+		return "(" + predicate + " AND " + dim + " IS NOT NULL)"
+	case negate || hasNull:
+		return "(" + predicate + " OR " + dim + " IS NULL)"
+	}
+	return predicate
 }
 
 func betweenValues(v interface{}) (interface{}, interface{}, bool) {
