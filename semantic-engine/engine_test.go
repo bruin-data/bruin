@@ -837,7 +837,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Metrics: []string{"revenue"},
 				Filters: []Filter{{Dimension: "status", Operator: "not_equals", Value: "cancelled"}},
 			},
-			must: []string{"WHERE (status != 'cancelled' OR status IS NULL)"},
+			must: []string{"WHERE status != 'cancelled'"},
 		},
 		{
 			name: "filter gte",
@@ -861,48 +861,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Metrics: []string{"revenue"},
 				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []string{"cancelled"}}},
 			},
-			must: []string{"WHERE (status NOT IN ('cancelled') OR status IS NULL)"},
-		},
-		{
-			name: "filter in list with null",
-			query: Query{
-				Metrics: []string{"revenue"},
-				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{"shipped", nil}}},
-			},
-			must: []string{"WHERE (status IN ('shipped') OR status IS NULL)"},
-		},
-		{
-			name: "filter not_in list with null",
-			query: Query{
-				Metrics: []string{"revenue"},
-				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []interface{}{"cancelled", nil}}},
-			},
-			must: []string{"WHERE (status NOT IN ('cancelled') AND status IS NOT NULL)"},
-		},
-		{
-			name: "filter in only null",
-			query: Query{
-				Metrics: []string{"revenue"},
-				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{nil}}},
-			},
-			must: []string{"WHERE status IS NULL"},
-		},
-		{
-			name: "filter not_in only null",
-			query: Query{
-				Metrics: []string{"revenue"},
-				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []interface{}{nil}}},
-			},
-			must: []string{"WHERE status IS NOT NULL"},
-		},
-		{
-			name: "filter in string null is a literal",
-			query: Query{
-				Metrics: []string{"revenue"},
-				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{"shipped", "null"}}},
-			},
-			must:    []string{"WHERE status IN ('shipped', 'null')"},
-			mustNot: []string{"IS NULL"},
+			must: []string{"WHERE status NOT IN ('cancelled')"},
 		},
 		{
 			name: "filter between number range",
@@ -1718,14 +1677,6 @@ func TestStructuredFilterValidationRejectsInvalidOperatorAndValue(t *testing.T) 
 				Filters: []Filter{{Dimension: "order_date", Operator: "between", Value: []interface{}{"2025-01-01"}}},
 			},
 			want: "invalid between filter value",
-		},
-		{
-			name: "null scalar value",
-			query: Query{
-				Metrics: []string{"revenue"},
-				Filters: []Filter{{Dimension: "country", Operator: "not_equals", Value: nil}},
-			},
-			want: "use is_null or is_not_null",
 		},
 	}
 

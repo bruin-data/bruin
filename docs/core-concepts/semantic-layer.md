@@ -318,13 +318,6 @@ Supported operators:
 | `is_null` | No value required |
 | `is_not_null` | No value required |
 
-Null handling:
-
-- `not_equals` and `not_in` keep rows where the dimension is null, so "everything except US" still counts rows with no country: `not_in ["US"]` compiles to `(country NOT IN ('US') OR country IS NULL)`.
-- Add `null` to an `in` or `not_in` list to select or exclude null rows alongside values: `in ["US", null]` compiles to `(country IN ('US') OR country IS NULL)`, and `not_in ["US", null]` to `(country NOT IN ('US') AND country IS NOT NULL)`.
-- `equals` and the comparison operators (`gt`, `gte`, `lt`, `lte`, `between`) never match null rows.
-- The string `"null"` is a literal value, not SQL NULL. To test only for null, use `is_null` or `is_not_null`; a `null` value on a scalar operator such as `equals` is rejected.
-
 Filters can also target joined dimensions:
 
 ```bash
