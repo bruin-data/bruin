@@ -837,7 +837,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Metrics: []string{"revenue"},
 				Filters: []Filter{{Dimension: "status", Operator: "not_equals", Value: "cancelled"}},
 			},
-			must: []string{"WHERE status != 'cancelled'"},
+			must: []string{"WHERE (status != 'cancelled' OR status IS NULL)"},
 		},
 		{
 			name: "filter gte",
@@ -861,7 +861,57 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Metrics: []string{"revenue"},
 				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []string{"cancelled"}}},
 			},
-			must: []string{"WHERE status NOT IN ('cancelled')"},
+			must: []string{"WHERE (status NOT IN ('cancelled') OR status IS NULL)"},
+		},
+		{
+			name: "filter in list with null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{"shipped", nil}}},
+			},
+			must: []string{"WHERE (status IN ('shipped') OR status IS NULL)"},
+		},
+		{
+			name: "filter not_in list with null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []interface{}{"cancelled", nil}}},
+			},
+			must: []string{"WHERE (status NOT IN ('cancelled') AND status IS NOT NULL)"},
+		},
+		{
+			name: "filter in only null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{nil}}},
+			},
+			must: []string{"WHERE status IS NULL"},
+		},
+		{
+			name: "filter not_in only null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []interface{}{nil}}},
+			},
+			must: []string{"WHERE status IS NOT NULL"},
+		},
+		{
+			name: "filter in empty list does not select nulls",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{}}},
+			},
+			must:    []string{"WHERE status IN ()"},
+			mustNot: []string{"IS NULL"},
+		},
+		{
+			name: "filter in string null is a literal",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{"shipped", "null"}}},
+			},
+			must:    []string{"WHERE status IN ('shipped', 'null')"},
+			mustNot: []string{"IS NULL"},
 		},
 		{
 			name: "filter between number range",
@@ -1497,7 +1547,25 @@ func TestFilterOnCalculatedDimension(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, sql, "WHERE customer_order_number = 1 = TRUE")
+	expectContains(t, sql, "WHERE (customer_order_number = 1) = TRUE")
+
+	// Null checks must apply to the whole expression, not bind inside it.
+	m.Dimensions = append(m.Dimensions, Dimension{Name: "inactive", Type: "boolean", Expression: "NOT active"})
+	engine = minimalEngine(t, m)
+	for _, tc := range []struct {
+		filter Filter
+		want   string
+	}{
+		{Filter{Dimension: "inactive", Operator: "in", Value: []interface{}{nil}}, "WHERE (NOT active) IS NULL"},
+		{Filter{Dimension: "inactive", Operator: "not_equals", Value: true}, "WHERE ((NOT active) != TRUE OR (NOT active) IS NULL)"},
+		{Filter{Dimension: "inactive", Operator: "is_null"}, "WHERE (NOT active) IS NULL"},
+	} {
+		sql, err := engine.GenerateSQL(&Query{Metrics: []string{"n"}, Filters: []Filter{tc.filter}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, sql, tc.want)
+	}
 }
 
 func TestJinjaTemplateDelimitersPassThrough(t *testing.T) {
@@ -1677,6 +1745,14 @@ func TestStructuredFilterValidationRejectsInvalidOperatorAndValue(t *testing.T) 
 				Filters: []Filter{{Dimension: "order_date", Operator: "between", Value: []interface{}{"2025-01-01"}}},
 			},
 			want: "invalid between filter value",
+		},
+		{
+			name: "null scalar value",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "country", Operator: "not_equals", Value: nil}},
+			},
+			want: "use is_null or is_not_null",
 		},
 	}
 
