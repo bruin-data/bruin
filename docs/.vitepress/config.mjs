@@ -115,7 +115,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         items: [
                             {text: "Bruin Academy", link: "https://getbruin.com/learn/"},
                             {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
-                            {text: "Test Snowflake Pipelines with LocalStack", link: "/getting-started/tutorials/localstack-snowflake"},
                             {text: "Explore Example Project", link: "/getting-started/tutorials/example-project"},
                         ],
                     },
@@ -282,7 +281,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "MySQL", link: "/platforms/mysql"},
                             {text: "Postgres", link: "/platforms/postgres"},
                             {text: "Redshift", link: "/platforms/redshift"},
-                            {text: "Snowflake", link: "/platforms/snowflake"},
+                            {text: "Snowflake", link: "/platforms/snowflake", items: [
+                                {text: "Snowflake in CI/CD", link: "/getting-started/tutorials/localstack-snowflake"},
+                            ]},
                             {text: "StarRocks", link: "/platforms/starrocks"},
                             {text: "Synapse", link: "/platforms/synapse"},
                             {text: "S3", link: "/platforms/s3"},
