@@ -7,15 +7,16 @@ import (
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 )
 
 // externalVaultManager builds the connections that read from an external vault the first time they are asked
 // for, so a command that never opens one never contacts the vault.
 type externalVaultManager struct {
-	ctx   context.Context
-	cm    *config.Config
-	base  config.ConnectionAndDetailsGetter
-	types map[string]string
+	context func() context.Context
+	cm      *config.Config
+	base    config.ConnectionAndDetailsGetter
+	types   map[string]string
 
 	mu       sync.Mutex
 	resolved map[string]*externalVaultResult
@@ -30,7 +31,7 @@ type externalVaultResult struct {
 func newExternalVaultManager(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
 	base, errs := NewManagerFromConfigWithContext(ctx, cm.WithoutExternalVaultConnections())
 	return &externalVaultManager{
-		ctx:      ctx,
+		context:  func() context.Context { return ctx },
 		cm:       cm,
 		base:     base,
 		types:    cm.SelectedEnvironment.Connections.ConnectionsSummaryList(),
@@ -39,6 +40,7 @@ func newExternalVaultManager(ctx context.Context, cm *config.Config) (config.Con
 }
 
 // resolve keeps failures too: within one command, asking the vault again would only repeat the prompt and the error.
+// It reads one item at a time on purpose, so the user isn't shown several 1Password prompts at once.
 func (m *externalVaultManager) resolve(name string) *externalVaultResult {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -48,9 +50,10 @@ func (m *externalVaultManager) resolve(name string) *externalVaultResult {
 	}
 
 	result := &externalVaultResult{}
-	single, err := m.cm.ExternalVaultConnection(name)
+	single, err := m.cm.ExternalVaultConnection(m.context(), name)
 	if err == nil {
-		manager, errs := NewManagerFromConfigWithContext(m.ctx, single)
+		// File settings were expanded when the config loaded; values from the vault are used exactly as stored.
+		manager, errs := buildManager(m.context(), single)
 		if len(errs) > 0 {
 			err = fmt.Errorf("failed to configure connection '%s': %w", name, errs[0])
 		} else {
@@ -111,6 +114,25 @@ func (m *externalVaultManager) GetConnectionDetails(name string) any {
 		return manager.GetConnectionDetails(name)
 	}
 	return nil
+}
+
+func (m *externalVaultManager) GetSfConnectionWithWarehouse(name, warehouse string) (snowflake.SfClient, error) {
+	manager := m.base
+	if m.cm.UsesExternalVault(name) {
+		result := m.resolve(name)
+		if result.err != nil {
+			return nil, result.err
+		}
+		manager = result.manager
+	}
+
+	getter, ok := manager.(interface {
+		GetSfConnectionWithWarehouse(name, warehouse string) (snowflake.SfClient, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("connection '%s' cannot use another Snowflake warehouse", name)
+	}
+	return getter.GetSfConnectionWithWarehouse(name, warehouse)
 }
 
 // GetConnectionType answers from the config file, so asking for a type never contacts the vault.

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,7 @@ type fakeOnePassword struct {
 	calls map[string]int
 }
 
-func (f *fakeOnePassword) FetchItem(path string) (map[string]string, error) {
+func (f *fakeOnePassword) FetchItem(_ context.Context, path string) (map[string]string, error) {
 	vault, item, err := parseOnePasswordPath(path)
 	if err != nil {
 		return nil, err
@@ -34,7 +35,7 @@ func (f *fakeOnePassword) FetchItem(path string) (map[string]string, error) {
 
 type fakeProvider map[string]map[string]string
 
-func (f fakeProvider) FetchItem(path string) (map[string]string, error) {
+func (f fakeProvider) FetchItem(_ context.Context, path string) (map[string]string, error) {
 	fields, ok := f[path]
 	if !ok {
 		return nil, errors.New("not found")
@@ -47,18 +48,18 @@ func fakeVaults(items map[string]map[string]string) (vaultProviders, *fakeOnePas
 	return vaultProviders{"op": op}, op
 }
 
-func loadWithVault(t *testing.T, config string, fetcher secretItemFetcher, env string) *Config {
+func loadWithVault(t *testing.T, config string, fetcher secretItemFetcher) *Config {
 	t.Helper()
 	var cfg Config
 	require.NoError(t, decodeConfigYAML([]byte(config), &cfg))
-	require.NoError(t, cfg.SelectEnvironment(env))
+	require.NoError(t, cfg.SelectEnvironment("default"))
 	cfg.vaultFetcher = fetcher
 	return &cfg
 }
 
 func vaultPostgres(t *testing.T, cfg *Config, name string) *PostgresConnection {
 	t.Helper()
-	resolved, err := cfg.ExternalVaultConnection(name)
+	resolved, err := cfg.ExternalVaultConnection(t.Context(), name)
 	require.NoError(t, err)
 	pg, ok := resolved.SelectedEnvironment.Connections.GetConnection(name).(*PostgresConnection)
 	require.True(t, ok)
@@ -96,7 +97,7 @@ func TestExternalVaultFillsConnectionKeys(t *testing.T) {
 		},
 	})
 
-	cfg := loadWithVault(t, vaultConfig, vault, "default")
+	cfg := loadWithVault(t, vaultConfig, vault)
 
 	pg := vaultPostgres(t, cfg, "my_pg")
 	assert.Equal(t, "localhost", pg.Host)
@@ -135,7 +136,7 @@ environments:
           bruin_external_vault: op://Private/shared
 `
 	for range 2 {
-		cfg := loadWithVault(t, config, fetcher, "default")
+		cfg := loadWithVault(t, config, fetcher)
 		assert.Equal(t, "s3cret", vaultPostgres(t, cfg, "a").Password)
 		require.NoError(t, cfg.SelectEnvironment("prod"))
 		assert.Equal(t, "s3cret", vaultPostgres(t, cfg, "b").Password)
@@ -202,7 +203,7 @@ environments:
 			t.Parallel()
 
 			providers, _ := fakeVaults(tt.items)
-			_, err := loadWithVault(t, tt.config, providers, "default").ExternalVaultConnection("my_pg")
+			_, err := loadWithVault(t, tt.config, providers).ExternalVaultConnection(t.Context(), "my_pg")
 			require.Error(t, err)
 			for _, want := range tt.wantErr {
 				assert.Contains(t, err.Error(), want)
@@ -216,7 +217,7 @@ environments:
 func TestSelectingAnEnvironmentDoesNotReadTheVault(t *testing.T) {
 	t.Parallel()
 
-	cfg := loadWithVault(t, vaultConfig, unreachableVault{}, "default")
+	cfg := loadWithVault(t, vaultConfig, unreachableVault{})
 
 	pg := cfg.SelectedEnvironment.Connections.Postgres[0]
 	assert.Equal(t, "localhost", pg.Host)
@@ -245,24 +246,24 @@ environments:
           bruin_external_vault: op://Private/prod-missing
 `
 	providers, op := fakeVaults(map[string]map[string]string{"op://Private/dev": {"password": "dev-secret"}})
-	cfg := loadWithVault(t, config, providers, "default")
+	cfg := loadWithVault(t, config, providers)
 
 	assert.Equal(t, "dev-secret", vaultPostgres(t, cfg, "dev_pg").Password)
 	assert.Equal(t, map[string]int{"op://Private/dev": 1}, op.calls)
 
-	_, err := cfg.ExternalVaultConnection("prod_pg")
+	_, err := cfg.ExternalVaultConnection(t.Context(), "prod_pg")
 	require.ErrorContains(t, err, "connection 'prod_pg' does not use bruin_external_vault in environment 'default'")
 
 	require.NoError(t, cfg.SelectEnvironment("prod"))
 	assert.False(t, cfg.UsesExternalVault("dev_pg"))
-	_, err = cfg.ExternalVaultConnection("prod_pg")
+	_, err = cfg.ExternalVaultConnection(t.Context(), "prod_pg")
 	require.ErrorContains(t, err, "connection 'prod_pg' (postgres) in environment 'prod'")
 }
 
 func TestWithoutExternalVaultConnections(t *testing.T) {
 	t.Parallel()
 
-	cfg := loadWithVault(t, twoEnvironmentVaultConfig, unreachableVault{}, "default")
+	cfg := loadWithVault(t, twoEnvironmentVaultConfig, unreachableVault{})
 	filtered := cfg.WithoutExternalVaultConnections()
 
 	names := make([]string, 0, len(filtered.SelectedEnvironment.Connections.Postgres))
@@ -303,7 +304,7 @@ func TestPersistAfterReadingTheVaultWritesNoSecrets(t *testing.T) {
 	vault, _ := fakeVaults(map[string]map[string]string{
 		"op://Private/bruin-my-pg": {"password": "s3cret"},
 	})
-	cfg := loadWithVault(t, vaultConfig, vault, "default")
+	cfg := loadWithVault(t, vaultConfig, vault)
 	cfg.fs = fs
 	cfg.path = path
 	assert.Equal(t, "s3cret", vaultPostgres(t, cfg, "my_pg").Password)
@@ -443,7 +444,7 @@ environments:
 	providers, _ := fakeVaults(map[string]map[string]string{"op://Private/pg": {"password": "from-1password"}})
 	providers["other"] = fakeProvider{"project/prod": {"password": "from-other-vault"}}
 
-	cfg := loadWithVault(t, config, providers, "default")
+	cfg := loadWithVault(t, config, providers)
 
 	assert.Equal(t, "from-1password", vaultPostgres(t, cfg, "from_op").Password)
 	assert.Equal(t, "from-other-vault", vaultPostgres(t, cfg, "from_other").Password)
@@ -479,7 +480,7 @@ func TestParseOnePasswordPath(t *testing.T) {
 
 type unreachableVault struct{}
 
-func (unreachableVault) FetchItem(externalVaultRef) (map[string]string, error) {
+func (unreachableVault) FetchItem(context.Context, externalVaultRef) (map[string]string, error) {
 	return nil, errors.New("vault is locked")
 }
 
@@ -506,7 +507,7 @@ environments:
 			"connection options": "sslmode=require",
 		},
 	})
-	cfg := loadWithVault(t, config, vault, "default")
+	cfg := loadWithVault(t, config, vault)
 
 	pg := vaultPostgres(t, cfg, "my_pg")
 	assert.Equal(t, "my_pg", pg.Name)
@@ -523,7 +524,7 @@ func TestExternalVaultRejectsTwoLabelsForOneSetting(t *testing.T) {
 	vault, _ := fakeVaults(map[string]map[string]string{
 		"op://Private/bruin-my-pg": {"password": "first", "Password": "second"},
 	})
-	_, err := loadWithVault(t, vaultConfig, vault, "default").ExternalVaultConnection("my_pg")
+	_, err := loadWithVault(t, vaultConfig, vault).ExternalVaultConnection(t.Context(), "my_pg")
 
 	require.ErrorContains(t, err, "the fields 'Password' and 'password' both set 'password'")
 	assert.NotContains(t, err.Error(), "first")
@@ -549,14 +550,73 @@ environments:
 		"op://Private/duck": {"path": "data/local.db"},
 		"op://Private/snow": {"account": "acme"},
 	})
-	cfg := loadWithVault(t, config, vault, "default")
+	cfg := loadWithVault(t, config, vault)
 	cfg.path = "/project/.bruin.yml"
-
-	resolved, err := cfg.ExternalVaultConnection("local")
+	absoluteConfig, err := filepath.Abs(cfg.path)
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join("/project", "data", "local.db"), resolved.SelectedEnvironment.Connections.DuckDB[0].Path)
 
-	resolved, err = cfg.ExternalVaultConnection("warehouse")
+	resolved, err := cfg.ExternalVaultConnection(t.Context(), "local")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(filepath.Dir(absoluteConfig), "data", "local.db"), resolved.SelectedEnvironment.Connections.DuckDB[0].Path)
+
+	resolved, err = cfg.ExternalVaultConnection(t.Context(), "warehouse")
 	require.NoError(t, err)
 	assert.Equal(t, "/keys/already-absolute.p8", resolved.SelectedEnvironment.Connections.Snowflake[0].PrivateKeyPath)
+}
+
+func TestExternalVaultKeepsLinksOnConnectionsSharedThroughAnchors(t *testing.T) {
+	t.Parallel()
+
+	config := `
+environments:
+  default:
+    connections:
+      postgres:
+        - &shared
+          name: my_pg
+          host: localhost
+          bruin_external_vault: op://Private/bruin-my-pg
+  prod:
+    connections:
+      postgres:
+        - *shared
+`
+	vault, _ := fakeVaults(map[string]map[string]string{"op://Private/bruin-my-pg": {"password": "s3cret"}})
+	cfg := loadWithVault(t, config, vault)
+
+	assert.Equal(t, map[string]string{
+		"default/my_pg": "op://Private/bruin-my-pg",
+		"prod/my_pg":    "op://Private/bruin-my-pg",
+	}, vaultReferences(cfg))
+	assert.Equal(t, "s3cret", vaultPassword(t, cfg, "prod", "my_pg"))
+}
+
+func TestExternalVaultIgnoresSettingsTheLoaderFilledIn(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	config := `
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: remote
+          bruin_external_vault: op://Private/quack
+`
+	require.NoError(t, afero.WriteFile(fs, "/project/.bruin.yml", []byte(config), 0o600))
+	cfg, err := LoadFromFileOrEnv(fs, "/project/.bruin.yml")
+	require.NoError(t, err)
+	require.NotEmpty(t, cfg.SelectedEnvironment.Connections.DuckDB[0].Path, "the loader gives a DuckDB connection without a path a default one")
+
+	vault, _ := fakeVaults(map[string]map[string]string{
+		"op://Private/quack": {"quack": "true", "host": "quack.internal", "token": "t0ken"},
+	})
+	cfg.vaultFetcher = vault
+	resolved, err := cfg.ExternalVaultConnection(t.Context(), "remote")
+	require.NoError(t, err)
+
+	duck := resolved.SelectedEnvironment.Connections.DuckDB[0]
+	assert.True(t, duck.Quack)
+	assert.Equal(t, "quack.internal", duck.Host)
+	assert.Empty(t, duck.Path)
 }

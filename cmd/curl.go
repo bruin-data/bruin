@@ -133,7 +133,7 @@ func loadCurlConnectionLookup(ctx context.Context, c *cli.Command) (curlConnecti
 		return func(name string) (any, error) {
 			connections := cm.SelectedEnvironment.Connections
 			if cm.UsesExternalVault(name) {
-				resolved, err := cm.ExternalVaultConnection(name)
+				resolved, err := cm.ExternalVaultConnection(ctx, name)
 				if err != nil {
 					return nil, err
 				}
