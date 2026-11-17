@@ -1547,7 +1547,25 @@ func TestFilterOnCalculatedDimension(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, sql, "WHERE customer_order_number = 1 = TRUE")
+	expectContains(t, sql, "WHERE (customer_order_number = 1) = TRUE")
+
+	// Null checks must apply to the whole expression, not bind inside it.
+	m.Dimensions = append(m.Dimensions, Dimension{Name: "inactive", Type: "boolean", Expression: "NOT active"})
+	engine = minimalEngine(t, m)
+	for _, tc := range []struct {
+		filter Filter
+		want   string
+	}{
+		{Filter{Dimension: "inactive", Operator: "in", Value: []interface{}{nil}}, "WHERE (NOT active) IS NULL"},
+		{Filter{Dimension: "inactive", Operator: "not_equals", Value: true}, "WHERE ((NOT active) != TRUE OR (NOT active) IS NULL)"},
+		{Filter{Dimension: "inactive", Operator: "is_null"}, "WHERE (NOT active) IS NULL"},
+	} {
+		sql, err := engine.GenerateSQL(&Query{Metrics: []string{"n"}, Filters: []Filter{tc.filter}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, sql, tc.want)
+	}
 }
 
 func TestJinjaTemplateDelimitersPassThrough(t *testing.T) {

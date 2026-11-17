@@ -12,6 +12,8 @@ import (
 
 var refPattern = regexp.MustCompile(`\{([^}]+)\}`)
 
+var plainColumnPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$`)
+
 var aggregateFuncPattern = regexp.MustCompile(`(?i)\b(sum|count|avg|min|max|stddev|stddev_samp|stddev_pop|variance|var_samp|var_pop|median|percentile_cont|percentile_disc|array_agg|string_agg|listagg|approx_count_distinct|approx_quantile)\s*\(`)
 
 func maskTemplateDelimiters(expr string) string {
@@ -1032,6 +1034,11 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	dim := f.Dimension
 	if binding := plan.dimensionBinding(DimensionRef{Name: f.Dimension}); binding != nil {
 		dim = plan.dimensionSQL(binding)
+	}
+	// Group expression dimensions such as "NOT active" so operators like IS NULL
+	// apply to the whole expression rather than binding inside it.
+	if !plainColumnPattern.MatchString(dim) {
+		dim = "(" + dim + ")"
 	}
 	switch f.Operator {
 	case "equals":
