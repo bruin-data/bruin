@@ -28,7 +28,7 @@ bruin init localstack-snowflake-nyc-taxi
 ```bash
 export LOCALSTACK_AUTH_TOKEN=<your-token>
 docker pull localstack/snowflake-next:latest
-docker run -d --name localstack-snowflake -p 127.0.0.1:4567:4566 \
+docker run -d --name localstack-snowflake -p 127.0.0.1:4566:4566 \
   -e LOCALSTACK_AUTH_TOKEN localstack/snowflake-next:latest
 ```
 
@@ -50,7 +50,7 @@ environments:
           username: test
           password: test
           host: snowflake.localhost.localstack.cloud
-          port: 4567
+          port: 4566
           database: LOCALSTACK_DEMO
           warehouse: COMPUTE_WH
       http:
@@ -63,7 +63,8 @@ environments:
 ```
 
 `test`/`test` is the emulator's built-in login. `port` is the host port from `-p` in the `docker run`
-above (4567). If you map a different port, change it here and in the `snow sql` command below.
+above (4566, LocalStack's default). If that port is taken, for example by LocalStack for AWS, map a different
+one and change it here and in the `snow sql` command below.
 
 ## Run
 
@@ -74,7 +75,7 @@ Bruin creates the `BRONZE`, `SILVER` and `GOLD` schemas itself on the first run.
 
 ```bash
 snow sql --temporary-connection --account test --user test --password test \
-  --host snowflake.localhost.localstack.cloud --port 4567 -q "
+  --host snowflake.localhost.localstack.cloud --port 4566 -q "
 CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH;
 CREATE DATABASE IF NOT EXISTS LOCALSTACK_DEMO;"
 ```

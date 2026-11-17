@@ -8,7 +8,7 @@ environments:
           username: test
           password: test
           host: snowflake.localhost.localstack.cloud
-          port: 4567
+          port: 4566
           database: LOCALSTACK_DEMO
           warehouse: COMPUTE_WH
       http:
