@@ -4684,30 +4684,6 @@ func processConnections[T config.Named](connections []T, adder func(*T) error, w
 	for i := range connections {
 		conn := &connections[i]
 		wg.Go(func() {
-			// Check for environment variable placeholders in connection fields
-			v := reflect.ValueOf(conn).Elem()
-			for i := range v.NumField() {
-				field := v.Field(i)
-
-				// Only process string fields
-				if field.Kind() != reflect.String {
-					continue
-				}
-				if !field.CanSet() {
-					continue
-				}
-				strValue := strings.TrimSpace(field.String())
-				matches := envVarRegex.FindStringSubmatch(strValue)
-				for len(matches) > 0 {
-					envVarName := matches[1]
-					envValue := os.Getenv(envVarName)
-					strValue = strings.Replace(strValue, matches[0], envValue, 1)
-					field.SetString(strValue)
-					// Look for more matches after replacement
-					matches = envVarRegex.FindStringSubmatch(strValue)
-				}
-			}
-
 			err := adder(conn)
 			if err != nil {
 				mu.Lock()
@@ -4731,6 +4707,44 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 		return newExternalVaultManager(ctx, cm)
 	}
 
+	expandConnectionEnvVars(cm.SelectedEnvironment.Connections)
+	return buildManager(ctx, cm)
+}
+
+// expandConnectionEnvVars replaces ${VAR} placeholders in the connections' text settings with environment values.
+func expandConnectionEnvVars(connections *config.Connections) {
+	value := reflect.ValueOf(connections).Elem()
+	for i := range value.NumField() {
+		list := value.Field(i)
+		if !value.Type().Field(i).IsExported() || list.Kind() != reflect.Slice {
+			continue
+		}
+		for j := range list.Len() {
+			if conn := list.Index(j); conn.Kind() == reflect.Struct {
+				expandEnvVarPlaceholders(conn)
+			}
+		}
+	}
+}
+
+func expandEnvVarPlaceholders(conn reflect.Value) {
+	for i := range conn.NumField() {
+		field := conn.Field(i)
+		if field.Kind() != reflect.String || !field.CanSet() {
+			continue
+		}
+		strValue := strings.TrimSpace(field.String())
+		matches := envVarRegex.FindStringSubmatch(strValue)
+		for len(matches) > 0 {
+			strValue = strings.Replace(strValue, matches[0], os.Getenv(matches[1]), 1)
+			field.SetString(strValue)
+			matches = envVarRegex.FindStringSubmatch(strValue)
+		}
+	}
+}
+
+// buildManager builds the selected environment's connections with their settings used as they are.
+func buildManager(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 	connectionManager.AllConnectionDetails = make(map[string]any)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,6 +74,7 @@ environments:
           bruin_external_vault: op://lazyvault/prod-item
 `
 
+//nolint:paralleltest // t.Setenv puts the stand-in op on PATH.
 func TestManagerReadsTheVaultOnlyForTheConnectionsAskedFor(t *testing.T) {
 	calls := fakeOnePasswordCLI(t, map[string]string{
 		"lazyvault/item-a":    `{"fields":[{"label":"value","value":"from-vault"}]}`,
@@ -106,6 +108,7 @@ func TestManagerReadsTheVaultOnlyForTheConnectionsAskedFor(t *testing.T) {
 	assert.Empty(t, inFile.Value, "the secret must not be written back into the loaded config")
 }
 
+//nolint:paralleltest // t.Setenv puts the stand-in op on PATH.
 func TestManagerReportsAVaultFailureOnce(t *testing.T) {
 	calls := fakeOnePasswordCLI(t, map[string]string{})
 	cm := loadVaultConfig(t, lazyVaultConfig)
@@ -129,6 +132,7 @@ func TestManagerReportsAVaultFailureOnce(t *testing.T) {
 	assert.NotNil(t, plain)
 }
 
+//nolint:paralleltest // t.Setenv puts the stand-in op on PATH.
 func TestManagerReadsTheSelectedEnvironmentOnly(t *testing.T) {
 	calls := fakeOnePasswordCLI(t, map[string]string{
 		"lazyvault/prod-item": `{"fields":[{"label":"value","value":"prod-secret"}]}`,
@@ -142,4 +146,42 @@ func TestManagerReadsTheSelectedEnvironmentOnly(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "prod-secret", conn.Value)
 	assert.Equal(t, []string{"lazyvault/prod-item"}, calls())
+}
+
+//nolint:paralleltest // t.Setenv puts the stand-in op on PATH.
+func TestManagerUsesVaultValuesAsStored(t *testing.T) {
+	calls := fakeOnePasswordCLI(t, map[string]string{
+		"rawvault/item": `{"fields":[{"label":"value","value":"abc${BRUIN_TEST_UNSET_VARIABLE}def"}]}`,
+	})
+	cm := loadVaultConfig(t, `
+environments:
+  default:
+    connections:
+      generic:
+        - name: raw
+          bruin_external_vault: op://rawvault/item
+`)
+
+	manager, errs := NewManagerFromConfig(cm)
+	require.Empty(t, errs)
+	conn, ok := manager.GetConnection("raw").(*config.GenericConnection)
+	require.True(t, ok)
+	assert.Equal(t, "abc${BRUIN_TEST_UNSET_VARIABLE}def", conn.Value)
+	assert.Equal(t, []string{"rawvault/item"}, calls())
+}
+
+//nolint:paralleltest // t.Setenv puts the stand-in op on PATH.
+func TestManagerKeepsTheSnowflakeWarehouseOverride(t *testing.T) {
+	fakeOnePasswordCLI(t, map[string]string{})
+	cm := loadVaultConfig(t, lazyVaultConfig)
+
+	manager, errs := NewManagerFromConfig(cm)
+	require.Empty(t, errs)
+	getter, ok := manager.(interface {
+		GetSfConnectionWithWarehouse(name, warehouse string) (snowflake.SfClient, error)
+	})
+	require.True(t, ok, "Snowflake assets look for this to run on their own warehouse")
+
+	_, err := getter.GetSfConnectionWithWarehouse("broken", "OTHER_WH")
+	require.ErrorContains(t, err, "op://lazyvault/missing")
 }

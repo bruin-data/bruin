@@ -28,12 +28,12 @@ type externalVaultRef struct {
 }
 
 type secretItemFetcher interface {
-	FetchItem(ref externalVaultRef) (map[string]string, error)
+	FetchItem(ctx context.Context, ref externalVaultRef) (map[string]string, error)
 }
 
 // vaultProvider reads one item from a secret manager; path is the reference after "<scheme>://".
 type vaultProvider interface {
-	FetchItem(path string) (map[string]string, error)
+	FetchItem(ctx context.Context, path string) (map[string]string, error)
 }
 
 var defaultVaultProviders = vaultProviders{
@@ -65,12 +65,12 @@ func (p vaultProviders) provider(scheme string) (vaultProvider, error) {
 	return provider, nil
 }
 
-func (p vaultProviders) FetchItem(ref externalVaultRef) (map[string]string, error) {
+func (p vaultProviders) FetchItem(ctx context.Context, ref externalVaultRef) (map[string]string, error) {
 	provider, err := p.provider(ref.scheme)
 	if err != nil {
 		return nil, err
 	}
-	return provider.FetchItem(ref.path)
+	return provider.FetchItem(ctx, ref.path)
 }
 
 type onePasswordCLI struct{}
@@ -90,13 +90,13 @@ type onePasswordItem struct {
 	} `json:"fields"`
 }
 
-func (onePasswordCLI) FetchItem(path string) (map[string]string, error) {
+func (onePasswordCLI) FetchItem(ctx context.Context, path string) (map[string]string, error) {
 	vault, item, err := parseOnePasswordPath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	stdout, err := runOnePassword("item", "get", item, "--vault", vault, "--format", "json", "--reveal")
+	stdout, err := runOnePassword(ctx, "item", "get", item, "--vault", vault, "--format", "json", "--reveal")
 	if err != nil {
 		return nil, err
 	}
@@ -122,8 +122,8 @@ func (onePasswordCLI) FetchItem(path string) (map[string]string, error) {
 }
 
 // runOnePassword runs op with the terminal as stdin so it can prompt for sign-in.
-func runOnePassword(args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(context.Background(), "op", args...)
+func runOnePassword(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "op", args...)
 	cmd.Stdin = os.Stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -150,7 +150,7 @@ type cachingFetcher struct {
 	items map[string]map[string]string
 }
 
-func (c *cachingFetcher) FetchItem(ref externalVaultRef) (map[string]string, error) {
+func (c *cachingFetcher) FetchItem(ctx context.Context, ref externalVaultRef) (map[string]string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -158,7 +158,7 @@ func (c *cachingFetcher) FetchItem(ref externalVaultRef) (map[string]string, err
 		return fields, nil
 	}
 
-	fields, err := c.next.FetchItem(ref)
+	fields, err := c.next.FetchItem(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +201,9 @@ func (c *Config) ExternalVaultReferences() []ExternalVaultReference {
 func collectExternalVaultReferences(root *yaml.Node) ([]externalVaultConnection, error) {
 	connectionsType := reflect.TypeOf(Connections{})
 	var refs []externalVaultConnection
+	// A connection reused through a YAML anchor is one node in several environments, so the key
+	// is removed only after every environment has been read.
+	var linked []*yaml.Node
 
 	envs := yamlMappingValue(yamlDocumentRoot(root), "environments")
 	for envName, envNode := range yamlMappingPairs(envs) {
@@ -211,8 +214,8 @@ func collectExternalVaultReferences(root *yaml.Node) ([]externalVaultConnection,
 
 			for _, node := range seq.Content {
 				conn := resolveYAMLAlias(node)
-				idx := yamlMappingKeyIndex(conn, externalVaultKey)
-				if idx < 0 {
+				uriNode := yamlMappingValue(conn, externalVaultKey)
+				if uriNode == nil {
 					continue
 				}
 
@@ -220,10 +223,10 @@ func collectExternalVaultReferences(root *yaml.Node) ([]externalVaultConnection,
 				if n := yamlMappingValue(conn, "name"); n != nil {
 					ref.name = n.Value
 				}
-				uriNode := resolveYAMLAlias(conn.Content[idx+1])
-				conn.Content = slices.Delete(conn.Content, idx, idx+2)
 				for key := range yamlMappingPairs(conn) {
-					ref.yamlKeys[key] = true
+					if key != externalVaultKey {
+						ref.yamlKeys[key] = true
+					}
 				}
 
 				if uriNode.Kind != yaml.ScalarNode {
@@ -235,8 +238,16 @@ func collectExternalVaultReferences(root *yaml.Node) ([]externalVaultConnection,
 				}
 				ref.ref = parsed
 				refs = append(refs, ref)
+				if !slices.Contains(linked, conn) {
+					linked = append(linked, conn)
+				}
 			}
 		}
+	}
+
+	for _, conn := range linked {
+		idx := yamlMappingKeyIndex(conn, externalVaultKey)
+		conn.Content = slices.Delete(conn.Content, idx, idx+2)
 	}
 
 	return refs, nil
@@ -310,7 +321,7 @@ func (c *Config) WithoutExternalVaultConnections() *Config {
 
 // ExternalVaultConnection reads the named connection's vault item and returns a config that holds only that
 // connection, complete. The receiver is not changed, so fetched secrets never reach a config that gets saved.
-func (c *Config) ExternalVaultConnection(name string) (*Config, error) {
+func (c *Config) ExternalVaultConnection(ctx context.Context, name string) (*Config, error) {
 	ref, ok := c.selectedExternalVaultRef(name)
 	if !ok {
 		return nil, fmt.Errorf("connection '%s' does not use %s in environment '%s'", name, externalVaultKey, c.SelectedEnvironmentName)
@@ -325,10 +336,14 @@ func (c *Config) ExternalVaultConnection(name string) (*Config, error) {
 		return nil, fmt.Errorf("%s: could not find the connection", ref.where())
 	}
 
+	// The loader fills in some settings the file left out, like a DuckDB path that would clash with quack.
+	fileOnly := reflect.New(item.Elem().Type()).Elem()
+	copyFileSettings(fileOnly, item.Elem(), ref.yamlKeys)
+
 	connections := &Connections{}
 	target, _ := connectionsFieldByYAMLKey(reflect.ValueOf(connections).Elem(), ref.connType)
-	target.Set(reflect.Append(reflect.MakeSlice(target.Type(), 0, 1), item.Elem()))
-	if err := fillFromExternalVault(connections, ref, c.fetcher()); err != nil {
+	target.Set(reflect.Append(reflect.MakeSlice(target.Type(), 0, 1), fileOnly))
+	if err := fillFromExternalVault(ctx, connections, ref, c.fetcher()); err != nil {
 		return nil, err
 	}
 	if c.path != "" {
@@ -347,7 +362,24 @@ func (c *Config) ExternalVaultConnection(name string) (*Config, error) {
 	}, nil
 }
 
-func fillFromExternalVault(connections *Connections, ref externalVaultConnection, fetcher secretItemFetcher) error {
+func copyFileSettings(dst, src reflect.Value, keys map[string]bool) {
+	for i := range src.NumField() {
+		field := src.Type().Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		name, inline := yamlTagName(field)
+		if inline && field.Type.Kind() == reflect.Struct {
+			copyFileSettings(dst.Field(i), src.Field(i), keys)
+			continue
+		}
+		if keys[name] {
+			dst.Field(i).Set(src.Field(i))
+		}
+	}
+}
+
+func fillFromExternalVault(ctx context.Context, connections *Connections, ref externalVaultConnection, fetcher secretItemFetcher) error {
 	list, ok := connectionsFieldByYAMLKey(reflect.ValueOf(connections).Elem(), ref.connType)
 	if !ok || list.Kind() != reflect.Slice {
 		return fmt.Errorf("%s: could not find the connection to fill from %s", ref.where(), ref.ref.uri)
@@ -358,7 +390,7 @@ func fillFromExternalVault(connections *Connections, ref externalVaultConnection
 	}
 	structType := target.Elem().Type()
 
-	fields, err := fetcher.FetchItem(ref.ref)
+	fields, err := fetcher.FetchItem(ctx, ref.ref)
 	if err != nil {
 		return fmt.Errorf("%s: failed to read %s: %w", ref.where(), ref.ref.uri, err)
 	}
@@ -471,11 +503,12 @@ func (c *Config) yamlWithVaultReferences() ([]byte, error) {
 				kept = append(kept, conn.Content[i], conn.Content[i+1])
 			}
 		}
-		conn.Content = append(
+		kept = append(
 			kept,
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: externalVaultKey},
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: ref.ref.uri},
 		)
+		conn.Content = kept
 	}
 
 	return yaml.Marshal(&root)
