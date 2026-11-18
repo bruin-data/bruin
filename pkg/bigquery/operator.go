@@ -370,10 +370,10 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			res, err := conn.Select(sinkCtx, qry[0])
 			if err != nil {
 				query.LogQueryID(ctx, "BigQuery", lastJobID)
-				if pokeAgainAfter(ctx, err, o.sensorMode, t) {
-					continue
+				if stop := pokeAgainAfter(ctx, err, o.sensorMode, t, timeout, sensorTimeout); stop != nil {
+					return stop
 				}
-				return err
+				continue
 			}
 			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
@@ -398,20 +398,30 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	}
 }
 
-// pokeAgainAfter reports whether a waiting sensor should poke again after its query failed, and
-// waits the poke interval if so. A transient BigQuery error, such as a job that failed inside
-// BigQuery, says nothing about the data the sensor waits for; failing the sensor would throw
-// away the time it already waited. The sensor's timeout still applies.
-func pokeAgainAfter(ctx context.Context, err error, sensorMode string, t *pipeline.Asset) bool {
+// pokeAgainAfter decides whether a waiting sensor polls again after its query failed with err,
+// and waits the poke interval if so. A transient BigQuery error, such as a job that failed inside
+// BigQuery, says nothing about the data the sensor waits for; failing the sensor would throw away
+// the time it already waited. It returns nil to poll again, and otherwise the error to fail the
+// sensor with: err itself, or the sensor's timeout or the task's cancellation if either cuts the
+// wait short.
+func pokeAgainAfter(ctx context.Context, err error, sensorMode string, t *pipeline.Asset, timeout <-chan time.Time, sensorTimeout time.Duration) error {
 	if sensorMode == "once" || sensorMode == "" || ctx.Err() != nil || !isTransient(err) {
-		return false
+		return err
 	}
 	pokeInterval := helpers.GetPokeInterval(ctx, t)
 	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
 		fmt.Fprintln(printer, "Info: Sensor query failed with a transient BigQuery error, trying again in", pokeInterval, "seconds:", err)
 	}
-	time.Sleep(time.Duration(pokeInterval) * time.Second)
-	return true
+	wait := time.NewTimer(time.Duration(pokeInterval) * time.Second)
+	defer wait.Stop()
+	select {
+	case <-wait.C:
+		return nil
+	case <-timeout:
+		return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 type TableSensor struct {
@@ -490,10 +500,10 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			res, err := conn.Select(sinkCtx, extractedQuery)
 			if err != nil {
 				query.LogQueryID(ctx, "BigQuery", lastJobID)
-				if pokeAgainAfter(ctx, err, ts.sensorMode, t) {
-					continue
+				if stop := pokeAgainAfter(ctx, err, ts.sensorMode, t, timeout, sensorTimeout); stop != nil {
+					return stop
 				}
-				return err
+				continue
 			}
 			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {

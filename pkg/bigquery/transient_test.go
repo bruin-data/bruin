@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -123,8 +125,13 @@ func fakeSensorBigQuery(t *testing.T, answers ...string) (*httptest.Server, *ato
 
 func runQuerySensor(t *testing.T, server *httptest.Server, sensorMode string) (string, error) {
 	t.Helper()
+	return runQuerySensorWith(t.Context(), t, server, sensorMode, pipeline.ParameterMap{"poke_interval": "0"})
+}
+
+func runQuerySensorWith(ctx context.Context, t *testing.T, server *httptest.Server, sensorMode string, params pipeline.ParameterMap) (string, error) {
+	t.Helper()
 	client, err := bigquery.NewClient(
-		t.Context(), testProjectID,
+		ctx, testProjectID,
 		option.WithEndpoint(server.URL),
 		option.WithCredentials(&google.Credentials{ProjectID: testProjectID, TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"})}),
 	)
@@ -139,11 +146,11 @@ func runQuerySensor(t *testing.T, server *httptest.Server, sensorMode string) (s
 		Name:       "sensor",
 		Type:       pipeline.AssetTypeBigqueryQuerySensor,
 		Connection: "bq",
-		Parameters: pipeline.ParameterMap{"query": "select 1", "poke_interval": "0"},
+		Parameters: pipeline.ParameterMap{"query": "select 1"},
 	}
+	maps.Copy(asset.Parameters, params)
 
 	var out bytes.Buffer
-	ctx := t.Context()
 	ctx = context.WithValue(ctx, executor.KeyPrinter, &out)
 	err = NewQuerySensor(conns, extractor, sensorMode).RunTask(ctx, &pipeline.Pipeline{}, asset)
 	return out.String(), err
@@ -178,4 +185,33 @@ func TestQuerySensor_OnceFailsOnTransientError(t *testing.T) {
 
 	require.EqualError(t, err, jobBackendErrorMessage)
 	assert.Equal(t, int32(1), jobs.Load())
+}
+
+// A long poke interval doesn't hold a sensor past its timeout, or a cancelled task.
+func TestQuerySensor_TransientErrorWaitEndsEarly(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sensor timeout", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, "jobBackendError")
+		start := time.Now()
+		_, err := runQuerySensorWith(t.Context(), t, server, "wait", pipeline.ParameterMap{"poke_interval": "3600", "timeout": "200ms"})
+
+		require.EqualError(t, err, "Sensor timed out after 200ms")
+		assert.Less(t, time.Since(start), 30*time.Second)
+		assert.Equal(t, int32(1), jobs.Load())
+	})
+
+	t.Run("task context ends", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, "jobBackendError")
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+		start := time.Now()
+		_, err := runQuerySensorWith(ctx, t, server, "wait", pipeline.ParameterMap{"poke_interval": "3600"})
+
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, time.Since(start), 30*time.Second)
+		assert.Equal(t, int32(1), jobs.Load())
+	})
 }
