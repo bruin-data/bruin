@@ -345,7 +345,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 	bqQuery := d.queryForExecution(ctx, q.String())
 	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
-		return nil, formatError(err)
+		return nil, queryError(err)
 	}
 	defer cancelJobOnContextCancellation(ctx, job)
 	if job != nil {
@@ -355,7 +355,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 		rows, err = job.Read(ctx)
 	}
 	if err != nil {
-		return nil, formatError(err)
+		return nil, queryError(err)
 	}
 
 	result := make([][]interface{}, 0)
@@ -366,6 +366,9 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 			break
 		}
 		if err != nil {
+			if hasTransientReason(err) {
+				return nil, &transientError{err: err}
+			}
 			return nil, err
 		}
 

@@ -370,7 +370,10 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			res, err := conn.Select(sinkCtx, qry[0])
 			if err != nil {
 				query.LogQueryID(ctx, "BigQuery", lastJobID)
-				return err
+				if stop := pokeAgainAfter(ctx, err, o.sensorMode, t, timeout, sensorTimeout); stop != nil {
+					return stop
+				}
+				continue
 			}
 			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
@@ -392,6 +395,32 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
 			}
 		}
+	}
+}
+
+// pokeAgainAfter decides whether a waiting sensor polls again after its query failed with err,
+// and waits the poke interval if so. A transient BigQuery error, such as a job that failed inside
+// BigQuery, says nothing about the data the sensor waits for; failing the sensor would throw away
+// the time it already waited. It returns nil to poll again, and otherwise the error to fail the
+// sensor with: err itself, or the sensor's timeout or the task's cancellation if either cuts the
+// wait short.
+func pokeAgainAfter(ctx context.Context, err error, sensorMode string, t *pipeline.Asset, timeout <-chan time.Time, sensorTimeout time.Duration) error {
+	if sensorMode == "once" || sensorMode == "" || ctx.Err() != nil || !isTransient(err) {
+		return err
+	}
+	pokeInterval := helpers.GetPokeInterval(ctx, t)
+	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
+		fmt.Fprintln(printer, "Info: Sensor query failed with a transient BigQuery error, trying again in", pokeInterval, "seconds:", err)
+	}
+	wait := time.NewTimer(time.Duration(pokeInterval) * time.Second)
+	defer wait.Stop()
+	select {
+	case <-wait.C:
+		return nil
+	case <-timeout:
+		return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -471,7 +500,10 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			res, err := conn.Select(sinkCtx, extractedQuery)
 			if err != nil {
 				query.LogQueryID(ctx, "BigQuery", lastJobID)
-				return err
+				if stop := pokeAgainAfter(ctx, err, ts.sensorMode, t, timeout, sensorTimeout); stop != nil {
+					return stop
+				}
+				continue
 			}
 			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
