@@ -47,6 +47,8 @@ Each field of the item whose label is a setting name is used for that setting, f
 
 Bruin reads an item only when a command opens that connection, for example when running an asset that uses it or testing it with `bruin connections test`. Commands that don't open connections, such as `render`, `validate`, `lineage` and `connections list`, never contact 1Password. Each item is read at most once per command.
 
+`bruin run` also reads the items of every connection used anywhere in the pipeline, even when running a single asset, so it can hide their values in the logs. `--mask-credentials=false` turns this off.
+
 Values read from 1Password are never written back to `.bruin.yml`, and commands that change other connections or environments keep each link as it is.
 
 ::: warning VS Code extension
