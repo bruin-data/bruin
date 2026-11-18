@@ -223,11 +223,8 @@ func collectExternalVaultReferences(root *yaml.Node) ([]externalVaultConnection,
 				if n := yamlMappingValue(conn, "name"); n != nil {
 					ref.name = n.Value
 				}
-				for key := range yamlMappingPairs(conn) {
-					if key != externalVaultKey {
-						ref.yamlKeys[key] = true
-					}
-				}
+				collectFileKeys(conn, ref.yamlKeys)
+				delete(ref.yamlKeys, externalVaultKey)
 
 				if uriNode.Kind != yaml.ScalarNode {
 					return nil, fmt.Errorf("%s: %s must be a string like op://<vault>/<item>", ref.where(), externalVaultKey)
@@ -251,6 +248,23 @@ func collectExternalVaultReferences(root *yaml.Node) ([]externalVaultConnection,
 	}
 
 	return refs, nil
+}
+
+// collectFileKeys records a connection's keys, including the ones it inherits through "<<" merge keys.
+func collectFileKeys(conn *yaml.Node, keys map[string]bool) {
+	for key, value := range yamlMappingPairs(conn) {
+		if key != "<<" {
+			keys[key] = true
+			continue
+		}
+		if value.Kind == yaml.SequenceNode {
+			for _, merged := range value.Content {
+				collectFileKeys(resolveYAMLAlias(merged), keys)
+			}
+			continue
+		}
+		collectFileKeys(value, keys)
+	}
 }
 
 func (c *Config) fetcher() secretItemFetcher {

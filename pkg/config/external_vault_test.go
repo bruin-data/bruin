@@ -642,6 +642,33 @@ environments:
 	assert.Equal(t, "s3cret", vaultPassword(t, cfg, "prod", "my_pg"))
 }
 
+func TestExternalVaultKeepsSettingsInheritedThroughMergeKeys(t *testing.T) {
+	t.Parallel()
+
+	config := `
+defaults: &defaults
+  host: db.internal
+  port: 5433
+more_defaults: &more_defaults
+  database: analytics
+environments:
+  default:
+    connections:
+      postgres:
+        - <<: [*defaults, *more_defaults]
+          name: my_pg
+          bruin_external_vault: op://Private/bruin-my-pg
+`
+	vault, _ := fakeVaults(map[string]map[string]string{"op://Private/bruin-my-pg": {"password": "s3cret"}})
+	cfg := loadWithVault(t, config, vault)
+
+	pg := vaultPostgres(t, cfg, "my_pg")
+	assert.Equal(t, "db.internal", pg.Host)
+	assert.Equal(t, 5433, pg.Port)
+	assert.Equal(t, "analytics", pg.Database)
+	assert.Equal(t, "s3cret", pg.Password)
+}
+
 func TestExternalVaultIgnoresSettingsTheLoaderFilledIn(t *testing.T) {
 	t.Parallel()
 
