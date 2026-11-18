@@ -2076,6 +2076,24 @@ func (c ADLSConnection) GetName() string {
 	return c.Name
 }
 
+type AzureBlobConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	AccountName        string `yaml:"account_name,omitempty" json:"account_name,omitempty" mapstructure:"account_name"`
+	ConnectionString   string `yaml:"connection_string,omitempty" json:"connection_string,omitempty" mapstructure:"connection_string" sensitive:"true"`
+	AccountKey         string `yaml:"account_key,omitempty" json:"account_key,omitempty" mapstructure:"account_key" sensitive:"true"`
+	SASToken           string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token" sensitive:"true"`
+	TenantID           string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	ContainerName      string `yaml:"container_name,omitempty" json:"container_name,omitempty" mapstructure:"container_name"`
+	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+}
+
+func (c AzureBlobConnection) GetName() string {
+	return c.Name
+}
+
 type HTTPConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	URL                string `yaml:"url,omitempty" json:"url" mapstructure:"url"`

@@ -238,7 +238,7 @@ Destination support depends on ingestr's destination implementation:
 | --- | --- | --- |
 | Athena / `athena` | Yes | `replace`, `append` |
 | BigQuery / `bigquery` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
-| Blob storage / `s3`, `gcs`, `adls`, `abfs`, etc. | No, set `connection` | `replace`, `append` |
+| Blob storage / `s3`, `gcs`, `azure_blob`, `adls`, `abfs`, etc. | No, set `connection` | `replace`, `append` |
 | Cassandra / `cassandra` | No, set `connection` | `replace`, `append`, `merge`, `truncate+insert` |
 | ClickHouse / `clickhouse` | Yes | `replace`, `append`, `merge`, `delete+insert`, `truncate+insert` |
 | CrateDB / `cratedb` | No, set `connection` | `replace`, `append`, `merge`, `truncate+insert` |

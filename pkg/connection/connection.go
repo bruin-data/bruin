@@ -27,6 +27,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/attio"
+	"github.com/bruin-data/bruin/pkg/azureblob"
 	"github.com/bruin-data/bruin/pkg/balldontlie"
 	"github.com/bruin-data/bruin/pkg/bamboohr"
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -180,6 +181,7 @@ type Manager struct {
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
 	ADLS                 map[string]*adls.Client
+	AzureBlob            map[string]*azureblob.Client
 	Fabric               map[string]*fabric.DB
 	OneLake              map[string]*onelake.Client
 	Mongo                map[string]*mongo.DB
@@ -656,6 +658,38 @@ func (m *Manager) AddADLSConnectionFromConfig(connection *config.ADLSConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.ADLS[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAzureBlobConnectionFromConfig(connection *config.AzureBlobConnection) error {
+	m.mutex.Lock()
+	if m.AzureBlob == nil {
+		m.AzureBlob = make(map[string]*azureblob.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := azureblob.NewClient(azureblob.Config{
+		AccountName:      connection.AccountName,
+		ConnectionString: connection.ConnectionString,
+		AccountKey:       connection.AccountKey,
+		SASToken:         connection.SASToken,
+		TenantID:         connection.TenantID,
+		ClientID:         connection.ClientID,
+		ClientSecret:     connection.ClientSecret,
+		ContainerName:    connection.ContainerName,
+		PathToFile:       connection.PathToFile,
+		Layout:           connection.Layout,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AzureBlob[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4661,6 +4695,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ADLS, connectionManager.AddADLSConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AzureBlob, connectionManager.AddAzureBlobConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fabric, connectionManager.AddFabricConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.OneLake, connectionManager.AddOneLakeConnectionFromConfig, &wg, &errList, &mu)
