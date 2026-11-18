@@ -77,7 +77,7 @@ func TestQueryError(t *testing.T) {
 }
 
 // fakeSensorBigQuery answers each query job with the next of the given getQueryResults answers:
-// an error reason, or "" for a result of 1.
+// an error reason, "0" for a result of 0, or "" for a result of 1.
 func fakeSensorBigQuery(t *testing.T, answers ...string) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 	var jobs atomic.Int32
@@ -102,7 +102,10 @@ func fakeSensorBigQuery(t *testing.T, answers ...string) (*httptest.Server, *ato
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			if reason := answers[n-1]; reason != "" {
+			value := "1"
+			if reason := answers[n-1]; reason == "0" {
+				value = "0"
+			} else if reason != "" {
 				write(w, http.StatusBadRequest, map[string]any{"error": googleapi.Error{
 					Code: http.StatusBadRequest, Message: jobBackendErrorMessage, Errors: []googleapi.ErrorItem{{Reason: reason, Message: jobBackendErrorMessage}},
 				}})
@@ -112,7 +115,7 @@ func fakeSensorBigQuery(t *testing.T, answers ...string) (*httptest.Server, *ato
 				JobReference: &bigquery2.JobReference{JobId: fmt.Sprintf("job-%d", n), ProjectId: testProjectID},
 				JobComplete:  true,
 				Schema:       &bigquery2.TableSchema{Fields: []*bigquery2.TableFieldSchema{{Name: "ok", Type: "INTEGER"}}},
-				Rows:         []*bigquery2.TableRow{{F: []*bigquery2.TableCell{{V: "1"}}}},
+				Rows:         []*bigquery2.TableRow{{F: []*bigquery2.TableCell{{V: value}}}},
 				TotalRows:    1,
 			})
 		default:
@@ -164,7 +167,7 @@ func TestQuerySensor_PokesAgainAfterTransientError(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(2), jobs.Load())
-	assert.Contains(t, out, "Sensor query failed with a transient BigQuery error, trying again in 0 seconds: "+jobBackendErrorMessage)
+	assert.Contains(t, out, "Sensor query failed with a transient BigQuery error, trying again in 0 seconds (retry 1 of 10): "+jobBackendErrorMessage)
 }
 
 func TestQuerySensor_FailsOnOtherErrors(t *testing.T) {
@@ -213,5 +216,49 @@ func TestQuerySensor_TransientErrorWaitEndsEarly(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Less(t, time.Since(start), 30*time.Second)
 		assert.Equal(t, int32(1), jobs.Load())
+	})
+}
+
+// A sensor polls again after up to 10 transient errors in a row, and fails on the 11th; a poll
+// that gets through starts the count over.
+func TestQuerySensor_TransientErrorRetryLimit(t *testing.T) {
+	t.Parallel()
+
+	repeat := func(answer string, n int) []string {
+		answers := make([]string, n)
+		for i := range answers {
+			answers[i] = answer
+		}
+		return answers
+	}
+
+	t.Run("gives up after 10 retries in a row", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, repeat("jobBackendError", 11)...)
+		out, err := runQuerySensor(t, server, "wait")
+
+		require.EqualError(t, err, jobBackendErrorMessage)
+		assert.Equal(t, int32(11), jobs.Load())
+		assert.Contains(t, out, "failed with a transient BigQuery error 11 times in a row, giving up")
+	})
+
+	t.Run("10 in a row are fine", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, append(repeat("jobBackendError", 10), "")...)
+		_, err := runQuerySensor(t, server, "wait")
+
+		require.NoError(t, err)
+		assert.Equal(t, int32(11), jobs.Load())
+	})
+
+	t.Run("a successful poll starts the count over", func(t *testing.T) {
+		t.Parallel()
+		answers := append(repeat("jobBackendError", 10), "0")
+		answers = append(answers, repeat("jobBackendError", 10)...)
+		server, jobs := fakeSensorBigQuery(t, append(answers, "")...)
+		_, err := runQuerySensor(t, server, "wait")
+
+		require.NoError(t, err)
+		assert.Equal(t, int32(22), jobs.Load())
 	})
 }
