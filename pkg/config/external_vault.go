@@ -343,6 +343,8 @@ func (c *Config) ExternalVaultConnection(ctx context.Context, name string) (*Con
 	connections := &Connections{}
 	target, _ := connectionsFieldByYAMLKey(reflect.ValueOf(connections).Elem(), ref.connType)
 	target.Set(reflect.Append(reflect.MakeSlice(target.Type(), 0, 1), fileOnly))
+	// Only the file's settings are expanded, before the item's values are added, which are used exactly as stored.
+	connections.ExpandEnvVarPlaceholders()
 	if err := fillFromExternalVault(ctx, connections, ref, c.fetcher()); err != nil {
 		return nil, err
 	}
@@ -360,6 +362,38 @@ func (c *Config) ExternalVaultConnection(ctx context.Context, name string) (*Con
 		SelectedEnvironment:     &env,
 		Environments:            map[string]Environment{c.SelectedEnvironmentName: env},
 	}, nil
+}
+
+// ExpandEnvVarPlaceholders replaces ${VAR} in the connections' text settings, using an empty value for unset variables.
+func (c *Connections) ExpandEnvVarPlaceholders() {
+	value := reflect.ValueOf(c).Elem()
+	for i := range value.NumField() {
+		list := value.Field(i)
+		if !value.Type().Field(i).IsExported() || list.Kind() != reflect.Slice {
+			continue
+		}
+		for j := range list.Len() {
+			if conn := list.Index(j); conn.Kind() == reflect.Struct {
+				expandEnvVarPlaceholders(conn)
+			}
+		}
+	}
+}
+
+func expandEnvVarPlaceholders(conn reflect.Value) {
+	for i := range conn.NumField() {
+		field := conn.Field(i)
+		if field.Kind() != reflect.String || !field.CanSet() {
+			continue
+		}
+		strValue := strings.TrimSpace(field.String())
+		matches := configEnvVarRegex.FindStringSubmatch(strValue)
+		for len(matches) > 0 {
+			strValue = strings.Replace(strValue, matches[0], os.Getenv(matches[1]), 1)
+			field.SetString(strValue)
+			matches = configEnvVarRegex.FindStringSubmatch(strValue)
+		}
+	}
 }
 
 func copyFileSettings(dst, src reflect.Value, keys map[string]bool) {

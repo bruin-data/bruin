@@ -26,6 +26,13 @@ environments:
 
 The link is `op://<vault>/<item>`, using the vault and item names as they appear in 1Password, or their IDs. Each connection in each environment can point to its own item.
 
+To add a linked connection from the command line, pass the link with the other settings:
+
+```bash
+bruin connections add --env default --name analytics_pg --type postgres \
+  --credentials '{"database": "analytics", "bruin_external_vault": "op://Employee/analytics-postgres"}'
+```
+
 ## How item fields are matched
 
 Each field of the item whose label is a setting name is used for that setting, for example a field labelled `password` sets `password`.
@@ -40,7 +47,11 @@ Each field of the item whose label is a setting name is used for that setting, f
 
 Bruin reads an item only when a command opens that connection, for example when running an asset that uses it or testing it with `bruin connections test`. Commands that don't open connections, such as `render`, `validate`, `lineage` and `connections list`, never contact 1Password. Each item is read at most once per command.
 
-Values read from 1Password are never written back to `.bruin.yml`: commands that save the file, such as `bruin connections add`, keep the link as it is.
+Values read from 1Password are never written back to `.bruin.yml`, and commands that change other connections or environments keep each link as it is.
+
+::: warning VS Code extension
+Editing a linked connection in the VS Code extension removes its link. Until the extension supports links, edit linked connections in `.bruin.yml`.
+:::
 
 ## Settings to keep in `.bruin.yml`
 

@@ -112,6 +112,27 @@ func TestExternalVaultFillsConnectionKeys(t *testing.T) {
 	assert.Empty(t, inFile.SslMode)
 }
 
+func TestExternalVaultExpandsOnlyTheFileSettings(t *testing.T) {
+	t.Parallel()
+
+	vault, _ := fakeVaults(map[string]map[string]string{
+		"op://Private/bruin-my-pg": {"password": "a${HOME}b"},
+	})
+	cfg := loadWithVault(t, `
+environments:
+  default:
+    connections:
+      postgres:
+        - name: my_pg
+          database: ${BRUIN_TEST_VARIABLE_THAT_IS_NOT_SET}
+          bruin_external_vault: op://Private/bruin-my-pg
+`, vault)
+
+	pg := vaultPostgres(t, cfg, "my_pg")
+	assert.Empty(t, pg.Database)
+	assert.Equal(t, "a${HOME}b", pg.Password)
+}
+
 func TestExternalVaultFetchesEachItemOnce(t *testing.T) {
 	t.Parallel()
 
@@ -337,13 +358,13 @@ environments:
           bruin_external_vault: op://Private/bruin-prod-pg
 `
 
-func loadForEditing(t *testing.T, content string) (*Config, func() *Config) {
+func loadForEditing(t *testing.T) (*Config, func() *Config) {
 	t.Helper()
 
 	fs := afero.NewMemMapFs()
 	path := "/project/.bruin.yml"
 	var cfg Config
-	require.NoError(t, decodeConfigYAML([]byte(content), &cfg))
+	require.NoError(t, decodeConfigYAML([]byte(twoEnvironmentVaultConfig), &cfg))
 	require.NoError(t, cfg.SelectEnvironment("default"))
 	cfg.fs = fs
 	cfg.path = path
@@ -378,7 +399,7 @@ func vaultReferences(cfg *Config) map[string]string {
 func TestPersistKeepsVaultReferencesWhenOtherConnectionsChange(t *testing.T) {
 	t.Parallel()
 
-	cfg, saveAndReload := loadForEditing(t, twoEnvironmentVaultConfig)
+	cfg, saveAndReload := loadForEditing(t)
 	require.NoError(t, cfg.DeleteConnection("default", "plain_pg"))
 	require.NoError(t, cfg.AddConnection("default", "new_pg", "postgres", map[string]any{"host": "db", "password": "typed"}))
 
@@ -401,7 +422,7 @@ func TestPersistKeepsVaultReferencesWhenOtherConnectionsChange(t *testing.T) {
 func TestPersistDropsTheReferenceOfADeletedConnection(t *testing.T) {
 	t.Parallel()
 
-	cfg, saveAndReload := loadForEditing(t, twoEnvironmentVaultConfig)
+	cfg, saveAndReload := loadForEditing(t)
 	require.NoError(t, cfg.DeleteConnection("default", "my_pg"))
 
 	reloaded := saveAndReload()
@@ -409,10 +430,40 @@ func TestPersistDropsTheReferenceOfADeletedConnection(t *testing.T) {
 	assert.Len(t, reloaded.Environments["default"].Connections.Postgres, 1)
 }
 
+func TestAddConnectionKeepsAVaultLink(t *testing.T) {
+	t.Parallel()
+
+	cfg, saveAndReload := loadForEditing(t)
+	require.NoError(t, cfg.DeleteConnection("default", "my_pg"))
+	require.NoError(t, cfg.AddConnection("default", "my_pg", "postgres", map[string]interface{}{
+		"host":                 "db.internal",
+		"password":             "",
+		"bruin_external_vault": "op://Private/bruin-my-pg",
+	}))
+
+	reloaded := saveAndReload()
+	assert.Equal(t, "op://Private/bruin-my-pg", vaultReferences(reloaded)["default/my_pg"])
+	require.NoError(t, reloaded.SelectEnvironment("default"))
+	pg := vaultPostgres(t, reloaded, "my_pg")
+	assert.Equal(t, "db.internal", pg.Host)
+	assert.Equal(t, "s3cret", pg.Password)
+}
+
+func TestAddConnectionRejectsAnInvalidVaultLink(t *testing.T) {
+	t.Parallel()
+
+	cfg, _ := loadForEditing(t)
+	err := cfg.AddConnection("default", "new_pg", "postgres", map[string]interface{}{
+		"bruin_external_vault": "Private/bruin-my-pg",
+	})
+	require.ErrorContains(t, err, "not a vault reference")
+	assert.False(t, cfg.Environments["default"].Connections.Exists("new_pg"))
+}
+
 func TestPersistKeepsVaultReferencesThroughEnvironmentChanges(t *testing.T) {
 	t.Parallel()
 
-	cfg, saveAndReload := loadForEditing(t, twoEnvironmentVaultConfig)
+	cfg, saveAndReload := loadForEditing(t)
 	require.NoError(t, cfg.UpdateEnvironment("prod", "production", ""))
 	require.NoError(t, cfg.CloneEnvironment("default", "staging", ""))
 

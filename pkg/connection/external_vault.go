@@ -52,7 +52,7 @@ func (m *externalVaultManager) resolve(name string) *externalVaultResult {
 	result := &externalVaultResult{}
 	single, err := m.cm.ExternalVaultConnection(m.context(), name)
 	if err == nil {
-		// File settings were expanded when the config loaded; values from the vault are used exactly as stored.
+		// ExternalVaultConnection expanded only the file's settings; the item's values are used exactly as stored.
 		manager, errs := buildManager(m.context(), single)
 		if len(errs) > 0 {
 			err = fmt.Errorf("failed to configure connection '%s': %w", name, errs[0])

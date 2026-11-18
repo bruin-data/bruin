@@ -887,8 +887,50 @@ func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, e
 	return &config, ensureConfigIsInGitignore(fs, path)
 }
 
-//nolint:maintidx
 func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error {
+	link, linked := creds[externalVaultKey]
+	if !linked {
+		return c.addConnection(environmentName, name, connType, creds)
+	}
+
+	uri, ok := link.(string)
+	if !ok {
+		return fmt.Errorf("%s must be a string like op://<vault>/<item>", externalVaultKey)
+	}
+	ref, err := parseExternalVaultRef(uri)
+	if err != nil {
+		return err
+	}
+	if _, ok := yamlFieldType(reflect.TypeOf(Connections{}), connType); !ok {
+		return fmt.Errorf("unsupported connection type: %s", connType)
+	}
+
+	// Empty values are left out so the file doesn't hide the item's values for them.
+	fileCreds := make(map[string]interface{}, len(creds))
+	for key, value := range creds {
+		if key != externalVaultKey && value != nil && value != "" {
+			fileCreds[key] = value
+		}
+	}
+	if connType == "aws" {
+		fileCreds = populateAwsConfigAliases(fileCreds)
+	}
+	yamlKeys := map[string]bool{"name": true}
+	for key, value := range fileCreds {
+		if value != nil {
+			yamlKeys[key] = true
+		}
+	}
+
+	if err := c.addConnection(environmentName, name, connType, fileCreds); err != nil {
+		return err
+	}
+	c.externalVault = append(c.externalVault, externalVaultConnection{env: environmentName, connType: connType, name: name, ref: ref, yamlKeys: yamlKeys})
+	return nil
+}
+
+//nolint:maintidx
+func (c *Config) addConnection(environmentName, name, connType string, creds map[string]interface{}) error {
 	// Check if the environment exists
 	env, exists := c.Environments[environmentName]
 	if !exists {
