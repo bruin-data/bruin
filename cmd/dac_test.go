@@ -54,7 +54,7 @@ func useFakeDac(t *testing.T) {
 	t.Setenv("TELEMETRY_OPTOUT", "")
 }
 
-func TestDac_PassesArgumentsUnparsed(t *testing.T) {
+func TestDac_PassesArgumentsUnparsed(t *testing.T) { //nolint:paralleltest // uses t.Setenv
 	useFakeDac(t)
 
 	for _, args := range [][]string{
@@ -78,7 +78,7 @@ func TestDac_PassesArgumentsUnparsed(t *testing.T) {
 	}
 }
 
-func TestDac_SetsHostEnvironment(t *testing.T) {
+func TestDac_SetsHostEnvironment(t *testing.T) { //nolint:paralleltest // uses t.Setenv
 	useFakeDac(t)
 	bruinPath, err := os.Executable()
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestDac_SetsHostEnvironment(t *testing.T) {
 	assert.Contains(t, stdout, "TELEMETRY_OPTOUT=\n")
 }
 
-func TestDac_TelemetryOptOutReachesDac(t *testing.T) {
+func TestDac_TelemetryOptOutReachesDac(t *testing.T) { //nolint:paralleltest // uses t.Setenv
 	useFakeDac(t)
 	previous := telemetry.OptOut
 	telemetry.OptOut = true

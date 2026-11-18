@@ -4,6 +4,7 @@ package dac
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -41,7 +42,7 @@ func TestRun_ForwardsSignalsAndWaitsForDac(t *testing.T) {
 			signals := make(chan os.Signal, 1)
 			done := make(chan error, 1)
 			go func() {
-				done <- Run(executable, nil, env, nil, stdoutWriter, io.Discard, signals)
+				done <- Run(context.Background(), executable, nil, env, nil, stdoutWriter, io.Discard, signals)
 				_ = stdoutWriter.Close()
 			}()
 

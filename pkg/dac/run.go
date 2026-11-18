@@ -1,6 +1,7 @@
 package dac
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -25,9 +26,10 @@ func Environment(base []string, bruinPath string, telemetryOptOut bool) []string
 
 // Run starts binary with args and env, connects it to the given stdio, and waits
 // for it to exit. Signals received on signals while dac runs are passed on to it
-// (see forwardSignal). A non-zero exit is returned as *exec.ExitError.
-func Run(binary string, args, env []string, stdin io.Reader, stdout, stderr io.Writer, signals <-chan os.Signal) error {
-	cmd := exec.Command(binary, args...) //nolint:gosec // running the dac binary is the point
+// (see forwardSignal); cancelling ctx kills it. A non-zero exit is returned as
+// *exec.ExitError.
+func Run(ctx context.Context, binary string, args, env []string, stdin io.Reader, stdout, stderr io.Writer, signals <-chan os.Signal) error {
+	cmd := exec.CommandContext(ctx, binary, args...) //nolint:gosec // running the dac binary is the point
 	cmd.Env = env
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout

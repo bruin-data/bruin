@@ -55,7 +55,7 @@ func Dac() *cli.Command {
 			defer signal.Stop(signals)
 
 			env := dac.Environment(os.Environ(), bruinPath, telemetry.OptOut)
-			err = dac.Run(binary, c.Args().Slice(), env, root.Reader, root.Writer, root.ErrWriter, signals)
+			err = dac.Run(ctx, binary, c.Args().Slice(), env, root.Reader, root.Writer, root.ErrWriter, signals)
 			if err != nil {
 				var exitError *exec.ExitError
 				if errors.As(err, &exitError) {

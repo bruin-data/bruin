@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,7 +38,7 @@ func helperCommand(t *testing.T, mode string, env ...string) *exec.Cmd {
 	t.Helper()
 	executable, err := os.Executable()
 	require.NoError(t, err)
-	cmd := exec.Command(executable) //nolint:gosec
+	cmd := exec.CommandContext(t.Context(), executable) //nolint:gosec
 	cmd.Env = append(append(os.Environ(), helperModeEnv+"="+mode), env...)
 	return cmd
 }
@@ -54,7 +53,9 @@ func fakeDac() int {
 			report[key] = value
 		}
 	}
-	_ = json.NewEncoder(os.Stdout).Encode(report)
+	if err := json.NewEncoder(os.Stdout).Encode(report); err != nil {
+		return 2
+	}
 
 	if os.Getenv("FAKE_DAC_WAIT_FOR_SIGNAL") != "" {
 		return waitForSignal()
@@ -129,7 +130,7 @@ func TestRun_PassesArgsStdioEnvAndExitCode(t *testing.T) {
 			args := []string{"serve", "--dir", "my project", "--help", "--", "-x"}
 			var stdout, stderr bytes.Buffer
 
-			err := Run(executable, args, Environment(base, "/path/to/bruin", tc.optOut), strings.NewReader("from stdin"), &stdout, &stderr, nil)
+			err := Run(context.Background(), executable, args, Environment(base, "/path/to/bruin", tc.optOut), strings.NewReader("from stdin"), &stdout, &stderr, nil)
 			if tc.exitCode == 0 {
 				require.NoError(t, err)
 			} else {
@@ -165,8 +166,8 @@ func TestRun_PassesArgsStdioEnvAndExitCode(t *testing.T) {
 func TestRun_MissingBinary(t *testing.T) {
 	t.Parallel()
 
-	err := Run("/does/not/exist/dac", nil, nil, nil, io.Discard, io.Discard, nil)
+	err := Run(context.Background(), "/does/not/exist/dac", nil, nil, nil, io.Discard, io.Discard, nil)
 	require.Error(t, err)
 	var exitError *exec.ExitError
-	assert.False(t, errors.As(err, &exitError))
+	assert.NotErrorAs(t, err, &exitError)
 }
