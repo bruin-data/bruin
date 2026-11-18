@@ -21,7 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/snowflakedb/gosnowflake"
+	"github.com/snowflakedb/gosnowflake/v2"
 )
 
 const (
@@ -226,10 +226,7 @@ func (db *DB) selectOnce(ctx context.Context, query *query.Query, requestID *gos
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
@@ -301,10 +298,7 @@ func (db *DB) selectOnlyLastResultOnce(ctx context.Context, query *query.Query, 
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
@@ -389,10 +383,7 @@ func (db *DB) isValidOnce(ctx context.Context, query *query.Query, requestID *go
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	rows, err := db.conn.QueryContext(ctx, query.ToExplainQuery())
 	// Try to print the query ID once the function returns
@@ -496,10 +487,7 @@ func (db *DB) streamWithSchemaOnce(ctx context.Context, queryObj *query.Query, h
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	// Convert query object to string and execute it
 	queryString := queryObj.String()

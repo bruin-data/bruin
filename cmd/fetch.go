@@ -36,7 +36,7 @@ import (
 	"github.com/gofrs/flock"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
-	gosnowflake "github.com/snowflakedb/gosnowflake"
+	gosnowflake "github.com/snowflakedb/gosnowflake/v2"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
