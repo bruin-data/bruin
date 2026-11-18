@@ -59,6 +59,7 @@ func Internal() *cli.Command {
 			IngestrURI(),
 			LockAssetDependencies(),
 			InstallDuckDBDrivers(),
+			InstallDac(),
 		},
 	}
 }

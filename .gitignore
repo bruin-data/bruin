@@ -176,3 +176,6 @@ logs/backfills/
 # overwrite the committed placeholder below. The placeholder stays tracked so
 # that `go:embed` resolves for downstream module consumers.
 /pkg/python/ingestr_hashes.json.tmp
+
+# Written by scripts/update_dac_pins.py before it replaces pkg/dac/release.json.
+/pkg/dac/release.json.tmp
