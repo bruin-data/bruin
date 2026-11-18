@@ -136,7 +136,7 @@ lake/
         └── <load_id>.<file_id>.parquet
 ```
 
-To change the file names, set `layout` on the connection. For example, `layout: "{table_name}.{ext}"` writes a single `lake/exports/users.parquet` file and overwrites it on every run. See the [ingestr documentation](https://getbruin.com/docs/ingestr/supported-sources/azure-blob.html#file-layout) for the available placeholders.
+To change the file names, set `layout` on the connection. For example, `layout: "{table_name}.{ext}"` writes a single `lake/exports/public.users/users.parquet` file and overwrites it on every run. The layout only names the files inside the folder named after the asset; `{table_name}` is the part of the asset name after the last `.`. See the [ingestr documentation](https://getbruin.com/docs/ingestr/supported-sources/azure-blob.html#file-layout) for the available placeholders.
 
 The destination supports the `replace` and `append` strategies. `replace` removes the parquet files from the previous run that match the layout once the new files are written; other files are kept.
 
