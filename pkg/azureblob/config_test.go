@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,4 +79,19 @@ func TestConfig_GetIngestrURI_ContainerAndPath(t *testing.T) {
 
 	_, err = Config{AccountName: "myaccount", PathToFile: "exports"}.GetIngestrURI()
 	require.ErrorContains(t, err, "container_name")
+}
+
+func TestConfig_GetIngestrURI_CredentialsWithWhitespaceStayMasked(t *testing.T) {
+	t.Parallel()
+
+	conn := config.AzureBlobConnection{
+		ConnectionString: "DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=c2VjcmV0LWtleQ==;EndpointSuffix=core.windows.net\n",
+		SASToken:         " sv=2024-01-01&sig=secret-sig\n",
+	}
+	uri, err := Config{ConnectionString: conn.ConnectionString, SASToken: conn.SASToken}.GetIngestrURI()
+	require.NoError(t, err)
+
+	masked := mask.New(mask.InlineSensitiveValues(conn)).Mask(uri)
+	require.NotContains(t, masked, "c2VjcmV0LWtleQ")
+	require.NotContains(t, masked, "secret-sig")
 }

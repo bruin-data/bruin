@@ -23,14 +23,14 @@ type Config struct {
 // The container and path only matter when the connection is an ingestr destination.
 func (c Config) GetIngestrURI() (string, error) {
 	accountName := strings.TrimSpace(c.AccountName)
-	connectionString := strings.TrimSpace(c.ConnectionString)
-	if accountName == "" && connectionString == "" {
+	if accountName == "" && strings.TrimSpace(c.ConnectionString) == "" {
 		return "", errors.New("azure_blob: account_name or connection_string must be provided")
 	}
 
+	// Credentials go in unchanged: the log masker only knows their configured form.
 	params := url.Values{}
 	addOptionalParam(params, "account_name", accountName)
-	addOptionalParam(params, "connection_string", connectionString)
+	addOptionalParam(params, "connection_string", c.ConnectionString)
 	addOptionalParam(params, "account_key", c.AccountKey)
 	addOptionalParam(params, "sas_token", c.SASToken)
 	addOptionalParam(params, "tenant_id", c.TenantID)
