@@ -254,6 +254,7 @@ var defaultMapping = map[string]string{
 	"elasticsearch":         "elasticsearch-default",
 	"vertica":               "vertica-default",
 	"adls":                  "adls-default",
+	"azure_blob":            "azure_blob-default",
 	"allium":                "allium-default",
 	"anthropic":             "anthropic-default",
 	"apifootball":           "apifootball-default",

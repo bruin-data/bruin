@@ -34,6 +34,7 @@ type Connections struct {
 	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql,omitempty" mapstructure:"mssql"`
 	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
 	ADLS                []ADLSConnection                `yaml:"adls,omitempty" json:"adls,omitempty" mapstructure:"adls"`
+	AzureBlob           []AzureBlobConnection           `yaml:"azure_blob,omitempty" json:"azure_blob,omitempty" mapstructure:"azure_blob"`
 	Synapse             []SynapseConnection             `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
 	Fabric              []FabricConnection              `yaml:"fabric,omitempty" json:"fabric,omitempty" mapstructure:"fabric"`
 	OneLake             []OneLakeConnection             `yaml:"onelake,omitempty" json:"onelake,omitempty" mapstructure:"onelake"`
@@ -938,6 +939,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ADLS = append(env.Connections.ADLS, conn)
+	case "azure_blob":
+		var conn AzureBlobConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AzureBlob = append(env.Connections.AzureBlob, conn)
 	case "synapse":
 		var conn SynapseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2088,6 +2096,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Databricks = removeConnection(env.Connections.Databricks, connectionName)
 	case "adls":
 		env.Connections.ADLS = removeConnection(env.Connections.ADLS, connectionName)
+	case "azure_blob":
+		env.Connections.AzureBlob = removeConnection(env.Connections.AzureBlob, connectionName)
 	case "mongo":
 		env.Connections.Mongo = removeConnection(env.Connections.Mongo, connectionName)
 	case "cassandra":
@@ -2513,6 +2523,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.MsSQL, source.MsSQL)
 	mergeConnectionList(&c.Databricks, source.Databricks)
 	mergeConnectionList(&c.ADLS, source.ADLS)
+	mergeConnectionList(&c.AzureBlob, source.AzureBlob)
 	mergeConnectionList(&c.Synapse, source.Synapse)
 	mergeConnectionList(&c.Fabric, source.Fabric)
 	mergeConnectionList(&c.OneLake, source.OneLake)

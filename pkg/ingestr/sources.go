@@ -36,6 +36,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Azure Data Lake Storage Gen2 (user-defined paths)
 	"adls": {},
 
+	// Azure Blob Storage (user-defined paths)
+	"azure_blob": {},
+
 	// Adapty - Subscription monetization platform
 	"adapty": {
 		{Name: "analytics?chart_id=<chart_id>", IncKey: "date", IncStrategy: "delete+insert"},

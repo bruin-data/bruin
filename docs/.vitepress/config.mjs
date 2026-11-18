@@ -323,6 +323,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Asana", link: "/ingestion/asana"},
                                     {text: "ABRA Flexi", link: "/ingestion/abraflexi"},
                                     {text: "Attio", link: "/ingestion/attio"},
+                                    {text: "Azure Blob Storage", link: "/ingestion/azure_blob"},
                                     {text: "Azure Data Lake Storage", link: "/ingestion/adls"},
                                     {text: "BallDontLie FIFA", link: "/ingestion/balldontlie"},
                                     {text: "BambooHR", link: "/ingestion/bamboohr"},
