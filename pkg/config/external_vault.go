@@ -77,7 +77,9 @@ type onePasswordCLI struct{}
 
 func parseOnePasswordPath(path string) (string, string, error) {
 	vault, item, ok := strings.Cut(path, "/")
-	if !ok || vault == "" || item == "" || strings.Contains(item, "/") {
+	// A leading "-" would reach op as a flag rather than a name.
+	if !ok || vault == "" || item == "" || strings.Contains(item, "/") ||
+		strings.HasPrefix(vault, "-") || strings.HasPrefix(item, "-") {
 		return "", "", errors.New("not a valid 1Password reference, expected op://<vault>/<item>")
 	}
 	return vault, item, nil
