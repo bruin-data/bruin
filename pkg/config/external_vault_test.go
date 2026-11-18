@@ -523,7 +523,7 @@ func TestParseOnePasswordPath(t *testing.T) {
 	assert.Equal(t, "Shared Vault", vault)
 	assert.Equal(t, "bruin my pg", item)
 
-	for _, path := range []string{"Private", "/item", "Private/", "Private/item/password"} {
+	for _, path := range []string{"Private", "/item", "Private/", "Private/item/password", "-x/item", "Private/--account=other"} {
 		_, _, err := parseOnePasswordPath(path)
 		assert.Error(t, err, path)
 	}
