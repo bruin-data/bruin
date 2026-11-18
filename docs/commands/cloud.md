@@ -129,6 +129,14 @@ bruin cloud teams list
 +----+--------+----------------+
 ```
 
+See the team's roles (built-in and custom, with their permissions) and who has which. Both are read-only: create roles and change members in Team Settings. Both need **View team settings**; `members` also needs a personal API key, since it shows email addresses.
+
+```bash
+bruin cloud teams roles
+bruin cloud teams members
+bruin cloud teams roles --output json   # each role's full permission list
+```
+
 > [!TIP]
 > If your token belongs to more than one team, set a default once with
 > `bruin cloud config set-team <company_prefix>` and you can skip `--team` on

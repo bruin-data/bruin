@@ -141,6 +141,24 @@ func (c *APIClient) ListTeams(ctx context.Context) ([]Team, error) {
 	return resp.Teams, err
 }
 
+// ListTeamRoles returns the roles that can be given in the team, with their permissions.
+func (c *APIClient) ListTeamRoles(ctx context.Context) ([]TeamRole, error) {
+	var resp struct {
+		Roles []TeamRole `json:"roles"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/team/roles", nil, &resp)
+	return resp.Roles, err
+}
+
+// ListTeamMembers returns everyone in the team with their role. It needs a personal API token.
+func (c *APIClient) ListTeamMembers(ctx context.Context) ([]TeamMember, error) {
+	var resp struct {
+		Members []TeamMember `json:"members"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/team/members", nil, &resp)
+	return resp.Members, err
+}
+
 // --- Projects ---
 
 func (c *APIClient) ListProjects(ctx context.Context) ([]Project, error) {
