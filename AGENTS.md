@@ -233,6 +233,10 @@ Tools automatically installed and run via `make format`:
 - `make refresh-integration-expectations` rewrites JSON expectations. Inspect the diff carefully and include only intentional expectation changes.
 - Do not commit build outputs, virtual environments, local caches, logs, or generated binaries unless the repository already tracks that exact artifact and the change is intentional.
 
+### Git Identity and Attribution
+
+Before preparing commits, pushes, pull request text, or Git-related comments, follow the [Git account and attribution policy](GIT_ACCOUNT_POLICY.md). Keep the contributor's approved identity, omit AI or bot attribution, and preserve legitimate human credits and existing history.
+
 ### Development Workflow
 
 1. **Setup**: `make deps` to install tools and dependencies

@@ -12,6 +12,7 @@
     "docs/**/*.md",
     "README.md",
     "CONTRIBUTING.md",
+    "GIT_ACCOUNT_POLICY.md",
     "SECURITY.md"
   ]
 }

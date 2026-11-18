@@ -11,6 +11,10 @@ There are a few ways to contribute:
 
 We are pretty chill about the format of the contribution, although having an issue first to discuss the change is always a good idea. Feel free to deliver a PR early, we can always iterate on it.
 
+## Git identity and attribution
+
+Follow the [Git account and attribution policy](GIT_ACCOUNT_POLICY.md) when preparing commits, pushes, pull requests, or Git-related comments. Keep the contributor's approved identity, preserve legitimate human credits, and omit AI or bot attribution.
+
 ## Writing Code
 
 There are a few guidelines that you should follow when writing code:
