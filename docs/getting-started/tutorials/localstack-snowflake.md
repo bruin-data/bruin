@@ -181,7 +181,13 @@ docker run -d --name localstack-snowflake -p 127.0.0.1:4566:4566 \
   -e LOCALSTACK_AUTH_TOKEN localstack/snowflake-next:latest
 ```
 
-Then run the workflow's `snow sql` and `bruin run` commands. `bruin run` uses your local `.bruin.yml`. If port 4566 is taken, map another and update `port` there and in the `snow sql` command.
+Save the config from Step 3 as `emulator.yml` (it only holds the emulator's test login), run the workflow's `snow sql` command, then:
+
+```bash
+bruin run --config-file emulator.yml --full-refresh localstack-snowflake-nyc-taxi
+```
+
+`--config-file` keeps the run on the emulator even if your `.bruin.yml` points at production. If port 4566 is taken, map another and update `port` in `emulator.yml` and the `snow sql` command.
 
 ## Before you ship
 
