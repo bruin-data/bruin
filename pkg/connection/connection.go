@@ -5,8 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"os"
-	"reflect"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -4675,8 +4673,6 @@ func (m *Manager) AddVerticaConnectionFromConfig(connection *config.VerticaConne
 	return nil
 }
 
-var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
-
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
 		return
@@ -4707,40 +4703,8 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 		return newExternalVaultManager(ctx, cm)
 	}
 
-	expandConnectionEnvVars(cm.SelectedEnvironment.Connections)
+	cm.SelectedEnvironment.Connections.ExpandEnvVarPlaceholders()
 	return buildManager(ctx, cm)
-}
-
-// expandConnectionEnvVars replaces ${VAR} placeholders in the connections' text settings with environment values.
-func expandConnectionEnvVars(connections *config.Connections) {
-	value := reflect.ValueOf(connections).Elem()
-	for i := range value.NumField() {
-		list := value.Field(i)
-		if !value.Type().Field(i).IsExported() || list.Kind() != reflect.Slice {
-			continue
-		}
-		for j := range list.Len() {
-			if conn := list.Index(j); conn.Kind() == reflect.Struct {
-				expandEnvVarPlaceholders(conn)
-			}
-		}
-	}
-}
-
-func expandEnvVarPlaceholders(conn reflect.Value) {
-	for i := range conn.NumField() {
-		field := conn.Field(i)
-		if field.Kind() != reflect.String || !field.CanSet() {
-			continue
-		}
-		strValue := strings.TrimSpace(field.String())
-		matches := envVarRegex.FindStringSubmatch(strValue)
-		for len(matches) > 0 {
-			strValue = strings.Replace(strValue, matches[0], os.Getenv(matches[1]), 1)
-			field.SetString(strValue)
-			matches = envVarRegex.FindStringSubmatch(strValue)
-		}
-	}
 }
 
 // buildManager builds the selected environment's connections with their settings used as they are.
