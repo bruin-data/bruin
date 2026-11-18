@@ -7554,6 +7554,31 @@ func TestEnsureTimeIntervalIsValidForAssetWithPipelineMacros(t *testing.T) {
 	assert.Empty(t, issues)
 }
 
+func TestEnsureTimeIntervalIsValidForAssetReportsBrokenPipelineMacros(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2026, time.August, 24, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2026, time.August, 24, 23, 59, 59, 0, time.UTC)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+	asset := &pipeline.Asset{Name: "dataset.table"}
+	pl := &pipeline.Pipeline{
+		Name:   "test-pipeline",
+		Assets: []*pipeline.Asset{asset},
+		Macros: []pipeline.Macro{`{{ some_macro() }}`},
+	}
+
+	issues, err := EnsureTimeIntervalIsValidForAsset(ctx, pl, asset)
+
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Same(t, asset, issues[0].Task)
+	assert.Equal(t, "failed to render the time interval for asset dataset.table: 'some_macro' is not callable, make sure it is a defined macro or function", issues[0].Description)
+}
+
 type staticConnectionTypes map[string]string
 
 func (s staticConnectionTypes) GetConnectionType(name string) string { return s[name] }
