@@ -4297,6 +4297,7 @@ func (m *Manager) AddOdooConnectionFromConfig(connection *config.OdooConnection)
 
 	client, err := odoo.NewClient(&odoo.Config{
 		Host:     connection.Host,
+		Port:     connection.Port,
 		APIKey:   connection.APIKey,
 		Database: connection.Database,
 		Username: connection.Username,

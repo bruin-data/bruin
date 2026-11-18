@@ -1185,6 +1185,7 @@ func TestManager_AddOdooConnectionFromConfig(t *testing.T) {
 	configuration := &config.OdooConnection{
 		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
 		Host:               "mycompany.odoo.com",
+		Port:               8443,
 		APIKey:             "key_123",
 		Database:           "mycompany",
 		Username:           "me@example.com",
@@ -1200,7 +1201,7 @@ func TestManager_AddOdooConnectionFromConfig(t *testing.T) {
 
 	uri, err := m.Odoo["test"].GetIngestrURI()
 	require.NoError(t, err)
-	assert.Equal(t, "odoo://mycompany.odoo.com?api_key=key_123&database=mycompany&username=me%40example.com", uri)
+	assert.Equal(t, "odoo://mycompany.odoo.com:8443?api_key=key_123&database=mycompany&username=me%40example.com", uri)
 }
 
 func TestManager_AddCouchDBConnectionFromConfig(t *testing.T) {

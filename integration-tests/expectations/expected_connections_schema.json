@@ -4282,6 +4282,9 @@
         "host": {
           "type": "string"
         },
+        "port": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
