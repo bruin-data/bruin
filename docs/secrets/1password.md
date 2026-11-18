@@ -51,9 +51,7 @@ Bruin reads an item only when a command opens that connection, for example when 
 
 Values read from 1Password are never written back to `.bruin.yml`, and commands that change other connections or environments keep each link as it is.
 
-::: warning VS Code extension
-Editing a linked connection in the VS Code extension removes its link. Until the extension supports links, edit linked connections in `.bruin.yml`.
-:::
+`bruin connections list -o json` shows each linked connection's `bruin_external_vault`, but never the values that come from the item. To change a linked connection with `bruin connections delete` and `bruin connections add`, pass `bruin_external_vault` again in `--credentials`; without it, the connection is saved without its link.
 
 ## Settings to keep in `.bruin.yml`
 
