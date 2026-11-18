@@ -837,7 +837,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Metrics: []string{"revenue"},
 				Filters: []Filter{{Dimension: "status", Operator: "not_equals", Value: "cancelled"}},
 			},
-			must: []string{"WHERE status != 'cancelled'"},
+			must: []string{"WHERE (status != 'cancelled' OR status IS NULL)"},
 		},
 		{
 			name: "filter gte",
@@ -861,7 +861,57 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Metrics: []string{"revenue"},
 				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []string{"cancelled"}}},
 			},
-			must: []string{"WHERE status NOT IN ('cancelled')"},
+			must: []string{"WHERE (status NOT IN ('cancelled') OR status IS NULL)"},
+		},
+		{
+			name: "filter in list with null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{"shipped", nil}}},
+			},
+			must: []string{"WHERE (status IN ('shipped') OR status IS NULL)"},
+		},
+		{
+			name: "filter not_in list with null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []interface{}{"cancelled", nil}}},
+			},
+			must: []string{"WHERE (status NOT IN ('cancelled') AND status IS NOT NULL)"},
+		},
+		{
+			name: "filter in only null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{nil}}},
+			},
+			must: []string{"WHERE status IS NULL"},
+		},
+		{
+			name: "filter not_in only null",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "not_in", Value: []interface{}{nil}}},
+			},
+			must: []string{"WHERE status IS NOT NULL"},
+		},
+		{
+			name: "filter in empty list does not select nulls",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{}}},
+			},
+			must:    []string{"WHERE status IN ()"},
+			mustNot: []string{"IS NULL"},
+		},
+		{
+			name: "filter in string null is a literal",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "status", Operator: "in", Value: []interface{}{"shipped", "null"}}},
+			},
+			must:    []string{"WHERE status IN ('shipped', 'null')"},
+			mustNot: []string{"IS NULL"},
 		},
 		{
 			name: "filter between number range",
@@ -1079,7 +1129,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Sort:       []SortSpec{{Name: "order_date", Direction: "asc"}},
 				Limit:      5,
 			},
-			must: []string{") base ORDER BY base.order_date ASC LIMIT 5"},
+			must: []string{") base ORDER BY base.order_date ASC, base.category ASC LIMIT 5"},
 		},
 	}
 
@@ -1497,7 +1547,25 @@ func TestFilterOnCalculatedDimension(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, sql, "WHERE customer_order_number = 1 = TRUE")
+	expectContains(t, sql, "WHERE (customer_order_number = 1) = TRUE")
+
+	// Null checks must apply to the whole expression, not bind inside it.
+	m.Dimensions = append(m.Dimensions, Dimension{Name: "inactive", Type: "boolean", Expression: "NOT active"})
+	engine = minimalEngine(t, m)
+	for _, tc := range []struct {
+		filter Filter
+		want   string
+	}{
+		{Filter{Dimension: "inactive", Operator: "in", Value: []interface{}{nil}}, "WHERE (NOT active) IS NULL"},
+		{Filter{Dimension: "inactive", Operator: "not_equals", Value: true}, "WHERE ((NOT active) != TRUE OR (NOT active) IS NULL)"},
+		{Filter{Dimension: "inactive", Operator: "is_null"}, "WHERE (NOT active) IS NULL"},
+	} {
+		sql, err := engine.GenerateSQL(&Query{Metrics: []string{"n"}, Filters: []Filter{tc.filter}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, sql, tc.want)
+	}
 }
 
 func TestJinjaTemplateDelimitersPassThrough(t *testing.T) {
@@ -1677,6 +1745,14 @@ func TestStructuredFilterValidationRejectsInvalidOperatorAndValue(t *testing.T) 
 				Filters: []Filter{{Dimension: "order_date", Operator: "between", Value: []interface{}{"2025-01-01"}}},
 			},
 			want: "invalid between filter value",
+		},
+		{
+			name: "null scalar value",
+			query: Query{
+				Metrics: []string{"revenue"},
+				Filters: []Filter{{Dimension: "country", Operator: "not_equals", Value: nil}},
+			},
+			want: "use is_null or is_not_null",
 		},
 	}
 
@@ -2243,6 +2319,19 @@ func TestJoinGraphQualifiesRootFieldsWhenJoined(t *testing.T) {
 	expectContains(t, sql, "SELECT base.country AS country, customers.segment AS customers_segment, sum(base.order_total) AS revenue")
 	expectContains(t, sql, "WHERE base.country = 'US' AND base.status = 'completed'")
 	expectContains(t, sql, "GROUP BY 1, 2")
+	for _, dialect := range []string{"bigquery", "google_cloud_platform"} {
+		engine.Dialect = dialect
+		for _, tc := range [][2]string{{`a"b`, `"a\"b"`}, {`a"b {country}`, `"a\"b {country}"`}} {
+			sql, err := engine.GenerateSQL(&Query{
+				Dimensions: []DimensionRef{{Name: "country"}, {Name: "customers.segment"}},
+				Filters:    []Filter{{Dimension: "country", Operator: "equals", Value: tc[0]}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectContains(t, sql, "WHERE base.country = "+tc[1])
+		}
+	}
 }
 
 func TestWindowSortOnlyDimensionIsAvailableInOuterOrder(t *testing.T) {
@@ -2340,4 +2429,312 @@ func TestGenerateSQLWithColumns_JoinedDimensionAlias(t *testing.T) {
 			t.Fatalf("column %d = %+v, want %+v", i, cols[i], c)
 		}
 	}
+}
+
+func TestBigQueryFilterLiterals(t *testing.T) {
+	t.Parallel()
+	e := minimalEngine(t, richTestModel())
+	values := []string{"Summer's End", "Kids' Toys", "x\\'); SELECT 1 --", "line\nend", `x") OR 1=1 --`}
+	for _, dialect := range []string{"bigquery", "google_cloud_platform"} {
+		e.Dialect = dialect
+		for _, operator := range []string{"in", "not_in"} {
+			for _, value := range []any{values, []any{values[0], values[1], values[2], values[3], values[4]}} {
+				sql, err := e.GenerateSQL(&Query{Dimensions: []DimensionRef{{Name: "country"}}, Filters: []Filter{{Dimension: "country", Operator: operator, Value: value}}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := `IN ("Summer's End", "Kids' Toys", "x\\'); SELECT 1 --", "line\nend", "x\") OR 1=1 --")`
+				if operator == "not_in" {
+					want = "NOT " + want
+				}
+				expectContains(t, sql, want)
+			}
+		}
+	}
+}
+
+func TestGenerateGrandTotalSQL(t *testing.T) {
+	t.Parallel()
+
+	model := richTestModel()
+	model.Segments = append(model.Segments, Segment{Name: "small", Filter: "{revenue} < 1000"})
+	e := minimalEngine(t, model)
+	q := &Query{
+		Dimensions: []DimensionRef{{Name: "country"}, {Name: "order_date", Granularity: "month"}},
+		Metrics:    []string{"revenue", "order_count", "row_count", "avg_order_value", "completed_revenue", "completion_rate"},
+		Filters:    []Filter{{Dimension: "status", Operator: "equals", Value: "completed"}, {Expression: "{revenue} < 1000"}, {Expression: "COUNT(*) > 1"}},
+		Segments:   []string{"us", "small"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 1,
+	}
+	before, err := json.Marshal(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := json.Marshal(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("mutated the detail query")
+	}
+	detail, err := e.GenerateSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, detail, "HAVING")
+	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 1")
+	total, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "FROM ("+detail+") __grand_total_detail")
+	expectContains(t, total, "__grand_total_shown_1 = (date_trunc('month', order_date))")
+	for _, want := range []string{"sum(amount) AS revenue", "count(distinct order_id)", "count(*)", "AS avg_order_value", "CASE WHEN status = 'completed'", "WHERE status = 'completed' AND country = 'US'"} {
+		expectContains(t, total, want)
+	}
+	for _, unwanted := range []string{"GROUP BY", "HAVING", "ORDER BY", "LIMIT", "< 1000", "> 1"} {
+		expectNotContains(t, total, unwanted)
+	}
+}
+
+// splitShownGrandTotal splits a grand-total query into its outer query and its
+// shown-rows subquery.
+func splitShownGrandTotal(t *testing.T, sql string) (total, shown string) {
+	t.Helper()
+	start := strings.Index(sql, " INNER JOIN (")
+	end := strings.Index(sql, " __grand_total_shown ON ")
+	if start < 0 || end < start {
+		t.Fatalf("expected totals restricted to shown rows\nSQL: %s", sql)
+	}
+	return sql[:start] + sql[end:], sql[start:end]
+}
+
+func TestGenerateGrandTotalSQLJoinsShownRowsOnlyWhenRowsCanBeHidden(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	for _, q := range []*Query{
+		{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}},
+		{Metrics: []string{"revenue"}, Limit: 5},
+	} {
+		sql, err := e.GenerateGrandTotalSQL(q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectNotContains(t, sql, "JOIN")
+	}
+	sql, err := e.GenerateGrandTotalSQL(&Query{Metrics: []string{"revenue"}, Filters: []Filter{{Expression: "{revenue} > 10"}}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "HAVING sum(amount) > 10")
+	expectNotContains(t, shown, "ORDER BY")
+	expectContains(t, total, "__grand_total_shown ON 1 = 1")
+}
+
+func TestGenerateGrandTotalSQLParenthesizesDimensionExpressions(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, &Model{Name: "orders", Source: Source{Table: "orders"}, Dimensions: []Dimension{{Name: "is_first", Type: "boolean", Expression: "order_number = 1"}}, Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}}})
+	sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "is_first"}}, Metrics: []string{"revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "(__grand_total_shown.__grand_total_shown_0 = (order_number = 1) OR (__grand_total_shown.__grand_total_shown_0 IS NULL AND (order_number = 1) IS NULL))")
+}
+
+func TestGenerateGrandTotalSQLRepeatedRefs(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	sort := []SortSpec{{Name: "revenue", Direction: "desc"}}
+	// Identical refs collapse to one key column, adjacent or not, and to one shown column.
+	sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "country"}, {Name: "category"}, {Name: "country"}}, Metrics: []string{"revenue", "revenue"}, Sort: sort, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "SELECT DISTINCT country AS __grand_total_shown_0, category AS __grand_total_shown_1 FROM (")
+	if n := strings.Count(shown, "AS revenue"); n != 1 {
+		t.Errorf("shown rows repeat revenue %d times: %s", n, shown)
+	}
+	// A repeated metric is computed once and projected twice.
+	sql, err = e.GenerateGrandTotalSQL(&Query{Metrics: []string{"revenue", "revenue"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "SELECT revenue, revenue FROM (SELECT sum(amount) AS revenue, COUNT(*) AS __grand_total_row_count FROM")
+	// Two grains share the column order_date, so ties break by position and
+	// the totals are blank.
+	q := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "year"}, {Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue", "order_count"}, Sort: sort, Limit: 2}
+	detail, err := e.GenerateSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, detail, "ORDER BY revenue DESC, 1 ASC, 2 ASC LIMIT 2")
+	sql, err = e.GenerateGrandTotalSQL(q)
+	if err != nil || sql != "SELECT NULL AS revenue, NULL AS order_count" {
+		t.Fatalf("expected blank totals, got %q, %v", sql, err)
+	}
+}
+
+func TestGenerateGrandTotalSQLKeysWindowQueriesByInnerDimensions(t *testing.T) {
+	t.Parallel()
+
+	// running_revenue partitions by category and orders by order_date.
+	e := minimalEngine(t, richTestModel())
+	q := &Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"revenue", "running_revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 2}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, shown := splitShownGrandTotal(t, sql)
+	expectContains(t, shown, "SELECT DISTINCT country AS __grand_total_shown_0, category AS __grand_total_shown_1, order_date AS __grand_total_shown_2 FROM (")
+	expectContains(t, shown, "LIMIT 2")
+	for _, want := range []string{"__grand_total_shown_0 = (country)", "__grand_total_shown_1 = (category)", "__grand_total_shown_2 = (order_date)", "SUM(NULLIF(0, 0)) AS running_revenue"} {
+		expectContains(t, total, want)
+	}
+	expectNotContains(t, total, "OVER")
+}
+
+func TestGenerateGrandTotalSQLRejectsUnsupportedQueries(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	for _, q := range []*Query{
+		{Dimensions: []DimensionRef{{Name: "country"}}},
+		{Metrics: []string{"missing"}},
+		{Metrics: []string{"revenue"}, Segments: []string{"missing"}},
+		{Metrics: []string{"revenue"}, Filters: []Filter{{Expression: "{missing} = 1"}}},
+	} {
+		if _, err := e.GenerateGrandTotalSQL(q); err == nil {
+			t.Fatalf("accepted unsupported query: %+v", q)
+		}
+	}
+}
+
+func TestGenerateGrandTotalSQLMovesHavingToShownRows(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{{Name: "country", Type: "string"}}}
+	orders := &Model{Name: "orders", Source: Source{Table: "orders"}, PrimaryKey: "id", Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}}}
+	e, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := &Query{Dimensions: []DimensionRef{{Name: "customers.country"}}, Metrics: []string{"revenue"}, Filters: []Filter{{Expression: "{customers.country} = 'CA' AND {revenue} < 1000"}}}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, _ := splitShownGrandTotal(t, sql)
+	expectNotContains(t, total, "HAVING")
+	expectNotContains(t, total, "WHERE")
+	expectContains(t, total, "__grand_total_shown_0 = (customers.country)")
+	q.Filters = []Filter{{Dimension: "customers.country", Operator: "equals", Value: "CA"}}
+	sql, err = e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "JOIN")
+	expectContains(t, sql, "country = 'CA'")
+}
+
+func TestGenerateGrandTotalSQLWindowColumnsAreNull(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	for _, metrics := range [][]string{
+		{"revenue", "running_revenue", "revenue_growth"},
+		{"running_revenue", "revenue_rank", "revenue_share", "revenue_growth"},
+	} {
+		q := &Query{Dimensions: []DimensionRef{{Name: "order_date"}, {Name: "category"}}, Metrics: metrics}
+		sql, err := e.GenerateGrandTotalSQL(q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range metrics {
+			if name == "revenue" {
+				expectContains(t, sql, "sum(amount) AS revenue")
+			} else {
+				expectContains(t, sql, "SUM(NULLIF(0, 0)) AS "+name)
+			}
+		}
+		expectNotContains(t, sql, "OVER")
+		expectNotContains(t, sql, "GROUP BY")
+		detail, err := e.GenerateSQL(q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, detail, "OVER")
+	}
+}
+
+func TestGenerateGrandTotalSQLMetricFilterJoins(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{{Name: "country", Type: "string"}}}
+	orders := &Model{Name: "orders", Source: Source{Table: "orders"}, PrimaryKey: "id", Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Metrics: []Metric{
+		{Name: "revenue", Expression: "sum(amount)"},
+		{Name: "us_revenue", Expression: "sum(amount)", Filter: "{customers.country} = 'US'"},
+		{Name: "half_us_revenue", Expression: "{us_revenue} / 2"},
+	}}
+	e, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, metrics := range [][]string{{"revenue", "us_revenue"}, {"half_us_revenue"}} {
+		sql, err := e.GenerateGrandTotalSQL(&Query{Dimensions: []DimensionRef{{Name: "customers.country"}}, Metrics: metrics})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, sql, "LEFT JOIN")
+		expectContains(t, sql, "sum(CASE WHEN customers.country = 'US' THEN base.amount ELSE NULL END)")
+		expectNotContains(t, sql, "sum(amount)")
+		expectNotContains(t, sql, "GROUP BY")
+	}
+}
+
+func TestGenerateGrandTotalSQLConstantMetrics(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, &Model{Name: "orders", Source: Source{Table: "orders"}, Metrics: []Metric{
+		{Name: "target", Expression: "100"},
+		{Name: "label", Expression: "'Target'"},
+		{Name: "__grand_total_row_count", Expression: "200"},
+	}})
+	q := &Query{Metrics: []string{"target", "label"}}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(sql, "SELECT target, label FROM (") {
+		t.Fatal("helper metric must not appear in the result: " + sql)
+	}
+	expectContains(t, sql, "100 AS target, 'Target' AS label, COUNT(*) AS __grand_total_row_count_")
+	if len(q.Metrics) != 2 || len(e.metrics) != 3 {
+		t.Fatal("mutated the query or engine")
+	}
+}
+
+func TestGenerateGrandTotalSQLHelperDoesNotHideJoinedDimension(t *testing.T) {
+	t.Parallel()
+	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{
+		{Name: "country", Type: "string"},
+		{Name: "__grand_total_row_count", Type: "string", Expression: "country"},
+	}}
+	orders := &Model{Name: "orders", Source: Source{Table: "orders"}, Joins: []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}}, Metrics: []Metric{{Name: "revenue", Expression: "sum(amount)"}}}
+	e, err := NewEngineWithModels(orders, map[string]*Model{"customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := &Query{Dimensions: []DimensionRef{{Name: "customers.country"}}, Metrics: []string{"revenue"}, Filters: []Filter{{Expression: "{__grand_total_row_count} = 'US'"}}}
+	sql, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "LEFT JOIN")
+	expectContains(t, sql, "WHERE customers.country = 'US'")
+	expectContains(t, sql, "COUNT(*) AS __grand_total_row_count_")
 }

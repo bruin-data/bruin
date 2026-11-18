@@ -21,7 +21,12 @@ type resolvedCloudAuth struct {
 	team        string
 	connection  string
 	environment string
+	// agent names the agent acted as, when the credential is an act-as session.
+	agent string
 }
+
+// actingAsAgent is the agent this command's credential acts as, if any, so errors can say so.
+var actingAsAgent string
 
 func resolveCloudAuth(c *cli.Command) (resolvedCloudAuth, error) {
 	return resolveCloudAuthIn(c, cloudauth.DefaultStore)
@@ -33,12 +38,14 @@ func resolveCloudAuthIn(c *cli.Command, openStore func() (cloudauth.Store, error
 	if storeErr == nil {
 		actAs = func() (resolvedCloudAuth, bool, error) { return resolveActAs(c, store) }
 	}
-	return resolveCloudAuthWithStore(c, func() (*cloudauth.Credential, error) {
+	auth, err := resolveCloudAuthWithStore(c, func() (*cloudauth.Credential, error) {
 		if storeErr != nil {
 			return nil, storeErr
 		}
 		return store.Read(cloudauth.APIURL())
 	}, actAs)
+	actingAsAgent = auth.agent
+	return auth, err
 }
 
 func resolveCloudAuthWithStore(c *cli.Command, global func() (*cloudauth.Credential, error), actAs func() (resolvedCloudAuth, bool, error)) (resolvedCloudAuth, error) {

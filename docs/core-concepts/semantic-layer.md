@@ -318,6 +318,10 @@ Supported operators:
 | `is_null` | No value required |
 | `is_not_null` | No value required |
 
+### Null handling
+
+`not_in` and `not_equals` keep NULL rows: `not_in ["cancelled"]` compiles to `(status NOT IN ('cancelled') OR status IS NULL)`. Add `null` to an `in` or `not_in` list to select or exclude NULL rows, such as `in ["shipped", null]`. `"null"` is a string, not NULL; use `is_null` instead of `equals null`.
+
 Filters can also target joined dimensions:
 
 ```bash

@@ -29,10 +29,17 @@ type actAsStatus struct {
 }
 
 func CloudActAs() *cli.Command {
-	return actAsCommand(cloudauth.DefaultStore)
+	var relogin func(context.Context) error
+	if isStdinTerminal() {
+		relogin = func(ctx context.Context) error {
+			return CloudLogin().Run(ctx, []string{"login", "--" + cloudAuthGlobal, "--reauth"})
+		}
+	}
+	return actAsCommand(cloudauth.DefaultStore, relogin)
 }
 
-func actAsCommand(openStore func() (cloudauth.Store, error)) *cli.Command {
+// relogin, when set, signs the person in again for a login that can act as agents; nil without a terminal.
+func actAsCommand(openStore func() (cloudauth.Store, error), relogin func(context.Context) error) *cli.Command {
 	return &cli.Command{
 		Name:  "act-as",
 		Usage: "Run cloud commands as one of your team's agents, with the agent's permissions",
@@ -43,7 +50,7 @@ func actAsCommand(openStore func() (cloudauth.Store, error)) *cli.Command {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			output := c.String("output")
-			if err := runActAs(ctx, c, openStore, output); err != nil {
+			if err := runActAs(ctx, c, openStore, relogin, output); err != nil {
 				printError(err, output, "Act-as failed")
 				return cli.Exit("", 1)
 			}
@@ -52,7 +59,7 @@ func actAsCommand(openStore func() (cloudauth.Store, error)) *cli.Command {
 	}
 }
 
-func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.Store, error), output string) error {
+func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.Store, error), relogin func(context.Context) error, output string) error {
 	agentID := c.Int("agent-id")
 	if c.IsSet("agent-id") && agentID <= 0 {
 		return fmt.Errorf("--agent-id must be a positive integer, got %d", agentID)
@@ -80,9 +87,15 @@ func runActAs(ctx context.Context, c *cli.Command, openStore func() (cloudauth.S
 		fmt.Println(actAsStoppedMessage(session) + " Cloud commands use your own login again.")
 	case c.IsSet("agent-id"):
 		session, permissions, err := fetchActAs(ctx, store, agentID, resolveTeam(c))
+		if err != nil && strings.Contains(err.Error(), "agent:act-as") && relogin != nil && output != "json" {
+			fmt.Println("Your login can't act as agents yet. Opening your browser: keep \"Allow acting as agents\" ticked and click Authorize.")
+			if loginErr := relogin(ctx); loginErr == nil {
+				session, permissions, err = fetchActAs(ctx, store, agentID, resolveTeam(c))
+			}
+		}
 		if err != nil {
 			if strings.Contains(err.Error(), "agent:act-as") {
-				return fmt.Errorf("could not act as agent %d: your login doesn't allow acting as agents; run 'bruin cloud login --global --reauth' and keep \"Allow acting as agents\" ticked", agentID)
+				return fmt.Errorf("could not act as agent %d: your login doesn't allow acting as agents; run 'bruin cloud login --global --reauth' and tick \"Allow acting as agents\"", agentID)
 			}
 			return fmt.Errorf("could not act as agent %d: %w", agentID, err)
 		}
@@ -153,14 +166,14 @@ func resolveActAs(c *cli.Command, store cloudauth.Store) (resolvedCloudAuth, boo
 			return resolvedCloudAuth{}, true, errors.New("act-as session belongs to a different Cloud API destination; run 'bruin cloud act-as --stop'")
 		}
 		if time.Until(session.ExpiresAt) >= 2*time.Minute {
-			return resolvedCloudAuth{token: session.Token, source: cloudAuthActAs, team: session.Team}, true, nil
+			return resolvedCloudAuth{token: session.Token, source: cloudAuthActAs, team: session.Team, agent: actAsLabel(session)}, true, nil
 		}
 		renewed, err := renewActAs(store, session, raw)
 		if err != nil {
 			return resolvedCloudAuth{}, true, err
 		}
 		if renewed != nil {
-			return resolvedCloudAuth{token: renewed.Token, source: cloudAuthActAs, team: renewed.Team}, true, nil
+			return resolvedCloudAuth{token: renewed.Token, source: cloudAuthActAs, team: renewed.Team, agent: actAsLabel(renewed)}, true, nil
 		}
 		if attempt > 0 {
 			return resolvedCloudAuth{}, true, errors.New("the act-as session keeps changing; try again")

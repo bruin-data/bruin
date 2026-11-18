@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
-	"github.com/snowflakedb/gosnowflake"
+	"github.com/snowflakedb/gosnowflake/v2"
 	"github.com/youmark/pkcs8"
 )
+
+const snowflakeDomain = ".snowflakecomputing.com"
 
 type Config struct {
 	ReadOnly   bool
@@ -49,7 +52,7 @@ func (c Config) DSN() (string, error) {
 	snowflakeConfig := gosnowflake.Config{
 		Authenticator: authType,
 		Account:       c.Account,
-		Host:          c.Host,
+		Host:          hostWithRegion(c.Host, c.Account, c.Region),
 		Port:          c.Port,
 		User:          c.Username,
 		Password:      c.Password,
@@ -60,9 +63,44 @@ func (c Config) DSN() (string, error) {
 		Warehouse:     c.Warehouse,
 		PrivateKey:    privateKey,
 		Token:         c.Token,
+		// The LocalStack emulator has no OCSP cache server and its certificate names no OCSP
+		// responder, so OCSP would only retry ocsp.<host>:80 for seconds before failing open.
+		// gosnowflake can only turn off the cache server process-wide, so skip OCSP for these hosts.
+		DisableOCSPChecks: isLocalStackHost(c.Host),
 	}
 
 	return gosnowflake.DSN(&snowflakeConfig)
+}
+
+// gosnowflake v1 inserted the region into a regionless explicit host and v2 does not, so keep
+// that for the one shape where it is correct: a legacy locator account's <account>.snowflakecomputing.com.
+// The region may also come from the account, as in xy12345.eu-west-1.
+func hostWithRegion(host, account, region string) string {
+	region = strings.TrimSpace(region)
+	if region == "" {
+		account, region, _ = strings.Cut(account, ".")
+	}
+	if region == "" || !strings.EqualFold(host, account+snowflakeDomain) || !isAccountLocator(account) {
+		return host
+	}
+	return host[:len(account)] + "." + region + host[len(account):]
+}
+
+func isAccountLocator(account string) bool {
+	if account == "" {
+		return false
+	}
+	for _, r := range account {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func isLocalStackHost(host string) bool {
+	host = strings.ToLower(host)
+	return host == "localhost.localstack.cloud" || strings.HasSuffix(host, ".localhost.localstack.cloud")
 }
 
 func (c Config) GetIngestrURI() (string, error) {

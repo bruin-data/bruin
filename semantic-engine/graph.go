@@ -42,6 +42,8 @@ type queryPlan struct {
 	joinOrder       []*joinSpec
 	dimensionsByKey map[string]*dimensionBinding
 	sortsByName     map[string]*dimensionBinding
+	// shownJoin limits grand totals to the rows a detail query returns.
+	shownJoin string
 }
 
 func (e *Engine) planQuery(q *Query) (*queryPlan, error) {
@@ -87,6 +89,12 @@ func (e *Engine) planQuery(q *Query) (*queryPlan, error) {
 			continue
 		}
 		if err := plan.addFilterRefs(segment.Filter); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, name := range e.collectInnerMetrics(q.Metrics) {
+		if err := plan.addFilterRefs(e.metrics[name].Filter); err != nil {
 			return nil, err
 		}
 	}
@@ -196,7 +204,7 @@ func (p *queryPlan) dimensionSQL(binding *dimensionBinding) string {
 
 func (p *queryPlan) fromSQL() string {
 	if len(p.joinOrder) == 0 {
-		return " FROM " + p.engine.model.SourceRelation()
+		return " FROM " + p.engine.model.SourceRelation() + p.shownJoin
 	}
 
 	var sql strings.Builder
@@ -211,6 +219,7 @@ func (p *queryPlan) fromSQL() string {
 		sql.WriteString(" ON ")
 		sql.WriteString(renderJoinCondition(spec))
 	}
+	sql.WriteString(p.shownJoin)
 	return sql.String()
 }
 

@@ -478,3 +478,46 @@ func TestCouchDBSourceTables(t *testing.T) {
 	require.Empty(t, table.IncKey)
 	require.Equal(t, "replace", table.IncStrategy)
 }
+
+func TestGitHubSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("github")
+	require.NoError(t, err)
+
+	byName := make(map[string]*SourceTable, len(source.Tables))
+	for _, table := range source.Tables {
+		byName[table.Name] = table
+	}
+	for _, name := range []string{"commits", "commits:<repo>,<owner>/<repo>,<owner>/*", "repositories"} {
+		require.Contains(t, byName, name)
+	}
+
+	require.Equal(t, "sha", byName["commits"].PrimaryKey)
+	require.Equal(t, "repo, sha", byName["commits:<repo>,<owner>/<repo>,<owner>/*"].PrimaryKey)
+	require.Equal(t, "committed_at", byName["commits:<repo>,<owner>/<repo>,<owner>/*"].IncKey)
+	require.Equal(t, "id", byName["repositories"].PrimaryKey)
+	require.Equal(t, "replace", byName["repositories"].IncStrategy)
+}
+
+func TestOdooSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("odoo")
+	require.NoError(t, err)
+	require.Equal(t, "odoo", source.Name)
+	// 41 named tables plus the free-form <model_name> entry.
+	require.Len(t, source.Tables, 42)
+
+	names := make([]string, 0, len(source.Tables))
+	for _, table := range source.Tables {
+		names = append(names, table.Name)
+		require.Equal(t, "id", table.PrimaryKey, table.Name)
+		require.Equal(t, "write_date", table.IncKey, table.Name)
+		require.Equal(t, "merge", table.IncStrategy, table.Name)
+	}
+
+	for _, name := range []string{"partners", "sale_orders", "account_move_lines", "stock_quants", "messages", "<model_name>"} {
+		require.Contains(t, names, name)
+	}
+}

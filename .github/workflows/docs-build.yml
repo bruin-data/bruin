@@ -29,14 +29,14 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@v7.0.1
         with:
           # VitePress lastUpdated is disabled; pages and sitemap need no history.
           fetch-depth: 1
 
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '22.14.0'
           cache: npm
@@ -65,7 +65,7 @@ jobs:
 
       # Same flags as scripts/check_docs_links.sh; keep them in sync.
       - name: Check internal links and anchors
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        uses: lycheeverse/lychee-action@v2.9.0
         with:
           lycheeVersion: v0.24.2
           args: >-

@@ -101,7 +101,7 @@ Use `--api-key` or `--team` to inspect an explicit override. This checks local c
 
 ### `act-as`
 
-Run cloud commands as one of your team's agents, with its permissions instead of your login's; Cloud logs the actions as the agent. Needs a global login.
+Run cloud commands as one of your team's agents, with its permissions instead of your login's; Cloud logs the actions as the agent. Needs a global login with "Allow acting as agents" ticked on the login page; in a terminal, `act-as` opens that login page for you when your login lacks it.
 
 ```bash
 bruin cloud act-as --agent-id 12   # start
@@ -109,7 +109,7 @@ bruin cloud act-as                 # show the session
 bruin cloud act-as --stop          # use your own login again
 ```
 
-The session stays on the team it started on and renews automatically with your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
+The session stays on the team it started on and renews automatically with your own login. When the agent isn't allowed to do something, the error names the missing permission; add it to the agent's Cloud CLI permissions rather than stopping the session, since stopping switches back to your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
 
 ### `teams`
 
@@ -1285,6 +1285,88 @@ Delete a dashboard so it stops appearing. Requires manage-access (the dashboard 
 
 ```bash
 bruin cloud dashboards delete --dashboard-id 42
+```
+
+---
+
+### `data-apps`
+
+Build Bruin Cloud data apps from your own coding agent (Claude Code, Cursor, …). An app is three files — the HTML (`data-app.html`), its warehouse queries (`data-app.queries.json`) and its HTTP requests (`data-app.http.json`) — stored in Bruin Cloud. Its queries and requests run on the connections of the agent it's bound to.
+
+#### `guide`
+
+Print the guide a coding agent follows to build a data app, as markdown it can use as a skill. With `--output json` you also get its `name`, `description` and a `version` that changes whenever the guide does:
+
+```bash
+bruin cloud data-apps guide
+bruin cloud data-apps guide --output json
+```
+
+#### `list`
+
+List the data apps you can view (id, title, agent, visibility, last updated):
+
+```bash
+bruin cloud data-apps list
+```
+
+#### `settings`
+
+Show what the team allows its data apps: whether warehouse queries are read-only, and which domains a request may send a connection's credentials to. A team admin changes these in Bruin Cloud → AI settings → Data Apps.
+
+```bash
+bruin cloud data-apps settings
+```
+
+#### `create`
+
+Create an empty app. `--agent-id` can be left out and set later with `update`; until then the app's queries can't run. Apps are private unless `--visibility team`.
+
+```bash
+bruin cloud data-apps create --title "Sales overview" --agent-id 7
+```
+
+#### `get`
+
+Show an app's agent, version, and the queries and requests it declares:
+
+```bash
+bruin cloud data-apps get --data-app-id 42
+```
+
+#### `pull`
+
+Write an app's three files into a folder (default: the current one), plus a `.bruin-data-app.json` recording which app and version they came from. It won't overwrite local files that differ from the app unless you pass `--force`.
+
+```bash
+bruin cloud data-apps pull --data-app-id 42 --dir sales/
+```
+
+#### `push`
+
+Save the files to Bruin Cloud. Point at the folder `pull` wrote, or at the files directly; only the files you give are saved.
+
+```bash
+bruin cloud data-apps push --data-app-id 42 --dir sales/
+bruin cloud data-apps push --data-app-id 42 --html report.html --queries queries.json
+```
+
+After a `pull`, the push sends the version it was based on: if someone saved the app since, it fails instead of overwriting their change. Pull again, re-apply your change and push — or pass `--force` to overwrite.
+
+#### `update`
+
+Rename an app or set its agent. Changing the agent is limited to the app's creator and team admins, and an agent can be changed but not removed.
+
+```bash
+bruin cloud data-apps update --data-app-id 42 --title "Sales" --agent-id 8
+```
+
+#### `delete`
+
+Delete an app (its creator or a team admin only):
+
+```bash
+bruin cloud data-apps delete --data-app-id 42
 ```
 
 ---

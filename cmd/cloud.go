@@ -49,6 +49,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudConnections(),
 			CloudConnectionSets(),
 			CloudDashboards(),
+			CloudDataApps(),
 			CloudSemanticLayers(),
 			CloudScheduledAgents(),
 			CloudNotificationRules(),

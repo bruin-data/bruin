@@ -28,6 +28,23 @@ type Config struct {
 	ReadOnly                         bool
 	// StorageURI is the Cloud Storage prefix that Iceberg tables are stored under, e.g. gs://bucket.
 	StorageURI string
+	// ReadAPI selects how ingestr reads BigQuery source tables: "storage" (the Storage Read API) or "rest".
+	// Empty leaves the choice to ingestr, which defaults to the Storage Read API.
+	ReadAPI string
+}
+
+const (
+	ReadAPIStorage = "storage"
+	ReadAPIREST    = "rest"
+)
+
+// ValidateReadAPI accepts the values ingestr understands for the BigQuery source's read_api URI parameter.
+func ValidateReadAPI(value string) error {
+	if value != ReadAPIStorage && value != ReadAPIREST {
+		return fmt.Errorf("invalid read_api %q: must be %q or %q", value, ReadAPIStorage, ReadAPIREST)
+	}
+
+	return nil
 }
 
 // MaxBillableBytesByConnectionEnv lets Bruin Cloud cap an agent run's BigQuery connections: a JSON object of connection name to bytes.
@@ -99,6 +116,11 @@ func (c Config) GetConnectionURI() (string, error) {
 	if c.ReadOnly {
 		return "", errors.New("read_only connections cannot be used with ingestr")
 	}
+	if c.ReadAPI != "" {
+		if err := ValidateReadAPI(c.ReadAPI); err != nil {
+			return "", err
+		}
+	}
 	// If using Application Default Credentials, return simple URI
 	// ingestr will use ADC automatically when no credentials are in the URI
 	if c.UseApplicationDefaultCredentials {
@@ -106,7 +128,7 @@ func (c Config) GetConnectionURI() (string, error) {
 		if c.Location != "" {
 			URI += "?location=" + c.Location
 		}
-		return URI, nil
+		return c.appendReadAPI(URI), nil
 	}
 
 	var creds []byte
@@ -133,7 +155,19 @@ func (c Config) GetConnectionURI() (string, error) {
 		URI += "&location=" + c.Location
 	}
 
-	return URI, nil
+	return c.appendReadAPI(URI), nil
+}
+
+func (c Config) appendReadAPI(uri string) string {
+	if c.ReadAPI == "" {
+		return uri
+	}
+	separator := "?"
+	if strings.Contains(uri, "?") {
+		separator = "&"
+	}
+
+	return uri + separator + "read_api=" + c.ReadAPI
 }
 
 func (c Config) GetIngestrURI() (string, error) {

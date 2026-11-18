@@ -301,6 +301,41 @@ func TestClient_GetConnection_ReturnsConnection(t *testing.T) {
 	require.NotNil(t, conn)
 }
 
+func TestClient_GetConnection_GCPReadAPIReachesIngestrURI(t *testing.T) {
+	t.Parallel()
+	c := &Client{
+		client: &mockVaultClient{
+			response: &vault.Response[schema.KvV2ReadResponse]{
+				Data: schema.KvV2ReadResponse{
+					Data: map[string]any{
+						"details": map[string]any{
+							"project_id":                          "my-project",
+							"use_application_default_credentials": true,
+							"read_api":                            "rest",
+						},
+						"type": "google_cloud_platform",
+					},
+				},
+			},
+		},
+		mountPath:               "mount",
+		path:                    "path",
+		logger:                  &mockLogger{},
+		cacheConnections:        make(map[string]any),
+		cacheConnectionsDetails: make(map[string]any),
+	}
+
+	deets, ok := c.GetConnectionDetails("gcp").(*config.GoogleCloudPlatformConnection)
+	require.True(t, ok)
+	require.Equal(t, "rest", deets.ReadAPI)
+
+	conn, ok := c.GetConnection("gcp").(interface{ GetIngestrURI() (string, error) })
+	require.True(t, ok)
+	uri, err := conn.GetIngestrURI()
+	require.NoError(t, err)
+	require.Equal(t, "bigquery://my-project?read_api=rest", uri)
+}
+
 func TestClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 	t.Parallel()
 	c := &Client{

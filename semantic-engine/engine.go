@@ -3,12 +3,16 @@ package semantic
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
 
 var refPattern = regexp.MustCompile(`\{([^}]+)\}`)
+
+var plainColumnPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$`)
 
 var aggregateFuncPattern = regexp.MustCompile(`(?i)\b(sum|count|avg|min|max|stddev|stddev_samp|stddev_pop|variance|var_samp|var_pop|median|percentile_cont|percentile_disc|array_agg|string_agg|listagg|approx_count_distinct|approx_quantile)\s*\(`)
 
@@ -26,6 +30,9 @@ func containsAggregateOutsideRefs(expr string) bool {
 
 // Engine generates SQL from a Model and a Query.
 type Engine struct {
+	// Dialect selects warehouse-specific string escaping; empty uses SQL quote doubling.
+	Dialect string
+
 	model    *Model
 	models   map[string]*Model
 	metrics  map[string]*Metric
@@ -322,6 +329,138 @@ func (e *Engine) validateRefs(name string, visited map[string]bool) error {
 func (e *Engine) GenerateSQL(q *Query) (string, error) {
 	sql, _, err := e.GenerateSQLWithColumns(q)
 	return sql, err
+}
+
+// GenerateGrandTotalSQL recalculates metrics over the source rows behind the
+// rows the query returns, so limits and aggregate filters/segments bound the
+// totals. Window metrics and their dependents return NULL. The input query and
+// engine are not modified.
+func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
+	if len(q.Metrics) == 0 {
+		return "", errors.New("grand totals require at least one metric")
+	}
+	plan, err := e.planQuery(q)
+	if err != nil {
+		return "", err
+	}
+	if err := e.validateQuery(q, plan); err != nil {
+		return "", err
+	}
+
+	grandTotal := *q
+	grandTotal.Dimensions, grandTotal.Sort, grandTotal.Limit = nil, nil, 0
+	grandTotal.Filters = nil
+	for _, filter := range q.Filters {
+		if filter.Expression != "" {
+			_, having, err := e.expandFilterExpr(filter.Expression, plan)
+			if err != nil {
+				return "", err
+			}
+			if having {
+				continue
+			}
+		}
+		grandTotal.Filters = append(grandTotal.Filters, filter)
+	}
+	grandTotal.Segments = nil
+	for _, name := range q.Segments {
+		_, having, err := e.expandFilterExpr(e.segments[name].Filter, plan)
+		if err != nil {
+			return "", err
+		}
+		if !having {
+			grandTotal.Segments = append(grandTotal.Segments, name)
+		}
+	}
+	grandTotalEngine := *e
+	grandTotalEngine.metrics = maps.Clone(e.metrics)
+	for _, name := range q.Metrics {
+		if e.needsWindowWrap([]string{name}) {
+			metric := *e.metrics[name]
+			// An aggregate NULL also returns one row for window-only queries.
+			metric.Expression, metric.Filter, metric.Window = "SUM(NULLIF(0, 0))", "", nil
+			grandTotalEngine.metrics[name] = &metric
+		}
+	}
+	// Keep an aggregate grain even when every requested metric is a constant.
+	// The outer projection hides the helper metric from the result.
+	rowCount := "__grand_total_row_count"
+	for {
+		if _, err := e.resolveDimension(DimensionRef{Name: rowCount}); e.metrics[rowCount] == nil && err != nil {
+			break
+		}
+		rowCount += "_"
+	}
+	grandTotalEngine.metrics[rowCount] = &Metric{Name: rowCount, Expression: "COUNT(*)"}
+	// Compute each metric once; the outer projection repeats it by name.
+	grandTotal.Metrics = nil
+	for _, name := range q.Metrics {
+		if !slices.Contains(grandTotal.Metrics, name) {
+			grandTotal.Metrics = append(grandTotal.Metrics, name)
+		}
+	}
+	grandTotal.Metrics = append(grandTotal.Metrics, rowCount)
+	// Replan without excluded filters so HAVING-only joins cannot affect totals.
+	// When a limit or aggregate filter can hide rows, join to the rows the
+	// detail query returns. Window queries return one row per combination of
+	// their inner dimensions, so those key the rows.
+	shown := *q
+	shown.Metrics = grandTotal.Metrics[:len(grandTotal.Metrics)-1] // without rowCount; SQL Server rejects repeated derived-table columns
+	if e.needsWindowWrap(q.Metrics) {
+		shown.Dimensions = e.collectInnerDimensions(q)
+	}
+	// Identical refs return the same rows; sorting matters only with a limit.
+	seen := map[DimensionRef]bool{}
+	shown.Dimensions = slices.DeleteFunc(slices.Clone(shown.Dimensions), func(d DimensionRef) bool {
+		if seen[d] {
+			return true
+		}
+		seen[d] = true
+		return false
+	})
+	if shown.Limit == 0 {
+		shown.Sort = nil
+	}
+	restrict := len(grandTotal.Filters) < len(q.Filters) || len(grandTotal.Segments) < len(q.Segments) || (len(shown.Dimensions) > 0 && q.Limit > 0)
+	planned := grandTotal
+	if restrict {
+		planned.Dimensions = shown.Dimensions
+	}
+	totalPlan, err := grandTotalEngine.planQuery(&planned)
+	if err != nil {
+		return "", err
+	}
+	if restrict {
+		shownSQL, columns, err := e.GenerateSQLWithColumns(&shown)
+		if err != nil {
+			return "", err
+		}
+		keys := make([]string, len(shown.Dimensions))
+		conditions := make([]string, len(shown.Dimensions))
+		names := map[string]bool{}
+		for i, d := range shown.Dimensions {
+			if names[strings.ToLower(columns[i].Name)] {
+				// Two dimensions share a column, so the shown rows can't be matched.
+				return "SELECT NULL AS " + strings.Join(q.Metrics, ", NULL AS "), nil
+			}
+			names[strings.ToLower(columns[i].Name)] = true
+			key := fmt.Sprintf("__grand_total_shown_%d", i)
+			keys[i] = columns[i].Name + " AS " + key
+			shown := "__grand_total_shown." + key
+			source := totalPlan.dimensionSQL(totalPlan.dimensionBinding(d))
+			conditions[i] = fmt.Sprintf("(%s = (%s) OR (%s IS NULL AND (%s) IS NULL))", shown, source, shown, source)
+		}
+		if len(keys) == 0 {
+			// A metric-only query's one row may be hidden by an aggregate filter.
+			keys, conditions = []string{"1 AS __grand_total_shown_0"}, []string{"1 = 1"}
+		}
+		totalPlan.shownJoin = " INNER JOIN (SELECT DISTINCT " + strings.Join(keys, ", ") + " FROM (" + shownSQL + ") __grand_total_detail) __grand_total_shown ON " + strings.Join(conditions, " AND ")
+	}
+	sql, err := grandTotalEngine.generateSimple(&grandTotal, totalPlan)
+	if err != nil {
+		return "", err
+	}
+	return "SELECT " + strings.Join(q.Metrics, ", ") + " FROM (" + sql + ") grand_total", nil
 }
 
 // GenerateSQLWithColumns compiles the query and also returns the result set's
@@ -734,13 +873,12 @@ func (e *Engine) buildWhereHaving(q *Query, plan *queryPlan) (where, having stri
 	var whereParts, havingParts []string
 
 	for _, f := range q.Filters {
-		var raw string
-		if f.Expression != "" {
-			raw = f.Expression
-		} else {
-			raw = e.filterToSQL(f, plan)
+		if f.Expression == "" {
+			// The plan resolves dimensions; keep literal values out of expression rewriting.
+			whereParts = append(whereParts, e.filterToSQL(f, plan))
+			continue
 		}
-		expanded, needsHaving, err := e.expandFilterExpr(raw, plan)
+		expanded, needsHaving, err := e.expandFilterExpr(f.Expression, plan)
 		if err != nil {
 			return "", "", err
 		}
@@ -822,6 +960,7 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 	var s string
 	if len(q.Sort) > 0 {
 		parts := make([]string, 0, len(q.Sort))
+		sorted := map[string]bool{}
 		for _, sort := range q.Sort {
 			dir := strings.ToUpper(sort.Direction)
 			if dir == "" {
@@ -834,7 +973,32 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 					name = "base." + name
 				}
 			}
+			sorted[name] = true
 			parts = append(parts, name+" "+dir)
+		}
+		// Break ties by the grouping key so reruns of a limited query, such as
+		// the grand total's copy, pick the same rows when sort values tie
+		// exactly. Float aggregates can still differ in their last bits.
+		keys := q.Dimensions
+		if outer {
+			keys = e.collectInnerDimensions(q)
+		}
+		for i, d := range keys {
+			binding := plan.dimensionBinding(d)
+			if q.Limit == 0 || binding == nil {
+				continue
+			}
+			// Dimension i is select column i+1; positions stay unambiguous when
+			// two dimensions share an alias.
+			name, ref := binding.outputAlias, strconv.Itoa(i+1)
+			if outer {
+				name = "base." + name
+				ref = name
+			}
+			if !sorted[name] && !sorted[ref] {
+				sorted[ref] = true
+				parts = append(parts, ref+" ASC")
+			}
 		}
 		s += " ORDER BY " + strings.Join(parts, ", ")
 	}
@@ -846,7 +1010,12 @@ func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) strin
 
 func validateStructuredFilter(f Filter) error {
 	switch f.Operator {
-	case "equals", "not_equals", "gt", "gte", "lt", "lte", "in", "not_in", "is_null", "is_not_null":
+	case "equals", "not_equals", "gt", "gte", "lt", "lte", "in", "not_in":
+		if f.Value == nil {
+			return fmt.Errorf("filter %s on dimension %s needs a value; use is_null or is_not_null to match null", f.Operator, f.Dimension)
+		}
+		return nil
+	case "is_null", "is_not_null":
 		return nil
 	case "between":
 		if _, _, ok := betweenValues(f.Value); !ok {
@@ -866,29 +1035,33 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	if binding := plan.dimensionBinding(DimensionRef{Name: f.Dimension}); binding != nil {
 		dim = plan.dimensionSQL(binding)
 	}
+	// Group expression dimensions such as "NOT active" so operators like IS NULL
+	// apply to the whole expression rather than binding inside it.
+	if !plainColumnPattern.MatchString(dim) {
+		dim = "(" + dim + ")"
+	}
 	switch f.Operator {
 	case "equals":
-		return fmt.Sprintf("%s = %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s = %s", dim, formatValue(f.Value, e.Dialect))
 	case "not_equals":
-		return fmt.Sprintf("%s != %s", dim, formatValue(f.Value))
+		// Keep null rows: "everything except X" should still count rows where the dimension is null.
+		return fmt.Sprintf("(%s != %s OR %s IS NULL)", dim, formatValue(f.Value, e.Dialect), dim)
 	case "gt":
-		return fmt.Sprintf("%s > %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s > %s", dim, formatValue(f.Value, e.Dialect))
 	case "gte":
-		return fmt.Sprintf("%s >= %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s >= %s", dim, formatValue(f.Value, e.Dialect))
 	case "lt":
-		return fmt.Sprintf("%s < %s", dim, formatValue(f.Value))
+		return fmt.Sprintf("%s < %s", dim, formatValue(f.Value, e.Dialect))
 	case "lte":
-		return fmt.Sprintf("%s <= %s", dim, formatValue(f.Value))
-	case "in":
-		return fmt.Sprintf("%s IN (%s)", dim, formatList(f.Value))
-	case "not_in":
-		return fmt.Sprintf("%s NOT IN (%s)", dim, formatList(f.Value))
+		return fmt.Sprintf("%s <= %s", dim, formatValue(f.Value, e.Dialect))
+	case "in", "not_in":
+		return membershipSQL(dim, f.Operator == "not_in", f.Value, e.Dialect)
 	case "between":
 		start, end, ok := betweenValues(f.Value)
 		if !ok {
 			return ""
 		}
-		return fmt.Sprintf("%s BETWEEN %s AND %s", dim, formatValue(start), formatValue(end))
+		return fmt.Sprintf("%s BETWEEN %s AND %s", dim, formatValue(start, e.Dialect), formatValue(end, e.Dialect))
 	case "is_null":
 		return dim + " IS NULL"
 	case "is_not_null":
@@ -896,6 +1069,42 @@ func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	default:
 		return ""
 	}
+}
+
+// membershipSQL compiles in/not_in. A null in the list selects (in) or excludes
+// (not_in) null rows; without one, not_in still keeps null rows, matching not_equals.
+func membershipSQL(dim string, negate bool, value interface{}, dialect string) string {
+	values, hasNull := value, false
+	if list, ok := value.([]interface{}); ok {
+		var kept []interface{}
+		for _, item := range list {
+			if item == nil {
+				hasNull = true
+				continue
+			}
+			kept = append(kept, item)
+		}
+		if hasNull && len(kept) == 0 {
+			if negate {
+				return dim + " IS NOT NULL"
+			}
+			return dim + " IS NULL"
+		}
+		values = kept
+	}
+
+	op := "IN"
+	if negate {
+		op = "NOT IN"
+	}
+	predicate := fmt.Sprintf("%s %s (%s)", dim, op, formatList(values, dialect))
+	switch {
+	case negate && hasNull:
+		return "(" + predicate + " AND " + dim + " IS NOT NULL)"
+	case negate || hasNull:
+		return "(" + predicate + " OR " + dim + " IS NULL)"
+	}
+	return predicate
 }
 
 func betweenValues(v interface{}) (interface{}, interface{}, bool) {
@@ -919,9 +1128,13 @@ func betweenValues(v interface{}) (interface{}, interface{}, bool) {
 	}
 }
 
-func formatValue(v interface{}) string {
+func formatValue(v interface{}, dialect ...string) string {
 	switch val := v.(type) {
 	case string:
+		if len(dialect) > 0 && (dialect[0] == "bigquery" || dialect[0] == "google_cloud_platform") {
+			// GoogleSQL accepts double-quoted strings and Go's escape sequences.
+			return strconv.Quote(val)
+		}
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
 	case int:
 		return strconv.Itoa(val)
@@ -939,22 +1152,22 @@ func formatValue(v interface{}) string {
 	}
 }
 
-func formatList(v interface{}) string {
+func formatList(v interface{}, dialect ...string) string {
 	switch val := v.(type) {
 	case []string:
 		quoted := make([]string, len(val))
 		for i, s := range val {
-			quoted[i] = "'" + strings.ReplaceAll(s, "'", "''") + "'"
+			quoted[i] = formatValue(s, dialect...)
 		}
 		return strings.Join(quoted, ", ")
 	case []interface{}:
 		parts := make([]string, len(val))
 		for i, item := range val {
-			parts[i] = formatValue(item)
+			parts[i] = formatValue(item, dialect...)
 		}
 		return strings.Join(parts, ", ")
 	default:
-		return formatValue(v)
+		return formatValue(v, dialect...)
 	}
 }
 
