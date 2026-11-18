@@ -345,7 +345,7 @@ join marketing.attribution as a
 
 Sensors are a special type of assets that are used to wait on certain external signals.
 
-Checks if a table exists in BigQuery, runs by default every 30 seconds until this table is available.
+Checks if a table exists in BigQuery, runs by default every 30 seconds until this table is available. If a check fails with a temporary BigQuery error, such as an internal error or a rate limit, the sensor checks again after `poke_interval` instead of failing; `timeout` still applies.
 
 ```yaml
 name: string
@@ -374,7 +374,7 @@ parameters:
 
 ### `bq.sensor.query`
 
-Checks if a query returns any results in BigQuery, runs by default every 30 seconds until this query returns any results.
+Checks if a query returns any results in BigQuery, runs by default every 30 seconds until this query returns any results. If a check fails with a temporary BigQuery error, such as an internal error or a rate limit, the sensor checks again after `poke_interval` instead of failing; `timeout` still applies.
 
 ```yaml
 name: string
