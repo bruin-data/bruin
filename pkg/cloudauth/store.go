@@ -38,8 +38,12 @@ type SecretStore interface {
 	Remove(key string) error
 }
 
+// Store keeps the global login in cloud.yml. The token is written to the file itself (0600 inside a 0700
+// directory). Older versions kept the token in the OS credential store and wrote a keyring:// pointer to the
+// file instead; such logins are moved into the file the first time they are read.
 type Store struct {
 	Path string
+	// Open opens the OS credential store. It is only used to migrate logins saved by older versions.
 	Open func() (SecretStore, error)
 }
 
@@ -65,13 +69,15 @@ func DefaultStore() (Store, error) {
 				KeychainSynchronizable:         false,
 			})
 			if err != nil {
-				return nil, errors.New("OS credential store is unavailable; unlock it or use BRUIN_CLOUD_API_KEY")
+				return nil, errors.New("OS credential store is unavailable; unlock it to move your existing global login, or log in again")
 			}
 			return store, nil
 		},
 	}, nil
 }
 
+// Load returns the configured global login without contacting the OS credential store, so a login saved by
+// an older version comes back with an empty Token and a credential-store pointer.
 func (s Store) Load() (*Credential, []byte, error) {
 	data, err := os.ReadFile(s.Path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -96,86 +102,123 @@ func (s Store) Load() (*Credential, []byte, error) {
 		DefaultTeam: cm.GetDefaultTeam(),
 		connection:  *ref,
 	}
-	reference, err := url.Parse(ref.Connection.APIToken)
-	if err == nil && reference.Scheme == "keyring" && reference.Host != "" && reference.User == nil && reference.RawQuery == "" && reference.Fragment == "" {
-		tokenID := strings.TrimPrefix(reference.Path, "/")
-		if tokenID != "" && !strings.Contains(tokenID, "/") {
-			credential.key = reference.Host
-			credential.TokenID = tokenID
-		}
+	if key, tokenID, ok := parseKeyringReference(ref.Connection.APIToken); ok {
+		credential.key = key
+		credential.TokenID = tokenID
+	} else {
+		credential.Token = ref.Connection.APIToken
 	}
 	return credential, data, nil
 }
 
-func (s Store) Read(apiURL string) (*Credential, error) {
-	credential, _, err := s.Load()
-	if err != nil || credential == nil {
-		return nil, err
+func parseKeyringReference(token string) (string, string, bool) {
+	if !strings.HasPrefix(token, "keyring://") {
+		return "", "", false
 	}
-	if err := s.validateReference(credential); err != nil {
+	reference, err := url.Parse(token)
+	if err != nil || reference.Host == "" || reference.User != nil || reference.RawQuery != "" || reference.Fragment != "" {
+		return "", "", true
+	}
+	tokenID := strings.TrimPrefix(reference.Path, "/")
+	if tokenID == "" || strings.Contains(tokenID, "/") {
+		return "", "", true
+	}
+	return reference.Host, tokenID, true
+}
+
+func (s Store) Read(apiURL string) (*Credential, error) {
+	credential, data, err := s.Load()
+	if err != nil || credential == nil {
 		return nil, err
 	}
 	if err := CheckDestination(credential.APIURL, apiURL); err != nil {
 		return nil, err
 	}
-	store, err := s.Open()
-	if err != nil {
-		return nil, err
+	if credential.Token == "" {
+		if err := s.migrate(credential, data); err != nil {
+			return nil, err
+		}
 	}
-	item, err := store.Get(credential.key)
-	if err != nil {
-		return nil, errors.New("cannot read global token from OS credential store; unlock it or log in again")
-	}
-	if len(item.Data) == 0 {
-		return nil, errors.New("global credential is empty; log in again")
-	}
-	credential.Token = string(item.Data)
 	credential.APIURL = apiURL
 	return credential, nil
 }
 
+// migrate reads a token that an older version kept in the OS credential store, writes it into cloud.yml and
+// removes it from the credential store, so later commands no longer need credential-store access.
+func (s Store) migrate(credential *Credential, data []byte) error {
+	if err := s.validateReference(credential); err != nil {
+		return err
+	}
+	if s.Open == nil {
+		return errors.New("cannot read global token from OS credential store; log in again")
+	}
+	store, err := s.Open()
+	if err != nil {
+		return err
+	}
+	item, err := store.Get(credential.key)
+	if err != nil {
+		return errors.New("cannot read global token from OS credential store; unlock it or log in again")
+	}
+	if len(item.Data) == 0 {
+		return errors.New("global credential is empty; log in again")
+	}
+	credential.Token = string(item.Data)
+	ref := credential.connection
+	ref.Connection.APIToken = credential.Token
+	updated, err := config.MarshalCloudConnection(data, ref, credential.DefaultTeam)
+	if err != nil {
+		return err
+	}
+	// A concurrent change to cloud.yml only postpones the move to the next command; the token is still usable.
+	if err := config.WriteCloudFile(afero.NewOsFs(), s.Path, data, updated); err != nil {
+		return nil //nolint:nilerr
+	}
+	_ = store.Remove(credential.key)
+	credential.connection = ref
+	credential.key = ""
+	return nil
+}
+
 func (s Store) Save(credential Credential, expected []byte) error {
-	if credential.Token == "" || credential.TokenID == "" || credential.APIURL == "" {
+	if credential.Token == "" || credential.APIURL == "" {
 		return errors.New("cannot store an incomplete credential")
 	}
 	if err := os.MkdirAll(filepath.Dir(s.Path), 0o700); err != nil {
-		return err
-	}
-	key, err := s.key(credential.TokenID, credential.APIURL)
-	if err != nil {
 		return err
 	}
 	previous, _, err := s.Load()
 	if err != nil {
 		return err
 	}
-	if previous != nil && previous.key == key {
-		return errors.New("login returned the existing token identity; refusing to overwrite its secret")
-	}
 	ref := config.CloudConnectionRef{Environment: "default", Connection: config.BruinCloudConnection{ConnectionMetadata: config.ConnectionMetadata{Name: "cloud"}}}
 	if previous != nil {
 		ref = previous.connection
 	}
-	reference := url.URL{Scheme: "keyring", Host: key, Path: "/" + credential.TokenID}
-	ref.Connection.APIToken = reference.String()
+	ref.Connection.APIToken = credential.Token
 	ref.Connection.APIURL = credential.APIURL
 	data, err := config.MarshalCloudConnection(expected, ref, credential.DefaultTeam)
 	if err != nil {
 		return err
 	}
+	if err := config.WriteCloudFile(afero.NewOsFs(), s.Path, expected, data); err != nil {
+		return err
+	}
+	_ = s.removeLegacyToken(previous)
+	return nil
+}
+
+// removeLegacyToken deletes a token an older version kept in the OS credential store, if it belongs to this file.
+func (s Store) removeLegacyToken(credential *Credential) error {
+	if credential == nil || credential.key == "" || s.validateReference(credential) != nil || s.Open == nil {
+		return nil
+	}
 	store, err := s.Open()
 	if err != nil {
 		return err
 	}
-	if err := store.Set(keyring.Item{Key: key, Data: []byte(credential.Token), Label: "Bruin Cloud personal token", KeychainNotSynchronizable: true}); err != nil {
-		return errors.New("could not save token in OS credential store")
-	}
-	if err := config.WriteCloudFile(afero.NewOsFs(), s.Path, expected, data); err != nil {
-		_ = store.Remove(key)
+	if err := store.Remove(credential.key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return err
-	}
-	if previous != nil && s.validateReference(previous) == nil {
-		_ = store.Remove(previous.key)
 	}
 	return nil
 }
@@ -195,7 +238,7 @@ func (s Store) key(tokenID, apiURL string) (string, error) {
 
 func (s Store) validateReference(credential *Credential) error {
 	if credential.key == "" || credential.TokenID == "" || credential.APIURL == "" {
-		return errors.New("global login requires a credential-store reference; run 'bruin cloud login --global --reauth'")
+		return errors.New("global login has an invalid credential-store reference; run 'bruin cloud login --global --reauth'")
 	}
 	expected, err := s.key(credential.TokenID, credential.APIURL)
 	if err != nil {
@@ -240,17 +283,10 @@ func (s Store) Delete() error {
 	if credential == nil {
 		return errors.New("no global login found")
 	}
-	if err := s.validateReference(credential); err != nil {
-		return err
-	}
-	store, err := s.Open()
-	if err != nil {
-		return err
-	}
 	if err := config.RemoveCloudConnection(afero.NewOsFs(), s.Path, expected, credential.connection); err != nil {
 		return err
 	}
-	if err := store.Remove(credential.key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+	if err := s.removeLegacyToken(credential); err != nil {
 		return errors.New("global login removed from configuration, but could not remove token from OS credential store")
 	}
 	return nil
