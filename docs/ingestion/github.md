@@ -155,4 +155,10 @@ interval_modifiers:
   start: -30d
 ```
 
+Bruin Cloud applies interval modifiers automatically. On the CLI they are off by default, so run the asset with `--apply-interval-modifiers` to use the lookback:
+
+```bash
+bruin run --apply-interval-modifiers assets/github_pull_request_commits.yml
+```
+
 See the [ingestr GitHub documentation](https://getbruin.com/docs/ingestr/supported-sources/github.html#pull-request-commits) for the columns and the limits of the table.
