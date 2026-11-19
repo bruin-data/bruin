@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/fatih/color"
@@ -83,9 +82,8 @@ func newActAsEnv(t *testing.T) (*actAsStub, cloudauth.Store) {
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
-	secrets := keyring.NewArrayKeyring(nil)
 	// Same path as DefaultStore, so commands that open the default store see the session.
-	store := cloudauth.Store{Path: filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "bruin", "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+	store := cloudauth.Store{Path: filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "bruin", "cloud.yml")}
 	require.NoError(t, store.Save(cloudauth.Credential{Token: "person-token", TokenID: "1", APIURL: server.URL, DefaultTeam: "acme"}, nil))
 	return stub, store
 }
