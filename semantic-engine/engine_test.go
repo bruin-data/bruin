@@ -64,6 +64,14 @@ func richTestModel() *Model {
 			{Name: "completed_revenue", Expression: "sum(amount)", Filter: "status = 'completed'"},
 			{Name: "completed_count", Expression: "count(*)", Filter: "status = 'completed'"},
 			{Name: "completed_distinct_orders", Expression: "count(distinct order_id)", Filter: "status = 'completed'"},
+			{Name: "completed_revenue_rounded", Expression: "round(sum(amount), 2)", Filter: "status IN ('completed', 'shipped')"},
+			{Name: "completed_profit", Expression: "sum(amount) - sum(cogs)", Filter: "status = 'completed'"},
+			{Name: "completed_categories", Expression: "string_agg(category, ', ')", Filter: "status = 'completed'"},
+			{Name: "completed_median", Expression: "percentile_cont(0.5) WITHIN GROUP (ORDER BY amount DESC NULLS LAST)", Filter: "status = 'completed'"},
+			{Name: "completed_category_list", Expression: "listagg(category, ', ') WITHIN GROUP (ORDER BY category)", Filter: "status = 'completed'"},
+			// Viewer values end up in literals like these.
+			{Name: "completed_quoted", Expression: "sum(CASE WHEN category = 'a''), sum(b' THEN amount ELSE 0 END)", Filter: "status = 'completed'"},
+			{Name: "completed_escaped", Expression: `sum(CASE WHEN category = 'a\'), sum(b' THEN amount ELSE 0 END)`, Filter: "status = 'completed'"},
 			{Name: "profit", Expression: "{revenue} - {cost}"},
 			{Name: "avg_order_value", Expression: "{revenue} / {order_count}"},
 			{Name: "profit_margin", Expression: "{profit} / {revenue}"},
@@ -754,6 +762,36 @@ func TestGenerateSQL_Cases(t *testing.T) {
 			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_distinct_orders"}},
 			must:  []string{"count(DISTINCT CASE WHEN status = 'completed' THEN order_id ELSE NULL END) AS completed_distinct_orders"},
 		},
+		{
+			name:  "filter goes inside the aggregate, not the function around it",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_revenue_rounded"}},
+			must:  []string{"round(sum(CASE WHEN status IN ('completed', 'shipped') THEN amount ELSE NULL END), 2) AS completed_revenue_rounded"},
+		},
+		{
+			name:  "filter applies to every aggregate and keeps the arithmetic between them",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_profit"}},
+			must:  []string{"sum(CASE WHEN status = 'completed' THEN amount ELSE NULL END) - sum(CASE WHEN status = 'completed' THEN cogs ELSE NULL END) AS completed_profit"},
+		},
+		{
+			name:  "filter wraps only the first aggregate argument",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_categories"}},
+			must:  []string{"string_agg(CASE WHEN status = 'completed' THEN category ELSE NULL END, ', ') AS completed_categories"},
+		},
+		{
+			name:  "ordered-set aggregate filters its ORDER BY values, not the fraction",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_median"}},
+			must:  []string{"percentile_cont(0.5) WITHIN GROUP (ORDER BY CASE WHEN status = 'completed' THEN amount ELSE NULL END DESC NULLS LAST) AS completed_median"},
+		},
+		{
+			name:  "listagg WITHIN GROUP only orders, so its value argument is filtered",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_category_list"}},
+			must:  []string{"listagg(CASE WHEN status = 'completed' THEN category ELSE NULL END, ', ') WITHIN GROUP (ORDER BY category) AS completed_category_list"},
+		},
+		{
+			name:  "parentheses, commas, and aggregates inside a doubled-quote literal stay text",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_quoted"}},
+			must:  []string{"sum(CASE WHEN status = 'completed' THEN CASE WHEN category = 'a''), sum(b' THEN amount ELSE 0 END ELSE NULL END) AS completed_quoted"},
+		},
 
 		// --- derived metrics ---
 		{
@@ -1243,6 +1281,24 @@ func TestGenerateSQL_QueryErrors(t *testing.T) {
 	}
 }
 
+// Only BigQuery reads a backslash as an escape.
+func TestMetricFilterBackslashesFollowDialect(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, richTestModel())
+	query := &Query{Metrics: []string{"completed_escaped"}}
+	if _, err := engine.GenerateSQL(query); err == nil || !strings.Contains(err.Error(), "backslashes in quoted text") {
+		t.Fatalf("want backslash error without a dialect, got %v", err)
+	}
+
+	engine.Dialect = "bigquery"
+	sql, err := engine.GenerateSQL(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, `sum(CASE WHEN status = 'completed' THEN CASE WHEN category = 'a\'), sum(b' THEN amount ELSE 0 END ELSE NULL END) AS completed_escaped`)
+}
+
 // --- model-level validation errors ---
 
 func TestNewEngine_ValidationErrors(t *testing.T) {
@@ -1330,6 +1386,27 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 				},
 			},
 			want: "duplicate name: shared",
+		},
+		{
+			name: "filter on derived metric",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Metrics: []Metric{
+					{Name: "revenue", Expression: "sum(x)"},
+					{Name: "bad", Expression: "{revenue} * 2", Filter: "status = 'paid'"},
+				},
+			},
+			want: `metric "bad": filter is not supported on derived metrics`,
+		},
+		{
+			name: "filter without aggregate",
+			model: Model{
+				Name:    "m",
+				Source:  Source{Table: "t"},
+				Metrics: []Metric{{Name: "bad", Expression: "x * 2", Filter: "status = 'paid'"}},
+			},
+			want: `metric "bad": filter needs an aggregate function`,
 		},
 		{
 			name: "metric without expression",

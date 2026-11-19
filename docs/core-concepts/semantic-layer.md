@@ -227,6 +227,8 @@ metrics:
     filter: "status = 'completed'"
 ```
 
+The filter applies to every aggregate in the expression, so `round(sum(amount), 2)` works as expected. A filtered metric needs at least one aggregate, and derived metrics cannot have a `filter`.
+
 Metric metadata is optional:
 
 ```yaml
@@ -608,6 +610,7 @@ Bruin also validates semantic models when it loads the repository semantic catal
 - Exactly one of `source.table` or `source.query` is required.
 - Metric names, dimension names, and segment names must be unique within a model.
 - Metrics require `expression`.
+- A metric with `filter` needs an aggregate and cannot be derived.
 - Segments require `filter`.
 - Derived metric references such as `{revenue}` must resolve to known metrics and cannot form cycles.
 - Window metrics must reference exactly one metric, for example `expression: "{revenue}"`.
