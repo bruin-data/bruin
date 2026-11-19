@@ -16,11 +16,6 @@ var plainColumnPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_]
 
 var aggregateFuncPattern = regexp.MustCompile(`(?i)\b(sum|count|avg|min|max|stddev|stddev_samp|stddev_pop|variance|var_samp|var_pop|median|percentile_cont|percentile_disc|array_agg|string_agg|listagg|approx_count_distinct|approx_quantile)\s*\(`)
 
-var withinGroupOrderByPattern = regexp.MustCompile(`(?i)^\s*within\s+group\s*\(\s*order\s+by\s+`)
-
-// orderDirectionPattern matches a trailing ASC/DESC and NULLS FIRST/LAST.
-var orderDirectionPattern = regexp.MustCompile(`(?i)(\s+(asc|desc))?(\s+nulls\s+(first|last))?\s*$`)
-
 func maskTemplateDelimiters(expr string) string {
 	replacer := strings.NewReplacer("{{", "@@", "}}", "##")
 	return replacer.Replace(expr)
@@ -136,8 +131,8 @@ func (e *Engine) validate() error {
 		if m.Filter != "" && isDerived(&m) {
 			return fmt.Errorf("metric %q: filter is not supported on derived metrics; put it on the base metrics it references", m.Name)
 		}
-		if m.Filter != "" && !containsAggregateOutsideRefs(m.Expression) {
-			return fmt.Errorf("metric %q: filter needs an aggregate function such as sum or count in the expression", m.Name)
+		if _, err := applyMetricFilter(m.Expression, "true"); m.Filter != "" && err != nil {
+			return fmt.Errorf("metric %q: %w", m.Name, err)
 		}
 	}
 	for _, s := range e.model.Segments {
@@ -627,8 +622,7 @@ func (e *Engine) expandSimple(name string, visited map[string]bool, plan *queryP
 			if err != nil {
 				return "", err
 			}
-			backslashEscapes := e.Dialect == "bigquery" || e.Dialect == "google_cloud_platform"
-			filtered, err := applyMetricFilter(expr, expandedFilter, backslashEscapes)
+			filtered, err := applyMetricFilter(expr, expandedFilter)
 			if err != nil {
 				return "", fmt.Errorf("metric %q: %w", name, err)
 			}
@@ -828,105 +822,36 @@ func expandRefs(expr string, resolve func(string) (string, error)) (string, erro
 	return b.String(), nil
 }
 
-// applyMetricFilter puts filter inside every aggregate call in expr.
-// Quoted text is skipped, since it may hold viewer values.
-func applyMetricFilter(expr, filter string, backslashEscapes bool) (string, error) {
-	masked, err := maskQuotedText(expr, backslashEscapes)
-	if err != nil {
-		return "", err
+// applyMetricFilter puts filter inside a metric that is one aggregate call,
+// such as sum(x). Like Cube and Looker, other shapes are rejected: filter a
+// base metric and wrap it in a derived metric instead.
+func applyMetricFilter(expr, filter string) (string, error) {
+	expr = strings.TrimSpace(expr)
+	parenIdx := strings.Index(expr, "(")
+	funcName := ""
+	if parenIdx > 0 {
+		funcName = strings.TrimSpace(expr[:parenIdx])
 	}
-	var b strings.Builder
-	rewrote := false
-	pos := 0
-	for {
-		loc := aggregateFuncPattern.FindStringSubmatchIndex(masked[pos:])
-		if loc == nil {
-			break
-		}
-		openIdx := pos + loc[1] - 1
-		closeIdx := findMatchingParen(masked, openIdx)
-		if closeIdx == -1 {
-			return "", fmt.Errorf("unbalanced parentheses in the expression %q", expr)
-		}
-		rewrote = true
-		// percentile_*(0.5) WITHIN GROUP: filter the ORDER BY value, not 0.5.
-		funcName := strings.ToLower(masked[pos+loc[2] : pos+loc[3]])
-		if within := withinGroupOrderByPattern.FindStringIndex(masked[closeIdx+1:]); within != nil && strings.HasPrefix(funcName, "percentile_") {
-			orderStart := closeIdx + 1 + within[1]
-			groupClose := findMatchingParen(masked, strings.LastIndex(masked[:orderStart], "("))
-			if groupClose == -1 {
-				return "", fmt.Errorf("unbalanced parentheses in the expression %q", expr)
-			}
-			order, maskedOrder := expr[orderStart:groupClose], masked[orderStart:groupClose]
-			value := order[:orderDirectionPattern.FindStringIndex(maskedOrder)[0]]
-			b.WriteString(expr[pos:orderStart])
-			fmt.Fprintf(&b, "CASE WHEN %s THEN %s ELSE NULL END%s", filter, value, order[len(value):])
-			pos = groupClose
-			continue
-		}
-		b.WriteString(expr[pos : openIdx+1])
-		b.WriteString(filterAggregateArgs(expr[openIdx+1:closeIdx], masked[openIdx+1:closeIdx], filter))
-		pos = closeIdx
+	if !plainColumnPattern.MatchString(funcName) || findMatchingParen(expr, parenIdx) != len(expr)-1 ||
+		containsAggregateOutsideRefs(expr[parenIdx+1:len(expr)-1]) {
+		return "", fmt.Errorf("a metric with filter must be a single aggregate call such as sum(amount), got %q; to round or combine it, reference it from a derived metric such as round({metric}, 2)", expr)
 	}
-	if !rewrote {
-		return "", fmt.Errorf("filter needs an aggregate function such as sum or count in the expression %q", expr)
-	}
-	b.WriteString(expr[pos:])
-	return b.String(), nil
-}
+	closeIdx := len(expr) - 1
 
-// filterAggregateArgs wraps the first argument in a CASE and keeps the rest.
-func filterAggregateArgs(args, masked, filter string) string {
-	split := len(args)
-	depth := 0
-	for i := 0; i < len(masked) && split == len(args); i++ {
-		switch masked[i] {
-		case '(':
-			depth++
-		case ')':
-			depth--
-		case ',':
-			if depth == 0 {
-				split = i
-			}
-		}
-	}
-	first, more := args[:split], args[split:]
-	arg := strings.TrimSpace(first)
-	if arg == "*" {
-		return fmt.Sprintf("CASE WHEN %s THEN 1 ELSE NULL END%s", filter, more)
-	}
-	if strings.HasPrefix(strings.ToUpper(arg), "DISTINCT ") {
-		arg = strings.TrimSpace(arg[len("DISTINCT "):])
-		return fmt.Sprintf("DISTINCT CASE WHEN %s THEN %s ELSE NULL END%s", filter, arg, more)
-	}
-	return fmt.Sprintf("CASE WHEN %s THEN %s ELSE NULL END%s", filter, arg, more)
-}
+	inner := expr[parenIdx+1 : closeIdx]
+	innerTrim := strings.TrimSpace(inner)
 
-// maskQuotedText blanks quoted text, keeping offsets. Backslash escapes
-// only BigQuery; elsewhere a backslash in quotes is an error.
-func maskQuotedText(s string, backslashEscapes bool) (string, error) {
-	b := []byte(s)
-	var quote byte
-	for i := 0; i < len(b); i++ {
-		c := b[i]
-		switch {
-		case quote == 0:
-			if c == '\'' || c == '"' || c == '`' {
-				quote = c
-			}
-		case c == '\\' && !backslashEscapes:
-			return "", fmt.Errorf("backslashes in quoted text are not supported in a filtered metric for this connection: %q", s)
-		case c == '\\' && i+1 < len(b):
-			b[i], b[i+1] = ' ', ' '
-			i++
-		case c == quote:
-			quote = 0
-		default:
-			b[i] = ' '
-		}
+	if innerTrim == "*" {
+		return fmt.Sprintf("%s(CASE WHEN %s THEN 1 ELSE NULL END)", funcName, filter), nil
 	}
-	return string(b), nil
+
+	upperInner := strings.ToUpper(innerTrim)
+	if strings.HasPrefix(upperInner, "DISTINCT ") {
+		arg := strings.TrimSpace(innerTrim[len("DISTINCT "):])
+		return fmt.Sprintf("%s(DISTINCT CASE WHEN %s THEN %s ELSE NULL END)", funcName, filter, arg), nil
+	}
+
+	return fmt.Sprintf("%s(CASE WHEN %s THEN %s ELSE NULL END)", funcName, filter, inner), nil
 }
 
 func findMatchingParen(s string, openIdx int) int {
