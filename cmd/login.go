@@ -305,6 +305,10 @@ func runOAuthLogin(ctx context.Context, c *cli.Command, deps loginDependencies) 
 		}
 	} else {
 		err = store.Save(*credential, expected)
+		if errors.Is(err, cloudauth.ErrLegacyTokenNotRemoved) {
+			_, _ = fmt.Fprintf(output, "Warning: %v.\n", err)
+			err = nil
+		}
 	}
 	if err != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)

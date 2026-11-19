@@ -1,9 +1,11 @@
 package cloudauth
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -12,11 +14,16 @@ import (
 
 	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/gofrs/flock"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
 
 const DefaultAPIURL = "https://cloud.getbruin.com/api/v1"
+
+// ErrLegacyTokenNotRemoved means the login was saved, but a token an older version kept in the OS credential
+// store could not be removed. The new login works; the old token only lingers in the credential store.
+var ErrLegacyTokenNotRemoved = errors.New("could not remove the previous token from the OS credential store; delete the \"bruin-cloud\" item there if you no longer need it")
 
 type Credential struct {
 	Token       string    `json:"access_token"`
@@ -170,9 +177,18 @@ func (s Store) migrate(credential *Credential, data []byte) error {
 	if err != nil {
 		return err
 	}
-	// A concurrent change to cloud.yml only postpones the move to the next command; the token is still usable.
-	if err := config.WriteCloudFile(afero.NewOsFs(), s.Path, data, updated); err != nil {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	// A login or logout that finished since data was read wins; the token still serves this command, and a
+	// pointer that is still there is moved by the next one.
+	if current, err := os.ReadFile(s.Path); err != nil || !bytes.Equal(current, data) {
 		return nil //nolint:nilerr
+	}
+	if err := config.WriteCloudFile(afero.NewOsFs(), s.Path, data, updated); err != nil {
+		return fmt.Errorf("could not move the global token from the OS credential store into %s: %w", s.Path, err)
 	}
 	_ = store.Remove(credential.key)
 	credential.connection = ref
@@ -180,13 +196,17 @@ func (s Store) migrate(credential *Credential, data []byte) error {
 	return nil
 }
 
+// Save writes the login to cloud.yml. It returns ErrLegacyTokenNotRemoved, after saving, when the replaced
+// login's token is left behind in the OS credential store.
 func (s Store) Save(credential Credential, expected []byte) error {
 	if credential.Token == "" || credential.APIURL == "" {
 		return errors.New("cannot store an incomplete credential")
 	}
-	if err := os.MkdirAll(filepath.Dir(s.Path), 0o700); err != nil {
+	unlock, err := s.lock()
+	if err != nil {
 		return err
 	}
+	defer unlock()
 	previous, _, err := s.Load()
 	if err != nil {
 		return err
@@ -204,13 +224,41 @@ func (s Store) Save(credential Credential, expected []byte) error {
 	if err := config.WriteCloudFile(afero.NewOsFs(), s.Path, expected, data); err != nil {
 		return err
 	}
-	_ = s.removeLegacyToken(previous)
+	if err := s.removeLegacyToken(previous); err != nil {
+		return ErrLegacyTokenNotRemoved
+	}
 	return nil
+}
+
+// lock serialises changes to cloud.yml across bruin processes; plain reads need no lock.
+func (s Store) lock() (func(), error) {
+	if err := os.MkdirAll(filepath.Dir(s.Path), 0o700); err != nil {
+		return nil, err
+	}
+	lock := flock.New(filepath.Join(filepath.Dir(s.Path), "cloud.lock"))
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		locked, err := lock.TryLock()
+		if err != nil {
+			return nil, fmt.Errorf("could not lock the global Bruin Cloud configuration: %w", err)
+		}
+		if locked {
+			break
+		}
+		if time.Now().After(deadline) {
+			return nil, errors.New("could not lock the global Bruin Cloud configuration: another bruin command is changing it")
+		}
+	}
+	return func() { _ = lock.Unlock() }, nil
+}
+
+// ownsLegacyToken reports whether credential points at a credential-store token that belongs to this file.
+func (s Store) ownsLegacyToken(credential *Credential) bool {
+	return credential != nil && credential.key != "" && s.Open != nil && s.validateReference(credential) == nil
 }
 
 // removeLegacyToken deletes a token an older version kept in the OS credential store, if it belongs to this file.
 func (s Store) removeLegacyToken(credential *Credential) error {
-	if credential == nil || credential.key == "" || s.validateReference(credential) != nil || s.Open == nil {
+	if !s.ownsLegacyToken(credential) {
 		return nil
 	}
 	store, err := s.Open()
@@ -276,6 +324,11 @@ func CheckDestination(stored, current string) error {
 }
 
 func (s Store) Delete() error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	credential, expected, err := s.Load()
 	if err != nil {
 		return err
@@ -287,7 +340,7 @@ func (s Store) Delete() error {
 		return err
 	}
 	if err := s.removeLegacyToken(credential); err != nil {
-		return errors.New("global login removed from configuration, but could not remove token from OS credential store")
+		return errors.New("global login removed from configuration, but could not remove its token from the OS credential store; delete the \"bruin-cloud\" item there if you no longer need it")
 	}
 	return nil
 }

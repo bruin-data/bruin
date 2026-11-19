@@ -95,12 +95,13 @@ func TestGlobalStorePreservesExistingConfig(t *testing.T) {
 
 // writeLegacyLogin writes a global login the way older versions did: the token in the credential store and a
 // keyring:// pointer in cloud.yml.
-func writeLegacyLogin(t *testing.T, store Store, secrets keyring.Keyring, token, tokenID string) string {
+func writeLegacyLogin(t *testing.T, store Store, secrets keyring.Keyring) string {
 	t.Helper()
+	const tokenID = "7"
 	require.NoError(t, os.MkdirAll(filepath.Dir(store.Path), 0o700))
 	key, err := store.key(tokenID, DefaultAPIURL)
 	require.NoError(t, err)
-	require.NoError(t, secrets.Set(keyring.Item{Key: key, Data: []byte(token)}))
+	require.NoError(t, secrets.Set(keyring.Item{Key: key, Data: []byte("legacy-token")}))
 	reference := url.URL{Scheme: "keyring", Host: key, Path: "/" + tokenID}
 	ref := config.CloudConnectionRef{Environment: "default", Connection: config.BruinCloudConnection{ConnectionMetadata: config.ConnectionMetadata{Name: "cloud"}, APIToken: reference.String(), APIURL: DefaultAPIURL}}
 	data, err := config.MarshalCloudConnection(nil, ref, "acme")
@@ -117,7 +118,7 @@ func TestGlobalStoreMigratesLegacyPointer(t *testing.T) {
 		opened++
 		return secrets, nil
 	}}
-	writeLegacyLogin(t, store, secrets, "legacy-token", "7")
+	writeLegacyLogin(t, store, secrets)
 
 	loaded, err := store.Read(DefaultAPIURL)
 	require.NoError(t, err)
@@ -142,7 +143,7 @@ func TestGlobalStoreLegacyPointerErrors(t *testing.T) {
 	t.Parallel()
 	secrets := keyring.NewArrayKeyring(nil)
 	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	key := writeLegacyLogin(t, store, secrets, "legacy-token", "7")
+	key := writeLegacyLogin(t, store, secrets)
 	data, err := os.ReadFile(store.Path)
 	require.NoError(t, err)
 
@@ -172,7 +173,7 @@ func TestGlobalStoreReplacesLegacyPointer(t *testing.T) {
 	t.Parallel()
 	secrets := keyring.NewArrayKeyring(nil)
 	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	writeLegacyLogin(t, store, secrets, "legacy-token", "7")
+	writeLegacyLogin(t, store, secrets)
 	data, err := os.ReadFile(store.Path)
 	require.NoError(t, err)
 	require.NoError(t, store.Save(Credential{Token: "fresh-token", TokenID: "8", APIURL: DefaultAPIURL}, data))
@@ -188,7 +189,7 @@ func TestGlobalStoreDeletesLegacyPointer(t *testing.T) {
 	t.Parallel()
 	secrets := keyring.NewArrayKeyring(nil)
 	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
-	writeLegacyLogin(t, store, secrets, "legacy-token", "7")
+	writeLegacyLogin(t, store, secrets)
 	require.NoError(t, store.Delete())
 	keys, err := secrets.Keys()
 	require.NoError(t, err)
@@ -196,4 +197,59 @@ func TestGlobalStoreDeletesLegacyPointer(t *testing.T) {
 	loaded, err := store.Read(DefaultAPIURL)
 	require.NoError(t, err)
 	assert.Nil(t, loaded)
+}
+
+func TestGlobalStoreMigrationYieldsToConcurrentLogout(t *testing.T) {
+	t.Parallel()
+	secrets := keyring.NewArrayKeyring(nil)
+	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
+	key := writeLegacyLogin(t, store, secrets)
+	// Log out while the migrating command is reading the credential store.
+	store.Open = func() (SecretStore, error) {
+		other := Store{Path: store.Path}
+		require.NoError(t, other.Delete())
+		return secrets, nil
+	}
+	loaded, err := store.Read(DefaultAPIURL)
+	require.NoError(t, err)
+	assert.Equal(t, "legacy-token", loaded.Token)
+	data, err := os.ReadFile(store.Path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "api_token", "migration must not restore a login removed meanwhile")
+	keys, err := secrets.Keys()
+	require.NoError(t, err)
+	assert.Equal(t, []string{key}, keys)
+}
+
+func TestGlobalStoreMigrationReportsWriteFailure(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs a directory the user cannot write")
+	}
+	secrets := keyring.NewArrayKeyring(nil)
+	store := Store{Path: filepath.Join(t.TempDir(), "bruin", "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
+	writeLegacyLogin(t, store, secrets)
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(store.Path), "cloud.lock"), nil, 0o600))
+	require.NoError(t, os.Chmod(filepath.Dir(store.Path), 0o500))
+	t.Cleanup(func() { _ = os.Chmod(filepath.Dir(store.Path), 0o700) })
+	_, err := store.Read(DefaultAPIURL)
+	require.ErrorContains(t, err, "could not move the global token")
+	keys, err := secrets.Keys()
+	require.NoError(t, err)
+	assert.Len(t, keys, 1, "the token must stay in the credential store until it is saved in cloud.yml")
+}
+
+func TestGlobalStoreReportsLeftoverLegacyToken(t *testing.T) {
+	t.Parallel()
+	secrets := keyring.NewArrayKeyring(nil)
+	store := Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (SecretStore, error) { return secrets, nil }}
+	writeLegacyLogin(t, store, secrets)
+	data, err := os.ReadFile(store.Path)
+	require.NoError(t, err)
+	store.Open = func() (SecretStore, error) { return nil, errors.New("locked") }
+	err = store.Save(Credential{Token: "fresh-token", TokenID: "8", APIURL: DefaultAPIURL}, data)
+	require.ErrorIs(t, err, ErrLegacyTokenNotRemoved)
+	loaded, err := store.Read(DefaultAPIURL)
+	require.NoError(t, err)
+	assert.Equal(t, "fresh-token", loaded.Token)
 }
