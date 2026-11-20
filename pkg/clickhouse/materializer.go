@@ -37,7 +37,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 			}
 			return buildSCD2ByColumnFullRefreshQuery(asset, query)
 		}
-		if mat.Strategy != pipeline.MaterializationStrategyDDL {
+		// Data Vault strategies have no CreateReplace equivalent here, so overriding them would
+		// silently build a plain table without the Data Vault loading rules.
+		if mat.Strategy != pipeline.MaterializationStrategyDDL && !mat.Strategy.IsDataVault() {
 			strategy = pipeline.MaterializationStrategyCreateReplace
 		}
 	}
@@ -65,7 +67,7 @@ func (m *Materializer) RenderWithCleanup(asset *pipeline.Asset, query string) ([
 	}
 
 	strategy := asset.Materialization.Strategy
-	if asset.FullRefreshEnabled(m.fullRefresh) && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL {
+	if asset.FullRefreshEnabled(m.fullRefresh) && asset.Materialization.Type == pipeline.MaterializationTypeTable && strategy != pipeline.MaterializationStrategyDDL && !strategy.IsDataVault() {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 	if m.cluster == "" && len(tableDeclarations(asset)) > 0 &&
