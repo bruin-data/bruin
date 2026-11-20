@@ -322,6 +322,9 @@ const (
 	SecretsBackendContextKey  EnvContextKey = "secrets_backend"
 	EnvironmentNameContextKey EnvContextKey = "environment_name"
 	ConfigFilePathContextKey  EnvContextKey = "config_file_path"
+	// ConnectionLookupErrorsContextKey holds a ConnectionLookupErrors, so a connection reported
+	// missing can say that its secrets backend couldn't be read instead.
+	ConnectionLookupErrorsContextKey EnvContextKey = "connection_lookup_errors"
 )
 
 type Config struct {

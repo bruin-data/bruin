@@ -35,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
+	"github.com/bruin-data/bruin/pkg/failurereport"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/inference"
@@ -1258,6 +1259,10 @@ func Run(isDebug *bool) *cli.Command {
 			// Errors are printed below, once credential masking is installed: a
 			// connection error can echo the DSN or URI it failed on, password included.
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
+			// A connection reported missing can then say that its secrets backend couldn't be read.
+			if lookupErrors, ok := connectionManager.(config.ConnectionLookupErrors); ok {
+				runCtx = context.WithValue(runCtx, config.ConnectionLookupErrorsContextKey, lookupErrors)
+			}
 
 			foundPipeline := pipelineInfo.Pipeline
 			connectionOverride, err := continuedConnectionOverride(c.String("connection-override"), c.Bool("continue"), runConfig.ConnectionOverride)
@@ -1954,10 +1959,13 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	fmt.Println(tree.String())
 }
 
+// printErrorsMinimal prints each failed asset's error, followed by a failurereport line that says
+// in a machine-readable way why it failed. Minimal logs are what Bruin Cloud runs with.
 func printErrorsMinimal(errorsInTaskResults []*scheduler.TaskExecutionResult) {
 	for _, result := range errorsInTaskResults {
 		assetName := result.Instance.GetAsset().Name
 		fmt.Printf("\n  %s: %s\n", assetName, result.Error)
+		fmt.Println(failurereport.Line(assetName, result.Error))
 	}
 }
 

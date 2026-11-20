@@ -15,4 +15,6 @@ var (
 	_ config.ConnectionResolver = (*DopplerClient)(nil)
 	_ config.ConnectionResolver = (*AWSSecretsManagerClient)(nil)
 	_ config.ConnectionResolver = (*AzureKeyVaultClient)(nil)
+
+	_ config.ConnectionLookupErrors = (*Client)(nil)
 )
