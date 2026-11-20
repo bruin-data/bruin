@@ -1,8 +1,11 @@
 package duck
 
 import (
+	"encoding/binary"
+	"io"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -13,11 +16,39 @@ import (
 const (
 	dbcDriverName = "duckdb"
 	quackAlias    = "quack_db"
-	// QuackDriverVersion pins the DuckDB ADBC driver used for Quack connections.
-	// Quack needs DuckDB 2.0+, while the default driver stays on a release
-	// MotherDuck supports, so the two are installed side by side.
+	// QuackDriverVersion pins the DuckDB ADBC driver used for Quack connections
+	// and DuckDB 2.0 database files. Both need DuckDB 2.0+, while the default
+	// driver stays on a release MotherDuck supports, so the two are installed side by side.
 	QuackDriverVersion = "2.0.0"
+	// maxDefaultDriverStorageVersion is the newest file header version the
+	// default driver reads; DuckDB 2.0 files carry 999 there.
+	maxDefaultDriverStorageVersion = 68
 )
+
+// IsDuckDB2FileURI reports whether an ingestr duckdb:/// URI points at a
+// database file only the DuckDB 2.0 driver can read.
+func IsDuckDB2FileURI(uri string) bool {
+	path, ok := strings.CutPrefix(uri, "duckdb:///")
+	return ok && isDuckDB2File(path)
+}
+
+// isDuckDB2File reads the DuckDB file header, a checksum followed by "DUCK" and
+// a little-endian version. Missing files are created by the default driver.
+func isDuckDB2File(path string) bool {
+	if path == "" || path == ":memory:" || strings.HasPrefix(path, "md:") {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	var header [20]byte
+	if _, err := io.ReadFull(f, header[:]); err != nil {
+		return false
+	}
+	return string(header[8:12]) == "DUCK" && binary.LittleEndian.Uint64(header[12:]) > maxDefaultDriverStorageVersion
+}
 
 // QuackADBCDriverDir returns the directory holding the Quack DuckDB driver.
 func QuackADBCDriverDir() (string, error) {
@@ -82,6 +113,12 @@ func (c Config) GetIngestrURI() string {
 
 func (c Config) HasQuack() bool {
 	return c.Quack
+}
+
+// usesDuckDB2Driver reports whether the connection needs the DuckDB 2.0 driver
+// instead of the default one.
+func (c Config) usesDuckDB2Driver() bool {
+	return c.HasQuack() || isDuckDB2File(c.Path)
 }
 
 // quackIngestrURI builds duckdb://:<token>@host[:port]?quack=true, keeping the
