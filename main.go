@@ -81,6 +81,7 @@ func main() {
 			cmd.Connections(),
 			cmd.Query(),
 			cmd.Semantic(&isDebug),
+			cmd.Dac(),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
 			cmd.Import(&isDebug),

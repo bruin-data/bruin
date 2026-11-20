@@ -271,11 +271,11 @@ func TestCurlExitCode(t *testing.T) {
 	failed := exec.CommandContext(t.Context(), "sh", "-c", "exit 7").Run()
 	var failedExit *exec.ExitError
 	require.ErrorAs(t, failed, &failedExit)
-	assert.Equal(t, 7, curlExitCode(failedExit))
+	assert.Equal(t, 7, subprocessExitCode(failedExit))
 
 	signalled := exec.CommandContext(t.Context(), "sh", "-c", "kill -TERM $$")
 	require.NoError(t, signalled.Start())
 	var signalledExit *exec.ExitError
 	require.ErrorAs(t, signalled.Wait(), &signalledExit)
-	assert.Equal(t, 128+int(syscall.SIGTERM), curlExitCode(signalledExit))
+	assert.Equal(t, 128+int(syscall.SIGTERM), subprocessExitCode(signalledExit))
 }

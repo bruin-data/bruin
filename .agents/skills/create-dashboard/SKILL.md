@@ -37,15 +37,17 @@ Dashboard files:
 
 ## Commands
 
+Run DAC through Bruin with `bruin dac …`. It works without installing DAC: Bruin downloads its pinned DAC release on first use, and DAC runs its queries through that same `bruin`.
+
 ```shell
-dac init my-dashboards
-dac validate --dir my-dashboards
-dac check --dir my-dashboards
-dac serve --dir my-dashboards --open
-dac query --dir my-dashboards --dashboard "Sales" --widget "Revenue"
+bruin dac init my-dashboards
+bruin dac validate --dir my-dashboards
+bruin dac check --dir my-dashboards
+bruin dac serve --dir my-dashboards --open
+bruin dac query --dir my-dashboards --dashboard "Sales" --widget "Revenue"
 ```
 
-Use `dac validate` after editing structure and `dac check` when query execution should be verified.
+Use `bruin dac validate` after editing structure and `bruin dac check` when query execution should be verified. A standalone `dac` install takes the same arguments (`dac validate --dir …`).
 
 ## Connection Config
 
@@ -195,7 +197,7 @@ Filter values are kept in the URL query string, so you can share a filtered dash
 SELECT * FROM orders WHERE owner_email = '{{ bruin.user_email }}'
 ```
 
-Locally there is no signed-in user, so the value comes from the `BRUIN_USER_EMAIL` environment variable (empty if unset). To preview a user-scoped dashboard as a specific person, pass it inline: `BRUIN_USER_EMAIL=someone@example.com dac dev`. In Bruin Cloud this becomes dynamic per signed-in viewer.
+Locally there is no signed-in user, so the value comes from the `BRUIN_USER_EMAIL` environment variable (empty if unset). To preview a user-scoped dashboard as a specific person, pass it inline: `BRUIN_USER_EMAIL=someone@example.com bruin dac serve`. In Bruin Cloud this becomes dynamic per signed-in viewer.
 
 ## Named Queries
 
@@ -428,7 +430,7 @@ TSX supports the same dashboard model as YAML. Keep semantic logic declarative; 
 
 ## Deprecated Fields
 
-These fields were removed from the DAC schema. Never emit them in new dashboards. **If you encounter any of them while reading or editing an existing dashboard, refactor them to the current form** — preserving the original column, formatting, and labels — and re-run `dac validate` to confirm the dashboard still loads.
+These fields were removed from the DAC schema. Never emit them in new dashboards. **If you encounter any of them while reading or editing an existing dashboard, refactor them to the current form** — preserving the original column, formatting, and labels — and re-run `bruin dac validate` to confirm the dashboard still loads.
 
 | Deprecated | Replacement |
 |---|---|

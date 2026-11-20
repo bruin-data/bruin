@@ -1,0 +1,10 @@
+{
+  "archives": {
+    "dac_Darwin_arm64.tar.gz": "9a41427a96ce6879339a9022d32fe7a20f0b9805df737498582a06c70019fcd8",
+    "dac_Darwin_x86_64.tar.gz": "81b615051d0216abcd264aa659e53b2e56dcdfdaf76f10cc8f3787b410087c14",
+    "dac_Linux_arm64.tar.gz": "500a37023b127edcf89bd71af751514e5bd1c3cc580efb7ebd0daf761dc385d6",
+    "dac_Linux_x86_64.tar.gz": "ec465139fa521e89b38ef1fcb0bb06c64acb9976ba7fd44426372946da609a84",
+    "dac_Windows_x86_64.zip": "55c9d985ad979d9d90113109f9d10927574e3565efc2d9d4283ff23abe75fe04"
+  },
+  "version": "0.32.5"
+}

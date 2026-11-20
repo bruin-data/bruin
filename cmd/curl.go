@@ -73,7 +73,7 @@ func newCurlCommand(resolveConnections curlConnectionLookupResolver, execute cur
 			if err := execute(ctx, renderedArgs, root.Reader, root.Writer, root.ErrWriter); err != nil {
 				var exitError *exec.ExitError
 				if errors.As(err, &exitError) {
-					return cli.Exit("", curlExitCode(exitError))
+					return cli.Exit("", subprocessExitCode(exitError))
 				}
 				return failCurlCommand(root, errors.Wrap(err, "failed to execute curl"))
 			}
@@ -93,9 +93,10 @@ func failCurlCommand(root *cli.Command, err error) error {
 	return cli.Exit("", 1)
 }
 
-// curlExitCode reports curl's own exit code, mapping a signalled curl onto the
-// 128+signal convention that a shell would have reported for curl itself.
-func curlExitCode(exitError *exec.ExitError) int {
+// subprocessExitCode reports a wrapped command's own exit code (curl, dac),
+// mapping a signalled command onto the 128+signal convention that a shell would
+// have reported for it.
+func subprocessExitCode(exitError *exec.ExitError) int {
 	code := exitError.ExitCode()
 	if code >= 0 {
 		return code

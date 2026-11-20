@@ -54,6 +54,7 @@ bruin validate --help
 | [`query`](/commands/query) | Execute ad-hoc queries against connections |
 | [`semantic`](/commands/semantic) | Validate semantic models and run their quality checks |
 | [`curl`](/commands/curl) | Call remote services with connection-aware Jinja rendering |
+| [`dac`](/commands/dac) | Build and serve dashboards as code with dac, installed on first use |
 | [`data-diff`](/commands/data-diff) | Compare data between connections |
 
 ### Asset Operations
