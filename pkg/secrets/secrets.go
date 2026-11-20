@@ -4,7 +4,8 @@ import "github.com/bruin-data/bruin/pkg/config"
 
 // Every backend resolves a connection by name and can say why a lookup failed.
 // GetConnection collapses that failure into a nil, so callers that need the
-// reason reach for ResolveConnection instead.
+// reason reach for ResolveConnection instead. Backends that can enumerate their
+// connections also back `bruin connections list`.
 var (
 	_ config.ConnectionAndDetailsGetter = (*Client)(nil)
 	_ config.ConnectionAndDetailsGetter = (*DopplerClient)(nil)
@@ -16,5 +17,11 @@ var (
 	_ config.ConnectionResolver = (*AWSSecretsManagerClient)(nil)
 	_ config.ConnectionResolver = (*AzureKeyVaultClient)(nil)
 
+	_ config.ConnectionsConfigGetter = (*Client)(nil)
+	_ config.ConnectionsConfigGetter = (*AWSSecretsManagerClient)(nil)
+	_ config.ConnectionsConfigGetter = (*AzureKeyVaultClient)(nil)
+
 	_ config.ConnectionLookupErrors = (*Client)(nil)
+	_ config.ConnectionLookupErrors = (*AWSSecretsManagerClient)(nil)
+	_ config.ConnectionLookupErrors = (*AzureKeyVaultClient)(nil)
 )
