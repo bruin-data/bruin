@@ -4,7 +4,7 @@
 
 Bruin supports QuickBooks as a source for [Ingestr assets](/assets/ingestr), so you can ingest data from QuickBooks into your data warehouse.
 
-To connect to QuickBooks you must add a configuration item to the `.bruin.yml` file and the asset file. You will need `company_id`, `client_id`, `client_secret` and `refresh_token`.
+To connect to QuickBooks you must add a configuration item to the `.bruin.yml` file and the asset file. You will need `company_id`, `client_id`, `client_secret`, and a `refresh_token` or an `access_token`.
 
 Follow the steps below to correctly set up QuickBooks as a data source and run ingestion.
 
@@ -28,8 +28,10 @@ connections:
 - `company_id`: The QuickBooks company (realm) id.
 - `client_id`: OAuth client id from your Intuit application.
 - `client_secret`: OAuth client secret.
-- `refresh_token`: OAuth refresh token used to obtain access tokens.
+- `refresh_token`: OAuth refresh token used to obtain access tokens. Required unless `access_token` is set.
+- `access_token`: Optional OAuth access token. Use it instead of `refresh_token` to authenticate with an existing token; it expires after about an hour, so prefer `refresh_token` for scheduled runs.
 - `environment`: Optional environment name, either production or sandbox. Defaults to production.
+- `minor_version`: Optional QuickBooks API minor version to request.
 
 ### Step 2: Create an asset file for data ingestion
 
