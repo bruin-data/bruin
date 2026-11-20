@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -22,8 +23,8 @@ type MissingConnectionError struct {
 // connection failed. Their GetConnection returns nil either way, so a connection that doesn't
 // exist and a backend that couldn't be read would otherwise look the same.
 type ConnectionLookupErrors interface {
-	// LookupError returns why the last read of the named connection failed, or nil if it
-	// succeeded or the connection doesn't exist.
+	// LookupError returns why reading the named connection failed during this run, or nil if it
+	// never failed other than by the connection not existing.
 	LookupError(name string) error
 }
 
@@ -62,10 +63,17 @@ func (e *MissingConnectionError) Error() string {
 
 	secretsBackend := strings.TrimSpace(e.SecretsBackend)
 	if e.Cause != nil {
-		if secretsBackend == "" {
-			return fmt.Sprintf("%sconnection '%s' could not be read: %v", prefix, e.Name, e.Cause)
+		// The cause is not shown: it can carry the backend's address, or the connection's own
+		// values when configuring it failed, and those aren't masked in the output.
+		from := ""
+		if secretsBackend != "" {
+			from = fmt.Sprintf(" from secrets backend '%s'", secretsBackend)
 		}
-		return fmt.Sprintf("%sconnection '%s' could not be read from secrets backend '%s': %v", prefix, e.Name, secretsBackend, e.Cause)
+		var unavailable *SecretsBackendUnavailableError
+		if errors.As(e.Cause, &unavailable) {
+			return fmt.Sprintf("%sconnection '%s' could not be read%s: the secrets backend is unavailable", prefix, e.Name, from)
+		}
+		return fmt.Sprintf("%sconnection '%s' read%s is not a valid connection", prefix, e.Name, from)
 	}
 	if secretsBackend != "" {
 		return fmt.Sprintf("%sconnection '%s' not found in secrets backend '%s'", prefix, e.Name, secretsBackend)

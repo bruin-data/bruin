@@ -814,10 +814,28 @@ func TestClient_LookupError_TellsAnUnreadableSecretFromAMissingOne(t *testing.T)
 	require.ErrorAs(t, c.LookupError("gcp-prod"), &unavailable, "Vault couldn't be read")
 
 	mock.err = &vault.ResponseError{StatusCode: 404, Errors: []string{}}
-	require.Nil(t, c.GetConnection("gcp-prod"))
-	require.NoError(t, c.LookupError("gcp-prod"), "the secret doesn't exist")
+	require.Nil(t, c.GetConnection("missing"))
+	require.NoError(t, c.LookupError("missing"), "the secret doesn't exist")
 
 	mock.err = errors.New("Vault returned HTTP status 500")
-	require.Nil(t, c.GetConnectionDetails("gcp-prod"))
-	require.Error(t, c.LookupError("gcp-prod"), "details are read the same way")
+	require.Nil(t, c.GetConnectionDetails("other"))
+	require.Error(t, c.LookupError("other"), "details are read the same way")
+}
+
+// Another asset reading the same connection successfully mustn't erase why this asset's read
+// failed: it asks for the reason only after its own read returned.
+func TestClient_LookupError_SurvivesALaterSuccessfulRead(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockVaultClient{err: errors.New("context deadline exceeded")}
+	c := &Client{client: mock, mountPath: "mount", path: "path", logger: &mockLogger{}}
+	require.Nil(t, c.GetConnection("pg-prod"))
+
+	mock.err = nil
+	mock.response = &vault.Response[schema.KvV2ReadResponse]{Data: schema.KvV2ReadResponse{Data: map[string]any{
+		"type":    "postgres",
+		"details": map[string]any{"username": "u", "password": "p", "host": "h", "port": 5432, "database": "d"},
+	}}}
+	require.NotNil(t, c.GetConnection("pg-prod"))
+	require.Error(t, c.LookupError("pg-prod"))
 }

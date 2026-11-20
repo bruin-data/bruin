@@ -203,7 +203,8 @@ type Client struct {
 	cacheManagers           map[string]config.ConnectionAndDetailsGetter
 	cacheConnections        map[string]any
 	cacheConnectionsDetails map[string]any
-	// lookupErrors holds why the last read of a connection failed, except for a missing secret.
+	// lookupErrors holds why reading a connection failed, except for a missing secret. Once
+	// recorded, an error stays for the run: see recordLookup.
 	lookupErrors map[string]error
 }
 
@@ -376,13 +377,17 @@ func (c *Client) LookupError(name string) error {
 
 // recordLookup remembers why reading a connection failed, so that a connection reported missing
 // because Vault couldn't be read says so. A missing secret is just a missing connection.
+//
+// A failure isn't cleared by a later successful read: assets read connections concurrently, and
+// an asset whose read failed asks for the reason after its read returned, by which time another
+// asset may have read the same connection. Keeping it means a connection is at worst reported
+// unreadable when it was missing, which gets it retried rather than given up on.
 func (c *Client) recordLookup(name string, err error) {
-	c.cacheMu.Lock()
-	defer c.cacheMu.Unlock()
 	if err == nil || isSecretNotFound(err) {
-		delete(c.lookupErrors, name)
 		return
 	}
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
 	if c.lookupErrors == nil {
 		c.lookupErrors = make(map[string]error)
 	}
