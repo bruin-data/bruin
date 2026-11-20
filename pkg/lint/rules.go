@@ -2734,19 +2734,28 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 
 	validationCtx := context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
 
+	// Interval modifiers and pipeline macros are user content, so a template that fails to
+	// render is reported against the asset instead of aborting the validation of every pipeline.
+	renderFailure := func(err error) []*Issue {
+		return []*Issue{{
+			Task:        asset,
+			Description: fmt.Sprintf("failed to render the time interval for asset %v: %v", asset.Name, err),
+		}}
+	}
+
 	r, err := intervalRenderer.CloneForAsset(validationCtx, p, asset)
 	if err != nil {
-		return nil, err
+		return renderFailure(err), nil
 	}
 
 	renderedStartDate, err := r.Render("{{ start_datetime }}")
 	if err != nil {
-		return nil, err
+		return renderFailure(err), nil
 	}
 
 	renderedEndDate, err := r.Render("{{ end_datetime }}")
 	if err != nil {
-		return nil, err
+		return renderFailure(err), nil
 	}
 
 	parsedStartDate, err := time.Parse("2006-01-02T15:04:05", renderedStartDate)

@@ -33,6 +33,8 @@ func init() { //nolint: gochecknoinits
 var (
 	missingVariableRegex = regexp.MustCompile(`name\s+"([^"]+)"`)
 	locationRegex        = regexp.MustCompile(`\(Line: \d+ Col: \d+, near ".*?"\)`)
+	notCallableRegex     = regexp.MustCompile(`^(\S+) is not callable$`)
+	unknownMethodRegex   = regexp.MustCompile(`^unknown method '[^']+' for .+$`)
 )
 
 const macroOutputBoundary = "__BRUIN_INTERNAL_MACRO_OUTPUT_BOUNDARY__"
@@ -392,6 +394,11 @@ func findRenderErrorType(err error) string {
 			return "missing variable '" + match[1] + "'"
 		}
 
+		return innermostErr
+	} else if match := notCallableRegex.FindStringSubmatch(innermostErr); match != nil {
+		// Gonja reports both undefined names and defined non-callable values this way.
+		return "'" + match[1] + "' is not callable, make sure it is a defined macro or function"
+	} else if unknownMethodRegex.MatchString(innermostErr) {
 		return innermostErr
 	}
 
