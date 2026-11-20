@@ -2313,6 +2313,9 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 
 			q := &query.Query{Query: renderedQuery}
 			valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), q)
+			if tableNotBuiltYet(err, p) {
+				continue
+			}
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,
@@ -2497,6 +2500,9 @@ func (g *GlossaryChecker) EnsureParentDomainsExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
+// ansiEscape matches the terminal highlighting SQLGlot puts in its parse errors.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 type UsedTableValidatorRule struct {
 	renderer jinja.RendererInterface
 	parser   sqlparser.Parser
@@ -2534,7 +2540,7 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "failed to get missing dependencies: " + err.Error(),
+			Description: "failed to get missing dependencies: " + ansiEscape.ReplaceAllString(err.Error(), ""),
 		})
 		return issues, nil //nolint
 	}

@@ -4363,6 +4363,18 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "parse error highlighting is stripped",
+			asset: &pipeline.Asset{
+				Type:           pipeline.AssetTypeDuckDBQuery,
+				ExecutableFile: pipeline.ExecutableFile{Content: "SELEC 1"},
+			},
+			setup: func(p *mockSQLParser) {
+				p.On("GetMissingDependenciesForAsset", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, errors.New("Invalid expression / Unexpected token. Line 1, Col: 5.\n  \x1b[4mSELEC\x1b[0m 1"))
+			},
+			want:    []string{"failed to get missing dependencies: Invalid expression / Unexpected token. Line 1, Col: 5.\n  SELEC 1"},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "no missing dependencies, no error",
 			asset: &pipeline.Asset{
 				Type:            pipeline.AssetTypeBigqueryQuery,
@@ -5386,6 +5398,20 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, issues, 1)
 		assert.Contains(t, issues[0].Description, "Custom check query is invalid")
+	})
+
+	t.Run("missing table is caught unless an asset builds it", func(t *testing.T) {
+		t.Parallel()
+		unbuilt := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Catalog Error: Table with name asset1 does not exist!")}}
+		issues, err := ValidateCustomCheckQueryDryRun(unbuilt, jinja.NewRendererWithYesterday("test", "test"))(t.Context(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+
+		misspelled := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Catalog Error: Table with name aset1 does not exist!")}}
+		issues, err = ValidateCustomCheckQueryDryRun(misspelled, jinja.NewRendererWithYesterday("test", "test"))(t.Context(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "aset1 does not exist")
 	})
 
 	t.Run("custom check with empty query", func(t *testing.T) {

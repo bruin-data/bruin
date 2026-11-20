@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -203,6 +204,9 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		return issues, nil
 	}
 	valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
+	if tableNotBuiltYet(err, p) {
+		return issues, nil
+	}
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -362,6 +366,10 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 				return
 			}
 			valid, err := valll.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
+			if tableNotBuiltYet(err, p) {
+				q.Logger.Debugf("skipping query validation for asset '%s', it reads a table that has not been built yet", task.Name)
+				return
+			}
 			if err != nil {
 				mu.Lock()
 				issues = append(issues, &Issue{
@@ -387,6 +395,28 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 	q.Logger.Debugf("Workers finished for task '%s'", task.Name)
 	done <- issues
 	q.Logger.Debugf("Pushed issues to the done channel for task '%s'", task.Name)
+}
+
+// missingTableError matches DuckDB's error for a table that does not exist.
+var missingTableError = regexp.MustCompile(`Table with name (.+?) does not exist`)
+
+// tableNotBuiltYet reports whether err is about a missing table that an asset in this pipeline
+// creates, which happens before the first run, as opposed to a misspelled table name.
+func tableNotBuiltYet(err error, p *pipeline.Pipeline) bool {
+	if err == nil {
+		return false
+	}
+	match := missingTableError.FindStringSubmatch(err.Error())
+	if match == nil {
+		return false
+	}
+	for _, asset := range p.Assets {
+		name := strings.ToLower(asset.Name)
+		if name == strings.ToLower(match[1]) || strings.HasSuffix(name, "."+strings.ToLower(match[1])) {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *QueryValidatorRule) bufferSize() int {
