@@ -12,4 +12,4 @@ custom_checks:
       query: select true
 @bruin */
 
-select "easy comes easy goes" as msgOfTheDay
+select 'easy comes easy goes' as msgOfTheDay

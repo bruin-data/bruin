@@ -113,6 +113,32 @@ func hasAttachmentStatement(sqlStr string) (bool, error) {
 	return false, nil
 }
 
+// splitStatements returns the non-empty top-level statements of a script, without their semicolons.
+func splitStatements(sqlStr string) ([]string, error) {
+	tokens, err := sqlengine.MustDialect("duckdb").Tokenize(sqlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to tokenize DuckDB query: %w", err)
+	}
+	// Token positions count code points, not bytes.
+	runes := []rune(sqlStr)
+	statements := []string{}
+	start, hasTokens := 0, false
+	for _, token := range tokens {
+		if token.Type != sqlengine.TK_SEMICOLON {
+			hasTokens = true
+			continue
+		}
+		if hasTokens {
+			statements = append(statements, strings.TrimSpace(string(runes[start:token.Start])))
+		}
+		start, hasTokens = int(token.End)+1, false
+	}
+	if hasTokens {
+		statements = append(statements, strings.TrimSpace(string(runes[start:])))
+	}
+	return statements, nil
+}
+
 // openADBC leases a fresh session. Cleanup releases the session before allowing
 // an external process or run cleanup to close the database.
 //
@@ -488,22 +514,17 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 	}
 	defer cleanup()
 
-	stmt, err := conn.NewStatement()
-	if err != nil {
-		return nil, err
+	// DuckDB points errors in a multi-statement script at the wrong line, so run the
+	// statements one by one on this session, which keeps their transactions intact.
+	sqlStr = inlineQueryArgs(sqlStr, arguments)
+	statements, err := splitStatements(sqlStr)
+	if err != nil || len(statements) < 2 {
+		statements = []string{sqlStr}
 	}
-	defer stmt.Close()
-
-	if err := stmt.SetSqlQuery(inlineQueryArgs(sqlStr, arguments)); err != nil {
-		return nil, transactionError(err)
-	}
-
-	reader, _, err := stmt.ExecuteQuery(ctx)
-	if err != nil {
-		return nil, transactionError(err)
-	}
-	if reader != nil {
-		reader.Release()
+	for _, statement := range statements {
+		if err := execADBCStatement(ctx, conn, statement); err != nil {
+			return nil, transactionError(err)
+		}
 	}
 
 	return driver.RowsAffected(0), nil
