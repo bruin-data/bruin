@@ -90,7 +90,6 @@ require (
 
 require (
 	cel.dev/expr v0.25.2 // indirect
-	cloud.google.com/go/auth v0.18.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.3 // indirect
@@ -278,7 +277,6 @@ require (
 	google.golang.org/genproto v0.0.0-20260316180232-0b37fe3546d5 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
-	google.golang.org/grpc v1.83.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gotest.tools/gotestsum v1.8.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
@@ -288,12 +286,15 @@ require (
 
 require (
 	cloud.google.com/go v0.123.0
+	cloud.google.com/go/auth v0.18.2
+	cloud.google.com/go/secretmanager v1.16.0
 	github.com/99designs/keyring v1.2.2
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0
 	github.com/bruin-data/bruin/semantic-engine v0.0.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/gofrs/flock v0.13.0
+	google.golang.org/grpc v1.83.2
 )
 
 replace github.com/bruin-data/bruin/semantic-engine => ./semantic-engine

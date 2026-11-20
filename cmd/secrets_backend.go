@@ -18,7 +18,7 @@ func SecretsBackendFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:    secretsBackendFlagName,
 		Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-		Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure'",
+		Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure', 'gcp'",
 	}
 }
 
@@ -77,7 +77,13 @@ func connectionManagerFromConfig(ctx context.Context, cm *config.Config, log log
 			return nil, []error{fmt.Errorf("failed to initialize Azure Key Vault client: %w", err)}
 		}
 		return manager, nil
+	case "gcp":
+		manager, err := secrets.NewGCPSecretManagerClientFromEnv(ctx, log)
+		if err != nil {
+			return nil, []error{fmt.Errorf("failed to initialize GCP Secret Manager client: %w", err)}
+		}
+		return manager, nil
 	default:
-		return nil, []error{fmt.Errorf("unsupported secrets backend %q; possible values: vault, doppler, aws, azure", secretsBackend)}
+		return nil, []error{fmt.Errorf("unsupported secrets backend %q; possible values: vault, doppler, aws, azure, gcp", secretsBackend)}
 	}
 }
