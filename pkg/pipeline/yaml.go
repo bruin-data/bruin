@@ -343,7 +343,7 @@ type customCheck struct {
 	Name          string        `yaml:"name"`
 	Description   string        `yaml:"description"`
 	Query         string        `yaml:"query"`
-	Value         int64         `yaml:"value"`
+	Value         float64       `yaml:"value"`
 	Count         *int64        `yaml:"count"`
 	Blocking      *bool         `yaml:"blocking"`
 	Retries       *int          `yaml:"retries,omitempty"`

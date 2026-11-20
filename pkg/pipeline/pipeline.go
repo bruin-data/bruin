@@ -1158,7 +1158,7 @@ type CustomCheck struct {
 	ID            string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name          string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description   string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value         int64           `json:"value" yaml:"value" mapstructure:"value"`
+	Value         float64         `json:"value" yaml:"value" mapstructure:"value"`
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
