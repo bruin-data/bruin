@@ -194,12 +194,12 @@ func (p *queryPlan) dimensionSQL(binding *dimensionBinding) string {
 	expr := p.engine.dimExpr(binding.dimension, binding.ref.Granularity)
 	if binding.model == p.engine.model {
 		if p.hasJoins() {
-			return qualifySQLIdentifiers(expr, "base", p.engine.backslashEscapes())
+			return qualifySQLIdentifiers(expr, "base", backslashEscapes(p.engine.Dialect))
 		}
 		return expr
 	}
 	spec := p.joinsByName[binding.relationName]
-	return qualifySQLIdentifiers(expr, spec.alias, p.engine.backslashEscapes())
+	return qualifySQLIdentifiers(expr, spec.alias, backslashEscapes(p.engine.Dialect))
 }
 
 func (p *queryPlan) fromSQL() string {

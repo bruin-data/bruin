@@ -87,7 +87,7 @@ func (e *Engine) maskSQL(expr string) string {
 	if e.Dialect == "" {
 		return maskSQLAnyDialect(expr)
 	}
-	return maskSQL(expr, e.backslashEscapes())
+	return maskSQL(expr, backslashEscapes(e.Dialect))
 }
 
 func derivedFilterError(name string) error {
@@ -102,7 +102,7 @@ var standardStringDialects = map[string]bool{
 
 // backslashEscapes is false only for dialects known to treat a backslash as
 // text; elsewhere it is true, which keeps DAC's \' escaped values in quotes.
-func (e *Engine) backslashEscapes() bool { return !standardStringDialects[e.Dialect] }
+func backslashEscapes(dialect string) bool { return !standardStringDialects[dialect] }
 
 // Engine generates SQL from a Model and a Query.
 type Engine struct {
@@ -699,14 +699,14 @@ func (e *Engine) expandSimple(name string, visited map[string]bool, plan *queryP
 	if !e.isDerived(m) {
 		expr := m.Expression
 		if plan != nil && plan.hasJoins() {
-			expr = qualifySQLIdentifiers(expr, "base", e.backslashEscapes())
+			expr = qualifySQLIdentifiers(expr, "base", backslashEscapes(e.Dialect))
 		}
 		if m.Filter != "" {
 			expandedFilter, _, err := e.expandFilterExpr(m.Filter, plan)
 			if err != nil {
 				return "", err
 			}
-			filtered, err := applyMetricFilter(expr, expandedFilter, e.backslashEscapes())
+			filtered, err := applyMetricFilter(expr, expandedFilter, backslashEscapes(e.Dialect))
 			if err != nil {
 				return "", fmt.Errorf("metric %q: %w", name, err)
 			}
@@ -1042,7 +1042,7 @@ func (e *Engine) expandFilterExpr(expr string, plan *queryPlan) (string, bool, e
 	hasAggregate := e.containsAggregateOutsideRefs(expr)
 	if !refPattern.MatchString(masked) {
 		if plan != nil && plan.hasJoins() {
-			expr = qualifySQLIdentifiers(expr, "base", e.backslashEscapes())
+			expr = qualifySQLIdentifiers(expr, "base", backslashEscapes(e.Dialect))
 		}
 		return expr, hasAggregate, nil
 	}
@@ -1056,7 +1056,7 @@ func (e *Engine) expandFilterExpr(expr string, plan *queryPlan) (string, bool, e
 		if dim, ok := e.dims[refName]; ok {
 			expr := e.dimExpr(dim, "")
 			if plan != nil && plan.hasJoins() {
-				expr = qualifySQLIdentifiers(expr, "base", e.backslashEscapes())
+				expr = qualifySQLIdentifiers(expr, "base", backslashEscapes(e.Dialect))
 			}
 			return expr
 		}
@@ -1275,6 +1275,9 @@ func formatValue(v interface{}, dialect ...string) string {
 		if len(dialect) > 0 && (dialect[0] == "bigquery" || dialect[0] == "google_cloud_platform") {
 			// GoogleSQL accepts double-quoted strings and Go's escape sequences.
 			return strconv.Quote(val)
+		}
+		if len(dialect) > 0 && backslashEscapes(dialect[0]) {
+			val = strings.ReplaceAll(val, `\`, `\\`)
 		}
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
 	case int:

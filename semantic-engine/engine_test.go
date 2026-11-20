@@ -2890,3 +2890,30 @@ func TestGenerateSQL_CycleRevealedByDialect(t *testing.T) {
 		t.Fatalf("want circular dependency error, got %v", err)
 	}
 }
+
+func TestFilterValueBackslashStaysInString(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, &Model{
+		Name:       "m",
+		Source:     Source{Table: "t"},
+		Dimensions: []Dimension{{Name: "note", Type: "string"}},
+		Metrics:    []Metric{{Name: "n", Expression: "count(*)"}},
+	})
+	for dialect, want := range map[string]string{
+		"snowflake": `note = '\\'' OR 1=1 --'`,
+		"":          `note = '\\'' OR 1=1 --'`,
+		"duckdb":    `note = '\'' OR 1=1 --'`,
+		"bigquery":  `note = "\\' OR 1=1 --"`,
+	} {
+		engine.Dialect = dialect
+		sql, err := engine.GenerateSQL(&Query{
+			Metrics: []string{"n"},
+			Filters: []Filter{{Dimension: "note", Operator: "equals", Value: `\' OR 1=1 --`}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, sql, want)
+	}
+}
