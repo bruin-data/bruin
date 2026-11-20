@@ -784,18 +784,21 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		return "", nil, "", "", nil, err
 	}
 
+	connName, conn, err := getSemanticQueryConnection(ctx, pipelineInfo, env, connectionName, model.Source.Connection, assetPath != "")
+	if err != nil {
+		return "", nil, "", "", nil, err
+	}
+	connType := pipelineInfo.Config.SelectedEnvironment.Connections.ConnectionsSummaryList()[connName]
+	dialect := sqlparser.ConnectionTypeToDialect(connType)
+
 	engine, err := semantic.NewEngineWithModels(model, models)
 	if err != nil {
 		return "", nil, "", "", nil, errors.Wrapf(err, "failed to initialize semantic model %q", semanticModelName)
 	}
+	engine.Dialect = semanticCheckDialect(connType)
 	compiledQuery, err := engine.GenerateSQL(semanticQuery)
 	if err != nil {
 		return "", nil, "", "", nil, errors.Wrap(err, "failed to compile semantic query")
-	}
-
-	connName, conn, err := getSemanticQueryConnection(ctx, pipelineInfo, env, connectionName, model.Source.Connection, assetPath != "")
-	if err != nil {
-		return "", nil, "", "", nil, err
 	}
 
 	if assetPath != "" {
@@ -833,7 +836,6 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		dialect := sqlparser.ConnectionTypeToDialect(pipelineInfo.Config.SelectedEnvironment.Connections.ConnectionsSummaryList()[connName])
 		return connName, conn, queryStr, dialect, pipelineInfo, nil
 	}
 }
