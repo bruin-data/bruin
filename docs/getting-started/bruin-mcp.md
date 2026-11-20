@@ -46,7 +46,7 @@ Run `claude mcp list` to check that the `bruin` server is connected.
 
 ### Cursor IDE
 
-Go to Cursor Settings > MCP & Integrations > Add Custom MCP, then add the following configuration to the configuration file (`~/.cursor/mcp.json`):
+Add the following configuration to `~/.cursor/mcp.json` (create the file if it doesn't exist). To set Bruin MCP up for a single project instead, use `.cursor/mcp.json` in the project folder. You can also add and manage MCP servers from the **Customize** page in Cursor.
 
 ```json
 {
@@ -65,7 +65,7 @@ There are two ways to set up Bruin MCP in VS Code:
 
 #### Option 1: Edit the mcp.json file
 
-1. Open the Command Palette with `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux) and run **MCP: Open User Configuration**. This opens your user-level `mcp.json` file, which lives at:
+1. Open the Command Palette with `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux) and run **MCP: Open User Configuration**. This opens your user-level `mcp.json` file, which for the default profile lives at:
    - **macOS**: `~/Library/Application Support/Code/User/mcp.json`
    - **Windows**: `%APPDATA%\Code\User\mcp.json`
    - **Linux**: `~/.config/Code/User/mcp.json`
@@ -123,7 +123,7 @@ Run `codex mcp list` to check that the server is registered, and `/mcp` inside a
 ### Troubleshooting
 
 - **The `bruin` server fails to start, or its tools never show up.** The app can't find the `bruin` binary. Use the full path as described in [Use the full path to `bruin`](#use-the-full-path-to-bruin), then restart the app.
-- **Codex asks for approval on every Bruin tool call, or `codex exec` fails with `MCP tool call requires approval`.** Upgrade Bruin CLI with `bruin upgrade`. Current versions mark the Bruin MCP tools as read-only so Codex can run them without asking.
+- **Codex asks for approval on every Bruin tool call, or `codex exec` fails with `MCP tool call requires approval`.** Bruin CLI versions newer than v0.11.830 mark the Bruin MCP tools as read-only, so Codex can run them without asking. Run `bruin upgrade` to get the latest version.
 - **You want to see what the server is doing.** Add `--debug` to the arguments (e.g. `"args": ["mcp", "--debug"]`). The server then logs every request and response to stderr, which most clients show in their MCP logs.
 
 ## Bruin Environment Setup
