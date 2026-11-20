@@ -521,3 +521,30 @@ func TestOdooSourceTables(t *testing.T) {
 		require.Contains(t, names, name)
 	}
 }
+
+func TestBreezyHRAndPrivatusSourceTables(t *testing.T) {
+	t.Parallel()
+
+	breezy, err := GetSourceTables("breezyhr")
+	require.NoError(t, err)
+	require.Len(t, breezy.Tables, 13)
+	for _, table := range breezy.Tables {
+		if table.Name == "position_stream" {
+			require.Equal(t, "timestamp", table.IncKey)
+			require.Equal(t, "delete+insert", table.IncStrategy)
+			continue
+		}
+		require.Equal(t, "replace", table.IncStrategy, table.Name)
+	}
+
+	privatus, err := GetSourceTables("privatus")
+	require.NoError(t, err)
+	require.Len(t, privatus.Tables, 9)
+	byName := map[string]*SourceTable{}
+	for _, table := range privatus.Tables {
+		byName[table.Name] = table
+	}
+	require.Equal(t, "site_id,date,goal_id", byName["goal_conversions"].PrimaryKey)
+	require.Equal(t, "date", byName["breakdown:<dimension>"].IncKey)
+	require.Equal(t, "replace", byName["sites"].IncStrategy)
+}

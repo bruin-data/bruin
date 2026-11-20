@@ -1070,6 +1070,37 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "<model_name>", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
 	},
 
+	// Breezy HR - Recruiting platform. Only position_stream is incremental; the other tables are replaced in full.
+	"breezyhr": {
+		{Name: "departments", PrimaryKey: "company_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "pipelines", PrimaryKey: "company_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "questionnaires", PrimaryKey: "company_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "custom_fields", PrimaryKey: "company_id,type,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "positions", PrimaryKey: "_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "position_team_members", PrimaryKey: "position_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "position_stream", PrimaryKey: "_id", IncKey: "timestamp", IncStrategy: "delete+insert"},
+		{Name: "position_custom_fields", PrimaryKey: "position_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidates", PrimaryKey: "_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_stream", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_scorecards", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_questionnaires", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_custom_fields", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// Privatus - Privacy-focused web analytics. Daily tables rewrite whole days;
+	// breakdown:<dimension> accepts any API dimension, such as country or prop:plan.
+	"privatus": {
+		{Name: "workspaces", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "sites", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "goals", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "daily_stats", PrimaryKey: "site_id,date", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "pages", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "referrers", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "events", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "goal_conversions", PrimaryKey: "site_id,date,goal_id", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "breakdown:<dimension>", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+	},
+
 	// Okta - Identity and access management platform
 	"okta": {
 		{Name: "users", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
