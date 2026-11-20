@@ -34,7 +34,7 @@ type EphemeralConnection struct {
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	ensure := EnsureADBCDriverInstalled
-	if cfg, ok := c.(Config); ok && cfg.HasQuack() {
+	if cfg, ok := c.(Config); ok && cfg.usesDuckDB2Driver() {
 		ensure = EnsureQuackADBCDriverInstalled
 	}
 	if err := ensure(context.Background()); err != nil {
@@ -297,9 +297,9 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 }
 
 // driverPath returns the manifest for the driver this connection needs: Quack
-// connections use their own DuckDB 2.0+ driver, everything else the default one.
+// connections and DuckDB 2.0 files use the 2.0 driver, everything else the default one.
 func (e *EphemeralConnection) driverPath() (string, error) {
-	if cfg, ok := e.config.(Config); ok && cfg.HasQuack() {
+	if cfg, ok := e.config.(Config); ok && cfg.usesDuckDB2Driver() {
 		dir, err := QuackADBCDriverDir()
 		if err != nil {
 			return "", err
