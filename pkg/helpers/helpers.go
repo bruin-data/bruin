@@ -265,6 +265,15 @@ func GetPokeInterval(ctx context.Context, t *pipeline.Asset) int64 {
 
 const DefaultSensorTimeout = 24 * time.Hour
 
+// SensorTimeoutError reports that a sensor's condition wasn't met before its timeout.
+type SensorTimeoutError struct {
+	Timeout time.Duration
+}
+
+func (e *SensorTimeoutError) Error() string {
+	return fmt.Sprintf("Sensor timed out after %s", e.Timeout)
+}
+
 // ParseSensorDuration parses a single-unit duration string using the same
 // suffix syntax as pipeline interval_modifiers (s, m, h, d, ms, ns).
 // Combinators like "1h30m" are not supported; use "90m" instead.

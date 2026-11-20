@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,4 +60,24 @@ func TestNewConnectionNotFoundError_ReturnsTypedError(t *testing.T) {
 	var typedErr *MissingConnectionError
 	require.ErrorAs(t, err, &typedErr)
 	require.Equal(t, "connection 'warehouse' not found in secrets backend 'aws-secrets-manager'", err.Error())
+}
+
+type lookupErrors map[string]error
+
+func (l lookupErrors) LookupError(name string) error { return l[name] }
+
+func TestNewConnectionNotFoundError_SaysWhenTheSecretsBackendCouldNotBeRead(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("failed to read secret 'bq-prod' from Vault: context deadline exceeded")
+	ctx := context.WithValue(t.Context(), SecretsBackendContextKey, "vault")
+	ctx = context.WithValue(ctx, ConnectionLookupErrorsContextKey, ConnectionLookupErrors(lookupErrors{"bq-prod": cause}))
+
+	err := NewConnectionNotFoundError(ctx, "", "bq-prod")
+	require.Equal(t, "connection 'bq-prod' could not be read from secrets backend 'vault': failed to read secret 'bq-prod' from Vault: context deadline exceeded", err.Error())
+	require.ErrorIs(t, err, cause)
+
+	missing := NewConnectionNotFoundError(ctx, "", "other")
+	require.Equal(t, "connection 'other' not found in secrets backend 'vault'", missing.Error())
+	require.NoError(t, missing.Unwrap())
 }

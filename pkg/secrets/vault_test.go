@@ -802,3 +802,22 @@ func TestClient_GetConnectionsConfig(t *testing.T) {
 	summary := connections.ConnectionsSummaryList()
 	require.Equal(t, map[string]string{"pg": "postgres", "gen": "generic"}, summary)
 }
+
+func TestClient_LookupError_TellsAnUnreadableSecretFromAMissingOne(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockVaultClient{err: errors.New("Get \"https://vault/v1/secret\": context deadline exceeded")}
+	c := &Client{client: mock, mountPath: "mount", path: "path", logger: &mockLogger{}}
+
+	require.Nil(t, c.GetConnection("gcp-prod"))
+	var unavailable *config.SecretsBackendUnavailableError
+	require.ErrorAs(t, c.LookupError("gcp-prod"), &unavailable, "Vault couldn't be read")
+
+	mock.err = &vault.ResponseError{StatusCode: 404, Errors: []string{}}
+	require.Nil(t, c.GetConnection("gcp-prod"))
+	require.NoError(t, c.LookupError("gcp-prod"), "the secret doesn't exist")
+
+	mock.err = errors.New("Vault returned HTTP status 500")
+	require.Nil(t, c.GetConnectionDetails("gcp-prod"))
+	require.Error(t, c.LookupError("gcp-prod"), "details are read the same way")
+}

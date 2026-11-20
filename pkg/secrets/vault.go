@@ -203,6 +203,8 @@ type Client struct {
 	cacheManagers           map[string]config.ConnectionAndDetailsGetter
 	cacheConnections        map[string]any
 	cacheConnectionsDetails map[string]any
+	// lookupErrors holds why the last read of a connection failed, except for a missing secret.
+	lookupErrors map[string]error
 }
 
 func newVaultAPIClient(host string, clientConfig vaultClientConfig) (*vault.Client, error) {
@@ -356,12 +358,35 @@ func newClient(ctx context.Context, client kvV2Reader, mountPath string, logger 
 
 func (c *Client) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
+	c.recordLookup(name, err)
 	if err != nil {
 		logLookupFailure(c.logger, err)
 		return nil
 	}
 
 	return conn
+}
+
+// LookupError implements config.ConnectionLookupErrors.
+func (c *Client) LookupError(name string) error {
+	c.cacheMu.RLock()
+	defer c.cacheMu.RUnlock()
+	return c.lookupErrors[name]
+}
+
+// recordLookup remembers why reading a connection failed, so that a connection reported missing
+// because Vault couldn't be read says so. A missing secret is just a missing connection.
+func (c *Client) recordLookup(name string, err error) {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+	if err == nil || isSecretNotFound(err) {
+		delete(c.lookupErrors, name)
+		return
+	}
+	if c.lookupErrors == nil {
+		c.lookupErrors = make(map[string]error)
+	}
+	c.lookupErrors[name] = err
 }
 
 // ResolveConnection implements config.ConnectionResolver.
@@ -398,6 +423,7 @@ func (c *Client) GetConnectionDetails(name string) any {
 	c.cacheMu.RUnlock()
 
 	manager, err := c.getVaultManager(name)
+	c.recordLookup(name, err)
 	if err != nil {
 		logLookupFailure(c.logger, err)
 		return nil
@@ -557,10 +583,10 @@ func (c *Client) readConnections(name string) (*config.Connections, error) {
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
 			return nil, newSecretNotFoundError("secret '%s' not found in Vault", name)
 		}
-		return nil, sanitizedVaultError(err, fmt.Sprintf("failed to read secret '%s' from Vault", name))
+		return nil, &config.SecretsBackendUnavailableError{Err: sanitizedVaultError(err, fmt.Sprintf("failed to read secret '%s' from Vault", name))}
 	}
 	if res == nil {
-		return nil, errors.Errorf("failed to read secret '%s' from Vault: Vault returned an empty response", name)
+		return nil, &config.SecretsBackendUnavailableError{Err: errors.Errorf("failed to read secret '%s' from Vault: Vault returned an empty response", name)}
 	}
 
 	detailsRaw, okDetails := res.Data.Data["details"]
