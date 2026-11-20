@@ -2902,7 +2902,7 @@ func TestFilterValueBackslashStaysInString(t *testing.T) {
 	})
 	for dialect, want := range map[string]string{
 		"snowflake": `note = '\\'' OR 1=1 --'`,
-		"":          `note = '\\'' OR 1=1 --'`,
+		"":          `note = '\'' OR 1=1 --'`,
 		"duckdb":    `note = '\'' OR 1=1 --'`,
 		"bigquery":  `note = "\\' OR 1=1 --"`,
 	} {

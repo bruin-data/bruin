@@ -1276,7 +1276,7 @@ func formatValue(v interface{}, dialect ...string) string {
 			// GoogleSQL accepts double-quoted strings and Go's escape sequences.
 			return strconv.Quote(val)
 		}
-		if len(dialect) > 0 && backslashEscapes(dialect[0]) {
+		if len(dialect) > 0 && dialect[0] != "" && backslashEscapes(dialect[0]) {
 			val = strings.ReplaceAll(val, `\`, `\\`)
 		}
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
