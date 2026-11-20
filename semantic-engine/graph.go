@@ -542,7 +542,11 @@ var sqlIdentifierKeywords = map[string]bool{
 	"WHEN": true, "WHERE": true, "WITH": true,
 	"BIGINT": true, "BOOLEAN": true, "DOUBLE": true, "FLOAT": true, "INTEGER": true,
 	"NUMERIC": true, "REAL": true, "STRING": true, "TEXT": true, "VARCHAR": true,
-	// Date parts, as in timestamp_trunc(ts, DAY) or extract(DOW FROM ts).
+}
+
+// sqlDateParts stay bare in timestamp_trunc(ts, DAY) or extract(DOW FROM ts).
+// Kept apart from sqlIdentifierKeywords so model aliases such as day stay unquoted.
+var sqlDateParts = map[string]bool{
 	"YEAR": true, "QUARTER": true, "MONTH": true, "WEEK": true, "DAY": true,
 	"HOUR": true, "MINUTE": true, "SECOND": true, "MILLISECOND": true,
 	"MICROSECOND": true, "NANOSECOND": true, "ISOWEEK": true, "ISOYEAR": true,
@@ -607,7 +611,7 @@ func scanQuoted(expr string, start int, quote byte, backslashEscapes bool) int {
 }
 
 func shouldQualifyIdentifier(expr string, start, end int, ident string) bool {
-	if sqlIdentifierKeywords[strings.ToUpper(ident)] {
+	if upper := strings.ToUpper(ident); sqlIdentifierKeywords[upper] || sqlDateParts[upper] {
 		return false
 	}
 	prev := previousNonSpace(expr, start)

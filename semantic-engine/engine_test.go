@@ -385,6 +385,7 @@ func TestSourceRelation_QuotesUnsafeAliases(t *testing.T) {
 		want  string
 	}{
 		{alias: "orders", want: "(select 1 as id\n) AS orders"},
+		{alias: "day", want: "(select 1 as id\n) AS day"},
 		{alias: "order-items", want: "(select 1 as id\n) AS \"order-items\""},
 		{alias: "sales model", want: "(select 1 as id\n) AS \"sales model\""},
 		{alias: "order", want: "(select 1 as id\n) AS \"order\""},
