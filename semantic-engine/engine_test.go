@@ -2870,3 +2870,23 @@ func TestQuotedTextIsNeverSQL(t *testing.T) {
 		}
 	}
 }
+
+// A ref hidden at load (no dialect) can reveal a cycle once Dialect is set.
+func TestGenerateSQL_CycleRevealedByDialect(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, &Model{
+		Name:       "m",
+		Source:     Source{Table: "t"},
+		Dimensions: []Dimension{{Name: "d", Type: "time"}},
+		Metrics: []Metric{
+			{Name: "x", Expression: `CASE WHEN p = 'C:\' THEN {x} END`},
+			{Name: "w", Expression: "{x}", Window: &Window{Type: "running_total", OrderBy: "d"}},
+		},
+	})
+	engine.Dialect = "duckdb"
+	_, err := engine.GenerateSQL(&Query{Metrics: []string{"w"}, Dimensions: []DimensionRef{{Name: "d"}}})
+	if err == nil || !strings.Contains(err.Error(), "circular dependency") {
+		t.Fatalf("want circular dependency error, got %v", err)
+	}
+}

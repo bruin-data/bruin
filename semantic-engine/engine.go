@@ -1345,10 +1345,15 @@ func (e *Engine) needsWindowWrap(metricNames []string) bool {
 func (e *Engine) collectInnerMetrics(metricNames []string) []string {
 	include := map[string]bool{}
 	visited := map[string]bool{}
+	depsSeen := map[string]bool{}
 	var collectDeps func(string)
 	var collectForQuery func(string)
 
 	collectDeps = func(name string) {
+		if depsSeen[name] {
+			return
+		}
+		depsSeen[name] = true
 		m := e.metrics[name]
 		if m == nil || isWindow(m) {
 			return
