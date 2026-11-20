@@ -4199,3 +4199,17 @@ func TestPipeline_GetAllConnectionNamesForAsset_SourceAssetsAreConnectionless(t 
 		})
 	}
 }
+
+func TestSecretMapping_MarshalYAML_OmitsDefaultInjectAs(t *testing.T) {
+	t.Parallel()
+
+	secrets := []pipeline.SecretMapping{
+		{SecretKey: "empty"},
+		{SecretKey: "same", InjectedKey: "same"},
+		{SecretKey: "custom", InjectedKey: "CUSTOM"},
+	}
+
+	out, err := yaml.Marshal(secrets)
+	require.NoError(t, err)
+	assert.Equal(t, "- key: empty\n- key: same\n- key: custom\n  inject_as: CUSTOM\n", string(out))
+}
