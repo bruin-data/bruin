@@ -352,6 +352,20 @@ func TestLoadFromFile(t *testing.T) {
 					PageSize:           500,
 				},
 			},
+			BreezyHR: []BreezyHRConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "breezyhr-1"},
+					APIKey:             "breezyhr-api-key-123",
+					CompanyID:          "abc123",
+				},
+			},
+			Privatus: []PrivatusConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "privatus-1"},
+					APIKey:             "privatus-api-key-123",
+					SiteIDs:            []string{"pa_AB12CD34EF", "pa_XY98ZW76VU"},
+				},
+			},
 			InfluxDB: []InfluxDBConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "influxdb-1"},
@@ -1919,6 +1933,28 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Breezy HR connection",
+			envName:  "default",
+			connType: "breezyhr",
+			connName: "breezyhr-conn",
+			creds: map[string]interface{}{
+				"api_key":    "key_123",
+				"company_id": "abc123",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Privatus connection",
+			envName:  "default",
+			connType: "privatus",
+			connName: "privatus-conn",
+			creds: map[string]interface{}{
+				"api_key":  "key_123",
+				"site_ids": []string{"pa_AB12CD34EF", "pa_XY98ZW76VU"},
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add AbraFlexi connection",
 			envName:  "default",
 			connType: "abraflexi",
@@ -2218,6 +2254,16 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["scheme"], env.Connections.Odoo[0].Scheme)
 					assert.Equal(t, tt.creds["api"], env.Connections.Odoo[0].API)
 					assert.Equal(t, tt.creds["page_size"], env.Connections.Odoo[0].PageSize)
+				case "breezyhr":
+					assert.Len(t, env.Connections.BreezyHR, 1)
+					assert.Equal(t, tt.connName, env.Connections.BreezyHR[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.BreezyHR[0].APIKey)
+					assert.Equal(t, tt.creds["company_id"], env.Connections.BreezyHR[0].CompanyID)
+				case "privatus":
+					assert.Len(t, env.Connections.Privatus, 1)
+					assert.Equal(t, tt.connName, env.Connections.Privatus[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Privatus[0].APIKey)
+					assert.Equal(t, tt.creds["site_ids"], env.Connections.Privatus[0].SiteIDs)
 				case "fireflies":
 					assert.Len(t, env.Connections.Fireflies, 1)
 					assert.Equal(t, tt.connName, env.Connections.Fireflies[0].Name)
@@ -2363,6 +2409,44 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								Odoo: []OdooConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "odoo-conn"}, Host: "mycompany.odoo.com", APIKey: "key_123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Breezy HR connection",
+			envName:  "default",
+			connName: "breezyhr-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								BreezyHR: []BreezyHRConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr-conn"}, APIKey: "key_123", CompanyID: "abc123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Privatus connection",
+			envName:  "default",
+			connName: "privatus-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Privatus: []PrivatusConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "privatus-conn"}, APIKey: "key_123"},
 								},
 							},
 						},
@@ -3520,6 +3604,8 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
 				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
 				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
+				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
+				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
 			},
 			want: &Connections{
 				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
@@ -3674,6 +3760,8 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
 				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
 				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
+				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
+				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
 			},
 			expectedErr: false,
 		},

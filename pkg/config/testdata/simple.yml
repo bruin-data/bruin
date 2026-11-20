@@ -216,6 +216,16 @@ environments:
           scheme: "https"
           api: "jsonrpc"
           page_size: 500
+      breezyhr:
+        - name: "breezyhr-1"
+          api_key: "breezyhr-api-key-123"
+          company_id: "abc123"
+      privatus:
+        - name: "privatus-1"
+          api_key: "privatus-api-key-123"
+          site_ids:
+            - "pa_AB12CD34EF"
+            - "pa_XY98ZW76VU"
       appsflyer:
         - name: conn19
           api_key: "appsflyerkey"
