@@ -22,8 +22,8 @@ type selector interface {
 // for better error reporting when running single checks.
 type CheckError struct {
 	Query    string
-	Result   int64
-	Expected int64
+	Result   float64
+	Expected float64
 	Message  string
 }
 
@@ -33,13 +33,15 @@ func (e *CheckError) Error() string {
 
 type CountableQueryCheck struct {
 	conn                config.ConnectionGetter
-	expectedQueryResult int64
+	expectedQueryResult float64
 	queryInstance       *query.Query
 	checkName           string
 	customError         func(count int64) error
+	// valueError replaces customError for results that may have decimals, such as custom check values.
+	valueError func(result float64) error
 }
 
-func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult int64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
+func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult float64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
 	return &CountableQueryCheck{
 		conn:                conn,
 		expectedQueryResult: expectedQueryResult,
@@ -97,21 +99,28 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 		return errors.Wrapf(err, "failed '%s' check", c.checkName)
 	}
 
-	count, err := helpers.CastResultToInteger(res, false)
+	result, err := helpers.CastResultToFloat(res)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse '%s' check result", c.checkName)
 	}
 
-	if count != c.expectedQueryResult {
-		return &CheckError{
-			Query:    c.queryInstance.Query,
-			Result:   count,
-			Expected: c.expectedQueryResult,
-			Message:  c.customError(count).Error(),
-		}
+	if result == c.expectedQueryResult {
+		return nil
 	}
 
-	return nil
+	var message error
+	if c.valueError != nil {
+		message = c.valueError(result)
+	} else {
+		message = c.customError(int64(result))
+	}
+
+	return &CheckError{
+		Query:    c.queryInstance.Query,
+		Result:   result,
+		Expected: c.expectedQueryResult,
+		Message:  message.Error(),
+	}
 }
 
 type NotNullCheck struct {
@@ -470,13 +479,24 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 	}
 	expected := ti.Check.Value
 	if ti.Check.Count != nil {
-		expected = *ti.Check.Count
+		expected = float64(*ti.Check.Count)
 		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
 	}
 
-	return NewCountableQueryCheck(c.conn, expected, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
-		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, expected)
+	return (&CountableQueryCheck{
+		conn:                c.conn,
+		expectedQueryResult: expected,
+		queryInstance:       &query.Query{Query: qq},
+		checkName:           ti.Check.Name,
+		valueError: func(result float64) error {
+			return errors.Errorf("custom check '%s' has returned %s instead of the expected %s", ti.Check.Name, FormatCheckNumber(result), FormatCheckNumber(expected))
+		},
 	}).CustomCheck(ctx, ti)
+}
+
+// FormatCheckNumber prints a check value without exponent or trailing zeros: 3014136.99, 3015906, 0.5.
+func FormatCheckNumber(v float64) string {
+	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
 type CheckRunner interface {

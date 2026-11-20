@@ -133,6 +133,26 @@ func CastResultToInteger(res [][]interface{}, tolerant bool) (int64, error) {
 	return 0, errors.Errorf("unexpected result from query during, cannot cast result to integer: %v", res)
 }
 
+// CastResultToFloat reads a single-value query result as a float64, keeping decimals that CastResultToInteger drops.
+func CastResultToFloat(res [][]interface{}) (float64, error) {
+	if len(res) == 1 && len(res[0]) == 1 {
+		switch v := res[0][0].(type) {
+		case float64:
+			return v, nil
+		case float32:
+			// Round-trip through text so 100.99 stays 100.99 instead of 100.98999786.
+			return strconv.ParseFloat(strconv.FormatFloat(float64(v), 'g', -1, 32), 64)
+		case string:
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				return f, nil
+			}
+		}
+	}
+
+	i, err := CastResultToInteger(res, false)
+	return float64(i), err
+}
+
 func WriteJSONToFile(fs afero.Fs, data interface{}, filename string) error {
 	file, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {

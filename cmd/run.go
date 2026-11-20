@@ -206,10 +206,15 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			// Check if this is upstream failed
 			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
 
-			if isUpstreamFailed {
+			switch {
+			case isUpstreamFailed:
 				assetStatus = "UPSTREAM FAILED"
 				assetColor = color.New(color.FgYellow)
-			} else {
+			case hasFailedCheck(results):
+				// Matches the summary, which counts the asset as failed due to checks.
+				assetStatus = "FAIL"
+				assetColor = color.New(color.FgRed)
+			default:
 				assetStatus = "PASS"
 				assetColor = color.New(color.FgGreen)
 			}
@@ -246,6 +251,15 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 
 		fmt.Println()
 	}
+}
+
+func hasFailedCheck(results map[string]*scheduler.TaskExecutionResult) bool {
+	for key, result := range results {
+		if key != "main" && result != nil && result.Error != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func find(slice []scheduler.TaskInstance, item scheduler.TaskInstance) (int, bool) { // nolint:unparam
@@ -1968,7 +1982,7 @@ func printSingleCheckError(result *scheduler.TaskExecutionResult) {
 	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
 	if ok {
 		fmt.Printf("Error: %s\n\n", checkErr.Message)
-		fmt.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
+		fmt.Printf("Result: %s (expected: %s)\n\n", ansisql.FormatCheckNumber(checkErr.Result), ansisql.FormatCheckNumber(checkErr.Expected))
 		fmt.Println("Query:")
 		fmt.Println(checkErr.Query + "\n")
 	} else {
@@ -2584,7 +2598,8 @@ func SetupExecutors(
 
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery ||
-		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSource) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     duck.NewMaterializer(fullRefresh),
 			Hoister: hoister,
@@ -2603,6 +2618,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDuckDBQuerySensor][scheduler.TaskInstanceTypeMain] = duckDBQuerySensor
 		mainExecutors[pipeline.AssetTypeDuckDBQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
 		mainExecutors[pipeline.AssetTypeDuckDBQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeDuckDBSource][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
