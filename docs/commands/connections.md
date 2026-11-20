@@ -35,7 +35,7 @@ Environment: someother
 
 ### Listing from a secrets backend
 
-With `--secrets-backend vault`, `aws` or `azure`, connections are listed directly from the secrets backend instead of `.bruin.yml`, so no local config file or git repository is required:
+With `--secrets-backend vault`, `aws`, `azure` or `gcp`, connections are listed directly from the secrets backend instead of `.bruin.yml`, so no local config file or git repository is required:
 
 ```bash
 bruin connections list --secrets-backend vault -o json
@@ -46,8 +46,9 @@ This uses the same settings as `bruin run` for that backend, and the credentials
 - [Vault](../secrets/vault.md#listing-secrets): **list** on the keys under `BRUIN_VAULT_PATH`.
 - [AWS Secrets Manager](../secrets/aws-secrets-manager.md#listing-connections): `secretsmanager:ListSecrets`. Only secrets under `BRUIN_AWS_SECRET_PREFIX` are listed, if set.
 - [Azure Key Vault](../secrets/azure-key-vault.md#listing-connections): the **List** secret permission (included in **Key Vault Secrets User**). Only secrets under `BRUIN_AZURE_SECRET_PREFIX` are listed, if set.
+- [GCP Secret Manager](../secrets/gcp-secret-manager.md#listing-connections): `secretmanager.secrets.list` on the project (included in `roles/secretmanager.viewer`, not in `roles/secretmanager.secretAccessor`). Only secrets under `BRUIN_GCP_SECRET_PREFIX` are listed, if set.
 
-For AWS and Azure, secrets that aren't in the Bruin secret format are skipped.
+For AWS, Azure and GCP, secrets that aren't in the Bruin secret format are skipped.
 
 > [!NOTE]
 > The `doppler` backend doesn't support listing and returns an "unsupported" error for `connections list`.
@@ -59,7 +60,7 @@ For AWS and Azure, secrets that aren't in the Bruin secret format are skipped.
 | `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
 | `--environment`, `-e`, `--env` | str | - | The environment to list connections for. |
 | `--config-file` | str | - | The path to the .bruin.yml file. |
-| `--secrets-backend` | str | - | List connections from a secrets backend instead of `.bruin.yml`. Supported: `vault`, `aws`, `azure`. |
+| `--secrets-backend` | str | - | List connections from a secrets backend instead of `.bruin.yml`. Supported: `vault`, `aws`, `azure`, `gcp`. |
 
 ## Add Connection
 

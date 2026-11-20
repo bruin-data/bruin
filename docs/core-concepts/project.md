@@ -149,7 +149,7 @@ For local development, Bruin reads credentials from your local `.bruin.yml` file
 When deploying to Bruin Cloud or other environments, you have several options:
 
 1. **Environment Variables**: Reference environment variables in `.bruin.yml` that are set in your deployment environment
-2. **Secret Providers**: Use external secret managers like [HashiCorp Vault](/secrets/vault), [Doppler](/secrets/doppler), or [AWS Secrets Manager](/secrets/aws-secrets-manager)
+2. **Secret Providers**: Use external secret managers like [HashiCorp Vault](/secrets/vault), [Doppler](/secrets/doppler), [AWS Secrets Manager](/secrets/aws-secrets-manager), [Azure Key Vault](/secrets/azure-key-vault), or [GCP Secret Manager](/secrets/gcp-secret-manager)
 3. **CI/CD Integration**: Inject secrets during CI/CD pipeline execution
 
 See the [Deployment](/deployment/overview) documentation for platform-specific guidance.
