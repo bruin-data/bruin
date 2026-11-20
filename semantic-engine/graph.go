@@ -542,6 +542,13 @@ var sqlIdentifierKeywords = map[string]bool{
 	"WHEN": true, "WHERE": true, "WITH": true,
 	"BIGINT": true, "BOOLEAN": true, "DOUBLE": true, "FLOAT": true, "INTEGER": true,
 	"NUMERIC": true, "REAL": true, "STRING": true, "TEXT": true, "VARCHAR": true,
+	// Date parts, as in timestamp_trunc(ts, DAY) or extract(DOW FROM ts).
+	"YEAR": true, "QUARTER": true, "MONTH": true, "WEEK": true, "DAY": true,
+	"HOUR": true, "MINUTE": true, "SECOND": true, "MILLISECOND": true,
+	"MICROSECOND": true, "NANOSECOND": true, "ISOWEEK": true, "ISOYEAR": true,
+	"DAYOFWEEK": true, "DAYOFYEAR": true, "DOW": true, "DOY": true, "EPOCH": true,
+	"MONDAY": true, "TUESDAY": true, "WEDNESDAY": true, "THURSDAY": true,
+	"FRIDAY": true, "SATURDAY": true, "SUNDAY": true,
 }
 
 func qualifySQLIdentifiers(expr, alias string, backslashEscapes bool) string {
