@@ -248,3 +248,46 @@ func TestCachedSecretBackend_GetConnectionsConfig(t *testing.T) {
 		require.ErrorContains(t, err, "list denied")
 	})
 }
+
+func TestCachedSecretBackend_LookupError(t *testing.T) {
+	t.Parallel()
+
+	unavailable := &config.SecretsBackendUnavailableError{Err: errors.New("timeout")}
+	store := &fakeSecretStore{
+		payloads: map[string]string{"bad-format": "plain text"},
+		errs:     map[string]error{"down": unavailable},
+	}
+	backend := newCachedSecretBackend(store, &mockLogger{})
+	var _ config.ConnectionLookupErrors = backend
+
+	require.Nil(t, backend.GetConnection("down"))
+	var target *config.SecretsBackendUnavailableError
+	require.ErrorAs(t, backend.LookupError("down"), &target, "the backend couldn't be read")
+
+	require.Nil(t, backend.GetConnection("missing"))
+	require.NoError(t, backend.LookupError("missing"), "the secret doesn't exist")
+
+	require.Nil(t, backend.GetConnectionDetails("bad-format"))
+	err := backend.LookupError("bad-format")
+	require.Error(t, err, "details are read the same way")
+	require.False(t, errors.As(err, &target), "an invalid secret isn't an outage")
+
+	require.NoError(t, backend.LookupError("never-read"))
+}
+
+func TestCachedSecretBackend_LookupErrorSurvivesALaterSuccessfulRead(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeSecretStore{
+		payloads: map[string]string{},
+		errs:     map[string]error{"conn": &config.SecretsBackendUnavailableError{Err: errors.New("timeout")}},
+	}
+	backend := newCachedSecretBackend(store, &mockLogger{})
+
+	require.Nil(t, backend.GetConnection("conn"))
+	delete(store.errs, "conn")
+	store.payloads["conn"] = testGenericSecretJSON
+	require.NotNil(t, backend.GetConnection("conn"))
+
+	require.Error(t, backend.LookupError("conn"))
+}

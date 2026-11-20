@@ -22,4 +22,6 @@ var (
 	_ config.ConnectionsConfigGetter = (*AzureKeyVaultClient)(nil)
 
 	_ config.ConnectionLookupErrors = (*Client)(nil)
+	_ config.ConnectionLookupErrors = (*AWSSecretsManagerClient)(nil)
+	_ config.ConnectionLookupErrors = (*AzureKeyVaultClient)(nil)
 )

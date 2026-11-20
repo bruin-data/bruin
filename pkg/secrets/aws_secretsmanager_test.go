@@ -714,3 +714,20 @@ func TestAWSSecretsManagerClient_GetConnectionsConfig(t *testing.T) {
 		require.ErrorContains(t, err, "AccessDeniedException")
 	})
 }
+
+func TestAWSReadFailuresAreReportedAsBackendUnavailable(t *testing.T) {
+	t.Parallel()
+
+	var unavailable *config.SecretsBackendUnavailableError
+	_, err := newTestAWSClient(&mockAWSSecretsManagerClient{err: errors.New("throttled")}, "").ResolveConnection("conn")
+	require.ErrorAs(t, err, &unavailable)
+
+	invalid := newTestAWSClient(&mockAWSSecretsManagerClient{secrets: map[string]string{"bad": "plain text"}}, "")
+	_, err = invalid.ResolveConnection("missing")
+	require.True(t, isSecretNotFound(err))
+	require.False(t, errors.As(err, &unavailable), "a missing secret isn't an outage")
+
+	_, err = invalid.ResolveConnection("bad")
+	require.Error(t, err)
+	require.False(t, errors.As(err, &unavailable), "an invalid secret isn't an outage")
+}

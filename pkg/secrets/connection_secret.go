@@ -82,6 +82,9 @@ type cachedSecretBackend struct {
 	mu       sync.RWMutex
 	managers map[string]config.ConnectionAndDetailsGetter
 	requests singleflight.Group
+	// lookupErrors holds why reading a connection failed, except for a missing secret. Once
+	// recorded, an error stays for the run: see recordLookup.
+	lookupErrors map[string]error
 }
 
 func newCachedSecretBackend(store connectionSecretStore, logger logger.Logger) *cachedSecretBackend {
@@ -94,12 +97,39 @@ func newCachedSecretBackend(store connectionSecretStore, logger logger.Logger) *
 
 func (b *cachedSecretBackend) GetConnection(name string) any {
 	conn, err := b.ResolveConnection(name)
+	b.recordLookup(name, err)
 	if err != nil {
 		logLookupFailure(b.logger, err)
 		return nil
 	}
 
 	return conn
+}
+
+// LookupError implements config.ConnectionLookupErrors.
+func (b *cachedSecretBackend) LookupError(name string) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.lookupErrors[name]
+}
+
+// recordLookup remembers why reading a connection failed, so a connection reported missing
+// because the backend couldn't be read says so. A missing secret is just a missing connection.
+//
+// As in the Vault client, a failure isn't cleared by a later successful read: assets read
+// connections concurrently, and an asset whose read failed asks for the reason after its read
+// returned, by which time another asset may have read the same connection.
+func (b *cachedSecretBackend) recordLookup(name string, err error) {
+	if err == nil || isSecretNotFound(err) {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.lookupErrors == nil {
+		b.lookupErrors = make(map[string]error)
+	}
+	b.lookupErrors[name] = err
 }
 
 // ResolveConnection implements config.ConnectionResolver.
@@ -114,6 +144,7 @@ func (b *cachedSecretBackend) ResolveConnection(name string) (any, error) {
 
 func (b *cachedSecretBackend) GetConnectionDetails(name string) any {
 	manager, err := b.manager(name)
+	b.recordLookup(name, err)
 	if err != nil {
 		logLookupFailure(b.logger, err)
 		return nil

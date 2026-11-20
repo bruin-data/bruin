@@ -367,7 +367,7 @@ func (c *AzureKeyVaultClient) readConnections(name string) (*config.Connections,
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
 			return nil, newSecretNotFoundError("secret '%s' not found in Azure Key Vault", secretName)
 		}
-		return nil, errors.Wrapf(err, "failed to read secret '%s' from Azure Key Vault", secretName)
+		return nil, &config.SecretsBackendUnavailableError{Err: errors.Wrapf(err, "failed to read secret '%s' from Azure Key Vault", secretName)}
 	}
 
 	return readConnectionSecret(name, result.Value)

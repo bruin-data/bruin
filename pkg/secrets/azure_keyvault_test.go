@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -678,4 +679,25 @@ func TestAzureKeyVaultClient_GetConnectionsConfig(t *testing.T) {
 		_, err := c.GetConnectionsConfig()
 		require.ErrorContains(t, err, "failed to list secrets in Azure Key Vault")
 	})
+}
+
+func TestAzureReadFailuresAreReportedAsBackendUnavailable(t *testing.T) {
+	t.Parallel()
+
+	var unavailable *config.SecretsBackendUnavailableError
+	_, err := newTestAzureClient(&mockAzureKeyVaultClient{err: context.DeadlineExceeded}, "").ResolveConnection("conn")
+	require.ErrorAs(t, err, &unavailable)
+
+	invalid := newTestAzureClient(&mockAzureKeyVaultClient{secrets: map[string]string{"bad": "plain text"}}, "")
+	_, err = invalid.ResolveConnection("missing")
+	require.True(t, isSecretNotFound(err))
+	require.False(t, errors.As(err, &unavailable), "a missing secret isn't an outage")
+
+	_, err = invalid.ResolveConnection("bad")
+	require.Error(t, err)
+	require.False(t, errors.As(err, &unavailable), "an invalid secret isn't an outage")
+
+	_, err = invalid.ResolveConnection("my_connection")
+	require.Error(t, err)
+	require.False(t, errors.As(err, &unavailable), "an invalid name isn't an outage")
 }
