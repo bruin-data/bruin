@@ -1714,7 +1714,8 @@ type QuickBooksConnection struct {
 	CompanyID          string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
 	ClientID           string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
 	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret" sensitive:"true"`
-	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token" sensitive:"true"`
+	RefreshToken       string `yaml:"refresh_token,omitempty" json:"refresh_token,omitempty" mapstructure:"refresh_token" sensitive:"true"`
+	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
 	Environment        string `yaml:"environment,omitempty" json:"environment,omitempty" mapstructure:"environment"`
 	MinorVersion       string `yaml:"minor_version,omitempty" json:"minor_version,omitempty" mapstructure:"minor_version"`
 }

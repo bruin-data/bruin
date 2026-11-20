@@ -4943,6 +4943,9 @@
         "refresh_token": {
           "type": "string"
         },
+        "access_token": {
+          "type": "string"
+        },
         "environment": {
           "type": "string"
         },
@@ -4956,8 +4959,7 @@
         "name",
         "company_id",
         "client_id",
-        "client_secret",
-        "refresh_token"
+        "client_secret"
       ]
     },
     "QuickSightConnection": {

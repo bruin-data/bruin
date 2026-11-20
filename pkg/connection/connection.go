@@ -3286,6 +3286,7 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 		ClientID:     connection.ClientID,
 		ClientSecret: connection.ClientSecret,
 		RefreshToken: connection.RefreshToken,
+		AccessToken:  connection.AccessToken,
 		Environment:  connection.Environment,
 		MinorVersion: connection.MinorVersion,
 	})
