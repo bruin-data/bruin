@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -335,6 +336,14 @@ func (r *ConnectionsCommand) ListConnections(ctx context.Context, pathToProject,
 
 			// Marshal the structured output to JSON
 			js, err := json.Marshal(envOutput)
+			if err == nil {
+				js, err = markVaultConnections(js, cm.ExternalVaultReferences(), func(root map[string]any, env string) []any {
+					if env != environment {
+						return nil
+					}
+					return []any{root[environment]}
+				})
+			}
 			if err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
@@ -346,6 +355,18 @@ func (r *ConnectionsCommand) ListConnections(ctx context.Context, pathToProject,
 
 		// Marshal the entire configuration if no specific environment is specified
 		js, err := json.Marshal(cm)
+		if err == nil {
+			js, err = markVaultConnections(js, cm.ExternalVaultReferences(), func(root map[string]any, env string) []any {
+				found := []any{}
+				if envs, ok := root["environments"].(map[string]any); ok {
+					found = append(found, envs[env])
+				}
+				if root["selected_environment_name"] == env {
+					found = append(found, root["selected_environment"])
+				}
+				return found
+			})
+		}
 		if err != nil {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
@@ -381,6 +402,36 @@ func (r *ConnectionsCommand) ListConnections(ctx context.Context, pathToProject,
 	}
 
 	return nil
+}
+
+// markVaultConnections adds bruin_external_vault to the listed connections that read their secrets from a vault.
+// The output is left byte-for-byte alone when there are none.
+func markVaultConnections(js []byte, refs []config.ExternalVaultReference, environments func(root map[string]any, env string) []any) ([]byte, error) {
+	if len(refs) == 0 {
+		return js, nil
+	}
+
+	var root map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(js))
+	decoder.UseNumber()
+	if err := decoder.Decode(&root); err != nil {
+		return nil, err
+	}
+
+	for _, ref := range refs {
+		for _, env := range environments(root, ref.Environment) {
+			envMap, _ := env.(map[string]any)
+			connections, _ := envMap["connections"].(map[string]any)
+			list, _ := connections[ref.Type].([]any)
+			for _, item := range list {
+				if conn, ok := item.(map[string]any); ok && conn["name"] == ref.Name {
+					conn["bruin_external_vault"] = ref.Reference
+				}
+			}
+		}
+	}
+
+	return json.Marshal(root)
 }
 
 // loadConfigFromSecretsBackend builds an in-memory config.Config from the active
