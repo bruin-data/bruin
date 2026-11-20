@@ -802,11 +802,22 @@ func formatError(err error) error {
 	}
 
 	if googleError.Code == 404 || googleError.Code == 400 {
-		return fmt.Errorf("%s", googleError.Message)
+		return &formattedError{msg: googleError.Message, err: err}
 	}
 
 	return googleError
 }
+
+// formattedError shows only BigQuery's message, while keeping the error it came from reachable,
+// e.g. for its reason.
+type formattedError struct {
+	msg string
+	err error
+}
+
+func (e *formattedError) Error() string { return e.msg }
+
+func (e *formattedError) Unwrap() error { return e.err }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
 func (d *Client) Ping(ctx context.Context) error {

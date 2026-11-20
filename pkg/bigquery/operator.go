@@ -366,7 +366,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		select {
 		case <-timeout:
 			query.LogQueryID(ctx, "BigQuery", lastJobID)
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 		default:
 			res, err := conn.Select(sinkCtx, qry[0])
 			if err != nil {
@@ -434,7 +434,7 @@ func pokeAgainAfter(ctx context.Context, err error, sensorMode string, t *pipeli
 	case <-wait.C:
 		return nil
 	case <-timeout:
-		return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+		return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -512,7 +512,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		select {
 		case <-timeout:
 			query.LogQueryID(ctx, "BigQuery", lastJobID)
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 		default:
 			res, err := conn.Select(sinkCtx, extractedQuery)
 			if err != nil {

@@ -86,7 +86,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			if printerExists {
 				fmt.Fprintln(printer, "Sensor timed out after", sensorTimeout)
 			}
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 		default:
 			if querier, ok := conn.(interface {
 				Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
@@ -209,7 +209,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			if printerExists {
 				fmt.Fprintln(printer, "Sensor timed out after", sensorTimeout)
 			}
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 
 		default:
 			res, err := tableChecker.Select(ctx, annotatedQuery)

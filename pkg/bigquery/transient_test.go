@@ -262,3 +262,15 @@ func TestQuerySensor_TransientErrorRetryLimit(t *testing.T) {
 		assert.Equal(t, int32(22), jobs.Load())
 	})
 }
+
+func TestFormatErrorKeepsTheGoogleError(t *testing.T) {
+	t.Parallel()
+
+	apiErr := &googleapi.Error{Code: 400, Message: "Syntax error at [1:1]", Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}}}
+	formatted := formatError(fmt.Errorf("query failed: %w", apiErr))
+
+	require.EqualError(t, formatted, "Syntax error at [1:1]", "shows only BigQuery's message")
+	var got *googleapi.Error
+	require.ErrorAs(t, formatted, &got)
+	assert.Equal(t, "invalidQuery", got.Errors[0].Reason)
+}

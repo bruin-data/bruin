@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/spf13/afero"
@@ -324,8 +323,7 @@ func TestLoginDestinationWithoutProjectConfig(t *testing.T) {
 			nested := filepath.Join(dir, "nested")
 			require.NoError(t, os.Mkdir(nested, 0o700))
 			t.Chdir(nested)
-			secrets := keyring.NewArrayKeyring(nil)
-			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
 			authorizations := 0
 			deps := loginDependencies{
 				interactive: func() bool { return true },
@@ -397,8 +395,7 @@ func TestLoginOutsideRepository(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := loginTestRepo(t, "")
 			require.NoError(t, os.RemoveAll(filepath.Join(dir, ".git")))
-			secrets := keyring.NewArrayKeyring(nil)
-			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
 			authorizations := 0
 			deps := loginDependencies{
 				interactive: func() bool { return true },

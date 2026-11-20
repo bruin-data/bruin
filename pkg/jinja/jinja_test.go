@@ -323,6 +323,16 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 			wantErr: "missing variable 'some_random_variable'",
 		},
 		{
+			name:    "undefined function call",
+			query:   "{{ some_macro() }}",
+			wantErr: "'some_macro' is not callable, make sure it is a defined macro or function",
+		},
+		{
+			name:    "unknown method call",
+			query:   "{{ 'abc'.nope() }}",
+			wantErr: "unknown method 'nope' for 'abc'",
+		},
+		{
 			name:    "missing endfor",
 			query:   "{% for i in range(1, 10) %}{{ i }}",
 			wantErr: "missing 'endfor' at (Line: 1 Col: 35, near \"\")",

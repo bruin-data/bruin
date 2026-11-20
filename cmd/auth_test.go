@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/spf13/afero"
@@ -67,8 +66,7 @@ func TestLogoutDestination(t *testing.T) {
 			if tc.noGit {
 				require.NoError(t, os.RemoveAll(filepath.Join(dir, ".git")))
 			}
-			secrets := keyring.NewArrayKeyring(nil)
-			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
 			require.NoError(t, store.Save(cloudauth.Credential{Token: "global-token", TokenID: "1", APIURL: server.URL}, nil))
 			globalBefore, err := os.ReadFile(store.Path)
 			require.NoError(t, err)
@@ -109,16 +107,12 @@ func TestLogoutDestination(t *testing.T) {
 			}
 			credential, err := store.Read(server.URL)
 			require.NoError(t, err)
-			keys, err := secrets.Keys()
-			require.NoError(t, err)
 			if tc.target == "global" && tc.wantError == "" {
 				assert.Nil(t, credential)
-				assert.Empty(t, keys)
 				assert.Contains(t, output.String(), "Global login removed")
 			} else {
 				require.NotNil(t, credential)
 				assert.Equal(t, "global-token", credential.Token)
-				assert.Len(t, keys, 1)
 				data, err := os.ReadFile(store.Path)
 				require.NoError(t, err)
 				assert.Equal(t, globalBefore, data)
