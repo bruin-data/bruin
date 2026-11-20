@@ -385,6 +385,7 @@ func TestSourceRelation_QuotesUnsafeAliases(t *testing.T) {
 		want  string
 	}{
 		{alias: "orders", want: "(select 1 as id\n) AS orders"},
+		{alias: "day", want: "(select 1 as id\n) AS day"},
 		{alias: "order-items", want: "(select 1 as id\n) AS \"order-items\""},
 		{alias: "sales model", want: "(select 1 as id\n) AS \"sales model\""},
 		{alias: "order", want: "(select 1 as id\n) AS \"order\""},
@@ -2039,6 +2040,45 @@ func TestJoinGraphJoinsReachableDimension(t *testing.T) {
 	expectContains(t, sql, "FROM (SELECT * FROM orders) base")
 	expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.customer_id")
 	expectContains(t, sql, "GROUP BY 1")
+}
+
+func TestJoinGraphKeepsDatePartsBare(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins:  []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		Dimensions: []Dimension{{Name: "created_at", Type: "time", Granularities: map[string]string{
+			"day":  "timestamp_trunc(created_at, DAY)",
+			"week": "date_trunc(created_at, WEEK(MONDAY))",
+		}}, {Name: "dow", Type: "number", Expression: "extract(DOW FROM created_at)"}, {Name: "day", Type: "number"}},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "region", Type: "string"}},
+	}
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{
+			{Name: "created_at", Granularity: "day"}, {Name: "created_at", Granularity: "week"}, {Name: "dow"}, {Name: "day"},
+		},
+		Metrics: []string{"revenue"},
+		Filters: []Filter{{Expression: "{customers.region} = 'EU'"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "timestamp_trunc(base.created_at, DAY)")
+	expectContains(t, sql, "date_trunc(base.created_at, WEEK(MONDAY))")
+	expectContains(t, sql, "extract(DOW FROM base.created_at)")
+	expectContains(t, sql, "base.day AS day")
 }
 
 func TestJoinGraphRejectsMissingTargetKeyAndPrimaryKey(t *testing.T) {
