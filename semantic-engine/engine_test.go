@@ -2816,22 +2816,38 @@ func TestQuotedTextIsNeverSQL(t *testing.T) {
 		dialect, expr, filter, where string
 		want                         []string
 	}{
-		{"", "count(CASE WHEN note = '{rev}' THEN 1 END)", "", "note <> '{rev}'",
-			[]string{"count(CASE WHEN note = '{rev}' THEN 1 END) AS x", "WHERE note <> '{rev}'"}},
-		{"bigquery", `sum(CASE WHEN note = 'O\'Brien), sum(1' THEN amount END)`, paidFilter, "",
-			[]string{`sum(CASE WHEN status = 'paid' THEN CASE WHEN note = 'O\'Brien), sum(1' THEN amount END ELSE NULL END) AS x`}},
-		{"bigquery", `count(CASE WHEN note = 'O\'Brien' THEN 1 END) / {rev}`, "", `note <> 'O\'Brien' AND sum(amount) > 0`,
-			[]string{`count(CASE WHEN note = 'O\'Brien' THEN 1 END) / NULLIF(sum(amount), 0) AS x`, `HAVING note <> 'O\'Brien' AND sum(amount) > 0`}},
-		{"postgres", `count(CASE WHEN p = 'C:\' AND note = '{zzz}' THEN 1 END)`, paidFilter, "",
-			[]string{`note = '{zzz}' THEN 1 END ELSE NULL END) AS x`}},
-		{"postgres", `CASE WHEN p = 'C:\' THEN {rev} END`, "", "",
-			[]string{`CASE WHEN p = 'C:\' THEN sum(amount) END AS x`}},
-		{"", "sum(\n  amount -- gross\n)", "status = 'paid' -- only paid", "",
-			[]string{"sum(CASE WHEN status = 'paid' -- only paid\n THEN amount -- gross\n ELSE NULL END) AS x"}},
-		{"", "sum(amt$usd$x)", paidFilter, "a$b$c = 1 AND {note} = 'x'",
-			[]string{"sum(CASE WHEN status = 'paid' THEN amt$usd$x ELSE NULL END) AS x", "a$b$c = 1 AND note = 'x'"}},
-		{"", "max(a$b$c) + {rev}", "", "",
-			[]string{"max(a$b$c) + sum(amount) AS x"}},
+		{
+			"", "count(CASE WHEN note = '{rev}' THEN 1 END)", "", "note <> '{rev}'",
+			[]string{"count(CASE WHEN note = '{rev}' THEN 1 END) AS x", "WHERE note <> '{rev}'"},
+		},
+		{
+			"bigquery", `sum(CASE WHEN note = 'O\'Brien), sum(1' THEN amount END)`, paidFilter, "",
+			[]string{`sum(CASE WHEN status = 'paid' THEN CASE WHEN note = 'O\'Brien), sum(1' THEN amount END ELSE NULL END) AS x`},
+		},
+		{
+			"bigquery", `count(CASE WHEN note = 'O\'Brien' THEN 1 END) / {rev}`, "", `note <> 'O\'Brien' AND sum(amount) > 0`,
+			[]string{`count(CASE WHEN note = 'O\'Brien' THEN 1 END) / NULLIF(sum(amount), 0) AS x`, `HAVING note <> 'O\'Brien' AND sum(amount) > 0`},
+		},
+		{
+			"postgres", `count(CASE WHEN p = 'C:\' AND note = '{zzz}' THEN 1 END)`, paidFilter, "",
+			[]string{`note = '{zzz}' THEN 1 END ELSE NULL END) AS x`},
+		},
+		{
+			"postgres", `CASE WHEN p = 'C:\' THEN {rev} END`, "", "",
+			[]string{`CASE WHEN p = 'C:\' THEN sum(amount) END AS x`},
+		},
+		{
+			"", "sum(\n  amount -- gross\n)", "status = 'paid' -- only paid", "",
+			[]string{"sum(CASE WHEN status = 'paid' -- only paid\n THEN amount -- gross\n ELSE NULL END) AS x"},
+		},
+		{
+			"", "sum(amt$usd$x)", paidFilter, "a$b$c = 1 AND {note} = 'x'",
+			[]string{"sum(CASE WHEN status = 'paid' THEN amt$usd$x ELSE NULL END) AS x", "a$b$c = 1 AND note = 'x'"},
+		},
+		{
+			"", "max(a$b$c) + {rev}", "", "",
+			[]string{"max(a$b$c) + sum(amount) AS x"},
+		},
 	}
 	for _, tc := range cases {
 		engine := minimalEngine(t, &Model{
