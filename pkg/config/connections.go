@@ -1050,6 +1050,7 @@ func (c DuneConnection) GetName() string {
 type OdooConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`

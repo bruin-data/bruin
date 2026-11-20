@@ -3,6 +3,7 @@ package odoo
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -11,8 +12,11 @@ import (
 // maxPageSize mirrors ingestr's upper bound for page_size.
 const maxPageSize = 5000
 
+const maxPort = 65535
+
 type Config struct {
 	Host     string
+	Port     int
 	APIKey   string
 	Database string
 	Username string
@@ -61,11 +65,27 @@ func (c *Config) GetIngestrURI() (string, error) {
 		return "", fmt.Errorf("odoo: page_size must be between 1 and %d, got %d", maxPageSize, c.PageSize)
 	}
 
+	if c.Port < 0 || c.Port > maxPort {
+		return "", fmt.Errorf("odoo: port must be between 1 and %d, got %d", maxPort, c.Port)
+	}
+
 	// The host may carry a port and a path prefix, e.g. erp.example.com:8069/odoo.
 	u := &url.URL{Scheme: "odoo", Host: host}
 	if i := strings.Index(host, "/"); i >= 0 {
 		u.Host = host[:i]
 		u.Path = host[i:]
+	}
+
+	// Ingestr has no port parameter, so a separate port goes into the authority, ahead of any path prefix.
+	if c.Port != 0 {
+		hostname, hasPort, err := splitHostPort(u.Host)
+		if err != nil {
+			return "", err
+		}
+		if hasPort {
+			return "", fmt.Errorf("odoo: host %q already includes a port; set the port in either host or port, not both", host)
+		}
+		u.Host = net.JoinHostPort(hostname, strconv.Itoa(c.Port))
 	}
 
 	params := url.Values{}
@@ -88,4 +108,24 @@ func (c *Config) GetIngestrURI() (string, error) {
 	u.RawQuery = params.Encode()
 
 	return u.String(), nil
+}
+
+// splitHostPort returns the hostname of an authority and whether it carries a port. Unlike
+// net.SplitHostPort it accepts an authority without a port, and it reads an unbracketed IPv6
+// literal such as ::1 as a hostname.
+func splitHostPort(authority string) (string, bool, error) {
+	if strings.HasPrefix(authority, "[") {
+		hostname, rest, closed := strings.Cut(authority[1:], "]")
+		if !closed || (rest != "" && !strings.HasPrefix(rest, ":")) {
+			return "", false, fmt.Errorf("odoo: host %q is not a valid bracketed IPv6 address", authority)
+		}
+		return hostname, rest != "", nil
+	}
+
+	if strings.Count(authority, ":") == 1 {
+		hostname, _, _ := strings.Cut(authority, ":")
+		return hostname, true, nil
+	}
+
+	return authority, false, nil
 }

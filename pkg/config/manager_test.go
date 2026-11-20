@@ -343,6 +343,7 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "odoo-1"},
 					Host:               "mycompany.odoo.com",
+					Port:               8443,
 					APIKey:             "odoo-api-key-123",
 					Database:           "mycompany",
 					Username:           "me@example.com",
@@ -1907,6 +1908,7 @@ func TestConfig_AddConnection(t *testing.T) {
 			connName: "odoo-conn",
 			creds: map[string]interface{}{
 				"host":      "mycompany.odoo.com",
+				"port":      8443,
 				"api_key":   "key_123",
 				"database":  "mycompany",
 				"username":  "me@example.com",
@@ -2209,6 +2211,7 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Odoo, 1)
 					assert.Equal(t, tt.connName, env.Connections.Odoo[0].Name)
 					assert.Equal(t, tt.creds["host"], env.Connections.Odoo[0].Host)
+					assert.Equal(t, tt.creds["port"], env.Connections.Odoo[0].Port)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Odoo[0].APIKey)
 					assert.Equal(t, tt.creds["database"], env.Connections.Odoo[0].Database)
 					assert.Equal(t, tt.creds["username"], env.Connections.Odoo[0].Username)

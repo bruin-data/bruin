@@ -209,6 +209,7 @@ environments:
       odoo:
         - name: "odoo-1"
           host: "mycompany.odoo.com"
+          port: 8443
           api_key: "odoo-api-key-123"
           database: "mycompany"
           username: "me@example.com"
