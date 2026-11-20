@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
@@ -145,6 +146,12 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 	envVariables["BRUIN_THIS"] = t.Name
+	// The running binary, so the asset can call back into this exact Bruin, e.g.
+	// the Python SDK rendering queries, without depending on PATH.
+	if executable, err := os.Executable(); err == nil {
+		envVariables["BRUIN_PATH"] = executable
+		envVariables["BRUIN_EXECUTABLE"] = executable
+	}
 	if t.Connection != "" {
 		envVariables["BRUIN_CONNECTION"] = t.Connection
 	}
