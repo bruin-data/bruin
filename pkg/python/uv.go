@@ -68,8 +68,8 @@ func ingestrEnvVars(args []string) (map[string]string, error) {
 			env["ADBC_DRIVER_PATH"] = dir
 		}
 	}
-	if slices.ContainsFunc(args, duck.IsQuackURI) {
-		// Quack needs the DuckDB 2.0+ driver, so its directory is searched first.
+	if slices.ContainsFunc(args, func(arg string) bool { return duck.IsQuackURI(arg) || duck.IsDuckDB2FileURI(arg) }) {
+		// Quack and DuckDB 2.0 files need the 2.0 driver, so its directory is searched first.
 		dir, err := duck.QuackADBCDriverDir()
 		if err != nil {
 			return nil, err
