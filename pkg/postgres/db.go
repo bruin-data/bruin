@@ -184,10 +184,14 @@ func (c *Client) streamWithSchema(ctx context.Context, queryObj *query.Query, h 
 		return nil, err
 	}
 
+	converters := resultValueConverters(fieldDescriptions, typeMap)
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to collect row values")
+		}
+		if converters != nil {
+			convertResultValues(converters, rows.RawValues(), values)
 		}
 		if err := h.Row(values); err != nil {
 			return nil, err

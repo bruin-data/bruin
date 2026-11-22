@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
+	"net"
 	"os"
 	"os/signal"
 	path2 "path"
@@ -2068,6 +2070,9 @@ func readQueryLogPreview(path string) (QueryLog, error) {
 }
 
 func formatQueryCellForDisplay(cell interface{}) interface{} {
+	if formatted, ok := formatPostgresValue(cell); ok {
+		return formatted
+	}
 	switch v := cell.(type) {
 	case *big.Rat:
 		return formatBigRatAsDecimal(v)
@@ -2076,6 +2081,25 @@ func formatQueryCellForDisplay(cell interface{}) interface{} {
 		return formatBigRatAsDecimal(&vcopy)
 	case pgtype.Numeric:
 		return formatPgNumeric(v)
+	case float64:
+		if text, ok := formatNonFiniteFloat(v); ok {
+			return text
+		}
+		return cell
+	case float32:
+		if text, ok := formatNonFiniteFloat(float64(v)); ok {
+			return text
+		}
+		return cell
+	case map[string]interface{}:
+		// JSON objects, such as Postgres json and jsonb values, print as JSON rather than map[key:value].
+		var text strings.Builder
+		encoder := json.NewEncoder(&text)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(v); err != nil {
+			return cell
+		}
+		return strings.TrimSuffix(text.String(), "\n")
 	case []interface{}:
 		formatted := make([]interface{}, len(v))
 		for i, item := range v {
@@ -2088,6 +2112,9 @@ func formatQueryCellForDisplay(cell interface{}) interface{} {
 }
 
 func formatQueryCellForJSON(cell interface{}) interface{} {
+	if formatted, ok := formatPostgresValue(cell); ok {
+		return formatted
+	}
 	switch v := cell.(type) {
 	case *big.Rat:
 		if v == nil {
@@ -2104,6 +2131,20 @@ func formatQueryCellForJSON(cell interface{}) interface{} {
 		}
 		// NaN and ±Infinity have no JSON number form, so they stay strings.
 		return formatted
+	case float64:
+		// encoding/json rejects NaN and ±Infinity, which would fail the whole result.
+		if text, ok := formatNonFiniteFloat(v); ok {
+			return text
+		}
+		return cell
+	case float32:
+		if text, ok := formatNonFiniteFloat(float64(v)); ok {
+			return text
+		}
+		return cell
+	case net.HardwareAddr:
+		// encoding/json would base64-encode the address bytes.
+		return v.String()
 	case []interface{}:
 		formatted := make([]interface{}, len(v))
 		for i, item := range v {
@@ -2115,15 +2156,19 @@ func formatQueryCellForJSON(cell interface{}) interface{} {
 	}
 }
 
-// formatPgNumeric renders a Postgres NUMERIC as Postgres prints it, e.g. 42.86,
-// NaN or Infinity, and returns nil for NULL. pgx returns NUMERIC columns as
-// pgtype.Numeric, which %v would print as its raw struct fields.
-func formatPgNumeric(n pgtype.Numeric) interface{} {
-	value, err := n.Value()
-	if err != nil {
-		return n
+// formatNonFiniteFloat names NaN and ±Infinity the way Postgres does, and returns
+// false for finite values.
+func formatNonFiniteFloat(f float64) (string, bool) {
+	switch {
+	case math.IsNaN(f):
+		return "NaN", true
+	case math.IsInf(f, 1):
+		return "Infinity", true
+	case math.IsInf(f, -1):
+		return "-Infinity", true
+	default:
+		return "", false
 	}
-	return value
 }
 
 func formatQueryRowsForJSON(rows [][]interface{}) [][]interface{} {

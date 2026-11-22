@@ -248,9 +248,6 @@ func TestQueryLogWriterCleansUpInvalidRows(t *testing.T) {
 	}{
 		{name: "channel", cell: make(chan int)},
 		{name: "function", cell: func() {}},
-		{name: "nan", cell: math.NaN()},
-		{name: "positive infinity", cell: math.Inf(1)},
-		{name: "negative infinity", cell: math.Inf(-1)},
 		{name: "invalid raw json", cell: json.RawMessage(`{"broken":`)},
 		{name: "cyclic object", cell: cycle},
 	}
@@ -269,6 +266,17 @@ func TestQueryLogWriterCleansUpInvalidRows(t *testing.T) {
 			assert.NoFileExists(t, log.path+".tmp")
 		})
 	}
+}
+
+func TestQueryLogWriterWritesNonFiniteFloats(t *testing.T) {
+	t.Parallel()
+
+	log := openTestQueryLog(t, newQueryLogTestRepo(t))
+	log.writeColumns([]string{"nan", "inf", "neg_inf"})
+	log.writeRow([]any{math.NaN(), math.Inf(1), float32(math.Inf(-1))})
+	require.NoError(t, log.finish(nil))
+	got := decodeTestQueryLog(t, log.path)
+	assert.Equal(t, [][]any{{"NaN", "Infinity", "-Infinity"}}, got.Rows)
 }
 
 func TestQueryLogWriterCleansUpIOFailures(t *testing.T) {

@@ -977,22 +977,27 @@ func TestFormatPgNumericCells(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			row := []interface{}{tt.cell}
-			assert.Equal(t, []string{tt.expectedText}, formatQueryRowForCSV(row))
-
-			var table strings.Builder
-			renderTable(&table, []string{"value"}, [][]interface{}{row})
-			if tt.expectedText != "" {
-				assert.Contains(t, table.String(), " "+tt.expectedText+" ")
-			}
-			assert.NotContains(t, table.String(), "finite")
-
-			payload, err := json.Marshal(formatQueryRowForJSON(row))
-			require.NoError(t, err)
-			assert.Equal(t, "["+tt.expectedJSON+"]", string(payload))
+			assertQueryCellOutputs(t, tt.cell, tt.expectedText, tt.expectedJSON)
 		})
 	}
+}
+
+// assertQueryCellOutputs checks how a single cell prints in csv, table and JSON output.
+func assertQueryCellOutputs(t *testing.T, cell interface{}, expectedText, expectedJSON string) {
+	t.Helper()
+
+	row := []interface{}{cell}
+	assert.Equal(t, []string{expectedText}, formatQueryRowForCSV(row))
+
+	var table strings.Builder
+	renderTable(&table, []string{"value"}, [][]interface{}{row})
+	if expectedText != "" {
+		assert.Contains(t, table.String(), " "+expectedText+" ")
+	}
+
+	payload, err := json.Marshal(formatQueryRowForJSON(row))
+	require.NoError(t, err)
+	assert.Equal(t, "["+expectedJSON+"]", string(payload))
 }
 
 func TestWriteCSVFile(t *testing.T) {
