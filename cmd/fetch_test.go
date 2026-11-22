@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -925,6 +926,65 @@ func TestFormatQueryRowsForJSON_Marshal(t *testing.T) {
 			payload, err := json.Marshal(rows)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, string(payload))
+		})
+	}
+}
+
+func pgNumeric(t *testing.T, text string) pgtype.Numeric {
+	t.Helper()
+	var n pgtype.Numeric
+	require.NoError(t, n.Scan(text))
+	return n
+}
+
+func TestFormatPgNumericCells(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		cell         interface{}
+		expectedText string
+		expectedJSON string
+	}{
+		{name: "rounded percentage", cell: pgNumeric(t, "42.86"), expectedText: "42.86", expectedJSON: "42.86"},
+		{name: "keeps scale", cell: pgNumeric(t, "-1.50"), expectedText: "-1.50", expectedJSON: "-1.50"},
+		{name: "integer", cell: pgNumeric(t, "100"), expectedText: "100", expectedJSON: "100"},
+		{name: "small fraction", cell: pgNumeric(t, "0.000001"), expectedText: "0.000001", expectedJSON: "0.000001"},
+		{
+			name:         "beyond float64 precision",
+			cell:         pgNumeric(t, "123456789012345678901234567890.123456789"),
+			expectedText: "123456789012345678901234567890.123456789",
+			expectedJSON: "123456789012345678901234567890.123456789",
+		},
+		{name: "NaN", cell: pgNumeric(t, "NaN"), expectedText: "NaN", expectedJSON: `"NaN"`},
+		{name: "infinity", cell: pgNumeric(t, "Infinity"), expectedText: "Infinity", expectedJSON: `"Infinity"`},
+		{name: "negative infinity", cell: pgNumeric(t, "-Infinity"), expectedText: "-Infinity", expectedJSON: `"-Infinity"`},
+		{name: "null", cell: pgtype.Numeric{}, expectedText: "", expectedJSON: "null"},
+		{
+			name:         "numeric array",
+			cell:         []interface{}{pgNumeric(t, "1.5"), pgNumeric(t, "2.25"), nil},
+			expectedText: "[1.5 2.25 <nil>]",
+			expectedJSON: "[1.5,2.25,null]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			row := []interface{}{tt.cell}
+			assert.Equal(t, []string{tt.expectedText}, formatQueryRowForCSV(row))
+
+			var table strings.Builder
+			renderTable(&table, []string{"value"}, [][]interface{}{row})
+			if tt.expectedText != "" {
+				assert.Contains(t, table.String(), " "+tt.expectedText+" ")
+			}
+			assert.NotContains(t, table.String(), "finite")
+
+			payload, err := json.Marshal(formatQueryRowForJSON(row))
+			require.NoError(t, err)
+			assert.Equal(t, "["+tt.expectedJSON+"]", string(payload))
 		})
 	}
 }

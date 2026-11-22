@@ -34,6 +34,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	semantic "github.com/bruin-data/bruin/semantic-engine"
 	"github.com/gofrs/flock"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake/v2"
@@ -1598,8 +1599,8 @@ func writeCSVFile(path string, columns []string, rows [][]interface{}) error {
 func formatQueryRowForCSV(row []interface{}) []string {
 	rowStrings := make([]string, len(row))
 	for i, val := range row {
-		if val != nil {
-			rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
+		if formatted := formatQueryCellForDisplay(val); formatted != nil {
+			rowStrings[i] = fmt.Sprintf("%v", formatted)
 		}
 	}
 	return rowStrings
@@ -2073,6 +2074,14 @@ func formatQueryCellForDisplay(cell interface{}) interface{} {
 	case big.Rat:
 		vcopy := v
 		return formatBigRatAsDecimal(&vcopy)
+	case pgtype.Numeric:
+		return formatPgNumeric(v)
+	case []interface{}:
+		formatted := make([]interface{}, len(v))
+		for i, item := range v {
+			formatted[i] = formatQueryCellForDisplay(item)
+		}
+		return formatted
 	default:
 		return cell
 	}
@@ -2088,9 +2097,27 @@ func formatQueryCellForJSON(cell interface{}) interface{} {
 	case big.Rat:
 		vcopy := v
 		return json.Number(formatBigRatAsDecimal(&vcopy))
+	case pgtype.Numeric:
+		formatted := formatPgNumeric(v)
+		if text, ok := formatted.(string); ok && !v.NaN && v.InfinityModifier == pgtype.Finite {
+			return json.Number(text)
+		}
+		// NaN and ±Infinity have no JSON number form, so they stay strings.
+		return formatted
 	default:
 		return cell
 	}
+}
+
+// formatPgNumeric renders a Postgres NUMERIC as Postgres prints it, e.g. 42.86,
+// NaN or Infinity, and returns nil for NULL. pgx returns NUMERIC columns as
+// pgtype.Numeric, which %v would print as its raw struct fields.
+func formatPgNumeric(n pgtype.Numeric) interface{} {
+	value, err := n.Value()
+	if err != nil {
+		return n
+	}
+	return value
 }
 
 func formatQueryRowsForJSON(rows [][]interface{}) [][]interface{} {
