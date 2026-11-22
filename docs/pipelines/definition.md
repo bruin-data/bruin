@@ -452,6 +452,7 @@ Fields:
 | timeout            | String (Go duration)       | —       | Default asset timeout (for example, `1h30m`) |
 | rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
+| schema_evolution   | Object                     | —       | See [Schema Evolution](/assets/definition-schema#schema-evolution). Applied only to supported table assets using in-place strategies |
 | notifications      | Object                     | —       | Default asset notifications      |
 
 Asset identity/runtime fields such as `name`, `uri`, executable file metadata, definition file metadata, and `retries_delay` are not supported in pipeline defaults.

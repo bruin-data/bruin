@@ -1582,6 +1582,121 @@ func TestEnsureMaterializationValuesAreValid_ClickHouseSCD2(t *testing.T) {
 	}
 }
 
+func TestEnsureMaterializationValuesAreValid_SchemaEvolution(t *testing.T) {
+	t.Parallel()
+
+	boolPtr := func(v bool) *bool { return &v }
+
+	tests := []struct {
+		name      string
+		assetType pipeline.AssetType
+		matType   pipeline.MaterializationType
+		se        *pipeline.SchemaEvolution
+		want      []string
+	}{
+		{
+			name:      "not configured",
+			assetType: pipeline.AssetTypeDuckDBQuery,
+			matType:   pipeline.MaterializationTypeTable,
+		},
+		{
+			name:      "explicitly disabled on unsupported asset type",
+			assetType: pipeline.AssetTypePostgresQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(false)},
+		},
+		{
+			name:      "enabled on DuckDB table",
+			assetType: pipeline.AssetTypeDuckDBQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+		},
+		{
+			name:      "enabled on DuckDB view",
+			assetType: pipeline.AssetTypeDuckDBQuery,
+			matType:   pipeline.MaterializationTypeView,
+			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			want:      []string{"schema_evolution requires the materialization type to be 'table'"},
+		},
+		{
+			name:      "enabled on DuckDB without materialization",
+			assetType: pipeline.AssetTypeDuckDBQuery,
+			matType:   pipeline.MaterializationTypeNone,
+			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			want:      []string{"schema_evolution requires the materialization type to be 'table'"},
+		},
+		{
+			name:      "enabled on unsupported asset type",
+			assetType: pipeline.AssetTypePostgresQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			want:      []string{"schema_evolution is not supported for pg.sql assets"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Type:            tt.assetType,
+				SchemaEvolution: tt.se,
+				Materialization: pipeline.Materialization{
+					Type: tt.matType,
+				},
+			}
+			issues, err := EnsureMaterializationValuesAreValidForSingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			descriptions := make([]string, 0, len(issues))
+			for _, issue := range issues {
+				descriptions = append(descriptions, issue.Description)
+			}
+			assert.ElementsMatch(t, tt.want, descriptions)
+		})
+	}
+}
+
+func TestWarnSchemaEvolutionNoOpStrategy(t *testing.T) {
+	t.Parallel()
+
+	boolPtr := func(v bool) *bool { return &v }
+	wantMsg := "schema_evolution has no effect with 'create+replace' (or default) strategy because the table is recreated on every run"
+
+	tests := []struct {
+		name     string
+		strategy pipeline.MaterializationStrategy
+		enabled  bool
+		wantWarn bool
+	}{
+		{"create+replace warns", pipeline.MaterializationStrategyCreateReplace, true, true},
+		{"default empty strategy warns", pipeline.MaterializationStrategyNone, true, true},
+		{"append does not warn", pipeline.MaterializationStrategyAppend, true, false},
+		{"ddl does not warn", pipeline.MaterializationStrategyDDL, true, false},
+		{"disabled does not warn", pipeline.MaterializationStrategyCreateReplace, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Type:            pipeline.AssetTypeDuckDBQuery,
+				SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(tt.enabled)},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: tt.strategy,
+				},
+			}
+			issues, err := WarnSchemaEvolutionNoOpStrategy(t.Context(), &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			if tt.wantWarn {
+				require.Len(t, issues, 1)
+				assert.Equal(t, wantMsg, issues[0].Description)
+			} else {
+				assert.Empty(t, issues)
+			}
+		})
+	}
+}
+
 func TestEnsureMaterializationValuesAreValid_TableFormat(t *testing.T) {
 	t.Parallel()
 

@@ -667,6 +667,45 @@ func (a AssetType) SupportsTableFormat() bool {
 	return tableFormatAssetTypes[a]
 }
 
+// schemaEvolutionAssetTypes lists the asset types that support schema_evolution.
+var schemaEvolutionAssetTypes = map[AssetType]bool{
+	AssetTypeDuckDBQuery: true,
+}
+
+// SupportsSchemaEvolution reports whether assets of this type can enable schema_evolution.
+func (a AssetType) SupportsSchemaEvolution() bool {
+	return schemaEvolutionAssetTypes[a]
+}
+
+type SchemaEvolution struct {
+	Enabled *bool `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
+}
+
+func (s *SchemaEvolution) IsEnabled() bool {
+	return s != nil && s.Enabled != nil && *s.Enabled
+}
+
+func (s *SchemaEvolution) IsZero() bool {
+	return s == nil || s.Enabled == nil
+}
+
+func (s *SchemaEvolution) Clone() *SchemaEvolution {
+	if s == nil {
+		return nil
+	}
+	return &SchemaEvolution{
+		Enabled: cloneBoolPtr(s.Enabled),
+	}
+}
+
+// SupportsInPlaceEvolution reports whether this materialization updates an existing
+// table rather than dropping and recreating it on every normal run.
+func (m Materialization) SupportsInPlaceEvolution() bool {
+	return m.Type == MaterializationTypeTable &&
+		m.Strategy != MaterializationStrategyNone &&
+		m.Strategy != MaterializationStrategyCreateReplace
+}
+
 // IsDataVault reports whether the strategy is one of the Data Vault loading strategies.
 // These carry their own full-refresh handling, so they must never be silently swapped
 // for another strategy on a platform that does not implement them.
@@ -1462,6 +1501,7 @@ type Asset struct { //nolint:recvcheck
 	Timeout           DurationSeconds    `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	SchemaEvolution   *SchemaEvolution   `json:"schema_evolution,omitempty" yaml:"schema_evolution,omitempty" mapstructure:"schema_evolution"`
 	Notifications     *Notifications     `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 
 	upstream   []*Asset
@@ -1731,6 +1771,9 @@ func (a *Asset) removeRedundanciesBeforePersisting() {
 
 	if a.Routing.IsZero() {
 		a.Routing = nil
+	}
+	if a.SchemaEvolution.IsZero() {
+		a.SchemaEvolution = nil
 	}
 }
 
@@ -2483,6 +2526,7 @@ type DefaultValues struct {
 	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
 	Timeout           DurationSeconds        `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	SchemaEvolution   *SchemaEvolution       `json:"schema_evolution,omitempty" yaml:"schema_evolution,omitempty" mapstructure:"schema_evolution"`
 	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -2530,6 +2574,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		Retries:           asset.Retries,
 		Timeout:           asset.Timeout,
 		RefreshRestricted: asset.RefreshRestricted,
+		SchemaEvolution:   asset.SchemaEvolution.Clone(),
 		Notifications:     asset.Notifications,
 	}
 
@@ -3563,6 +3608,15 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if asset.RefreshRestricted == nil && defaults.RefreshRestricted != nil {
 		asset.RefreshRestricted = cloneBoolPtr(defaults.RefreshRestricted)
+	}
+	if defaults.SchemaEvolution != nil && defaults.SchemaEvolution.Enabled != nil &&
+		asset.Type.SupportsSchemaEvolution() &&
+		asset.Materialization.SupportsInPlaceEvolution() {
+		if asset.SchemaEvolution == nil {
+			asset.SchemaEvolution = defaults.SchemaEvolution.Clone()
+		} else if asset.SchemaEvolution.Enabled == nil {
+			asset.SchemaEvolution.Enabled = cloneBoolPtr(defaults.SchemaEvolution.Enabled)
+		}
 	}
 	asset.Notifications = mergeNotificationDefaults(asset.Notifications, defaults.Notifications)
 

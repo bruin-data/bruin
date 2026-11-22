@@ -29,7 +29,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyAppend:             buildAppendQuery,
 		pipeline.MaterializationStrategyCreateReplace:      buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:       buildIncrementalQuery,
-		pipeline.MaterializationStrategyTruncateInsert:     ansisql.BuildTruncateInsertQuery,
+		pipeline.MaterializationStrategyTruncateInsert:     buildTruncateInsertQuery,
 		pipeline.MaterializationStrategyMerge:              buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:       buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:                buildDDLQuery,
@@ -82,8 +82,25 @@ func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
 }
 
+func buildInsertInto(asset *pipeline.Asset, source string) string {
+	if asset.SchemaEvolution.IsEnabled() {
+		return fmt.Sprintf("INSERT INTO %s BY NAME %s", asset.Name, source)
+	}
+	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, source)
+}
+
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
+	return buildInsertInto(asset, query), nil
+}
+
+func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {
+	queries := []string{
+		"BEGIN TRANSACTION",
+		"TRUNCATE TABLE " + task.Name,
+		buildInsertInto(task, strings.TrimSuffix(query, ";")),
+		"COMMIT",
+	}
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
@@ -100,7 +117,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		ansisql.BuildIncrementalDelete(task.Name, fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName), mat.IncrementalPredicate),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		buildInsertInto(task, "SELECT * FROM "+tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
 	}
@@ -221,9 +238,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			asset.Materialization.IncrementalKey,
 			startVar,
 			endVar),
-		fmt.Sprintf(`INSERT INTO %s %s`,
-			asset.Name,
-			strings.TrimSuffix(query, ";")),
+		buildInsertInto(asset, strings.TrimSuffix(query, ";")),
 		"COMMIT",
 	}
 
@@ -324,7 +339,11 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	changeConditions := make([]string, 0, len(nonPKCols))
 	for _, col := range nonPKCols {
-		changeConditions = append(changeConditions, fmt.Sprintf("t.%s != s.%s", col, col))
+		if asset.SchemaEvolution.IsEnabled() {
+			changeConditions = append(changeConditions, fmt.Sprintf("t.%s IS DISTINCT FROM s.%s", col, col))
+		} else {
+			changeConditions = append(changeConditions, fmt.Sprintf("t.%s != s.%s", col, col))
+		}
 	}
 	changeCondition := ""
 	if len(changeConditions) > 0 {

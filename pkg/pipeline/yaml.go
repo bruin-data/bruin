@@ -524,6 +524,7 @@ type taskDefinition struct {
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
+	SchemaEvolution       *SchemaEvolution  `yaml:"schema_evolution"`
 	Notifications         Notifications     `yaml:"notifications"`
 }
 
@@ -750,6 +751,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Timeout:           definition.Timeout,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),
+		SchemaEvolution:   definition.SchemaEvolution.Clone(),
 		Notifications:     notificationsOrNil(definition.Notifications),
 	}
 

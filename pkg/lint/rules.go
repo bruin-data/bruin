@@ -1548,6 +1548,44 @@ func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline,
 	return issues, nil
 }
 
+// schemaEvolutionIssues validates asset-level schema_evolution configuration.
+func schemaEvolutionIssues(asset *pipeline.Asset) []*Issue {
+	if !asset.SchemaEvolution.IsEnabled() {
+		return nil
+	}
+	switch {
+	case !asset.Type.SupportsSchemaEvolution():
+		return []*Issue{{
+			Task:        asset,
+			Description: fmt.Sprintf("schema_evolution is not supported for %s assets", asset.Type),
+		}}
+	case asset.Materialization.Type != pipeline.MaterializationTypeTable:
+		return []*Issue{{
+			Task:        asset,
+			Description: "schema_evolution requires the materialization type to be 'table'",
+		}}
+	}
+	return nil
+}
+
+// WarnSchemaEvolutionNoOpStrategy warns when schema_evolution.enabled is true on a
+// create+replace (or default-strategy) table asset, where the table is dropped and
+// recreated on every run and schema evolution has no effect.
+func WarnSchemaEvolutionNoOpStrategy(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if !asset.SchemaEvolution.IsEnabled() ||
+		!asset.Type.SupportsSchemaEvolution() ||
+		asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return []*Issue{}, nil
+	}
+	if !asset.Materialization.SupportsInPlaceEvolution() {
+		return []*Issue{{
+			Task:        asset,
+			Description: "schema_evolution has no effect with 'create+replace' (or default) strategy because the table is recreated on every run",
+		}}, nil
+	}
+	return []*Issue{}, nil
+}
+
 // tableFormatIssues validates materialization.table_format: the value must be known, the asset type must
 // support it, and it only applies to table materializations.
 func tableFormatIssues(asset *pipeline.Asset) []*Issue {
@@ -1611,6 +1649,7 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	}
 
 	issues = append(issues, tableFormatIssues(asset)...)
+	issues = append(issues, schemaEvolutionIssues(asset)...)
 
 	if asset.Type == pipeline.AssetTypeInference {
 		if err := inference.ValidateAsset(asset); err != nil {

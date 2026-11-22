@@ -171,6 +171,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "schema-evolution-noop-strategy",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			AssetValidator:   WarnSchemaEvolutionNoOpStrategy,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "ingestr-destination-table-on-queryable",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
