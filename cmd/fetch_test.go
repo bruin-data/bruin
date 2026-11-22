@@ -966,6 +966,12 @@ func TestFormatPgNumericCells(t *testing.T) {
 			expectedText: "[1.5 2.25 <nil>]",
 			expectedJSON: "[1.5,2.25,null]",
 		},
+		{
+			name:         "numeric array with special values",
+			cell:         []interface{}{pgNumeric(t, "Infinity"), pgNumeric(t, "-Infinity"), pgNumeric(t, "NaN")},
+			expectedText: "[Infinity -Infinity NaN]",
+			expectedJSON: `["Infinity","-Infinity","NaN"]`,
+		},
 	}
 
 	for _, tt := range tests {

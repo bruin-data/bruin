@@ -2104,6 +2104,12 @@ func formatQueryCellForJSON(cell interface{}) interface{} {
 		}
 		// NaN and ±Infinity have no JSON number form, so they stay strings.
 		return formatted
+	case []interface{}:
+		formatted := make([]interface{}, len(v))
+		for i, item := range v {
+			formatted[i] = formatQueryCellForJSON(item)
+		}
+		return formatted
 	default:
 		return cell
 	}
