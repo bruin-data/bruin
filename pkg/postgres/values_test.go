@@ -35,8 +35,8 @@ func TestClient_StreamWithSchemaConvertsTypeDependentValues(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, [][]interface{}{
-		// The int4 column holds the same int32 as the "char" one and stays a number.
-		{"<a>1</a>", `\xdeadbeef`, "x", []any{"r", nil}, int32(120)},
+		// bytea keeps its bytes, and the int4 column holds the same int32 as the "char" one but stays a number.
+		{"<a>1</a>", []byte{0xde, 0xad, 0xbe, 0xef}, "x", []any{"r", nil}, int32(120)},
 		{nil, nil, nil, nil, nil},
 	}, h.rows)
 }

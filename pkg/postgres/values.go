@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -14,8 +13,9 @@ type valueConverter func(raw []byte, value any) any
 
 // resultValueConverters returns a converter per column, or nil for columns pgx already
 // decodes into values that need no column context. It covers values whose Go form can't
-// be read correctly without the column type: pgx returns xml and bytea both as []byte and
-// "char" as an int32, and flattens multi-dimensional arrays. Returns nil if no column needs one.
+// be read correctly without the column type: pgx returns xml as []byte like bytea and
+// "char" as an int32 like int4, and flattens multi-dimensional arrays. bytea stays []byte,
+// since callers such as inference need the raw bytes. Returns nil if no column needs one.
 func resultValueConverters(fields []pgconn.FieldDescription, typeMap *pgtype.Map) []valueConverter {
 	var converters []valueConverter
 	for i, field := range fields {
@@ -53,13 +53,6 @@ func scalarConverter(oid uint32) valueConverter {
 		return func(_ []byte, value any) any {
 			if b, ok := value.([]byte); ok {
 				return string(b)
-			}
-			return value
-		}
-	case pgtype.ByteaOID:
-		return func(_ []byte, value any) any {
-			if b, ok := value.([]byte); ok {
-				return `\x` + hex.EncodeToString(b)
 			}
 			return value
 		}

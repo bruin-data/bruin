@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -2091,6 +2092,13 @@ func formatQueryCellForDisplay(cell interface{}) interface{} {
 			return text
 		}
 		return cell
+	case []byte:
+		// Binary values, such as Postgres bytea, print as hex like Postgres does rather than [222 173 …].
+		// JSON output keeps encoding/json's base64.
+		if v == nil {
+			return nil
+		}
+		return `\x` + hex.EncodeToString(v)
 	case map[string]interface{}:
 		// JSON objects, such as Postgres json and jsonb values, print as JSON rather than map[key:value].
 		var text strings.Builder
