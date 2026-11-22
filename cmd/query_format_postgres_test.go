@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// scanPgText decodes Postgres text output into a pgx value, as a query result would hold it.
+// scanPgText decodes Postgres text output into a pgx value of type T, as a query result would hold it.
 func scanPgText[T any, PT interface {
 	*T
 	sql.Scanner
-}](t *testing.T, text string) T {
+}](t *testing.T, text string) interface{} {
 	t.Helper()
 	var value T
 	require.NoError(t, PT(&value).Scan(text))

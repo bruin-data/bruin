@@ -90,6 +90,12 @@ func TestNestArrayElements(t *testing.T) {
 			expected: []any{int32(1), int32(2)},
 		},
 		{
+			name:     "out of range dimension count stays flat",
+			raw:      append([]byte{0xff, 0xff, 0xff, 0xff}, make([]byte, 60)...),
+			elements: []any{int32(1)},
+			expected: []any{int32(1)},
+		},
+		{
 			name:     "truncated header stays flat",
 			raw:      []byte{0, 0, 0, 2},
 			elements: []any{int32(1)},

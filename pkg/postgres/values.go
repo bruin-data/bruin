@@ -66,7 +66,7 @@ func scalarConverter(oid uint32) valueConverter {
 	case pgtype.QCharOID:
 		return func(_ []byte, value any) any {
 			if c, ok := value.(int32); ok {
-				return formatQChar(byte(c))
+				return formatQChar(c)
 			}
 			return value
 		}
@@ -74,15 +74,16 @@ func scalarConverter(oid uint32) valueConverter {
 	return nil
 }
 
-// formatQChar matches Postgres' output for the single-byte "char" type.
-func formatQChar(c byte) string {
+// formatQChar matches Postgres' output for the single-byte "char" type, which pgx
+// decodes as an int32 holding the byte.
+func formatQChar(c int32) string {
 	switch {
 	case c == 0:
 		return ""
 	case c >= 0x80:
 		return fmt.Sprintf(`\%03o`, c)
 	default:
-		return string(rune(c))
+		return fmt.Sprintf("%c", c)
 	}
 }
 
@@ -122,22 +123,30 @@ func arrayConverter(field pgconn.FieldDescription, typeMap *pgtype.Map) valueCon
 // the binary array header: ndims, has-null flag and element OID, then length and lower
 // bound per dimension, each a 4-byte integer.
 func nestArrayElements(raw []byte, elements []any) []any {
-	const headerSize, dimensionSize = 12, 8
+	// Postgres arrays have at most 6 dimensions (MAXDIM).
+	const headerSize, dimensionSize, maxDimensions = 12, 8, 6
 	if len(raw) < headerSize {
 		return elements
 	}
-	ndims := int(int32(binary.BigEndian.Uint32(raw)))
-	if ndims < 2 || len(raw) < headerSize+dimensionSize*ndims {
+	ndims := binary.BigEndian.Uint32(raw)
+	if ndims < 2 || ndims > maxDimensions || len(raw) < headerSize+dimensionSize*int(ndims) {
 		return elements
 	}
 
 	lengths := make([]int, ndims)
 	total := 1
 	for i := range lengths {
-		lengths[i] = int(int32(binary.BigEndian.Uint32(raw[headerSize+dimensionSize*i:])))
+		length := binary.BigEndian.Uint32(raw[headerSize+dimensionSize*i:])
+		if length == 0 || int(length) > len(elements) {
+			return elements
+		}
+		lengths[i] = int(length)
 		total *= lengths[i]
+		if total > len(elements) {
+			return elements
+		}
 	}
-	if total != len(elements) || total == 0 {
+	if total != len(elements) {
 		return elements
 	}
 	return reshapeArray(elements, lengths)
