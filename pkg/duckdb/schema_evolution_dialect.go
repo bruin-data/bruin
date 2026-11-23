@@ -22,6 +22,10 @@ var duckDBTypeFormatConfig = schemaevolution.TypeFormatConfig{
 		"UINT8":   sqlengine.DT_UBIGINT,
 		"SQLNULL": sqlengine.DT_NULL,
 	},
+	DTypeFolds: map[sqlengine.DType]sqlengine.DType{
+		sqlengine.DT_DATETIME:     sqlengine.DT_TIMESTAMP,
+		sqlengine.DT_TIMESTAMPNTZ: sqlengine.DT_TIMESTAMP,
+	},
 	TypeNames: map[sqlengine.DType]string{
 		sqlengine.DT_INT:         "INTEGER",
 		sqlengine.DT_INT128:      "HUGEINT",
@@ -52,6 +56,7 @@ var duckDBBasePolicy = schemaevolution.PolicyDialect{
 		AllowDecimalWidening:           true,
 		AllowIntToDecimal:              true,
 		MaxDecimalPrecision:            duckDBMaxDecimalPrecision,
+		UnboundedVarcharAbsorbsAll:     true,
 		ImplicitVarcharTargetPredicate: acceptsDuckDBImplicitVarcharInsert,
 		AllowDateToTimestamp:           true,
 		AllowTimestampToTimestampTZ:    true,
@@ -62,10 +67,12 @@ var duckLakeBasePolicy = schemaevolution.PolicyDialect{
 	Policy: schemaevolution.TypePolicy{
 		Name:                           "DuckLake",
 		Format:                         duckDBTypeFormatConfig,
+		NotNullAddedColumnReason:       "cannot add a new NOT NULL column in DuckLake",
 		RequireLiteralDefault:          true,
 		MaxSignedIntDType:              sqlengine.DT_BIGINT,
 		MaxUnsignedIntDType:            sqlengine.DT_UBIGINT,
 		MaxDecimalPrecision:            duckDBMaxDecimalPrecision,
+		UnboundedVarcharAbsorbsAll:     true,
 		ImplicitVarcharTargetPredicate: acceptsDuckDBImplicitVarcharInsert,
 	},
 }

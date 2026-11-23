@@ -85,12 +85,52 @@ func TestSQLUtil_PureGoParserHelpers(t *testing.T) {
 		assert.Equal(t, 3, n)
 	})
 
-	t.Run("QuoteDoubleQuotedIdentifier preserves dots and escapes embedded double quotes", func(t *testing.T) {
+	t.Run("QuoteDoubleQuotedIdentifier and QuoteBacktickIdentifier preserve dots and escape quotes", func(t *testing.T) {
 		t.Parallel()
 
 		assert.Equal(t, `"a.b"`, schemaevolution.QuoteDoubleQuotedIdentifier("a.b"))
 		assert.Equal(t, `"x""y"`, schemaevolution.QuoteDoubleQuotedIdentifier(`x"y`))
 		assert.Equal(t, `"order"`, schemaevolution.QuoteDoubleQuotedIdentifier("order"))
+		assert.Equal(t, "`a.b`", schemaevolution.QuoteBacktickIdentifier("a.b"))
+		assert.Equal(t, "`x``y`", schemaevolution.QuoteBacktickIdentifier("x`y"))
+	})
+
+	t.Run("DetectUntypedSelectLiterals identifies bare NULL and empty array projections without flagging CASTs", func(t *testing.T) {
+		t.Parallel()
+
+		nulls, arrays := schemaevolution.DetectUntypedSelectLiterals(
+			"bigquery",
+			"WITH s AS (SELECT 1 AS a) SELECT a, NULL AS bare_null, CAST(NULL AS STRING) AS typed_null, [] AS empty_arr, [[]] AS nested_arr, ARRAY<STRING>[] AS typed_arr FROM s;",
+		)
+		assert.Equal(t, map[string]bool{"bare_null": true}, nulls)
+		assert.Equal(t, map[string]int{"empty_arr": 1, "nested_arr": 2}, arrays)
+	})
+
+	t.Run("InjectInsertColumnList rewrites append, truncate, and delete+insert SELECT * while ignoring other tables", func(t *testing.T) {
+		t.Parallel()
+
+		cols := []schemaevolution.Column{{Name: "id"}, {Name: "email"}}
+		gotAppend := schemaevolution.InjectInsertColumnList(
+			"bigquery",
+			"INSERT INTO `proj.ds.users` SELECT 1 AS id, 'a@b.com' AS email",
+			"`proj.ds.users`",
+			schemaevolution.QuoteBacktickIdentifier,
+			cols,
+		)
+		assert.Equal(t, "INSERT INTO `proj.ds.users` (`id`, `email`) SELECT 1 AS id, 'a@b.com' AS email", gotAppend)
+
+		gotDelIns := schemaevolution.InjectInsertColumnList(
+			"bigquery",
+			"BEGIN TRANSACTION;\nINSERT INTO ds.audit SELECT 'x';\nINSERT INTO ds.users SELECT * FROM __bruin_tmp_1;\nCOMMIT TRANSACTION;",
+			"ds.users",
+			schemaevolution.QuoteBacktickIdentifier,
+			cols,
+		)
+		assert.Equal(
+			t,
+			"BEGIN TRANSACTION;\nINSERT INTO ds.audit SELECT 'x';\nINSERT INTO ds.users (`id`, `email`) SELECT `id`, `email` FROM __bruin_tmp_1;\nCOMMIT TRANSACTION;",
+			gotDelIns,
+		)
 	})
 }
 

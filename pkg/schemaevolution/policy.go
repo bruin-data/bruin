@@ -70,6 +70,11 @@ type TypePolicy struct {
 	AllowDecimalWidening           bool
 	AllowIntToDecimal              bool
 	MaxDecimalPrecision            int
+	MaxDecimalIntDigits            int
+	MaxDecimalScale                int
+	AllowDecimalToBigDecimal       bool
+	AllowLengthWidening            bool
+	UnboundedVarcharAbsorbsAll     bool
 	ImplicitVarcharTargetPredicate func(cur ParsedType) bool
 	AllowDateToTimestamp           bool
 	AllowTimestampToTimestampTZ    bool
@@ -109,8 +114,9 @@ func (d PolicyDialect) NormalizeType(sqlType string) string {
 
 // ValidateNewColumn checks whether col can be added via ALTER TABLE under d.Policy.
 func (d PolicyDialect) ValidateNewColumn(col Column) (Column, string, bool) {
+	strExample := d.FormatType(ParsedType{DType: sqlengine.DT_VARCHAR})
 	if col.UntypedNull {
-		return Column{}, "cannot infer concrete type for new column from untyped NULL; add an explicit CAST (e.g. CAST(NULL AS VARCHAR))", false
+		return Column{}, fmt.Sprintf("cannot infer concrete type for new column from untyped NULL; add an explicit CAST (e.g. CAST(NULL AS %s))", strExample), false
 	}
 	rawType := strings.TrimSpace(col.Type)
 	if rawType == "" {
@@ -118,7 +124,7 @@ func (d PolicyDialect) ValidateNewColumn(col Column) (Column, string, bool) {
 	}
 	pt := d.ParseType(rawType)
 	if pt.IsNull() {
-		return Column{}, "cannot infer concrete type for new column from NULL; add an explicit CAST (e.g. CAST(NULL AS VARCHAR))", false
+		return Column{}, fmt.Sprintf("cannot infer concrete type for new column from NULL; add an explicit CAST (e.g. CAST(NULL AS %s))", strExample), false
 	}
 	if pt.HasNestedNull() {
 		return Column{}, "cannot infer concrete type for new column from nested untyped NULL or empty collection; add an explicit CAST", false
@@ -197,8 +203,8 @@ func (d PolicyDialect) resolveParsedTypeChange(cur, inc ParsedType) (TypeResolut
 		return TypeChangeNone, ParsedType{}, ""
 	}
 
-	if d.absorbsStringOrBinary(cur, inc) {
-		return TypeChangeNone, ParsedType{}, ""
+	if res, target, reason, handled := d.resolveStringAndBinary(cur, inc, curFmt, incFmt); handled {
+		return res, target, reason
 	}
 
 	if res, target, reason, handled := d.resolveNumeric(cur, inc, curFmt, incFmt); handled {
@@ -266,14 +272,27 @@ func (d PolicyDialect) compositeAbsorbs(cur, inc ParsedType) bool {
 	}
 }
 
-func (d PolicyDialect) absorbsStringOrBinary(cur, inc ParsedType) bool {
-	if cur.DType == sqlengine.DT_VARCHAR {
-		return true
+func (d PolicyDialect) resolveStringAndBinary(cur, inc ParsedType, curFmt, incFmt string) (TypeResolution, ParsedType, string, bool) {
+	if (cur.DType == sqlengine.DT_VARCHAR && inc.DType == sqlengine.DT_VARCHAR) ||
+		(cur.DType == sqlengine.DT_BINARY && inc.DType == sqlengine.DT_BINARY) {
+		if cur.Length == 0 || (inc.Length > 0 && inc.Length <= cur.Length) {
+			return TypeChangeNone, ParsedType{}, "", true
+		}
+		if !d.Policy.AllowLengthWidening {
+			return TypeChangeIncompatible, ParsedType{}, d.unsupportedWideningReason(curFmt, incFmt), true
+		}
+		return TypeChangeWiden, ParsedType{DType: cur.DType, Length: inc.Length}, "", true
 	}
-	if cur.DType == sqlengine.DT_BINARY && inc.DType == sqlengine.DT_BINARY {
-		return true
+
+	if cur.DType == sqlengine.DT_VARCHAR && cur.Length == 0 && d.Policy.UnboundedVarcharAbsorbsAll {
+		return TypeChangeNone, ParsedType{}, "", true
 	}
-	return inc.DType == sqlengine.DT_VARCHAR && d.Policy.ImplicitVarcharTargetPredicate != nil && d.Policy.ImplicitVarcharTargetPredicate(cur)
+
+	if inc.DType == sqlengine.DT_VARCHAR && d.Policy.ImplicitVarcharTargetPredicate != nil && d.Policy.ImplicitVarcharTargetPredicate(cur) {
+		return TypeChangeNone, ParsedType{}, "", true
+	}
+
+	return TypeChangeIncompatible, ParsedType{}, "", false
 }
 
 func (d PolicyDialect) resolveNumeric(cur, inc ParsedType, curFmt, incFmt string) (TypeResolution, ParsedType, string, bool) {
@@ -281,8 +300,8 @@ func (d PolicyDialect) resolveNumeric(cur, inc ParsedType, curFmt, incFmt string
 	incSigned, incIsSigned := signedIntRankByDType[inc.DType]
 	curUnsigned, curIsUnsigned := unsignedIntRankByDType[cur.DType]
 	incUnsigned, incIsUnsigned := unsignedIntRankByDType[inc.DType]
-	curIsDec := cur.DType == sqlengine.DT_DECIMAL
-	incIsDec := inc.DType == sqlengine.DT_DECIMAL
+	curIsDec := cur.DType == sqlengine.DT_DECIMAL || cur.DType == sqlengine.DT_BIGDECIMAL
+	incIsDec := inc.DType == sqlengine.DT_DECIMAL || inc.DType == sqlengine.DT_BIGDECIMAL
 	curIsFloat := cur.DType == sqlengine.DT_FLOAT || cur.DType == sqlengine.DT_DOUBLE
 	incIsFloat := inc.DType == sqlengine.DT_FLOAT || inc.DType == sqlengine.DT_DOUBLE
 
@@ -377,15 +396,11 @@ func (d PolicyDialect) resolveNumeric(cur, inc ParsedType, curFmt, incFmt string
 		if !d.Policy.AllowIntToDecimal {
 			return TypeChangeIncompatible, ParsedType{}, d.unsupportedWideningReason(curFmt, incFmt), true
 		}
-		newPrec := max(intDigits, incP-incS) + incS
-		if ok, reason := d.checkDecimalPrecision(newPrec); !ok {
+		target, ok, reason := d.selectDecimalTarget(inc.DType, max(intDigits, incP-incS), incS)
+		if !ok {
 			return TypeChangeIncompatible, ParsedType{}, reason, true
 		}
-		return TypeChangeWiden, ParsedType{
-			DType:     sqlengine.DT_DECIMAL,
-			Precision: newPrec,
-			Scale:     incS,
-		}, "", true
+		return TypeChangeWiden, target, "", true
 	}
 
 	if curIsDec && (incIsSigned || incIsUnsigned) {
@@ -400,15 +415,11 @@ func (d PolicyDialect) resolveNumeric(cur, inc ParsedType, curFmt, incFmt string
 		if !d.Policy.AllowDecimalWidening || !d.Policy.AllowIntToDecimal {
 			return TypeChangeIncompatible, ParsedType{}, d.unsupportedWideningReason(curFmt, incFmt), true
 		}
-		newPrec := intDigits + curS
-		if ok, reason := d.checkDecimalPrecision(newPrec); !ok {
+		target, ok, reason := d.selectDecimalTarget(cur.DType, intDigits, curS)
+		if !ok {
 			return TypeChangeIncompatible, ParsedType{}, reason, true
 		}
-		return TypeChangeWiden, ParsedType{
-			DType:     sqlengine.DT_DECIMAL,
-			Precision: newPrec,
-			Scale:     curS,
-		}, "", true
+		return TypeChangeWiden, target, "", true
 	}
 
 	if curIsDec && incIsFloat {
@@ -431,29 +442,31 @@ func (d PolicyDialect) resolveDecimalPair(cur, inc ParsedType, curFmt, incFmt st
 	curInt := curP - curS
 	incInt := incP - incS
 
-	if curInt >= incInt && curS >= incS {
+	isUpgradeToBigDec := cur.DType == sqlengine.DT_DECIMAL && inc.DType == sqlengine.DT_BIGDECIMAL
+	if !isUpgradeToBigDec && curInt >= incInt && curS >= incS {
 		return TypeChangeNone, ParsedType{}, "", true
 	}
-	if !d.Policy.AllowDecimalWidening {
+	if !d.Policy.AllowDecimalWidening && (!isUpgradeToBigDec || !d.Policy.AllowDecimalToBigDecimal) {
 		return TypeChangeIncompatible, ParsedType{}, d.unsupportedWideningReason(curFmt, incFmt), true
 	}
 
-	newScale := max(curS, incS)
-	newPrec := max(curInt, incInt) + newScale
-	if ok, reason := d.checkDecimalPrecision(newPrec); !ok {
+	preferredDT := cur.DType
+	if inc.DType == sqlengine.DT_BIGDECIMAL {
+		preferredDT = sqlengine.DT_BIGDECIMAL
+	}
+	target, ok, reason := d.selectDecimalTarget(preferredDT, max(curInt, incInt), max(curS, incS))
+	if !ok {
 		return TypeChangeIncompatible, ParsedType{}, reason, true
 	}
-
-	return TypeChangeWiden, ParsedType{
-		DType:     sqlengine.DT_DECIMAL,
-		Precision: newPrec,
-		Scale:     newScale,
-	}, "", true
+	return TypeChangeWiden, target, "", true
 }
 
 func (d PolicyDialect) effectiveDecimalPS(pt ParsedType) (int, int) {
 	if pt.Precision > 0 {
 		return pt.Precision, pt.Scale
+	}
+	if pt.DType == sqlengine.DT_BIGDECIMAL {
+		return defaultBigDecimalPrecision, defaultBigDecimalScale
 	}
 	if d.Policy.Format.DefaultDecimalPrecision > 0 {
 		return d.Policy.Format.DefaultDecimalPrecision, d.Policy.Format.DefaultDecimalScale
@@ -461,15 +474,29 @@ func (d PolicyDialect) effectiveDecimalPS(pt ParsedType) (int, int) {
 	return 38, 0
 }
 
-func (d PolicyDialect) checkDecimalPrecision(precision int) (bool, string) {
-	limit := d.Policy.MaxDecimalPrecision
-	if limit <= 0 {
-		limit = 38
+func (d PolicyDialect) selectDecimalTarget(preferred sqlengine.DType, intDigits, scale int) (ParsedType, bool, string) {
+	maxP := d.Policy.MaxDecimalPrecision
+	if maxP <= 0 {
+		maxP = 38
 	}
-	if precision > limit {
-		return false, fmt.Sprintf("widened DECIMAL precision exceeds %s maximum of %d", d.destName(), limit)
+	maxInt := d.Policy.MaxDecimalIntDigits
+	if maxInt <= 0 {
+		maxInt = maxP
 	}
-	return true, ""
+	maxScale := d.Policy.MaxDecimalScale
+	if maxScale <= 0 {
+		maxScale = maxP
+	}
+
+	prec := intDigits + scale
+	if preferred == sqlengine.DT_DECIMAL && intDigits <= maxInt && scale <= maxScale && prec <= maxP {
+		return ParsedType{DType: sqlengine.DT_DECIMAL, Precision: prec, Scale: scale}, true, ""
+	}
+	if (preferred == sqlengine.DT_BIGDECIMAL || d.Policy.AllowDecimalToBigDecimal) &&
+		intDigits <= defaultBigDecimalScale && scale <= defaultBigDecimalScale && prec <= defaultBigDecimalPrecision {
+		return ParsedType{DType: sqlengine.DT_BIGDECIMAL, Precision: prec, Scale: scale}, true, ""
+	}
+	return ParsedType{}, false, fmt.Sprintf("widened decimal (%d,%d) exceeds %s limits", prec, scale, d.destName())
 }
 
 func (d PolicyDialect) resolveTemporal(cur, inc ParsedType, curFmt, incFmt string) (TypeResolution, ParsedType, string, bool) {
@@ -503,11 +530,14 @@ func (d PolicyDialect) resolveTemporal(cur, inc ParsedType, curFmt, incFmt strin
 	}
 
 	if curIsTSTZ {
+		if !incIsTSTZ && (!d.Policy.AllowTimestampToTimestampTZ || (inc.DType == sqlengine.DT_DATE && !d.Policy.AllowDateToTimestamp)) {
+			return TypeChangeIncompatible, ParsedType{}, "", true
+		}
 		return TypeChangeNone, ParsedType{}, "", true
 	}
 
 	if incIsTSTZ {
-		if !d.Policy.AllowTimestampToTimestampTZ {
+		if !d.Policy.AllowTimestampToTimestampTZ || (cur.DType == sqlengine.DT_DATE && !d.Policy.AllowDateToTimestamp) {
 			return TypeChangeIncompatible, ParsedType{}, d.unsupportedWideningReason(curFmt, incFmt), true
 		}
 		return TypeChangeWiden, ParsedType{DType: sqlengine.DT_TIMESTAMPTZ}, "", true
@@ -518,6 +548,9 @@ func (d PolicyDialect) resolveTemporal(cur, inc ParsedType, curFmt, incFmt strin
 			return TypeChangeIncompatible, ParsedType{}, d.unsupportedWideningReason(curFmt, incFmt), true
 		}
 		return TypeChangeWiden, ParsedType{DType: inc.DType}, "", true
+	}
+	if inc.DType == sqlengine.DT_DATE && cur.DType != sqlengine.DT_DATE && !d.Policy.AllowDateToTimestamp {
+		return TypeChangeIncompatible, ParsedType{}, "", true
 	}
 	return TypeChangeNone, ParsedType{}, "", true
 }

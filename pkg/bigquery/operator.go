@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/schemaevolution"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
@@ -103,19 +104,52 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("asset '%s' is an Iceberg table but has no storage URI, set bigquery.storage_uri on the asset or storage_uri on the '%s' connection", t.Name, connName)
 	}
 
-	materialized, err := o.materializer.Render(renderAsset, q.String())
-	if err != nil {
-		return err
-	}
+	rawQuery := q.String()
 	writer := ctx.Value(executor.KeyPrinter)
-	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
-	if err != nil {
+	if err := o.materializer.LogIfFullRefreshAndDDL(writer, t); err != nil {
 		return err
 	}
-	q.Query = materialized
+
+	fullRefresh := t.FullRefreshEnabled(o.materializer.IsFullRefresh())
+	shouldEvolve := schemaevolution.ShouldEvolve(t, fullRefresh)
+
+	if shouldEvolve {
+		if t.Materialization.Type != pipeline.MaterializationTypeNone {
+			if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
+				return err
+			}
+		}
+		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
+		printer, _ := writer.(io.Writer)
+		var plan *schemaevolution.Plan
+		renderAsset, plan, err = o.prepareAndApplySchemaEvolution(ctx, p, t, renderAsset, conn, rawQuery, fullRefresh, printer)
+		if err != nil {
+			return err
+		}
+		materialized, err := o.materializer.Render(renderAsset, rawQuery)
+		if err != nil {
+			return err
+		}
+		if plan.TableExists && len(plan.IncomingColumns) > 0 {
+			materialized = schemaevolution.InjectInsertColumnList(
+				bigQuerySQLDialect,
+				materialized,
+				t.Name,
+				schemaevolution.QuoteBacktickIdentifier,
+				plan.IncomingColumns,
+			)
+		}
+		q.Query = materialized
+	} else {
+		materialized, err := o.materializer.Render(renderAsset, rawQuery)
+		if err != nil {
+			return err
+		}
+		q.Query = materialized
+	}
 
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
+		renderedQueries, err := extractor.ExtractQueriesFromString(q.Query)
 		if err != nil {
 			return errors.Wrap(err, "cannot re-extract/render materialized query for time_interval strategy")
 		}
@@ -147,13 +181,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
 	}
 
-	if t.Materialization.Type != pipeline.MaterializationTypeNone {
+	if !shouldEvolve && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 			return err
 		}
 	}
 
-	if t.FullRefreshEnabled(o.materializer.IsFullRefresh()) {
+	if fullRefresh {
 		err = conn.DropTableOnMismatch(ctx, t.Name, t)
 		if err != nil {
 			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)

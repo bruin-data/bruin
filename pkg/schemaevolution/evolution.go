@@ -42,9 +42,12 @@ type Action struct {
 	Column Column
 }
 
-// Plan holds the ordered schema evolution actions to apply.
+// Plan holds the ordered schema evolution actions to apply along with the inspected
+// table existence and incoming column list for engines that rewrite positional INSERTs.
 type Plan struct {
-	Actions []Action
+	TableExists     bool
+	Actions         []Action
+	IncomingColumns []Column
 }
 
 // IsEmpty reports whether the plan contains any schema changes.
@@ -130,12 +133,18 @@ type PlanReconciler interface {
 	ReconcilePlan(ctx context.Context, asset *pipeline.Asset, tableName string, existing, incoming []Column, plan *Plan) ([]IncompatibleColumnError, error)
 }
 
+// DeclaredColumnResolver is an optional interface implemented by engines that customize
+// declared-column resolution (for example, DuckDB Data Vault metadata or live CAST canonicalization).
+// Engines that do not implement it automatically use ColumnsFromAsset normalized via Dialect.NormalizeType.
+type DeclaredColumnResolver interface {
+	DeclaredColumns(ctx context.Context, asset *pipeline.Asset) ([]Column, error)
+}
+
 // Engine inspects live table and query schemas for a specific data warehouse.
 type Engine interface {
 	Dialect
 	ExistingColumns(ctx context.Context, tableName string) ([]Column, bool, error)
 	QueryColumns(ctx context.Context, queryStr string) ([]Column, error)
-	DeclaredColumns(ctx context.Context, asset *pipeline.Asset) ([]Column, error)
 }
 
 // ShouldEvolve reports whether schema evolution should run for asset given fullRefresh.
@@ -182,6 +191,7 @@ func ColumnsFromAsset(asset *pipeline.Asset) []Column {
 		cols = append(cols, Column{
 			Name:          name,
 			Type:          strings.TrimSpace(col.SQLType()),
+			NotNull:       col.Nullable.Value != nil && !*col.Nullable.Value,
 			Default:       strings.TrimSpace(col.Default),
 			Collation:     strings.TrimSpace(col.Collation),
 			PrimaryKey:    col.PrimaryKey,
@@ -329,7 +339,24 @@ func BuildPlan(ctx context.Context, engine Engine, asset *pipeline.Asset, tableN
 		}
 	}
 
+	plan.TableExists = true
+	plan.IncomingColumns = incoming
 	return plan, nil
+}
+
+// Validate checks a schema-evolution-enabled asset during `bruin validate` without mutating the
+// target warehouse: it verifies that any schema diff against an existing table is backwards-compatible,
+// and still inspects userQuery via engine.QueryColumns when the target table does not exist yet.
+func Validate(ctx context.Context, engine Engine, asset *pipeline.Asset, tableName, userQuery string) error {
+	plan, err := BuildPlan(ctx, engine, asset, tableName, userQuery, false)
+	if err != nil {
+		return err
+	}
+	if !plan.TableExists && asset != nil && !UsesDeclaredSchemaOnly(asset.Materialization.Strategy) && strings.TrimSpace(userQuery) != "" {
+		_, err = engine.QueryColumns(ctx, userQuery)
+		return err
+	}
+	return nil
 }
 
 func canSuggestFullRefresh(asset *pipeline.Asset) bool {
@@ -350,11 +377,20 @@ func canSuggestFullRefresh(asset *pipeline.Asset) bool {
 func resolveIncomingColumns(ctx context.Context, engine Engine, asset *pipeline.Asset, tableName, userQuery string) ([]Column, error) {
 	strategy := asset.Materialization.Strategy
 	if UsesDeclaredSchemaOnly(strategy) {
-		declared, err := engine.DeclaredColumns(ctx, asset)
-		if err != nil {
-			return nil, fmt.Errorf("schema evolution: failed to resolve declared columns for %q: %w", tableName, err)
+		if resolver, ok := engine.(DeclaredColumnResolver); ok {
+			declared, err := resolver.DeclaredColumns(ctx, asset)
+			if err != nil {
+				return nil, fmt.Errorf("schema evolution: failed to resolve declared columns for %q: %w", tableName, err)
+			}
+			return declared, nil
 		}
-		return declared, nil
+		cols := ColumnsFromAsset(asset)
+		for i := range cols {
+			if cols[i].Type != "" {
+				cols[i].Type = engine.NormalizeType(cols[i].Type)
+			}
+		}
+		return cols, nil
 	}
 
 	queryCols, err := engine.QueryColumns(ctx, userQuery)

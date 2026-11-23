@@ -385,7 +385,7 @@ schema_evolution:
 |-------|------|---------|-------------|
 | `enabled` | Boolean | `false` | Enables automatic backwards-compatible schema evolution for the asset. |
 
-Currently supported for `duckdb.sql` assets with `materialization.type: table` using in-place strategies (`append`, `delete+insert`, `truncate+insert`, `time_interval`, `merge`, `scd2_by_column`, `scd2_by_time`, `datavault_*`, and `ddl`). It has no effect on `create+replace` tables (which are recreated on every run) or during `--full-refresh` (except for `ddl`).
+Currently supported for `duckdb.sql` and `bq.sql` assets with `materialization.type: table` using in-place strategies (`append`, `delete+insert`, `truncate+insert`, `time_interval`, `merge`, `scd2_by_column`, `scd2_by_time`, `datavault_*`, and `ddl`). It has no effect on `create+replace` tables (which are recreated on every run) or during `--full-refresh` (except for `ddl`).
 
 Notes on DuckDB behavior when `schema_evolution.enabled` is `true`:
 - `append`, `delete+insert`, `truncate+insert`, and `time_interval` use `INSERT INTO ... BY NAME`, so query output column aliases must match the target table's column names. Explicitly alias computed expressions (`AS col_name`) instead of relying on auto-generated expression names or bare `VALUES` queries, and note that omitted `NOT NULL` columns without a `DEFAULT` cannot be inserted as `NULL`.

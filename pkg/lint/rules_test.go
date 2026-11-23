@@ -1612,6 +1612,12 @@ func TestEnsureMaterializationValuesAreValid_SchemaEvolution(t *testing.T) {
 			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
 		},
 		{
+			name:      "enabled on BigQuery table",
+			assetType: pipeline.AssetTypeBigqueryQuery,
+			matType:   pipeline.MaterializationTypeTable,
+			se:        &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+		},
+		{
 			name:      "enabled on DuckDB view",
 			assetType: pipeline.AssetTypeDuckDBQuery,
 			matType:   pipeline.MaterializationTypeView,

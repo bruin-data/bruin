@@ -462,6 +462,64 @@ func TestBuildPlan(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "syntax error")
 	})
+
+	t.Run("Validate checks existing table compatibility and inspects query when table does not exist yet", func(t *testing.T) {
+		t.Parallel()
+
+		missingTableEngine := &fakeEngine{
+			exists:   false,
+			incoming: []schemaevolution.Column{{Name: "id", Type: "INTEGER"}},
+		}
+		asset := &pipeline.Asset{
+			Name:            "analytics.events",
+			SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyAppend,
+			},
+		}
+		require.NoError(t, schemaevolution.Validate(t.Context(), missingTableEngine, asset, "analytics.events", "SELECT 1 AS id"))
+		assert.Equal(t, 1, missingTableEngine.queryCalls)
+	})
+
+	t.Run("DDL uses default ColumnsFromAsset normalization when engine does not implement DeclaredColumnResolver", func(t *testing.T) {
+		t.Parallel()
+
+		onlyTwoMethods := &minimalTwoMethodEngine{
+			exists:   true,
+			existing: []schemaevolution.Column{{Name: "id", Type: "INTEGER"}},
+		}
+		ddlAsset := &pipeline.Asset{
+			Name:            "analytics.orders",
+			SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDDL,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", Type: "INT"},
+				{Name: "note", Type: "VARCHAR"},
+			},
+		}
+		plan, err := schemaevolution.BuildPlan(t.Context(), onlyTwoMethods, ddlAsset, "analytics.orders", "", false)
+		require.NoError(t, err)
+		require.Len(t, plan.Actions, 1)
+		assert.Equal(t, "note", plan.Actions[0].ColumnName)
+	})
+}
+
+type minimalTwoMethodEngine struct {
+	fakeDialect
+	existing []schemaevolution.Column
+	exists   bool
+}
+
+func (m *minimalTwoMethodEngine) ExistingColumns(_ context.Context, _ string) ([]schemaevolution.Column, bool, error) {
+	return m.existing, m.exists, nil
+}
+
+func (m *minimalTwoMethodEngine) QueryColumns(_ context.Context, _ string) ([]schemaevolution.Column, error) {
+	return nil, nil
 }
 
 func TestLogPlan(t *testing.T) {

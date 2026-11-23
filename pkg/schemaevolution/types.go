@@ -8,17 +8,32 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
+const (
+	defaultBigDecimalPrecision = 76
+	defaultBigDecimalScale     = 38
+)
+
 // TypeFormatConfig configures dialect-aware SQL type parsing and canonical formatting
 // powered by pkg/sqlengine.
 type TypeFormatConfig struct {
-	// SQLDialect is the pkg/sqlengine dialect name (e.g. "duckdb").
+	// SQLDialect is the pkg/sqlengine dialect name (e.g. "duckdb", "bigquery").
 	SQLDialect string
 	// Aliases maps additional uppercase SQL type names not covered by the dialect's
-	// tokenizer (such as DuckDB "UINT1" or "SQLNULL") to canonical sqlengine DTypes.
+	// tokenizer (such as DuckDB "UINT1" or BigQuery "BYTEINT") to canonical sqlengine DTypes.
 	Aliases map[string]sqlengine.DType
+	// DTypeFolds maps dialect-equivalent DTypes into a single canonical DType (for example,
+	// folding DT_DATETIME -> DT_TIMESTAMP in DuckDB, or DT_INT/DT_SMALLINT -> DT_BIGINT in BigQuery).
+	DTypeFolds map[sqlengine.DType]sqlengine.DType
 	// TypeNames overrides the canonical display/DDL name for specific DTypes in this
-	// destination (e.g. DT_INT -> "INTEGER", DT_INT128 -> "HUGEINT").
+	// destination (e.g. DT_INT -> "INTEGER", DT_BIGINT -> "INT64", DT_DECIMAL -> "NUMERIC").
 	TypeNames map[sqlengine.DType]string
+	// GenericArraySyntax renders DT_ARRAY as `ARRAY<T>` instead of `T[]` / `T[N]`.
+	GenericArraySyntax bool
+	// KeepTypeLength preserves length parameters on string/binary types (e.g. `STRING(50)`, `BYTES(16)`).
+	KeepTypeLength bool
+	// OmitDefaultDecimalParams renders bare `NUMERIC` / `BIGNUMERIC` without `(P,S)` when
+	// Precision and Scale equal the engine's unparameterized defaults.
+	OmitDefaultDecimalParams bool
 	// DefaultDecimalPrecision and DefaultDecimalScale supply the engine's bare DECIMAL defaults
 	// when a type is written without explicit (precision, scale) parameters.
 	DefaultDecimalPrecision int
@@ -28,7 +43,7 @@ type TypeFormatConfig struct {
 	PreprocessTypeSQL func(sqlType string) string
 }
 
-// StructField describes a named field inside a SQL STRUCT type.
+// StructField describes a named field inside a SQL STRUCT or UNION type.
 type StructField struct {
 	Name string
 	Type ParsedType
@@ -40,9 +55,10 @@ type ParsedType struct {
 	DType     sqlengine.DType
 	Precision int
 	Scale     int
+	Length    int
 	Elem      *ParsedType   // element type for DT_ARRAY
 	ArraySize int           // > 0 for fixed-size arrays; 0 for variable-length lists
-	Fields    []StructField // fields for DT_STRUCT
+	Fields    []StructField // fields for DT_STRUCT / DT_UNION
 	MapKey    *ParsedType   // key type for DT_MAP
 	MapValue  *ParsedType   // value type for DT_MAP
 	Complex   bool
@@ -53,7 +69,7 @@ func (pt ParsedType) IsNull() bool {
 	return pt.DType == sqlengine.DT_NULL
 }
 
-// HasNestedNull reports whether pt is a composite type (ARRAY, STRUCT, or MAP) containing
+// HasNestedNull reports whether pt is a composite type (ARRAY, STRUCT, UNION, or MAP) containing
 // at least one untyped NULL leaf.
 func (pt ParsedType) HasNestedNull() bool {
 	switch pt.DType { //nolint:exhaustive
@@ -107,12 +123,9 @@ func ParseType(cfg TypeFormatConfig, sqlType string) ParsedType {
 		if aliased, ok := cfg.Aliases[upper]; ok {
 			pt := ParsedType{
 				Raw:   trimmed,
-				DType: canonicalizeDType(aliased),
+				DType: canonicalizeDType(cfg, aliased),
 			}
-			if pt.DType == sqlengine.DT_DECIMAL && cfg.DefaultDecimalPrecision > 0 {
-				pt.Precision = cfg.DefaultDecimalPrecision
-				pt.Scale = cfg.DefaultDecimalScale
-			}
+			applyDefaultDecimalParams(cfg, &pt)
 			return pt
 		}
 	}
@@ -136,6 +149,22 @@ func ParseType(cfg TypeFormatConfig, sqlType string) ParsedType {
 		pt.Complex = true
 	}
 	return pt
+}
+
+func applyDefaultDecimalParams(cfg TypeFormatConfig, pt *ParsedType) {
+	if pt.Precision > 0 {
+		return
+	}
+	switch pt.DType { //nolint:exhaustive
+	case sqlengine.DT_DECIMAL:
+		if cfg.DefaultDecimalPrecision > 0 {
+			pt.Precision = cfg.DefaultDecimalPrecision
+			pt.Scale = cfg.DefaultDecimalScale
+		}
+	case sqlengine.DT_BIGDECIMAL:
+		pt.Precision = defaultBigDecimalPrecision
+		pt.Scale = defaultBigDecimalScale
+	}
 }
 
 func peelTrailingBracketArray(dialectName, sqlType string) (string, int, bool) {
@@ -276,7 +305,7 @@ func buildParsedTypeFromExpr(cfg TypeFormatConfig, expr *sqlengine.Expr, raw str
 			Complex:  true,
 		}
 
-	case sqlengine.DT_ENUM, sqlengine.DT_NESTED, sqlengine.DT_OBJECT:
+	case sqlengine.DT_ENUM, sqlengine.DT_NESTED, sqlengine.DT_OBJECT, sqlengine.DT_RANGE:
 		return ParsedType{
 			Raw:     raw,
 			DType:   dt,
@@ -284,6 +313,17 @@ func buildParsedTypeFromExpr(cfg TypeFormatConfig, expr *sqlengine.Expr, raw str
 		}
 
 	case sqlengine.DT_USERDEFINED:
+		upperRaw := strings.Join(strings.Fields(strings.ToUpper(strings.TrimSpace(raw))), " ")
+		if cfg.Aliases != nil {
+			if aliased, ok := cfg.Aliases[upperRaw]; ok {
+				pt := ParsedType{
+					Raw:   raw,
+					DType: canonicalizeDType(cfg, aliased),
+				}
+				applyDefaultDecimalParams(cfg, &pt)
+				return pt
+			}
+		}
 		return ParsedType{
 			Raw:     raw,
 			DType:   sqlengine.DT_USERDEFINED,
@@ -291,7 +331,7 @@ func buildParsedTypeFromExpr(cfg TypeFormatConfig, expr *sqlengine.Expr, raw str
 		}
 	}
 
-	canon := canonicalizeDType(dt)
+	canon := canonicalizeDType(cfg, dt)
 	pt := ParsedType{
 		Raw:   raw,
 		DType: canon,
@@ -299,8 +339,8 @@ func buildParsedTypeFromExpr(cfg TypeFormatConfig, expr *sqlengine.Expr, raw str
 
 	params := expr.Expressions()
 	switch canon { //nolint:exhaustive
-	case sqlengine.DT_DECIMAL:
-		p, s, valid := extractDecimalPrecisionScale(cfg, params)
+	case sqlengine.DT_DECIMAL, sqlengine.DT_BIGDECIMAL:
+		p, s, valid := extractDecimalPrecisionScale(cfg, canon, params)
 		if !valid {
 			return ParsedType{
 				Raw:     raw,
@@ -322,12 +362,16 @@ func buildParsedTypeFromExpr(cfg TypeFormatConfig, expr *sqlengine.Expr, raw str
 					Complex: strings.ContainsAny(raw, `'"`),
 				}
 			}
-			if n, valid := parseDataTypeParamInt(params[0]); !valid || n <= 0 {
+			n, valid := parseDataTypeParamInt(params[0])
+			if !valid || n <= 0 {
 				return ParsedType{
 					Raw:     raw,
 					DType:   sqlengine.DT_USERDEFINED,
 					Complex: strings.ContainsAny(raw, `'"`),
 				}
+			}
+			if cfg.KeepTypeLength {
+				pt.Length = n
 			}
 		}
 	}
@@ -335,25 +379,30 @@ func buildParsedTypeFromExpr(cfg TypeFormatConfig, expr *sqlengine.Expr, raw str
 	return pt
 }
 
-func canonicalizeDType(dt sqlengine.DType) sqlengine.DType {
+func canonicalizeDType(cfg TypeFormatConfig, dt sqlengine.DType) sqlengine.DType {
 	switch dt { //nolint:exhaustive
 	case sqlengine.DT_UNKNOWN:
-		return sqlengine.DT_NULL
+		dt = sqlengine.DT_NULL
 	case sqlengine.DT_TEXT, sqlengine.DT_CHAR, sqlengine.DT_NCHAR, sqlengine.DT_BPCHAR,
 		sqlengine.DT_NVARCHAR, sqlengine.DT_TINYTEXT, sqlengine.DT_MEDIUMTEXT, sqlengine.DT_LONGTEXT:
-		return sqlengine.DT_VARCHAR
+		dt = sqlengine.DT_VARCHAR
 	case sqlengine.DT_BLOB, sqlengine.DT_VARBINARY, sqlengine.DT_BINARY,
 		sqlengine.DT_TINYBLOB, sqlengine.DT_MEDIUMBLOB, sqlengine.DT_LONGBLOB:
-		return sqlengine.DT_BINARY
-	case sqlengine.DT_DATETIME, sqlengine.DT_TIMESTAMPNTZ:
-		return sqlengine.DT_TIMESTAMP
-	default:
-		return dt
+		dt = sqlengine.DT_BINARY
 	}
+	if cfg.DTypeFolds != nil {
+		if folded, ok := cfg.DTypeFolds[dt]; ok {
+			dt = folded
+		}
+	}
+	return dt
 }
 
-func extractDecimalPrecisionScale(cfg TypeFormatConfig, params []*sqlengine.Expr) (int, int, bool) {
+func extractDecimalPrecisionScale(cfg TypeFormatConfig, dt sqlengine.DType, params []*sqlengine.Expr) (int, int, bool) {
 	if len(params) == 0 {
+		if dt == sqlengine.DT_BIGDECIMAL {
+			return defaultBigDecimalPrecision, defaultBigDecimalScale, true
+		}
 		if cfg.DefaultDecimalPrecision > 0 {
 			return cfg.DefaultDecimalPrecision, cfg.DefaultDecimalScale, true
 		}
@@ -419,6 +468,9 @@ func FormatType(cfg TypeFormatConfig, pt ParsedType) string {
 		if pt.Elem == nil {
 			return "ARRAY"
 		}
+		if cfg.GenericArraySyntax {
+			return "ARRAY<" + FormatType(cfg, *pt.Elem) + ">"
+		}
 		if pt.ArraySize > 0 {
 			return fmt.Sprintf("%s[%d]", FormatType(cfg, *pt.Elem), pt.ArraySize)
 		}
@@ -434,8 +486,25 @@ func FormatType(cfg TypeFormatConfig, pt ParsedType) string {
 	}
 
 	baseName := canonicalDTypeName(cfg, pt.DType)
-	if pt.DType == sqlengine.DT_DECIMAL && pt.Precision > 0 {
-		return fmt.Sprintf("%s(%d,%d)", baseName, pt.Precision, pt.Scale)
+	switch pt.DType { //nolint:exhaustive
+	case sqlengine.DT_DECIMAL:
+		if pt.Precision > 0 {
+			if cfg.OmitDefaultDecimalParams && pt.Precision == cfg.DefaultDecimalPrecision && pt.Scale == cfg.DefaultDecimalScale {
+				return baseName
+			}
+			return fmt.Sprintf("%s(%d,%d)", baseName, pt.Precision, pt.Scale)
+		}
+	case sqlengine.DT_BIGDECIMAL:
+		if pt.Precision > 0 {
+			if cfg.OmitDefaultDecimalParams && pt.Precision == defaultBigDecimalPrecision && pt.Scale == defaultBigDecimalScale {
+				return baseName
+			}
+			return fmt.Sprintf("%s(%d,%d)", baseName, pt.Precision, pt.Scale)
+		}
+	case sqlengine.DT_VARCHAR, sqlengine.DT_BINARY:
+		if cfg.KeepTypeLength && pt.Length > 0 {
+			return fmt.Sprintf("%s(%d)", baseName, pt.Length)
+		}
 	}
 	return baseName
 }

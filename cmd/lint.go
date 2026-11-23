@@ -487,6 +487,7 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
 		rules = append(rules, &lint.QueryValidatorRule{
 			Identifier:  "bigquery-validator",
+			FullRefresh: fullRefresh,
 			TaskType:    pipeline.AssetTypeBigqueryQuery,
 			Connections: connectionManager,
 			Extractor: &query.WholeFileExtractor{
@@ -508,6 +509,7 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 	if len(cfg.SelectedEnvironment.Connections.Snowflake) > 0 {
 		rules = append(rules, &lint.QueryValidatorRule{
 			Identifier:  "snowflake-validator",
+			FullRefresh: fullRefresh,
 			TaskType:    pipeline.AssetTypeSnowflakeQuery,
 			Connections: connectionManager,
 			Extractor: &query.FileQuerySplitterExtractor{
@@ -525,6 +527,7 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 	if len(cfg.SelectedEnvironment.Connections.RedShift) > 0 {
 		rules = append(rules, &lint.QueryValidatorRule{
 			Identifier:  "redshift-validator",
+			FullRefresh: fullRefresh,
 			TaskType:    pipeline.AssetTypeRedshiftQuery,
 			Connections: connectionManager,
 			Extractor: &query.FileQuerySplitterExtractor{
@@ -542,6 +545,7 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 	if len(cfg.SelectedEnvironment.Connections.Postgres) > 0 {
 		rules = append(rules, &lint.QueryValidatorRule{
 			Identifier:  "postgres-validator",
+			FullRefresh: fullRefresh,
 			TaskType:    pipeline.AssetTypePostgresQuery,
 			Connections: connectionManager,
 			Extractor: &query.FileQuerySplitterExtractor{

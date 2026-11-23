@@ -806,10 +806,21 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		insertCols = append(insertCols, col.Name)
 		insertValues = append(insertValues, "source."+col.Name)
 		if !col.PrimaryKey {
-			compareConds = append(compareConds,
-				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
-			compareCondsS1T1 = append(compareCondsS1T1,
-				fmt.Sprintf("t1.%[1]s != s1.%[1]s", col.Name))
+			if asset.SchemaEvolution.IsEnabled() && isBigQueryNonGroupableType(col.SQLType()) {
+				compareConds = append(compareConds,
+					fmt.Sprintf("FORMAT('%%T', target.%[1]s) != FORMAT('%%T', source.%[1]s)", col.Name))
+				compareCondsS1T1 = append(compareCondsS1T1,
+					fmt.Sprintf("FORMAT('%%T', t1.%[1]s) != FORMAT('%%T', s1.%[1]s)", col.Name))
+			} else {
+				op := "!="
+				if asset.SchemaEvolution.IsEnabled() {
+					op = "IS DISTINCT FROM"
+				}
+				compareConds = append(compareConds,
+					fmt.Sprintf("target.%[1]s %[2]s source.%[1]s", col.Name, op))
+				compareCondsS1T1 = append(compareCondsS1T1,
+					fmt.Sprintf("t1.%[1]s %[2]s s1.%[1]s", col.Name, op))
+			}
 		}
 	}
 

@@ -177,6 +177,38 @@ func nonEmptyHookSQLs(hooks []pipeline.Hook) []string {
 	return out
 }
 
+// ValidateSchemaEvolution validates a schema-evolution-enabled DuckDB SQL asset during `bruin validate`
+// without mutating the target database.
+func (c *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string) error {
+	if q, ok := any(c).(interface{ HasQuack() bool }); ok && q.HasQuack() {
+		return errors.New("connection uses quack: true, which does not support duckdb.sql assets yet")
+	}
+	duckLake := false
+	if provider, ok := any(c).(lakehouseFormatProvider); ok {
+		switch provider.LakehouseFormat() {
+		case config.LakehouseFormatIceberg:
+			return errors.New("schema_evolution is not yet supported for DuckDB Iceberg lakehouse connections")
+		case config.LakehouseFormatDuckLake:
+			duckLake = true
+		default:
+		}
+	}
+
+	cleaned := schemaevolution.StripTrailingSemicolonsAndComments(duckDBSQLDialect, rawQuery)
+	if _, err := NewMaterializer(false).Render(asset, cleaned); err != nil {
+		return err
+	}
+
+	dialect := newDuckDBDialect(duckLake, asset.Materialization.IsSCD2(), asset.Materialization.Strategy.IsDataVault())
+	return runInDuckDBSession(ctx, c, false, cleaned, func(ctx context.Context, session duckDBSession) error {
+		engine := &duckDBEvolutionEngine{
+			DuckDBDialect: dialect,
+			session:       session,
+		}
+		return schemaevolution.Validate(ctx, engine, asset, asset.Name, cleaned)
+	})
+}
+
 func (e *duckDBEvolutionEngine) ExistingColumns(ctx context.Context, tableName string) ([]schemaevolution.Column, bool, error) {
 	rows, err := e.session.Select(ctx, "DESCRIBE "+tableName)
 	if err != nil {
@@ -558,9 +590,17 @@ func (e *duckDBEvolutionEngine) QueryColumns(ctx context.Context, queryStr strin
 		return nil, err
 	}
 	cols := parseDescribeRows(rows)
+	hints := schemaevolution.ApplyUntypedSelectLiterals(duckDBTypeFormatConfig, trimmed, cols)
 
 	var candidates []int
 	for i := range cols {
+		if cols[i].UntypedNull {
+			continue
+		}
+		key := e.ColumnKey(cols[i].Name)
+		if hints.EmptyArrays[key] > 0 || hints.ConcreteScalars[key] {
+			continue
+		}
 		if strings.Contains(strings.ToUpper(cols[i].Type), "INTEGER") {
 			candidates = append(candidates, i)
 		}

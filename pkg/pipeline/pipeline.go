@@ -669,7 +669,8 @@ func (a AssetType) SupportsTableFormat() bool {
 
 // schemaEvolutionAssetTypes lists the asset types that support schema_evolution.
 var schemaEvolutionAssetTypes = map[AssetType]bool{
-	AssetTypeDuckDBQuery: true,
+	AssetTypeDuckDBQuery:   true,
+	AssetTypeBigqueryQuery: true,
 }
 
 // SupportsSchemaEvolution reports whether assets of this type can enable schema_evolution.
