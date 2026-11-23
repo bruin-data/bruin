@@ -195,6 +195,7 @@ var defaultMapping = map[string]string{
 	"odoo":                  "odoo-default",
 	"breezyhr":              "breezyhr-default",
 	"privatus":              "privatus-default",
+	"peeringdb":             "peeringdb-default",
 	"hana":                  "hana-default",
 	"shopify":               "shopify-default",
 	"gorgias":               "gorgias-default",

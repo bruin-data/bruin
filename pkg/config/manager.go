@@ -193,6 +193,7 @@ type Connections struct {
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	Odoo                []OdooConnection                `yaml:"odoo,omitempty" json:"odoo,omitempty" mapstructure:"odoo"`
 	Privatus            []PrivatusConnection            `yaml:"privatus,omitempty" json:"privatus,omitempty" mapstructure:"privatus"`
+	PeeringDB           []PeeringDBConnection           `yaml:"peeringdb,omitempty" json:"peeringdb,omitempty" mapstructure:"peeringdb"`
 	BreezyHR            []BreezyHRConnection            `yaml:"breezyhr,omitempty" json:"breezyhr,omitempty" mapstructure:"breezyhr"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
@@ -2014,6 +2015,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Privatus = append(env.Connections.Privatus, conn)
+	case "peeringdb":
+		var conn PeeringDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.PeeringDB = append(env.Connections.PeeringDB, conn)
 	case "breezyhr":
 		var conn BreezyHRConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2433,6 +2441,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Odoo = removeConnection(env.Connections.Odoo, connectionName)
 	case "privatus":
 		env.Connections.Privatus = removeConnection(env.Connections.Privatus, connectionName)
+	case "peeringdb":
+		env.Connections.PeeringDB = removeConnection(env.Connections.PeeringDB, connectionName)
 	case "breezyhr":
 		env.Connections.BreezyHR = removeConnection(env.Connections.BreezyHR, connectionName)
 	default:
@@ -2705,6 +2715,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Dune, source.Dune)
 	mergeConnectionList(&c.Odoo, source.Odoo)
 	mergeConnectionList(&c.Privatus, source.Privatus)
+	mergeConnectionList(&c.PeeringDB, source.PeeringDB)
 	mergeConnectionList(&c.BreezyHR, source.BreezyHR)
 	c.buildConnectionKeyMap()
 	return nil

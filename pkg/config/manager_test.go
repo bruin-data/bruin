@@ -359,6 +359,12 @@ func TestLoadFromFile(t *testing.T) {
 					CompanyID:          "abc123",
 				},
 			},
+			PeeringDB: []PeeringDBConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "peeringdb-1"},
+					APIKey:             "peeringdb-api-key-123",
+				},
+			},
 			Privatus: []PrivatusConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "privatus-1"},
@@ -1944,6 +1950,16 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add PeeringDB connection",
+			envName:  "default",
+			connType: "peeringdb",
+			connName: "peeringdb-conn",
+			creds: map[string]interface{}{
+				"api_key": "key_123",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add Privatus connection",
 			envName:  "default",
 			connType: "privatus",
@@ -2259,6 +2275,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.connName, env.Connections.BreezyHR[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.BreezyHR[0].APIKey)
 					assert.Equal(t, tt.creds["company_id"], env.Connections.BreezyHR[0].CompanyID)
+				case "peeringdb":
+					assert.Len(t, env.Connections.PeeringDB, 1)
+					assert.Equal(t, tt.connName, env.Connections.PeeringDB[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.PeeringDB[0].APIKey)
 				case "privatus":
 					assert.Len(t, env.Connections.Privatus, 1)
 					assert.Equal(t, tt.connName, env.Connections.Privatus[0].Name)
@@ -2428,6 +2448,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								BreezyHR: []BreezyHRConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr-conn"}, APIKey: "key_123", CompanyID: "abc123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing PeeringDB connection",
+			envName:  "default",
+			connName: "peeringdb-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								PeeringDB: []PeeringDBConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb-conn"}, APIKey: "key_123"},
 								},
 							},
 						},
@@ -3606,6 +3645,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
 				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
 				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
+				PeeringDB:           []PeeringDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb1"}}},
 			},
 			want: &Connections{
 				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
@@ -3762,6 +3802,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
 				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
 				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
+				PeeringDB:           []PeeringDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb1"}}},
 			},
 			expectedErr: false,
 		},
