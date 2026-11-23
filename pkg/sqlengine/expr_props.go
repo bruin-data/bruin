@@ -1,17 +1,17 @@
 package sqlengine
 
-// Ports of per-class properties/methods of sqlglot expressions.
-
-// TableText mirrors Column.table / Update.table text.
+// TableName returns the "table" argument's text: a column's qualifier or an UPDATE's target.
 func (e *Expr) TableName() string { return e.Text("table") }
 
-// DbName mirrors Column.db / Table.db.
+// DbName returns the text of the "db" argument of a column or table.
 func (e *Expr) DbName() string { return e.Text("db") }
 
-// CatalogName mirrors Column.catalog / Table.catalog.
+// CatalogName returns the text of the "catalog" argument of a column or table.
 func (e *Expr) CatalogName() string { return e.Text("catalog") }
 
-// Parts mirrors Column.parts, Table.parts and Dot.parts.
+// Parts returns the dotted name parts, outermost qualifier first: catalog, db, table and
+// column for a column; catalog, db and name for a table (dotted names flattened); for a Dot,
+// the leftmost operand's parts followed by the remaining dotted parts.
 func (e *Expr) Parts() []*Expr {
 	switch propOwner_parts[e.kind] {
 	case KColumn:
@@ -59,7 +59,8 @@ func (e *Expr) Parts() []*Expr {
 	return nil
 }
 
-// DotBuild mirrors Dot.build.
+// DotBuild left-folds exprs into a chain of Dot nodes. It panics with a ValueError when
+// fewer than two expressions are given.
 func DotBuild(exprs []*Expr) *Expr {
 	if len(exprs) < 2 {
 		panic(&ValueError{Msg: "Dot requires >= 2 expressions."})
@@ -71,7 +72,9 @@ func DotBuild(exprs []*Expr) *Expr {
 	return acc
 }
 
-// ToDot mirrors Column.to_dot(include_dots).
+// ToDot converts a column into a Dot chain of copies of its parts, or returns its only part
+// when it has one. With includeDots, the right-hand sides of enclosing Dot parents are
+// appended.
 func (e *Expr) ToDot(includeDots bool) *Expr {
 	parts := e.Parts()
 	parent := e.parent
@@ -91,7 +94,10 @@ func (e *Expr) ToDot(includeDots bool) *Expr {
 	return parts[0]
 }
 
-// Selects mirrors the `selects` property.
+// Selects returns the projections of a query-like expression: a SELECT's expressions, the
+// leftmost SELECT's projections for a set operation, the query's projections for a DDL or
+// derived table, and the alias columns (plus the offset column for UNNEST) for a table
+// function. Tables have none; other kinds return nil.
 func (e *Expr) Selects() []*Expr {
 	if e == nil {
 		return nil
@@ -128,6 +134,13 @@ func (e *Expr) Selects() []*Expr {
 			return this.Selects()
 		}
 		return []*Expr{}
+	case KLateral:
+		cols := e.udtfSelects()
+		// UNNEST ... WITH ORDINALITY stores the ordinality column's name in Unnest.offset
+		if off := e.This().ArgE("offset"); off.IsA(KIdentifier) {
+			cols = append(append([]*Expr{}, cols...), off)
+		}
+		return cols
 	case KUDTF:
 		return e.udtfSelects()
 	}
@@ -141,7 +154,9 @@ func (e *Expr) udtfSelects() []*Expr {
 	return []*Expr{}
 }
 
-// NamedSelects mirrors the `named_selects` property.
+// NamedSelects returns the output names of the projections. For a SELECT, unaliased
+// projections without a name are skipped, except multi-alias projections, which contribute
+// each alias.
 func (e *Expr) NamedSelects() []string {
 	if e == nil {
 		return nil
@@ -160,11 +175,40 @@ func (e *Expr) NamedSelects() []string {
 		}
 		return out
 	case KSetOperation:
-		x := e
-		for x.IsA(KSetOperation) {
-			x = x.This().Unnest()
+		// The names come from the leftmost query, except that a BY NAME operation outputs the
+		// columns of both of its operands, without duplicates
+		var names []string
+		stack := []*Expr{e}
+		byName := false
+		for len(stack) > 0 {
+			x := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if !x.IsA(KSetOperation) {
+				names = append(names, x.NamedSelects()...)
+				continue
+			}
+
+			reachedQuery := true
+			for x.IsA(KSetOperation) {
+				if x.ArgB("by_name") {
+					byName = true
+					stack = append(stack, x.Expression().Unnest(), x.This().Unnest())
+					reachedQuery = false
+					break
+				}
+				x = x.This().Unnest()
+			}
+			if reachedQuery {
+				names = append(names, namedSelectsOf(x)...)
+			}
 		}
-		return namedSelectsOf(x)
+		if byName {
+			return dedupeStrings(names)
+		}
+		if names == nil {
+			return []string{}
+		}
+		return names
 	case KTable:
 		return []string{}
 	case KDDL:
@@ -177,7 +221,6 @@ func (e *Expr) NamedSelects() []string {
 	return namedSelectsOf(e)
 }
 
-// namedSelectsOf mirrors expressions.query._named_selects.
 func namedSelectsOf(e *Expr) []string {
 	out := []string{}
 	for _, s := range e.Selects() {
@@ -186,7 +229,6 @@ func namedSelectsOf(e *Expr) []string {
 	return out
 }
 
-// CTEs mirrors Query.ctes / DDL.ctes.
 func (e *Expr) CTEs() []*Expr {
 	if w := e.ArgE("with_"); w != nil {
 		return w.Expressions()
@@ -194,7 +236,8 @@ func (e *Expr) CTEs() []*Expr {
 	return []*Expr{}
 }
 
-// IsWrapper mirrors Subquery.is_wrapper.
+// IsWrapper reports whether every argument other than "this" is unset, i.e. the node only
+// wraps its child (no alias, limit, ordering and so on).
 func (e *Expr) IsWrapper() bool {
 	for _, a := range e.args {
 		if a.key != "this" && a.val != nil {
@@ -204,7 +247,8 @@ func (e *Expr) IsWrapper() bool {
 	return true
 }
 
-// UnnestSubquery mirrors Subquery.unnest (first non-subquery).
+// UnnestSubquery returns the first non-subquery node found by descending through nested
+// subqueries.
 func (e *Expr) UnnestSubquery() *Expr {
 	x := e
 	for x.IsA(KSubquery) {
@@ -213,7 +257,8 @@ func (e *Expr) UnnestSubquery() *Expr {
 	return x
 }
 
-// Unwrap mirrors Subquery.unwrap.
+// Unwrap walks up through parents of the same kind while the node is a pure wrapper and
+// returns the outermost one.
 func (e *Expr) Unwrap() *Expr {
 	x := e
 	for x.SameParent() && x.IsWrapper() {
@@ -222,26 +267,24 @@ func (e *Expr) Unwrap() *Expr {
 	return x
 }
 
-// JoinKind mirrors Join.kind / SetOperation.kind (uppercased text).
 func (e *Expr) KindText() string { return pyUpper(e.Text("kind")) }
 
-// SideText mirrors Join.side / SetOperation.side.
 func (e *Expr) SideText() string { return pyUpper(e.Text("side")) }
 
-// MethodText mirrors Join.method.
 func (e *Expr) MethodText() string { return pyUpper(e.Text("method")) }
 
-// IsSemiOrAntiJoin mirrors Join.is_semi_or_anti_join.
 func (e *Expr) IsSemiOrAntiJoin() bool {
 	k := e.KindText()
 	return k == "SEMI" || k == "ANTI"
 }
 
-// Left mirrors Binary.left / SetOperation.left.
+func (e *Expr) isLimitAll() bool {
+	limit := e.Expression()
+	return e.IsA(KLimit) && limit.IsA(KVar) && pyUpper(limit.Name()) == "ALL"
+}
+
 func (e *Expr) Left() *Expr { return e.This() }
 
-// Right mirrors Binary.right / SetOperation.right.
 func (e *Expr) Right() *Expr { return e.Expression() }
 
-// TableAliasColumns mirrors TableAlias.columns.
 func (e *Expr) TableAliasColumns() []*Expr { return e.ArgL("columns") }

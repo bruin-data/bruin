@@ -1,10 +1,6 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/unnest_subqueries.py.
-
-// UnnestSubqueries mirrors sqlglot.optimizer.unnest_subqueries.unnest_subqueries.
-//
-// Rewrite sqlglot AST to convert some predicates with subqueries into joins.
+// UnnestSubqueries rewrites the AST to convert some predicates with subqueries into joins.
 //
 // Convert scalar subqueries into cross joins.
 // Convert correlated or vectorized subqueries into a group by so it is not a many to many left join.
@@ -27,7 +23,8 @@ func UnnestSubqueries(expression *Expr) *Expr {
 	return expression
 }
 
-// usUnnest mirrors unnest_subqueries.unnest.
+// usUnnest turns an uncorrelated subquery in a predicate into a join: scalar subqueries become
+// cross joins, and IN / = ANY subqueries in AND/OR filters become grouped left joins.
 func usUnnest(sel, parentSelect *Expr, nextAliasName func() string) {
 	if len(sel.Selects()) > 1 {
 		return
@@ -35,14 +32,25 @@ func usUnnest(sel, parentSelect *Expr, nextAliasName func() string) {
 
 	predicate := sel.FindAncestor(KCondition)
 	if predicate == nil ||
+		// EXISTS tests row presence, so joining its potentially many or NULL-valued rows is unsafe.
+		predicate.IsA(KExists) ||
+		// Scalar IN-list elements cannot replace the entire membership predicate.
+		(predicate.IsA(KIn) && len(predicate.Expressions()) > 0) ||
 		// Do not unnest subqueries inside table-valued functions such as
 		// FROM GENERATE_SERIES(...), FROM UNNEST(...) etc in order to preserve join order
 		(predicate.IsA(KFunc) && predicate.Parent().IsA(KTable, KFrom, KJoin)) ||
 		parentSelect != predicate.ParentSelect() ||
-		!parentSelect.ArgB("from_") ||
-		// NOT IN has three-valued semantics that the LEFT-JOIN-anti rewrite doesn't preserve:
-		// a NULL in the subquery makes NOT IN evaluate to NULL for every outer row.
-		(predicate.IsA(KIn) && predicate.Parent().IsA(KNot)) {
+		!parentSelect.ArgB("from_") {
+		return
+	}
+
+	clause := predicate.FindAncestor(KHaving, KWhere, KJoin, KSelect)
+	if clause.IsA(KJoin) && (clause.Parent() != parentSelect ||
+		clause.SideText() != "" ||
+		(clause.KindText() != "" && clause.KindText() != "INNER") ||
+		clause.MethodText() != "" ||
+		clause.ArgB("match_condition") ||
+		!predicate.IsA(KIn, KAny)) {
 		return
 	}
 
@@ -55,8 +63,12 @@ func usUnnest(sel, parentSelect *Expr, nextAliasName func() string) {
 		sel = SelectExpr(projections...).SelectFrom(sel.QuerySubquery(innerAlias, true), true)
 	}
 
+	if predicate.IsA(KIn, KAny) && !sel.ArgB("group") &&
+		FindInScope(sel.Selects()[0], KAggFunc) == nil && FindInScope(sel.Selects()[0], KAnonymous) != nil {
+		return
+	}
+
 	alias := nextAliasName()
-	clause := predicate.FindAncestor(KHaving, KWhere, KJoin)
 
 	// This subquery returns a scalar and can just be converted to a cross join
 	if !predicate.IsA(KIn, KAny) {
@@ -79,41 +91,59 @@ func usUnnest(sel, parentSelect *Expr, nextAliasName func() string) {
 		if (clause.IsA(KHaving) && clauseParentSelect == parentSelect) ||
 			((clause == nil || clauseParentSelect != parentSelect) &&
 				(parentSelect.ArgB("group") || hasAgg())) {
-			column = New(KMax, "this", column)
+			if usIsPostAggregation(sel, parentSelect) {
+				column = New(KMax, "this", column)
+			}
 		} else if !sel.Parent().IsA(KSubquery) {
 			return
 		}
 
-		joinType := "CROSS"
-		var onClause []*Expr
-		if predicate.IsA(KExists) {
-			// If a subquery returns no rows, cross-joining against it incorrectly eliminates all rows
-			// from the parent query. Therefore, we use a LEFT JOIN that always matches (ON TRUE), then
-			// check for non-NULL column values to determine whether the subquery contained rows.
-			column = optSQBinop(column, KIs, Null()).ExprNot(true)
-			joinType = "LEFT"
-			onClause = []*Expr{Boolean(true)}
-		}
-
 		usReplace(sel.Parent(), column)
-		parentSelect.SelectJoin(sel, onClause, nil, true, joinType, alias, false)
+		parentSelect.SelectJoin(sel, nil, nil, true, "CROSS", alias, false)
 
 		return
 	}
 
-	if sel.Find(KLimit, KOffset) != nil {
+	if FindInScope(sel, KLimit, KOffset) != nil {
 		return
 	}
 
 	if predicate.IsA(KAny) {
-		predicate = predicate.FindAncestor(KEQ)
+		predicate = predicate.Parent()
 
-		if predicate == nil || parentSelect != predicate.ParentSelect() {
+		if !predicate.IsA(KEQ) || parentSelect != predicate.ParentSelect() {
 			return
 		}
 	}
 
+	// The join's non-NULL check maps UNKNOWN to FALSE, which is only safe in AND/OR filters.
+	ancestor := predicate.Parent()
+	for ancestor.IsA(KAnd, KOr, KParen) {
+		// Moving a predicate from ON to WHERE is only safe for an inner-join conjunct.
+		if ancestor.IsA(KOr) && clause.IsA(KJoin) {
+			return
+		}
+		ancestor = ancestor.Parent()
+	}
+	if !ancestor.IsA(KWhere, KJoin) || ancestor != clause {
+		return
+	}
+
+	if clause.IsA(KJoin) {
+		// Later joins can pad or pair rows before the hoisted WHERE filters them.
+		joins := parentSelect.ArgL("joins")
+		for _, join := range joins[clause.Index()+1:] {
+			if side := join.SideText(); side == "RIGHT" || side == "FULL" || join.MethodText() == "POSITIONAL" || join.KindText() == "PASTE" {
+				return
+			}
+		}
+	}
+
 	column := usOtherOperand(predicate)
+	if column == nil || column.Find(KSubquery) != nil {
+		return
+	}
+
 	value := sel.Selects()[0]
 
 	joinKey := ColumnExpr(value.Alias(), alias, nil, nil, nil, nil, true)
@@ -133,10 +163,48 @@ func usUnnest(sel, parentSelect *Expr, nextAliasName func() string) {
 				SelectGroupBy([]*Expr{ColumnExpr(value.Alias(), "_q", nil, nil, nil, nil, true)}, true, false)
 		}
 	} else if FindInScope(value.This(), KAggFunc) == nil {
-		sel = sel.SelectGroupBy([]*Expr{value.This()}, true, false)
+		groupKey := value.This()
+		if groupKey.IsInt() {
+			// An integer literal in GROUP BY would be read as a projection position
+			groupKey = optSQBinop(groupKey, KAdd, LiteralInt(0))
+		}
+		sel = sel.SelectGroupBy([]*Expr{groupKey}, true, false)
 	}
 
 	parentSelect.SelectJoin(sel, []*Expr{optSQBinop(column, KEQ, joinKey)}, nil, true, "LEFT", alias, false)
+}
+
+// usIsPostAggregation reports whether expression, a part of select, is evaluated after the
+// aggregation: outside the input-row clauses (FROM, JOIN, WHERE, ...) and not consumed by an
+// ordinary aggregate (a window aggregate consumes post-group rows).
+func usIsPostAggregation(expression, sel *Expr) bool {
+	ancestor := expression.FindAncestor(KAggFunc, KFilter, KSelect)
+	if ancestor.IsA(KFilter) {
+		ancestor = ancestor.This().Unnest()
+	}
+	if ancestor.IsA(KAggFunc) {
+		// Look through FILTER, IGNORE NULLS and parentheses for an enclosing window.
+		for ancestor.Parent() != sel && ancestor.Parent() != nil && ancestor.ArgKey() == "this" &&
+			!ancestor.Parent().IsA(KFunc, KWindow) {
+			ancestor = ancestor.Parent()
+		}
+		if !(ancestor.ArgKey() == "this" && ancestor.Parent().IsA(KWindow)) {
+			return false
+		}
+	}
+
+	node := expression
+	for node != nil && node.Parent() != sel {
+		node = node.Parent()
+	}
+	if node == nil {
+		return false
+	}
+	switch node.ArgKey() {
+	case "with_", "from_", "laterals", "joins", "where":
+		return false
+	}
+	return true
 }
 
 type usKey struct {
@@ -150,7 +218,8 @@ type usKeyAlias struct {
 	alias string
 }
 
-// usDecorrelate mirrors unnest_subqueries.decorrelate.
+// usDecorrelate turns a correlated subquery into a grouped left join on its correlation keys,
+// rewriting the enclosing predicate to test the joined columns.
 func usDecorrelate(sel, parentSelect *Expr, externalColumns []*Expr, nextAliasName func() string) {
 	where := sel.ArgE("where")
 
@@ -216,7 +285,7 @@ func usDecorrelate(sel, parentSelect *Expr, externalColumns []*Expr, nextAliasNa
 	}
 
 	value := sel.Selects()[0]
-	// key_aliases is a dict keyed by expressions (structural equality), in insertion order.
+	// keyAliases maps key expressions (by structural equality) to aliases, in insertion order.
 	var keyAliases []usKeyAlias
 	keyAliasIndex := func(key *Expr) int {
 		for i, ka := range keyAliases {
@@ -296,7 +365,7 @@ func usDecorrelate(sel, parentSelect *Expr, externalColumns []*Expr, nextAliasNa
 
 	alias := ColumnExpr(value.Alias(), tableAlias, nil, nil, nil, nil, true)
 	other := usOtherOperand(parentPredicate)
-	opType := KNone // type(parent_predicate.parent) if parent_predicate else None
+	opType := KNone // kind of the parent predicate's parent, if any
 	if parentPredicate != nil && parentPredicate.Parent() != nil {
 		opType = parentPredicate.Parent().Kind()
 	}
@@ -328,10 +397,6 @@ func usDecorrelate(sel, parentSelect *Expr, externalColumns []*Expr, nextAliasNa
 			)
 		}
 	default:
-		if isSubqueryProjection && sel.Parent().Alias() != "" {
-			alias = AliasExpr(alias, sel.Parent().Alias(), nil, true)
-		}
-
 		// COUNT always returns 0 on empty datasets, so we need take that into consideration here
 		// by transforming all counts into 0 and using that as the coalesced value
 		if value.Find(KCount) != nil {
@@ -345,6 +410,11 @@ func usDecorrelate(sel, parentSelect *Expr, externalColumns []*Expr, nextAliasNa
 			}
 
 			alias = New(KCoalesce, "this", alias, "expressions", []*Expr{value.This().Transform(removeAggs, true)})
+		}
+
+		// The alias goes outside of the COALESCE, so the projection keeps its name
+		if isSubqueryProjection && sel.Parent().Alias() != "" {
+			alias = AliasExpr(alias, sel.Parent().Alias(), nil, true)
 		}
 
 		sel.Parent().Replace(alias)
@@ -389,8 +459,8 @@ func usDecorrelate(sel, parentSelect *Expr, externalColumns []*Expr, nextAliasNa
 	parentSelect.SelectJoin(grouped, on, nil, true, "LEFT", tableAlias, false)
 }
 
-// usReplace mirrors unnest_subqueries._replace: condition may be an *Expr or a SQL string
-// (exp.condition parses strings into a Condition with the default dialect and copies expressions).
+// usReplace replaces expression with condition, which may be an *Expr (copied) or a SQL string
+// (parsed as a condition with the default dialect).
 func usReplace(expression *Expr, condition any) *Expr {
 	var cond *Expr
 	switch c := condition.(type) {
@@ -402,27 +472,20 @@ func usReplace(expression *Expr, condition any) *Expr {
 	return expression.Replace(cond)
 }
 
-// usOtherOperand mirrors unnest_subqueries._other_operand.
+// usOtherOperand returns the operand compared against the subquery in expression (an IN, an
+// ANY/ALL or a binary predicate), or nil.
 func usOtherOperand(expression *Expr) *Expr {
-	if expression.IsA(KIn) {
-		return expression.This()
-	}
-
 	if expression.IsA(KAny, KAll) {
-		return usOtherOperand(expression.Parent())
+		expression = expression.Parent()
 	}
 
-	if expression.IsA(KBinary) {
-		if expression.Left().IsA(KSubquery, KAny, KExists, KAll) {
-			return expression.Right()
-		}
-		return expression.Left()
+	if expression.IsA(KIn, KBinary) {
+		return expression.This()
 	}
 
 	return nil
 }
 
-// usInList mirrors Python's `x in some_list` for expressions (identity or structural equality).
 func usInList(list []*Expr, x *Expr) bool {
 	for _, y := range list {
 		if y == x || (y != nil && y.Equal(x)) {
@@ -432,7 +495,8 @@ func usInList(list []*Expr, x *Expr) bool {
 	return false
 }
 
-// usSameExprSet mirrors `set(a) == set(b)` for expressions (structural equality).
+// usSameExprSet reports whether a and b hold the same expressions, ignoring order and duplicates
+// (structural equality).
 func usSameExprSet(a, b []*Expr) bool {
 	for _, x := range a {
 		if !usInList(b, x) {
@@ -447,14 +511,12 @@ func usSameExprSet(a, b []*Expr) bool {
 	return true
 }
 
-// usAssertBinary mirrors `assert issubclass(op_type, exp.Binary)`.
 func usAssertBinary(k Kind) {
 	if k == KNone || !k.IsA(KBinary) {
 		panic(&ValueError{Msg: "AssertionError"})
 	}
 }
 
-// optSQBinop mirrors Expr._binop(klass, other) for an expression `other` (used by .is_(), .eq()).
 func optSQBinop(this *Expr, kind Kind, other *Expr) *Expr {
 	t := this.Copy()
 	o := other.Copy()

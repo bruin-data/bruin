@@ -1,7 +1,9 @@
 package sqlengine
 
-// Port of sqlglot/parsers/databricks.py (DatabricksParser) and sqlglot/generators/databricks.py
-// (DatabricksGenerator).
+import (
+	"strings"
+	"unicode"
+)
 
 func init() { registerCustomizer("databricks", customizeDatabricks) }
 
@@ -9,10 +11,6 @@ func customizeDatabricks(d *Dialect) {
 	customizeDatabricksParser(d)
 	customizeDatabricksGenerator(d)
 }
-
-// ---------------------------------------------------------------------------------------------
-// DatabricksParser
-// ---------------------------------------------------------------------------------------------
 
 func customizeDatabricksParser(d *Dialect) {
 	P := d.P
@@ -30,6 +28,8 @@ func customizeDatabricksParser(d *Dialect) {
 
 	P.NO_PAREN_FUNCTION_PARSERS["CURDATE"] = databricksParseCurdate
 
+	P.STATEMENT_PARSERS[TK_OPTIMIZE] = databricksParseOptimize
+
 	FP := P.FUNCTION_PARSERS
 	FP["REGR_AVGX"] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KRegrAvgx, 1) }
 	FP["REGR_AVGY"] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KRegrAvgy, 0) }
@@ -37,8 +37,8 @@ func customizeDatabricksParser(d *Dialect) {
 	FP["REGR_SXY"] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KRegrSxy, 0) }
 	FP["REGR_SYY"] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KRegrSyy, 1) }
 
-	// COLUMN_OPERATORS = {**parser.Parser.COLUMN_OPERATORS, QDCOLON: ...}; SparkParser does not
-	// change COLUMN_OPERATORS, so editing the inherited table is equivalent.
+	// `?::` is a non-strict cast and parses to TryCast. The Spark parser does not change
+	// COLUMN_OPERATORS, so adding to the inherited table is enough.
 	P.COLUMN_OPERATORS[TK_QDCOLON] = func(p *Parser, this, to *Expr) *Expr {
 		return p.buildCast(false, "this", this, "to", to)
 	}
@@ -47,7 +47,6 @@ func customizeDatabricksParser(d *Dialect) {
 	P.h.parseClusterProperty = databricksParseClusterProperty
 }
 
-// databricksParseCurdate mirrors DatabricksParser._parse_curdate.
 func databricksParseCurdate(p *Parser) *Expr {
 	// CURDATE, an alias for CURRENT_DATE, has optional parentheses
 	if p.match(TK_L_PAREN) {
@@ -56,7 +55,6 @@ func databricksParseCurdate(p *Parser) *Expr {
 	return p.expression(New(KCurrentDate))
 }
 
-// databricksParsePrimaryKeyPart mirrors DatabricksParser._parse_primary_key_part.
 func databricksParsePrimaryKeyPart(p *Parser) *Expr {
 	this := p.baseParsePrimaryKeyPart()
 	if this != nil && p.matchTextSeq("TIMESERIES") {
@@ -65,7 +63,6 @@ func databricksParsePrimaryKeyPart(p *Parser) *Expr {
 	return this
 }
 
-// databricksParseClusterProperty mirrors DatabricksParser._parse_cluster_property.
 func databricksParseClusterProperty(p *Parser) *Expr {
 	if p.matchTexts("AUTO", "NONE") {
 		return p.expression(New(KClusterProperty, "this", upperText(p.prev)))
@@ -73,14 +70,39 @@ func databricksParseClusterProperty(p *Parser) *Expr {
 	return p.baseParseClusterProperty()
 }
 
-// ---------------------------------------------------------------------------------------------
-// DatabricksGenerator
-// ---------------------------------------------------------------------------------------------
+var databricksTimestampTypes = newDTypeSet(DT_DATETIME, DT_TIME, DT_TIMESTAMP, DT_TIMESTAMPNTZ, DT_TIMESTAMPLTZ, DT_TIMESTAMPTZ)
+
+// databricksDropTimestampPrecision drops a timestamp precision Databricks rejects: it only
+// supports 6 (microseconds) and 7 to 9 (nanoseconds), so e.g. TIMESTAMP(0) becomes TIMESTAMP.
+func databricksDropTimestampPrecision(e *Expr) {
+	exprs := e.Expressions()
+	if !databricksTimestampTypes.Has(e.DTypeOf()) || len(exprs) == 0 {
+		return
+	}
+	param := exprs[0]
+	if param.IsA(KDataTypeParam) {
+		param = param.This()
+	}
+	if param.IsInt() {
+		if v, _ := param.toPyNumber(); v != nil {
+			if p, _ := v.Int64(); p < 6 || p > 9 {
+				e.Set("expressions", nil)
+			}
+		}
+	}
+}
 
 func customizeDatabricksGenerator(d *Dialect) {
 	T := d.G.TRANSFORMS
 
+	sparkDatatypeSQL := d.G.h.datatypeSQL
+	d.G.h.datatypeSQL = func(g *Generator, e *Expr) string {
+		databricksDropTimestampPrecision(e)
+		return sparkDatatypeSQL(g, e)
+	}
+
 	T[KCurrentVersion] = func(g *Generator, e *Expr) string { return "CURRENT_VERSION()" }
+	T[KOptimize] = func(g *Generator, e *Expr) string { return "OPTIMIZE " + g.sqlKey(e, "this") }
 	T[KDateAdd] = dateDeltaSQL("DATEADD", false)
 	T[KDateDiff] = dateDeltaSQL("DATEDIFF", false)
 	T[KDatetimeAdd] = func(g *Generator, e *Expr) string {
@@ -137,7 +159,6 @@ func customizeDatabricksGenerator(d *Dialect) {
 	h.clusterpropertySQL = databricksClusterpropertySQL
 }
 
-// databricksCreateSQL mirrors DatabricksGenerator.create_sql.
 func databricksCreateSQL(g *Generator, e *Expr) string {
 	body := e.Expression()
 	if body != nil && !body.IsA(KReturn) && e.KindText() == "FUNCTION" {
@@ -155,7 +176,6 @@ func databricksCreateSQL(g *Generator, e *Expr) string {
 	return g.baseCreateSQL(e)
 }
 
-// databricksColumndefSQL mirrors DatabricksGenerator.columndef_sql.
 func databricksColumndefSQL(g *Generator, e *Expr, sep string) string {
 	constraint := e.Find(KGeneratedAsIdentityColumnConstraint)
 	kind := e.ArgE("kind")
@@ -169,30 +189,26 @@ func databricksColumndefSQL(g *Generator, e *Expr, sep string) string {
 	return hiveColumndefSQL(g, e, sep)
 }
 
-// databricksTimeserieskeySQL mirrors DatabricksGenerator.timeserieskey_sql.
 func databricksTimeserieskeySQL(g *Generator, e *Expr) string {
 	return g.sqlKey(e, "this") + " TIMESERIES"
 }
 
-// databricksJsonpathSQL mirrors DatabricksGenerator.jsonpath_sql.
 func databricksJsonpathSQL(g *Generator, e *Expr) string {
-	e.Set("escape", nil)
 	path := g.baseJsonpathSQL(e)
 
 	if e.Parent().IsA(KJSONExtractScalar) {
-		return g.d.S.QUOTE_START + path + g.d.S.QUOTE_END
+		return g.d.S.QUOTE_START + g.escapeStr(path, true, "", "", false) + g.d.S.QUOTE_END
 	}
 
 	return path
 }
 
-// databricksUniformSQL mirrors DatabricksGenerator.uniform_sql.
 func databricksUniformSQL(g *Generator, e *Expr) string {
 	gen := e.ArgE("gen")
 	seed := e.Arg("seed")
 
 	// From Snowflake UNIFORM(min, max, gen) as RANDOM(), RANDOM(seed), or constant value -> Extract seed
-	// (gen.this may be a raw string, e.g. for a Literal gen; Generator.func renders it verbatim)
+	// (the gen's "this" may be a raw string, e.g. for a literal gen; g.fn renders it verbatim)
 	if gen != nil {
 		seed = gen.Arg("this")
 	}
@@ -200,7 +216,6 @@ func databricksUniformSQL(g *Generator, e *Expr) string {
 	return g.fn("UNIFORM", e.Arg("this"), e.Arg("expression"), seed)
 }
 
-// databricksRegrSQL mirrors DatabricksGenerator._regr_sql.
 func databricksRegrSQL(g *Generator, e *Expr) string {
 	name := e.Kind().SQLName()
 	x := e.Expression()
@@ -212,11 +227,36 @@ func databricksRegrSQL(g *Generator, e *Expr) string {
 	return g.fn(name, e.Arg("this"), x)
 }
 
-// databricksClusterpropertySQL mirrors DatabricksGenerator.clusterproperty_sql.
 func databricksClusterpropertySQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	if this == "" {
 		this = "(" + g.expressions(e, exprsOpts{flat: true}) + ")"
 	}
 	return "CLUSTER BY " + this
+}
+
+// databricksParseOptimize parses OPTIMIZE <table name>; any other form, e.g. one with a WHERE or
+// ZORDER BY clause, falls back to a Command.
+func databricksParseOptimize(p *Parser) *Expr {
+	start := p.prev
+	if n := p.tokensSize - p.index; n == 1 || n == 3 || n == 5 {
+		tokens := p.tokens[p.index:p.tokensSize]
+		isName := true
+		for i, token := range tokens {
+			if i%2 == 1 {
+				isName = isName && token.Type == TK_DOT
+			} else {
+				// A name part that is not a quoted identifier can't contain whitespace
+				isName = isName && p.s.ID_VAR_TOKENS.Has(token.Type) &&
+					(token.Type == TK_IDENTIFIER || strings.IndexFunc(token.Text, unicode.IsSpace) < 0)
+			}
+		}
+		if isName {
+			return p.expression(New(KOptimize, "this", p.parseTableParts(true, false, false, false)))
+		}
+	}
+
+	command := p.parseAsCommand(start)
+	command.Set("this", upperText(start))
+	return p.expression(command)
 }

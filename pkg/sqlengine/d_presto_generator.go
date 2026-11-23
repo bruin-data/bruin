@@ -5,9 +5,7 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/generators/presto.py (sqlglot v30.13.0).
-
-// prestoFmtArg converts a Generator.format_time result ("" means None) into a Generator.func argument.
+// prestoFmtArg returns nil for an empty format, so g.fn drops the argument.
 func prestoFmtArg(s string) any {
 	if s == "" {
 		return nil
@@ -15,7 +13,6 @@ func prestoFmtArg(s string) any {
 	return s
 }
 
-// prestoPyFmt mirrors f"{value}" of a Generator.format_time result ("" means None).
 func prestoPyFmt(s string) string {
 	if s == "" {
 		return "None"
@@ -23,7 +20,6 @@ func prestoPyFmt(s string) string {
 	return s
 }
 
-// prestoSha2DigestSQL mirrors generators.presto._sha2_digest_sql.
 func prestoSha2DigestSQL(g *Generator, e *Expr) string {
 	length := e.Text("length")
 	if length == "" {
@@ -42,7 +38,6 @@ func prestoSha2DigestSQL(g *Generator, e *Expr) string {
 	return g.fn("SHA"+length, this)
 }
 
-// prestoInitcapSQL mirrors generators.presto._initcap_sql.
 func prestoInitcapSQL(g *Generator, e *Expr) string {
 	delimiters := e.Expression()
 	if delimiters != nil && !(delimiters.IsString() && delimiters.ThisS() == g.d.S.INITCAP_DEFAULT_DELIMITER_CHARS) {
@@ -53,7 +48,6 @@ func prestoInitcapSQL(g *Generator, e *Expr) string {
 	return "REGEXP_REPLACE(" + g.sqlKey(e, "this") + ", '" + regex + "', x -> UPPER(x[1]) || LOWER(x[2]))"
 }
 
-// prestoNoSortArray mirrors generators.presto._no_sort_array.
 func prestoNoSortArray(g *Generator, e *Expr) string {
 	var comparator any
 	if asc := e.ArgE("asc"); asc != nil && asc.Equal(Boolean(false)) {
@@ -62,11 +56,10 @@ func prestoNoSortArray(g *Generator, e *Expr) string {
 	return g.fn("ARRAY_SORT", e.Arg("this"), comparator)
 }
 
-// prestoSchemaSQL mirrors generators.presto._schema_sql.
 func prestoSchemaSQL(g *Generator, e *Expr) string {
 	if e.Parent().IsA(KPartitionedByProperty) {
 		// Any columns in the ARRAY[] string literals should not be quoted
-		// (Python replaces each Identifier by its name, a plain str; a Var renders the same text.)
+		// (each Identifier is replaced by raw SQL of its name.)
 		e.Transform(func(n *Expr) *Expr {
 			if n.IsA(KIdentifier) {
 				return dhRawSQL(n.Name())
@@ -96,14 +89,14 @@ func prestoSchemaSQL(g *Generator, e *Expr) string {
 				continue
 			}
 
-			// `column_defs` is a generator (always truthy); `expression.expressions` is a fresh
-			// empty list (so extending it is a no-op) unless the arg holds a non-empty list.
+			// Only a schema that already has expressions is extended with the column defs of a
+			// schema under a property; an empty one is left as is.
 			if schema.Parent().IsA(KProperty) {
 				if exprs := e.Expressions(); len(exprs) > 0 {
 					for cd := range schema.FindAll(KColumnDef) {
 						exprs = append(exprs, cd)
 					}
-					// list.extend does not re-parent the column defs
+					// SetArgRaw leaves the column defs' parents unchanged
 					e.SetArgRaw("expressions", exprs)
 				}
 			}
@@ -113,35 +106,30 @@ func prestoSchemaSQL(g *Generator, e *Expr) string {
 	return g.schemaSQL(e)
 }
 
-// prestoQuantileSQL mirrors generators.presto._quantile_sql.
 func prestoQuantileSQL(g *Generator, e *Expr) string {
 	g.unsupported("Presto does not support exact quantiles")
 	return g.fn("APPROX_PERCENTILE", e.Arg("this"), e.Arg("quantile"))
 }
 
-// prestoStrToTimeSQL mirrors generators.presto._str_to_time_sql.
 func prestoStrToTimeSQL(g *Generator, e *Expr) string {
 	return g.fn("DATE_PARSE", e.Arg("this"), prestoFmtArg(g.formatTime(e, nil, nil)))
 }
 
-// prestoTsOrDsToDateSQL mirrors generators.presto._ts_or_ds_to_date_sql.
 func prestoTsOrDsToDateSQL(g *Generator, e *Expr) string {
 	timeFormat := g.formatTime(e, nil, nil)
 	if timeFormat != "" && timeFormat != g.d.S.TIME_FORMAT && timeFormat != g.d.S.DATE_FORMAT {
-		// exp.cast parses the generated SQL string with the default dialect
+		// The generated SQL string is parsed back with the default dialect before casting
 		return g.sql(CastExpr(MaybeParse(prestoStrToTimeSQL(g, e), KNone, "", nil), DT_DATE, false, nil))
 	}
 	return g.sql(CastExpr(CastExpr(e.This(), DT_TIMESTAMP, true, nil), DT_DATE, true, nil))
 }
 
-// prestoTsOrDsAddSQL mirrors generators.presto._ts_or_ds_add_sql.
 func prestoTsOrDsAddSQL(g *Generator, e *Expr) string {
 	e = tsOrDsAddCast(e)
 	unit := unitToStr(e, "DAY")
 	return g.fn("DATE_ADD", unit, e.Arg("expression"), e.Arg("this"))
 }
 
-// prestoTsOrDsDiffSQL mirrors generators.presto._ts_or_ds_diff_sql.
 func prestoTsOrDsDiffSQL(g *Generator, e *Expr) string {
 	this := CastExpr(e.This(), DT_TIMESTAMP, true, nil)
 	expr := CastExpr(e.Expression(), DT_TIMESTAMP, true, nil)
@@ -149,13 +137,9 @@ func prestoTsOrDsDiffSQL(g *Generator, e *Expr) string {
 	return g.fn("DATE_DIFF", unit, expr, this)
 }
 
-// prestoFirstLastSQL mirrors generators.presto._first_last_sql.
-//
-// Trino doesn't support FIRST / LAST as functions, but they're valid in the context
-// of MATCH_RECOGNIZE, so we need to preserve them in that case. In all other cases
-// they're converted into an ARBITRARY call.
-//
-// Reference: https://trino.io/docs/current/sql/match-recognize.html#logical-navigation-functions
+// prestoFirstLastSQL keeps FIRST / LAST inside MATCH_RECOGNIZE, the only place Trino accepts
+// them, and renders them as ARBITRARY elsewhere.
+// https://trino.io/docs/current/sql/match-recognize.html#logical-navigation-functions
 func prestoFirstLastSQL(g *Generator, e *Expr) string {
 	if e.FindAncestor(KMatchRecognize, KSelect).IsA(KMatchRecognize) {
 		return g.functionFallbackSQL(e)
@@ -164,7 +148,6 @@ func prestoFirstLastSQL(g *Generator, e *Expr) string {
 	return renameFunc("ARBITRARY")(g, e)
 }
 
-// prestoUnixToTimeSQL mirrors generators.presto._unix_to_time_sql.
 func prestoUnixToTimeSQL(g *Generator, e *Expr) string {
 	scale := e.ArgE("scale")
 	timestamp := g.sqlKey(e, "this")
@@ -175,7 +158,6 @@ func prestoUnixToTimeSQL(g *Generator, e *Expr) string {
 	return "FROM_UNIXTIME(CAST(" + timestamp + " AS DOUBLE) / POW(10, " + dhPyStr(scale) + "))"
 }
 
-// prestoToInt mirrors generators.presto._to_int.
 func prestoToInt(g *Generator, e *Expr) *Expr {
 	if e.Type() == nil {
 		annotateTypes(e, g.d)
@@ -186,7 +168,6 @@ func prestoToInt(g *Generator, e *Expr) *Expr {
 	return e
 }
 
-// prestoDateDeltaSQL mirrors generators.presto._date_delta_sql(name, negate_interval=False).
 func prestoDateDeltaSQL(name string, negateInterval bool) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		interval := prestoToInt(g, e.Expression())
@@ -197,7 +178,6 @@ func prestoDateDeltaSQL(name string, negateInterval bool) GenFunc {
 	}
 }
 
-// prestoDateDiffSQL mirrors generators.presto._date_diff_sql.
 func prestoDateDiffSQL(g *Generator, e *Expr) string {
 	// Presto/Trino only expose date_diff(unit, ts1, ts2); it returns ts2 - ts1, so the
 	// operands are emitted as (expression, this) to preserve `this - expression` semantics.
@@ -237,7 +217,6 @@ func prestoDateDiffSQL(g *Generator, e *Expr) string {
 	return g.fn("DATE_DIFF", unit, expr, this)
 }
 
-// prestoExplodeToUnnestSQL mirrors generators.presto._explode_to_unnest_sql.
 func prestoExplodeToUnnestSQL(g *Generator, e *Expr) string {
 	explode := e.This()
 	if explode.IsA(KExplode) {
@@ -267,7 +246,8 @@ func prestoExplodeToUnnestSQL(g *Generator, e *Expr) string {
 	return explodeToUnnestSQL(g, e)
 }
 
-// prestoAmendExplodedColumnTable mirrors generators.presto.amend_exploded_column_table.
+// prestoAmendExplodedColumnTable rewrites column references qualified with an exploded struct
+// column so that they use the lateral's table alias.
 func prestoAmendExplodedColumnTable(expression *Expr) *Expr {
 	// We check for expression.type because the columns can be amended only if types were inferred
 	if expression.IsA(KSelect) && expression.Type() != nil {
@@ -297,14 +277,9 @@ func prestoAmendExplodedColumnTable(expression *Expr) *Expr {
 	return expression
 }
 
-// ---------------------------------------------------------------------------------------------
-// PrestoGenerator
-// ---------------------------------------------------------------------------------------------
-
 func customizePrestoGenerator(d *Dialect) {
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module level)
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -447,10 +422,10 @@ func customizePrestoGenerator(d *Dialect) {
 	T[KWith] = transformPreprocess([]func(*Expr) *Expr{transformAddRecursiveCteColumnNames}, nil)
 	T[KWithinGroup] = transformPreprocess([]func(*Expr) *Expr{transformRemoveWithinGroupForPercentiles}, nil)
 	// Note: Presto's TRUNCATE always returns DOUBLE, even with decimals=0, whereas
-	// most dialects return INT (SQLite also returns REAL, see sqlite.py). This creates
+	// most dialects return INT (SQLite also returns REAL, see sqliteTruncSQL). This creates
 	// a bidirectional transpilation gap: Presto→Other may change float division to int
-	// division, and vice versa. Modeling precisely would require exp.FloatTrunc or
-	// similar, deemed overengineering for this subtle semantic difference.
+	// division, and vice versa. Modeling precisely would require a separate float-truncation
+	// kind or similar, deemed overengineering for this subtle semantic difference.
 	T[KTrunc] = renameFunc("TRUNCATE")
 	T[KXor] = boolXorSQL
 	T[KMD5Digest] = renameFunc("MD5")
@@ -459,7 +434,6 @@ func customizePrestoGenerator(d *Dialect) {
 	T[KSHA2Digest] = prestoSha2DigestSQL
 	T[KSubstring] = renameFunc("SUBSTR")
 
-	// methods
 	G.h.extractSQL = prestoExtractSQL
 	G.methods[KJSONFormat] = prestoJSONFormatSQL
 	G.methods[KMD5] = prestoMD5SQL
@@ -472,11 +446,11 @@ func customizePrestoGenerator(d *Dialect) {
 	G.h.offsetLimitModifiers = prestoOffsetLimitModifiers
 	G.h.createSQL = prestoCreateSQL
 	G.h.deleteSQL = prestoDeleteSQL
+	G.h.datatypeSQL = prestoDatatypeSQL
 	G.methods[KJSONExtract] = prestoJSONExtractSQL
 	G.methods[KGroupConcat] = prestoGroupConcatSQL
 }
 
-// prestoExtractSQL mirrors PrestoGenerator.extract_sql.
 func prestoExtractSQL(g *Generator, e *Expr) string {
 	datePart := e.Name()
 
@@ -506,7 +480,6 @@ func prestoExtractSQL(g *Generator, e *Expr) string {
 	return g.sql(toUnix)
 }
 
-// prestoJSONFormatSQL mirrors PrestoGenerator.jsonformat_sql.
 func prestoJSONFormatSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	isJSON := e.ArgB("is_json")
@@ -522,7 +495,6 @@ func prestoJSONFormatSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// prestoMD5SQL mirrors PrestoGenerator.md5_sql.
 func prestoMD5SQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -537,7 +509,6 @@ func prestoMD5SQL(g *Generator, e *Expr) string {
 	return g.fn("LOWER", g.fn("TO_HEX", g.fn("MD5", g.sql(this))))
 }
 
-// prestoSHA2SQL mirrors PrestoGenerator.sha2_sql.
 func prestoSHA2SQL(g *Generator, e *Expr) string {
 	length := e.Text("length")
 	if length == "" {
@@ -556,7 +527,6 @@ func prestoSHA2SQL(g *Generator, e *Expr) string {
 	return g.fn("LOWER", g.fn("TO_HEX", g.fn("SHA"+length, g.sql(this))))
 }
 
-// prestoStrToUnixSQL mirrors PrestoGenerator.strtounix_sql.
 func prestoStrToUnixSQL(g *Generator, e *Expr) string {
 	// Since `TO_UNIXTIME` requires a `TIMESTAMP`, we need to parse the argument into one.
 	// To do this, we first try to `DATE_PARSE` it, but since this can fail when there's a
@@ -583,7 +553,6 @@ func prestoStrToUnixSQL(g *Generator, e *Expr) string {
 	return g.fn("TO_UNIXTIME", coalesced)
 }
 
-// prestoBracketSQL mirrors PrestoGenerator.bracket_sql.
 func prestoBracketSQL(g *Generator, e *Expr) string {
 	if e.ArgB("safe") {
 		return bracketToElementAtSQL(g, e)
@@ -591,7 +560,8 @@ func prestoBracketSQL(g *Generator, e *Expr) string {
 	return g.baseBracketSQL(e)
 }
 
-// prestoStructSQL mirrors PrestoGenerator.struct_sql.
+// prestoStructSQL renders a struct as ROW(...), cast to a named ROW type when every field is a
+// typed key-value pair.
 func prestoStructSQL(g *Generator, e *Expr) string {
 	if e.Type() == nil {
 		annotateTypes(e, g.d)
@@ -632,15 +602,20 @@ func prestoStructSQL(g *Generator, e *Expr) string {
 	return "CAST(ROW(" + strings.Join(vs, ", ") + ") AS ROW(" + strings.Join(ss, ", ") + "))"
 }
 
-// prestoIntervalSQL mirrors PrestoGenerator.interval_sql.
 func prestoIntervalSQL(g *Generator, e *Expr) string {
-	if e.This() != nil && strings.HasPrefix(pyUpper(e.Text("unit")), "WEEK") {
-		return "(" + e.This().Name() + " * INTERVAL '7' DAY)"
+	this := e.This()
+	if this != nil && strings.HasPrefix(pyUpper(e.Text("unit")), "WEEK") {
+		if !this.IsString() {
+			return "(" + g.sql(this) + " * INTERVAL '7' DAY)"
+		}
+		// Only a numeric string is spliced into the multiplication
+		if _, ok := parsePyDecimal(this.Name()); ok {
+			return "(" + this.Name() + " * INTERVAL '7' DAY)"
+		}
 	}
 	return g.baseIntervalSQL(e)
 }
 
-// prestoTransactionSQL mirrors PrestoGenerator.transaction_sql.
 func prestoTransactionSQL(g *Generator, e *Expr) string {
 	modes := ""
 	switch m := e.Arg("modes").(type) {
@@ -660,7 +635,7 @@ func prestoTransactionSQL(g *Generator, e *Expr) string {
 	return "START TRANSACTION" + modes
 }
 
-// prestoOffsetLimitModifiers mirrors PrestoGenerator.offset_limit_modifiers.
+// prestoOffsetLimitModifiers places OFFSET before LIMIT.
 func prestoOffsetLimitModifiers(g *Generator, e *Expr, fetch bool, limit *Expr) []string {
 	return []string{
 		g.sqlKey(e, "offset"),
@@ -668,10 +643,7 @@ func prestoOffsetLimitModifiers(g *Generator, e *Expr, fetch bool, limit *Expr) 
 	}
 }
 
-// prestoCreateSQL mirrors PrestoGenerator.create_sql.
-//
-// Presto doesn't support CREATE VIEW with expressions (ex: `CREATE VIEW x (cola)` then `(cola)` is the expression),
-// so we need to remove them.
+// prestoCreateSQL drops the column list of CREATE VIEW x (cola), which Presto doesn't support.
 func prestoCreateSQL(g *Generator, e *Expr) string {
 	kind := e.Arg("kind")
 	schema := e.This()
@@ -681,11 +653,8 @@ func prestoCreateSQL(g *Generator, e *Expr) string {
 	return g.baseCreateSQL(e)
 }
 
-// prestoDeleteSQL mirrors PrestoGenerator.delete_sql.
-//
-// Presto only supports DELETE FROM for a single table without an alias, so we need
-// to remove the unnecessary parts. If the original DELETE statement contains more
-// than one table to be deleted, we can't safely map it 1-1 to a Presto statement.
+// prestoDeleteSQL keeps only DELETE FROM of a single unaliased table, the one form Presto
+// supports. A DELETE of several tables can't be mapped 1-1 to Presto.
 func prestoDeleteSQL(g *Generator, e *Expr) string {
 	tables := e.ArgL("tables")
 	if len(tables) == 0 {
@@ -709,7 +678,6 @@ func prestoDeleteSQL(g *Generator, e *Expr) string {
 	return g.baseDeleteSQL(e)
 }
 
-// prestoJSONExtractSQL mirrors PrestoGenerator.jsonextract_sql.
 func prestoJSONExtractSQL(g *Generator, e *Expr) string {
 	isJSONExtract := true
 	if v, ok := g.d.Settings["variant_extract_is_json_extract"]; ok {
@@ -752,11 +720,22 @@ func prestoJSONExtractSQL(g *Generator, e *Expr) string {
 	return this + expr
 }
 
-// prestoGroupConcatSQL mirrors PrestoGenerator.groupconcat_sql.
 func prestoGroupConcatSQL(g *Generator, e *Expr) string {
 	return g.fn(
 		"ARRAY_JOIN",
 		g.fn("ARRAY_AGG", e.This()),
 		e.Arg("separator"),
 	)
+}
+
+// prestoDatatypeSQL renders a data type. Without SUPPORTS_TEMPORAL_PRECISION a temporal type
+// drops its precision, which is reported as unsupported unless it is milliseconds (3).
+func prestoDatatypeSQL(g *Generator, e *Expr) string {
+	if !g.s.SUPPORTS_TEMPORAL_PRECISION && DataType_TEMPORAL_TYPES.Has(e.DTypeOf()) {
+		if exprs := e.Expressions(); len(exprs) > 0 && exprs[0].Name() != "3" {
+			g.unsupported("Presto only supports millisecond precision for temporal types")
+		}
+		e.Set("expressions", nil)
+	}
+	return g.baseDatatypeSQL(e)
 }

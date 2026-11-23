@@ -2,11 +2,8 @@ package sqlengine
 
 import "time"
 
-// Port of sqlglot/optimizer/canonicalize.py.
-
-// Canonicalize mirrors optimizer.canonicalize.canonicalize: converts a sql expression into a
-// standard form. This relies on annotate_types because many of the conversions rely on type
-// inference. d == nil means the default dialect.
+// Canonicalize converts a SQL expression into a standard form. It relies on type annotation
+// because many of the conversions rely on type inference. d == nil means the default dialect.
 func Canonicalize(expression *Expr, d *Dialect) *Expr {
 	dialect := d
 	if dialect == nil {
@@ -29,7 +26,6 @@ func Canonicalize(expression *Expr, d *Dialect) *Expr {
 	return ReplaceTree(expression, canonicalize, nil)
 }
 
-// canonicalizeCoercibleDateOps mirrors canonicalize.COERCIBLE_DATE_OPS.
 var canonicalizeCoercibleDateOps = []Kind{
 	KAdd,
 	KSub,
@@ -43,37 +39,37 @@ var canonicalizeCoercibleDateOps = []Kind{
 	KNullSafeNEQ,
 }
 
-// canonicalizeTypes mirrors canonicalize._CANONICALIZE_TYPES: all expression types that any of
-// the canonicalize functions can act on.
+// canonicalizeTypes lists the kinds that any canonicalize function can act on.
 var canonicalizeTypes = append(
 	append([]Kind{
-		// add_text_to_concat
+		// canonicalizeAddTextToConcat
 		KAdd,
-		// replace_date_funcs
+		// canonicalizeReplaceDateFuncs
 		KDate,
 		KTsOrDsToDate,
 		KTimestamp,
 	}, canonicalizeCoercibleDateOps...),
-	// coerce_type (COERCIBLE_DATE_OPS + Between, Extract, DateAdd, DateSub, DateTrunc, DateDiff)
+	// canonicalizeCoerceType (the coercible date ops above, plus these)
 	KBetween,
 	KExtract,
 	KDateAdd,
 	KDateSub,
 	KDateTrunc,
 	KDateDiff,
-	// remove_redundant_casts
+	// canonicalizeRemoveRedundantCasts
 	KCast,
-	// ensure_bools (Connector, Not, If, Where, Having)
+	// canonicalizeEnsureBools
 	KConnector,
 	KNot,
 	KIf,
 	KWhere,
 	KHaving,
-	// remove_ascending_order
+	// canonicalizeRemoveAscendingOrder
 	KOrdered,
 )
 
-// canonicalizeAddTextToConcat mirrors canonicalize.add_text_to_concat.
+// canonicalizeAddTextToConcat rewrites a text-typed a + b as CONCAT(a, b) without NULL
+// coalescing.
 func canonicalizeAddTextToConcat(node *Expr) *Expr {
 	if node.IsA(KAdd) && node.Type() != nil && DataType_TEXT_TYPES.Has(node.Type().DTypeOf()) {
 		node = New(
@@ -87,7 +83,9 @@ func canonicalizeAddTextToConcat(node *Expr) *Expr {
 	return node
 }
 
-// canonicalizeReplaceDateFuncs mirrors canonicalize.replace_date_funcs.
+// canonicalizeReplaceDateFuncs rewrites DATE('iso date') and TS_OR_DS_TO_DATE('iso date') with no
+// other arguments as CAST(... AS DATE), and a zoneless TIMESTAMP(x) as a cast to its inferred
+// type.
 func canonicalizeReplaceDateFuncs(node *Expr, d *Dialect) *Expr {
 	if node.IsA(KDate, KTsOrDsToDate) &&
 		len(node.Expressions()) == 0 &&
@@ -110,7 +108,8 @@ func canonicalizeReplaceDateFuncs(node *Expr, d *Dialect) *Expr {
 	return node
 }
 
-// canonicalizeCoerceType mirrors canonicalize.coerce_type.
+// canonicalizeCoerceType casts the operands of date comparisons and arithmetic, BETWEEN, EXTRACT,
+// unit-based date functions and DATEDIFF to compatible temporal types.
 func canonicalizeCoerceType(node *Expr, promoteToInferredDatetimeType bool) *Expr {
 	switch {
 	case node.IsA(canonicalizeCoercibleDateOps...):
@@ -128,7 +127,8 @@ func canonicalizeCoerceType(node *Expr, promoteToInferredDatetimeType bool) *Exp
 	return node
 }
 
-// canonicalizeRemoveRedundantCasts mirrors canonicalize.remove_redundant_casts.
+// canonicalizeRemoveRedundantCasts removes casts to the operand's own type, and DATE() or
+// TS_OR_DS_TO_DATE() of a DATE value.
 func canonicalizeRemoveRedundantCasts(expression *Expr) *Expr {
 	if expression.IsA(KCast) &&
 		expression.This().Type() != nil &&
@@ -146,7 +146,8 @@ func canonicalizeRemoveRedundantCasts(expression *Expr) *Expr {
 	return expression
 }
 
-// canonicalizeEnsureBools mirrors canonicalize.ensure_bools.
+// canonicalizeEnsureBools applies replaceFunc to operands that must be booleans: those of AND/OR
+// and NOT, IF and searched CASE WHEN conditions, WHERE and HAVING.
 func canonicalizeEnsureBools(expression *Expr, replaceFunc func(*Expr)) *Expr {
 	switch {
 	case expression.IsA(KConnector):
@@ -164,7 +165,6 @@ func canonicalizeEnsureBools(expression *Expr, replaceFunc func(*Expr)) *Expr {
 	return expression
 }
 
-// canonicalizeRemoveAscendingOrder mirrors canonicalize.remove_ascending_order.
 func canonicalizeRemoveAscendingOrder(expression *Expr) *Expr {
 	if expression.IsA(KOrdered) {
 		if desc, ok := expression.Arg("desc").(bool); ok && !desc {
@@ -176,9 +176,11 @@ func canonicalizeRemoveAscendingOrder(expression *Expr) *Expr {
 	return expression
 }
 
-// canonicalizeCoerceDate mirrors canonicalize._coerce_date.
+// canonicalizeCoerceDate casts a text operand used with a temporal operand (in either order) to
+// the temporal type, or to the type inferred from the text when promoteToInferredDatetimeType
+// allows it. An interval operand first coerces the other operand by its unit.
 func canonicalizeCoerceDate(a, b *Expr, promoteToInferredDatetimeType bool) {
-	// itertools.permutations([a, b]) is evaluated upfront with the original nodes.
+	// Both operand orders are taken from the original nodes, before any replacement.
 	pairs := [][2]*Expr{{a, b}, {b, a}}
 	for _, pair := range pairs {
 		a, b := pair[0], pair[1]
@@ -194,8 +196,8 @@ func canonicalizeCoerceDate(a, b *Expr, promoteToInferredDatetimeType bool) {
 			continue
 		}
 
-		// targetType is either a DType or aType (a DataType expression). A DType never compares
-		// equal to a DataType in Python, so `target_type != a_type` is targetIsAType == false.
+		// targetType is either aType (a DataType expression) or a promoted DType; only a promoted
+		// type also casts a.
 		var targetType any = aType
 		targetIsAType := true
 		if promoteToInferredDatetimeType {
@@ -229,7 +231,7 @@ func canonicalizeCoerceDate(a, b *Expr, promoteToInferredDatetimeType bool) {
 	}
 }
 
-// canonicalizeCoercesTo mirrors `b_type in TypeAnnotator.COERCES_TO.get(a_type, {})`.
+// canonicalizeCoercesTo reports whether aType coerces to bType in the base coercion table.
 func canonicalizeCoercesTo(aType, bType DType) bool {
 	targets, ok := typeAnnotatorCoercesTo()[aType]
 	if !ok {
@@ -238,7 +240,9 @@ func canonicalizeCoercesTo(aType, bType DType) bool {
 	return targets.Has(bType)
 }
 
-// canonicalizeCoerceTimeunitArg mirrors canonicalize._coerce_timeunit_arg.
+// canonicalizeCoerceTimeunitArg casts a text argument of a unit-based date function to DATE (an
+// ISO date with a date unit) or DATETIME (an ISO datetime), and a DATE argument with a non-date
+// unit to DATETIME. It returns the argument or its replacement.
 func canonicalizeCoerceTimeunitArg(arg *Expr, unit *Expr) *Expr {
 	if arg.Type() == nil {
 		return arg
@@ -263,7 +267,6 @@ func canonicalizeCoerceTimeunitArg(arg *Expr, unit *Expr) *Expr {
 	return arg
 }
 
-// canonicalizeCoerceDatediffArgs mirrors canonicalize._coerce_datediff_args.
 func canonicalizeCoerceDatediffArgs(node *Expr) {
 	for _, e := range []*Expr{node.This(), node.Expression()} {
 		if e.Type() == nil || !DataType_TEMPORAL_TYPES.Has(e.Type().DTypeOf()) {
@@ -272,16 +275,16 @@ func canonicalizeCoerceDatediffArgs(node *Expr) {
 	}
 }
 
-// canonicalizeReplaceCast mirrors canonicalize._replace_cast. to is a DType or a DataType.
+// canonicalizeReplaceCast replaces node with a cast of it to the type to, a DType or a DataType.
 func canonicalizeReplaceCast(node *Expr, to any) {
 	node.Replace(CastExpr(node.Copy(), to, true, nil))
 }
 
-// canonicalizeReplaceIntPredicate mirrors canonicalize._replace_int_predicate.
+// canonicalizeReplaceIntPredicate rewrites an integer-typed predicate x as x <> 0, recursing into
+// COALESCE.
 //
-// this was originally designed for presto, there is a similar transform for tsql
-// this is different in that it only operates on int types, this is because
-// presto has a boolean type whereas tsql doesn't (people use bits)
+// This was originally designed for Presto. There is a similar transform for T-SQL; this one only
+// operates on int types because Presto has a boolean type whereas T-SQL doesn't (people use bits):
 // with y as (select true as x) select x = 0 FROM y -- illegal presto query.
 func canonicalizeReplaceIntPredicate(expression *Expr) {
 	if expression.IsA(KCoalesce) {
@@ -293,7 +296,6 @@ func canonicalizeReplaceIntPredicate(expression *Expr) {
 	}
 }
 
-// optxNeq mirrors Expr.neq(other) (Expr._binop(NEQ, other)) for an expression operand.
 func optxNeq(e *Expr, other *Expr) *Expr {
 	this := e.Copy()
 	other = other.Copy()
@@ -304,8 +306,6 @@ func optxNeq(e *Expr, other *Expr) *Expr {
 	return New(KNEQ, "this", this, "expression", other)
 }
 
-// optxIsType mirrors Expr.is_type(*dtypes) with its class dispatch: DataType.is_type for data
-// types, Cast.is_type (self.to.is_type) for casts and `_type.is_type` otherwise.
 func optxIsType(e *Expr, dtypes ...any) bool {
 	if e.IsA(KDataType) {
 		return DataTypeIsType(e, dtypes, false)
@@ -317,7 +317,6 @@ func optxIsType(e *Expr, dtypes ...any) bool {
 	return t != nil && DataTypeIsType(t, dtypes, false)
 }
 
-// optxDTypes converts a DTypeSet into an argument list for is_type.
 func optxDTypes(s DTypeSet) []any {
 	items := s.Items()
 	out := make([]any, len(items))
@@ -327,16 +326,14 @@ func optxDTypes(s DTypeSet) []any {
 	return out
 }
 
-// optxDateUnits mirrors sqlglot.helper.DATE_UNITS.
 var optxDateUnits = newStrSet("day", "week", "month", "quarter", "year", "year_month")
 
-// optxIsDateUnit mirrors sqlglot.helper.is_date_unit.
 func optxIsDateUnit(expression *Expr) bool {
 	return expression != nil && optxDateUnits.Has(pyLower(expression.Name()))
 }
 
-// optxIsISODate mirrors sqlglot.helper.is_iso_date, i.e. whether CPython 3.13's (C implemented)
-// datetime.date.fromisoformat(text) succeeds.
+// optxIsISODate reports whether text is a valid ISO 8601 date of 7, 8 or 10 bytes: YYYY-MM-DD,
+// YYYYMMDD or a week date (YYYY-Www[-D], YYYYWww[D]).
 func optxIsISODate(text string) bool {
 	n := len(text)
 	if n != 7 && n != 8 && n != 10 {
@@ -346,8 +343,8 @@ func optxIsISODate(text string) bool {
 	return ok && optxValidDate(year, month, day)
 }
 
-// optxIsISODatetime mirrors sqlglot.helper.is_iso_datetime, i.e. whether CPython 3.13's (C
-// implemented) datetime.datetime.fromisoformat(text) succeeds.
+// optxIsISODatetime reports whether text is a valid ISO 8601 date, optionally followed by a
+// one-character separator and a time with an optional fraction and UTC offset.
 func optxIsISODatetime(text string) bool {
 	n := len(text)
 	if len([]rune(text)) < 7 {
@@ -402,7 +399,8 @@ func optxIsISODatetime(text string) bool {
 		microsecond >= 0 && microsecond <= 999999
 }
 
-// optxCharAt returns s[i], or NUL past the end (C strings are NUL-terminated).
+// optxCharAt returns s[i], or 0 (NUL) outside s, so the parsers can read past the end as if s
+// were NUL-terminated.
 func optxCharAt(s string, i int) byte {
 	if i >= 0 && i < len(s) {
 		return s[i]
@@ -412,7 +410,8 @@ func optxCharAt(s string, i int) byte {
 
 func optxIsDigit(c byte) bool { return c >= '0' && c <= '9' }
 
-// optxParseDigits mirrors _datetimemodule.c parse_digits.
+// optxParseDigits parses numDigits decimal digits at p, returning the value, the new position and
+// success.
 func optxParseDigits(s string, p int, numDigits int) (int, int, bool) {
 	v := 0
 	for range numDigits {
@@ -426,7 +425,8 @@ func optxParseDigits(s string, p int, numDigits int) (int, int, bool) {
 	return v, p, true
 }
 
-// optxFindISOFormatDatetimeSeparator mirrors _datetimemodule.c _find_isoformat_datetime_separator.
+// optxFindISOFormatDatetimeSeparator returns the byte position of the separator between date and
+// time, inferred from the date format; false for a malformed week date.
 func optxFindISOFormatDatetimeSeparator(dtstr string, n int) (int, bool) {
 	const dateSeparator = '-'
 	const weekIndicator = 'W'
@@ -468,7 +468,6 @@ func optxFindISOFormatDatetimeSeparator(dtstr string, n int) (int, bool) {
 		// YYYYWww (7) or YYYYWwwd (8)
 		idx := 7
 		for ; idx < n; idx++ {
-			// Keep going until we run out of digits.
 			if !optxIsDigit(dtstr[idx]) {
 				break
 			}
@@ -488,8 +487,8 @@ func optxFindISOFormatDatetimeSeparator(dtstr string, n int) (int, bool) {
 	return 8, true
 }
 
-// optxParseISOFormatDate mirrors _datetimemodule.c parse_isoformat_date (n is the date length;
-// like C, digits may be read past it).
+// optxParseISOFormatDate parses a calendar or week date at the start of dtstr. n is the date
+// length; digits may be read past it.
 func optxParseISOFormatDate(dtstr string, n int) (year, month, day int, ok bool) {
 	p := 0
 	year, p, ok = optxParseDigits(dtstr, p, 4)
@@ -551,8 +550,9 @@ func optxParseISOFormatDate(dtstr string, n int) (year, month, day int, ok bool)
 	return year, month, day, true
 }
 
-// optxParseHHMMSSFF mirrors _datetimemodule.c parse_hh_mm_ss_ff (CPython 3.13.0). tstr is the
-// whole remaining string (C reads up to its NUL terminator) and end the logical end.
+// optxParseHHMMSSFF parses HH[:MM[:SS[.ffffff]]] (the colons may be omitted together). tstr is
+// the whole remaining string, which may be read to its end, and end the logical end. rv is 0 at
+// the end of the string, 1 if more text follows and negative on error.
 func optxParseHHMMSSFF(tstr string, end int) (hour, minute, second, microsecond, rv int) {
 	vals := [3]int{}
 	p := 0
@@ -588,7 +588,6 @@ func optxParseHHMMSSFF(tstr string, end int) (hour, minute, second, microsecond,
 		}
 	}
 
-	// Parse fractional components
 	lenRemains := end - p
 	toParse := lenRemains
 	if lenRemains >= 6 {
@@ -610,15 +609,14 @@ func optxParseHHMMSSFF(tstr string, end int) (hour, minute, second, microsecond,
 		p++ // skip truncated digits
 	}
 
-	// Return 1 if it's not the end of the string
 	if optxCharAt(tstr, p) != 0 {
 		return vals[0], vals[1], vals[2], microsecond, 1
 	}
 	return vals[0], vals[1], vals[2], microsecond, 0
 }
 
-// optxParseISOFormatTime mirrors _datetimemodule.c parse_isoformat_time. Return codes: 0 success
-// (no tzoffset), 1 success (with tzoffset), negative on failure.
+// optxParseISOFormatTime parses a time with an optional Z or +/-HH[:MM[:SS[.ffffff]]] UTC offset.
+// Return codes: 0 success (no tzoffset), 1 success (with tzoffset), negative on failure.
 func optxParseISOFormatTime(dtstr string) (hour, minute, second, microsecond, tzOffset, tzMicrosecond, rv int) {
 	pEnd := len(dtstr)
 
@@ -649,7 +647,6 @@ func optxParseISOFormatTime(dtstr string) (hour, minute, second, microsecond, tz
 		return
 	}
 
-	// Special case UTC / Zulu time.
 	if optxCharAt(dtstr, tzinfoPos) == 'Z' {
 		if optxCharAt(dtstr, tzinfoPos+1) != 0 {
 			rv = -5
@@ -677,7 +674,8 @@ func optxParseISOFormatTime(dtstr string) (hour, minute, second, microsecond, tz
 	return
 }
 
-// optxISOToYMD mirrors _datetimemodule.c iso_to_ymd.
+// optxISOToYMD converts an ISO year, week and weekday into a calendar date; false when one of
+// them is out of range.
 func optxISOToYMD(isoYear, isoWeek, isoDay int) (int, int, int, bool) {
 	// Year is bounded to 0 < year < 10000 because 9999-12-31 is (9999, 52, 5)
 	if isoYear < 1 || isoYear > 9999 {
@@ -703,7 +701,6 @@ func optxISOToYMD(isoYear, isoWeek, isoDay int) (int, int, int, bool) {
 		return 0, 0, 0, false
 	}
 
-	// Convert (Y, W, D) to (Y, M, D) in-place
 	day1 := optxISOWeek1Monday(isoYear)
 	dayOffset := (isoWeek-1)*7 + isoDay - 1
 
@@ -743,7 +740,7 @@ func optxOrdToYMD(ordinal int) (int, int, int) {
 	return t.Year(), int(t.Month()), t.Day()
 }
 
-// optxValidDate mirrors the date constructor's range checks.
+// optxValidDate reports whether year-month-day is a valid date in years 1 through 9999.
 func optxValidDate(year, month, day int) bool {
 	if year < 1 || year > 9999 || month < 1 || month > 12 {
 		return false

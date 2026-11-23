@@ -3,7 +3,7 @@ package sqlengine
 import "testing"
 
 // TestOwnMatchesCopy checks that handing a tree over with Own generates and transforms exactly like
-// working on a copy, over the conformance corpus.
+// working on a copy, over the golden statement corpus.
 func TestOwnMatchesCopy(t *testing.T) {
 	t.Parallel()
 	corpus, err := benchCorpus()

@@ -1,7 +1,9 @@
 package sqlengine
 
-// Port of sqlglot/parsers/hive.py (HiveParser) and the Hive dialect wiring.
-// The generator (sqlglot/generators/hive.py) lives in d_hive_generator.go.
+import (
+	"strconv"
+	"strings"
+)
 
 func init() { registerCustomizer("hive", customizeHive) }
 
@@ -10,11 +12,6 @@ func customizeHive(d *Dialect) {
 	customizeHiveGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level builders (parsers/hive.py)
-// ---------------------------------------------------------------------------------------------
-
-// hiveBuildWithIgnoreNulls mirrors parsers.hive.build_with_ignore_nulls.
 func hiveBuildWithIgnoreNulls(kind Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		this := New(kind, "this", seqGet(args, 0))
@@ -25,15 +22,14 @@ func hiveBuildWithIgnoreNulls(kind Kind) FuncBuilder {
 	}
 }
 
-// hiveBuildToDate mirrors parsers.hive._build_to_date.
 func hiveBuildToDate(args []*Expr, d *Dialect) *Expr {
 	expr := buildFormattedTime(KTsOrDsToDate, "", nil)(args, d)
 	expr.Set("safe", true)
 	return expr
 }
 
-// hiveBuildNamedStruct mirrors parsers.hive._build_named_struct.
-// Map named_struct('k', v, ...) to exp.Struct so _annotate_struct sees it.
+// hiveBuildNamedStruct maps named_struct('k', v, ...) to a Struct of PropertyEQ pairs so
+// annotateStruct can type it.
 func hiveBuildNamedStruct(args []*Expr, d *Dialect) *Expr {
 	expressions := []*Expr{}
 	for i := 0; i < len(args)-1; i += 2 {
@@ -44,7 +40,7 @@ func hiveBuildNamedStruct(args []*Expr, d *Dialect) *Expr {
 	return New(KStruct, "expressions", expressions)
 }
 
-// hiveBuildDateAdd mirrors parsers.hive._build_date_add (used for DATE_SUB).
+// hiveBuildDateAdd builds DATE_SUB(date, n) as a day-unit TsOrDsAdd with n negated.
 func hiveBuildDateAdd(args []*Expr, d *Dialect) *Expr {
 	expression := seqGet(args, 1)
 	if expression != nil {
@@ -53,10 +49,6 @@ func hiveBuildDateAdd(args []*Expr, d *Dialect) *Expr {
 
 	return New(KTsOrDsAdd, "this", seqGet(args, 0), "expression", expression, "unit", LiteralString("DAY"))
 }
-
-// ---------------------------------------------------------------------------------------------
-// HiveParser
-// ---------------------------------------------------------------------------------------------
 
 func customizeHiveParser(d *Dialect) {
 	P := d.P
@@ -154,14 +146,112 @@ func customizeHiveParser(d *Dialect) {
 	P.PROPERTY_PARSERS["USING"] = noKwargsE(hiveParseUsingProperty)
 
 	P.ALTER_PARSERS["CHANGE"] = func(p *Parser) any { return anyExpr(hiveParseAlterTableChange(p)) }
+	P.ALTER_PARSERS["REPLACE"] = func(p *Parser) any { return anyExpr(hiveParseAlterTableReplaceColumns(p)) }
 
 	P.h.parseTypes = hiveParseTypes
 	P.h.parsePartitionAndOrder = hiveParsePartitionAndOrder
 	P.h.parseParameter = hiveParseParameter
 	P.h.toPropEq = hiveToPropEq
+	// Strip trailing fractional zeros and normalize zero when inferring BD literal types, and
+	// widen negative scales to a zero scale.
+	P.h.buildCast = hiveBuildCast(true, false)
 }
 
-// hiveParseTransform mirrors HiveParser._parse_transform.
+// hiveBuildCast returns the cast builder for a dialect whose BD-suffixed literals (1.5BD) are
+// DECIMALs of the literal's own precision and scale: a literal like 1.50BD becomes
+// CAST('1.50' AS DECIMAL(3, 2)), cast from text so the value is not rounded through DOUBLE.
+// normalize strips trailing fractional zeros (DECIMAL(2, 1)) and gives zero DECIMAL(1, 0);
+// allowNegativeScale keeps the negative scale of an exponent literal (1E3BD as
+// DECIMAL(1, -3), cast from the number) instead of widening the precision to a zero scale.
+func hiveBuildCast(normalize, allowNegativeScale bool) func(p *Parser, strict bool, kv ...any) *Expr {
+	return func(p *Parser, strict bool, kv ...any) *Expr {
+		if upperText(p.prev) != "BD" {
+			return p.baseBuildCast(strict, kv...)
+		}
+
+		thisIndex := -1
+		for i := 0; i+1 < len(kv); i += 2 {
+			if kv[i] == "this" {
+				thisIndex = i + 1
+			}
+		}
+		if thisIndex < 0 {
+			return p.baseBuildCast(strict, kv...)
+		}
+		this, _ := kv[thisIndex].(*Expr)
+
+		digits, exponent, ok := hiveDecimalTuple(this.Name())
+		if !ok {
+			p.raiseError("Invalid decimal literal "+this.Name(), nil)
+			return p.baseBuildCast(strict, kv...)
+		}
+		precision, scale := len(digits), -exponent
+
+		if normalize {
+			if strings.Trim(digits, "0") == "" {
+				precision, scale = 1, 0
+			} else {
+				for scale > 0 && digits[precision-1] == '0' {
+					precision--
+					scale--
+				}
+			}
+		}
+
+		if scale < 0 && !allowNegativeScale {
+			precision -= scale
+			scale = 0
+		}
+
+		// Unsuffixed exponent literals can be DOUBLE, so cast from text to avoid rounding.
+		if scale >= 0 {
+			this = LiteralString(this.Name())
+		}
+		to := New(KDataType, "this", DT_DECIMAL, "expressions", []*Expr{
+			New(KDataTypeParam, "this", LiteralInt(max(precision, scale))),
+			New(KDataTypeParam, "this", LiteralInt(scale)),
+		})
+
+		out := make([]any, 0, len(kv)+2)
+		for i := 0; i+1 < len(kv); i += 2 {
+			if kv[i] != "this" && kv[i] != "to" {
+				out = append(out, kv[i], kv[i+1])
+			}
+		}
+		out = append(out, "this", this, "to", to)
+		return p.baseBuildCast(strict, out...)
+	}
+}
+
+// hiveDecimalTuple splits a decimal number such as 12.30 or 1.5E-3 into its coefficient digits,
+// without leading zeros (zero keeps a single digit), and its exponent: 12.30 is ("1230", -2).
+// ok is false when s is not a decimal number.
+func hiveDecimalTuple(s string) (digits string, exponent int, ok bool) {
+	mantissa, exp, hasExp := strings.Cut(strings.ToUpper(s), "E")
+	if hasExp {
+		e, err := strconv.Atoi(exp)
+		if err != nil {
+			return "", 0, false
+		}
+		exponent = e
+	}
+	intPart, fracPart, _ := strings.Cut(mantissa, ".")
+	if intPart+fracPart == "" {
+		return "", 0, false
+	}
+	for _, r := range intPart + fracPart {
+		if r < '0' || r > '9' {
+			return "", 0, false
+		}
+	}
+	digits = strings.TrimLeft(intPart+fracPart, "0")
+	if digits == "" {
+		digits = "0"
+	}
+	return digits, exponent - len(fracPart), true
+}
+
+// hiveParseTransform returns nil, backing up one token, when no parenthesis follows TRANSFORM.
 func hiveParseTransform(p *Parser) *Expr {
 	if !p.matchNoAdvance(TK_L_PAREN) {
 		p.retreat(p.index - 1)
@@ -203,11 +293,9 @@ func hiveParseTransform(p *Parser) *Expr {
 	))
 }
 
-// hiveParseTypes mirrors HiveParser._parse_types.
-//
-// Spark (and most likely Hive) treats casts to CHAR(length) and VARCHAR(length) as casts to
-// STRING in all contexts except for schema definitions, so we drop the length to transpile
-// correctly (see the Python docstring).
+// hiveParseTypes turns CHAR(n) and VARCHAR(n) outside a schema into TEXT without a length:
+// Spark (and most likely Hive) treats such casts as casts to STRING in all contexts except
+// schema definitions.
 func hiveParseTypes(p *Parser, checkFunc bool, schema bool, allowIdentifiers bool, withCollation bool) *Expr {
 	this := p.baseParseTypes(checkFunc, schema, allowIdentifiers, withCollation)
 
@@ -226,7 +314,6 @@ func hiveParseTypes(p *Parser, checkFunc bool, schema bool, allowIdentifiers boo
 	return this
 }
 
-// hiveParseAlterTableChange mirrors HiveParser._parse_alter_table_change.
 func hiveParseAlterTableChange(p *Parser) *Expr {
 	p.match(TK_COLUMN)
 	this := p.parseField(true, nil, false)
@@ -238,7 +325,7 @@ func hiveParseAlterTableChange(p *Parser) *Expr {
 	columnNew := p.parseField(true, nil, false)
 	dtype := p.parseTypes(false, true, true, false)
 
-	// self._match(TokenType.COMMENT) and self._parse_string() -> False when unmatched
+	// false (not nil) when COMMENT is absent.
 	var comment any = false
 	if p.match(TK_COMMENT) {
 		comment = p.parseString()
@@ -251,7 +338,6 @@ func hiveParseAlterTableChange(p *Parser) *Expr {
 	return p.expression(New(KAlterColumn, "this", this, "rename_to", columnNew, "dtype", dtype, "comment", comment))
 }
 
-// hiveParseUsingProperty mirrors HiveParser._parse_using_property.
 func hiveParseUsingProperty(p *Parser) *Expr {
 	if p.matchTexts("JAR", "FILE", "ARCHIVE") {
 		kind := upperText(p.prev)
@@ -261,24 +347,40 @@ func hiveParseUsingProperty(p *Parser) *Expr {
 	return p.parsePropertyAssignment(KFileFormatProperty)
 }
 
-// hiveParsePartitionAndOrder mirrors HiveParser._parse_partition_and_order.
 func hiveParsePartitionAndOrder(p *Parser) ([]*Expr, *Expr) {
-	partition := []*Expr{}
-	if p.matchAny(TK_PARTITION_BY, TK_DISTRIBUTE_BY) {
+	var partition []*Expr
+	if p.match(TK_DISTRIBUTE_BY) {
 		partition = p.parseCSV(p.parseAssignment, TK_COMMA)
+	} else {
+		partition = p.parsePartitionBy()
 	}
 	order := p.parseOrder(nil, p.match(TK_SORT_BY))
 	return partition, order
 }
 
-// hiveParseParameter mirrors HiveParser._parse_parameter.
+// hiveParseAlterTableReplaceColumns returns nil, so the statement falls back to a command, when
+// there are no columns or a definition does not parse.
+func hiveParseAlterTableReplaceColumns(p *Parser) *Expr {
+	if !p.matchTextSeq("COLUMNS") {
+		return nil
+	}
+
+	expressions := tryParse(p, func() []*Expr {
+		return p.parseWrappedCSV(p.parseFieldDef, TK_COMMA, true)
+	}, false, func(l []*Expr) bool { return len(l) == 0 })
+	if len(expressions) == 0 {
+		return nil
+	}
+	return p.expression(New(KReplaceColumns, "expressions", expressions))
+}
+
 func hiveParseParameter(p *Parser) *Expr {
 	p.match(TK_L_BRACE)
 	this := p.parseIdentifier()
 	if this == nil {
 		this = p.parsePrimaryOrVar()
 	}
-	// self._match(TokenType.COLON) and (...) -> False when unmatched
+	// false (not nil) when COLON is absent.
 	var expression any = false
 	if p.match(TK_COLON) {
 		e := p.parseIdentifier()
@@ -291,7 +393,6 @@ func hiveParseParameter(p *Parser) *Expr {
 	return p.expression(New(KParameter, "this", this, "expression", expression))
 }
 
-// hiveToPropEq mirrors HiveParser._to_prop_eq.
 func hiveToPropEq(p *Parser, expression *Expr, index int) *Expr {
 	if expression.IsStar() {
 		return expression

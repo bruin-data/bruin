@@ -2,15 +2,9 @@ package sqlengine
 
 import "fmt"
 
-// Port of sqlglot.parser.Parser (chunk A, part 1): commands, COMMENT, TTL, blocks, statements,
-// DROP, CREATE, sequence properties and triggers (parser.py L1430, L2211-L2793).
-
-// _parse_partitioned_by_bucket_or_truncate (parser.py L1430).
 func (p *Parser) parsePartitionedByBucketOrTruncate() *Expr {
 	if !p.matchNoAdvance(TK_L_PAREN) {
-		// Partitioning by bucket or truncate follows the syntax:
-		// PARTITION BY (BUCKET(..) | TRUNCATE(..))
-		// If we don't have parenthesis after each keyword, we should instead parse this as an identifier
+		// Without a parenthesis, BUCKET / TRUNCATE is an identifier, not a partition transform.
 		p.retreat(p.index - 1)
 		return nil
 	}
@@ -34,7 +28,6 @@ func (p *Parser) parsePartitionedByBucketOrTruncate() *Expr {
 	return p.expression(New(klass, "this", this, "expression", expression))
 }
 
-// _parse_command (parser.py L2211).
 func (p *Parser) parseCommand() *Expr {
 	p.warnUnsupported()
 	comments := p.prevComments
@@ -42,7 +35,6 @@ func (p *Parser) parseCommand() *Expr {
 	return p.expressionC(New(KCommand, "this", this, "expression", p.parseString()), comments)
 }
 
-// _parse_comment (parser.py L2219).
 func (p *Parser) parseComment(allowExists bool) *Expr {
 	start := p.prev
 	exists := false
@@ -84,13 +76,12 @@ func (p *Parser) parseComment(allowExists bool) *Expr {
 	))
 }
 
-// _parse_to_table (parser.py L2251).
 func (p *Parser) parseToTable() *Expr {
 	table := p.parseTableParts(true, false, false, false)
 	return p.expression(New(KToTableProperty, "this", table))
 }
 
-// _parse_ttl (parser.py L2258)
+// parseTtl parses a ClickHouse TTL clause.
 // https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#mergetree-table-ttl
 func (p *Parser) parseTtl() *Expr {
 	parseTtlAction := func() *Expr {
@@ -130,12 +121,10 @@ func (p *Parser) parseTtl() *Expr {
 	))
 }
 
-// _parse_condition (parser.py L2293).
 func (p *Parser) parseCondition() *Expr {
 	return p.parseWrapped(p.parseExpression, true)
 }
 
-// _parse_block (parser.py L2296).
 func (p *Parser) parseBlock() *Expr {
 	return p.expression(New(
 		KBlock,
@@ -143,12 +132,10 @@ func (p *Parser) parseBlock() *Expr {
 	))
 }
 
-// _parse_whileblock (parser.py L2305).
 func (p *Parser) parseWhileblock() *Expr {
 	return p.expression(New(KWhileBlock, "this", p.parseCondition(), "body", p.parseBlock()))
 }
 
-// _parse_statement (parser.py L2310).
 func (p *Parser) parseStatement() *Expr {
 	p.enter()
 	defer p.leave()
@@ -172,6 +159,10 @@ func (p *Parser) parseStatement() *Expr {
 		return p.parseWhileblock()
 	}
 
+	if p.isTableQuery() {
+		return p.parseSelect(false, false, true, true, true, nil)
+	}
+
 	expression := p.parseExpression()
 	if expression != nil {
 		expression = p.parseSetOperations(expression)
@@ -186,34 +177,60 @@ func (p *Parser) parseStatement() *Expr {
 	return p.parseQueryModifiers(expression)
 }
 
-// _parse_drop (parser.py L2334).
-func (p *Parser) parseDrop(exists bool) *Expr {
+// parseDrop takes a non-empty kind as the already-known kind of the dropped object, which then
+// follows DROP directly.
+func (p *Parser) parseDrop(exists bool, kind string) *Expr {
 	start := p.prev
-	temporary := p.match(TK_TEMPORARY)
-	materialized := p.matchTextSeq("MATERIALIZED")
-	iceberg := p.matchTextSeq("ICEBERG")
-
-	kind := ""
-	if p.matchSet(p.s.CREATABLES) {
-		kind = upperText(p.prev)
+	temporary, materialized, iceberg := false, false, false
+	if kind == "" {
+		temporary = p.match(TK_TEMPORARY)
+		materialized = p.matchTextSeq("MATERIALIZED")
+		iceberg = p.matchTextSeq("ICEBERG")
+		if p.matchSet(p.s.CREATABLES) {
+			kind = upperText(p.prev)
+		}
 	}
-	if kind == "" || (iceberg && kind != "" && kind != "TABLE") {
+	if kind == "" || (iceberg && kind != "TABLE") {
 		return p.parseAsCommand(start)
 	}
 
-	concurrently := p.matchTextSeq("CONCURRENTLY")
+	// CONCURRENTLY is only a modifier when an index name follows it
+	concurrently := kind == "INDEX" && p.s.ID_VAR_TOKENS.Has(p.next.Type) && p.matchTextSeq("CONCURRENTLY")
 	ifExists := exists || p.parseExists(false)
 
 	var this *Expr
 	if kind == "COLUMN" {
-		this = p.parseColumn()
+		// A dropped column named after a keyword, like `any` or `charset`, is only a name
+		var name *Expr
+		if _, ok := p.s.NO_PAREN_FUNCTION_PARSERS[upperText(p.curr)]; !ok {
+			name = p.parseColumn()
+		}
+		if name == nil {
+			name = p.parseIdVar(true, nil)
+		}
+		if name.IsA(KIdentifier) {
+			name = p.expression(New(KColumn, "this", name))
+		}
+		this = name
 	} else {
 		this = p.parseTableParts(true, kind == "SCHEMA", false, false)
 	}
 
+	// DROP TABLE and DROP VIEW take a list: the first name is this, the rest are tables. Other
+	// kinds stop at the comma, which separates ALTER actions such as DROP COLUMN a, DROP COLUMN b.
+	var tables any
+	if (kind == "TABLE" || kind == "VIEW") && p.match(TK_COMMA) {
+		tables = p.parseCSV(func() *Expr { return p.parseTableParts(true, false, false, false) }, TK_COMMA)
+	}
+
 	var cluster *Expr
 	if p.match(TK_ON) {
-		cluster = p.parseOnProperty()
+		if kind == "INDEX" || kind == "TRIGGER" {
+			// DROP INDEX i ON [db.]t, DROP TRIGGER t ON [db.]t
+			cluster = p.expression(New(KOnProperty, "this", p.parseTableParts(false, false, false, false)))
+		} else {
+			cluster = p.parseOnProperty()
+		}
 	}
 
 	var expressions any
@@ -231,15 +248,17 @@ func (p *Parser) parseDrop(exists bool) *Expr {
 		mappedKind = kind
 	}
 
-	// Keyword arguments are evaluated in order in Python; keep the matching order.
+	// Match CONSTRAINTS, PURGE, SYNC and FORCE in this order, before building the node.
 	constraints := p.matchTextSeq("CONSTRAINTS")
 	purge := p.matchTextSeq("PURGE")
 	sync := p.matchTextSeq("SYNC")
+	force := p.matchTextSeq("FORCE")
 
 	return p.expression(New(
 		KDrop,
 		"exists", ifExists,
 		"this", this,
+		"tables", tables,
 		"expressions", expressions,
 		"kind", mappedKind,
 		"temporary", temporary,
@@ -252,17 +271,19 @@ func (p *Parser) parseDrop(exists bool) *Expr {
 		"concurrently", concurrently,
 		"sync", sync,
 		"iceberg", iceberg,
+		"force", force,
 	))
 }
 
-// _parse_exists (parser.py L2380).
 func (p *Parser) parseExists(not bool) bool {
-	return p.matchTextSeq("IF") && (!not || p.match(TK_NOT)) && p.match(TK_EXISTS)
+	if not {
+		return p.matchTextSeq("IF", "NOT", "EXISTS")
+	}
+	return p.matchTextSeq("IF", "EXISTS")
 }
 
-// _parse_create (parser.py L2387).
 func (p *Parser) baseParseCreate() *Expr {
-	// Note: this can't be None because we've matched a statement parser
+	// Note: this can't be nil because we've matched a statement parser
 	start := p.prev
 
 	replace := start.Type == TK_REPLACE || p.matchPair(TK_OR, TK_REPLACE) || p.matchPair(TK_OR, TK_ALTER)
@@ -288,7 +309,7 @@ func (p *Parser) baseParseCreate() *Expr {
 	}
 
 	if createToken == nil {
-		// exp.Properties.Location.POST_CREATE
+		// Properties at Loc_POST_CREATE
 		properties = p.parseProperties(false)
 		if p.matchSet(p.s.CREATABLES) {
 			createToken = p.prev
@@ -301,7 +322,8 @@ func (p *Parser) baseParseCreate() *Expr {
 
 	createTokenType := createToken.Type
 
-	concurrently := p.matchTextSeq("CONCURRENTLY")
+	// CONCURRENTLY only modifies CREATE INDEX; elsewhere it can be a name (CREATE TABLE concurrently)
+	concurrently := createTokenType == TK_INDEX && p.matchTextSeq("CONCURRENTLY")
 	exists := p.parseExists(true)
 	var this *Expr
 	var expression *Expr
@@ -312,8 +334,8 @@ func (p *Parser) baseParseCreate() *Expr {
 
 	extendProps := func(tempProps *Expr) {
 		if properties != nil && tempProps != nil {
-			// properties.expressions.extend(...) mutates the list in place (no parent bookkeeping);
-			// `.expressions` returns a fresh list when the arg is empty, so extending it is a no-op then.
+			// Append to the existing list without parent bookkeeping; when properties has no
+			// expressions yet, nothing is added.
 			if existing := properties.Expressions(); len(existing) > 0 {
 				properties.SetArgRaw("expressions", append(existing, tempProps.Expressions()...))
 			}
@@ -325,7 +347,7 @@ func (p *Parser) baseParseCreate() *Expr {
 	if createTokenType == TK_FUNCTION || createTokenType == TK_PROCEDURE {
 		this = p.parseUserDefinedFunction(createTokenType)
 
-		// exp.Properties.Location.POST_SCHEMA ("schema" here is the UDF's type signature)
+		// Properties at Loc_POST_SCHEMA ("schema" here is the UDF's type signature)
 		extendProps(p.parseProperties(false))
 
 		if p.match(TK_ALIAS) {
@@ -365,7 +387,7 @@ func (p *Parser) baseParseCreate() *Expr {
 
 				if p.matchNoAdvance(TK_STRING) {
 					// Takes care of BigQuery's JavaScript UDF definitions that end in an OPTIONS property
-					// # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_function_statement
+					// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_function_statement
 					expression = p.parseString()
 					extendProps(p.parseProperties(false))
 				} else if createTokenType == TK_FUNCTION {
@@ -429,7 +451,7 @@ func (p *Parser) baseParseCreate() *Expr {
 		deferrable, initially := p.parseTriggerDeferrable()
 		referencing := p.parseTriggerReferencing()
 		forEach := p.parseTriggerForEach()
-		// self._match_text_seq("WHEN") and self._parse_wrapped(...) -> False when unmatched
+		// false (not nil) when WHEN is absent
 		var when any = false
 		if p.matchTextSeq("WHEN") {
 			when = p.parseWrapped(p.parseDisjunction, true)
@@ -481,18 +503,18 @@ func (p *Parser) baseParseCreate() *Expr {
 	} else if p.s.DB_CREATABLES.Has(createTokenType) {
 		tableParts := p.parseTableParts(true, createTokenType == TK_SCHEMA, false, false)
 
-		// exp.Properties.Location.POST_NAME
+		// Properties at Loc_POST_NAME
 		p.match(TK_COMMA)
 		extendProps(p.parseProperties(true))
 
 		this = p.parseSchema(tableParts)
 
-		// exp.Properties.Location.POST_SCHEMA and POST_WITH
+		// Properties at Loc_POST_SCHEMA and Loc_POST_WITH
 		extendProps(p.parseProperties(false))
 
 		hasAlias := p.match(TK_ALIAS)
 		if !p.matchSetNoAdvance(p.s.DDL_SELECT_TOKENS) {
-			// exp.Properties.Location.POST_ALIAS
+			// Properties at Loc_POST_ALIAS
 			extendProps(p.parseProperties(false))
 		}
 
@@ -502,9 +524,9 @@ func (p *Parser) baseParseCreate() *Expr {
 			if props != nil {
 				sequenceProps := New(KSequenceProperties)
 				var options []*Expr
-				// `for prop in props` iterates the live expressions list while prop.pop() removes
-				// items from it, so re-read the list on every step (like Python's list iterator).
-				for i := 0; i < len(props.Expressions()); i++ { //nolint:intrange // the list shrinks while iterating, like the Python loop
+				// Iterate the live expressions list, re-reading it on every step while prop.Pop()
+				// removes items from it: the item right after a popped one is skipped.
+				for i := 0; i < len(props.Expressions()); i++ { //nolint:intrange // the list shrinks while iterating
 					prop := props.Expressions()[i]
 					if prop.IsA(KSequenceProperties) {
 						for _, arg := range prop.ArgKeys() {
@@ -537,14 +559,14 @@ func (p *Parser) baseParseCreate() *Expr {
 		}
 
 		if createTokenType == TK_TABLE {
-			// exp.Properties.Location.POST_EXPRESSION
+			// Properties at Loc_POST_EXPRESSION
 			extendProps(p.parseProperties(false))
 
 			indexList := []*Expr{}
 			for {
 				index := p.parseIndex(nil, false)
 
-				// exp.Properties.Location.POST_INDEX
+				// Properties at Loc_POST_INDEX
 				extendProps(p.parseProperties(false))
 				if index == nil {
 					break
@@ -602,9 +624,8 @@ func (p *Parser) baseParseCreate() *Expr {
 	))
 }
 
-// _parse_sequence_properties (parser.py L2673).
 func (p *Parser) parseSequenceProperties() *Expr {
-	// The node is created on first use: most calls match nothing and return None.
+	// The node is created on first use: most calls match nothing and return nil.
 	var seq *Expr
 
 	options := []*Expr{}
@@ -620,7 +641,8 @@ func (p *Parser) parseSequenceProperties() *Expr {
 			lazySet(&seq, KSequenceProperties, "minvalue", p.parseTerm())
 		} else if p.matchTextSeq("MAXVALUE") {
 			lazySet(&seq, KSequenceProperties, "maxvalue", p.parseTerm())
-		} else if p.match(TK_START_WITH) || p.matchTextSeq("START") {
+		} else if p.matchTextSeq("START") {
+			p.matchTextSeq("WITH")
 			p.matchTextSeq("=")
 			lazySet(&seq, KSequenceProperties, "start", p.parseTerm())
 		} else if p.matchTextSeq("CACHE") {
@@ -658,7 +680,6 @@ func (p *Parser) parseSequenceProperties() *Expr {
 	return seq
 }
 
-// lazySet sets key on *e, creating the node first if needed.
 func lazySet(e **Expr, kind Kind, key string, v any) {
 	if *e == nil {
 		*e = New(kind)
@@ -666,12 +687,11 @@ func lazySet(e **Expr, kind Kind, key string, v any) {
 	(*e).Set(key, v)
 }
 
-// _parse_trigger_events (parser.py L2708).
 func (p *Parser) parseTriggerEvents() []*Expr {
 	events := []*Expr{}
 
 	for {
-		// self._match_set(self.TRIGGER_EVENTS) and self._prev.text.upper() -> False when unmatched
+		// false (not a string) when no trigger event matches
 		var eventType any = false
 		if p.matchSet(p.s.TRIGGER_EVENTS) {
 			eventType = upperText(p.prev)
@@ -696,7 +716,6 @@ func (p *Parser) parseTriggerEvents() []*Expr {
 	return events
 }
 
-// _parse_trigger_deferrable (parser.py L2730).
 func (p *Parser) parseTriggerDeferrable() (string, string) {
 	deferrableVar := p.parseVarFromOptions(p.s.TRIGGER_DEFERRABLE, false)
 	deferrable := ""
@@ -714,7 +733,6 @@ func (p *Parser) parseTriggerDeferrable() (string, string) {
 	return deferrable, initially
 }
 
-// _parse_trigger_referencing_clause (parser.py L2746).
 func (p *Parser) parseTriggerReferencingClause(keyword string) *Expr {
 	if !p.matchTextSeq(keyword) {
 		return nil
@@ -726,7 +744,6 @@ func (p *Parser) parseTriggerReferencingClause(keyword string) *Expr {
 	return p.parseIdVar(true, nil)
 }
 
-// _parse_trigger_referencing (parser.py L2754).
 func (p *Parser) parseTriggerReferencing() *Expr {
 	if !p.matchTextSeq("REFERENCING") {
 		return nil
@@ -757,7 +774,6 @@ func (p *Parser) parseTriggerReferencing() *Expr {
 	return p.expression(New(KTriggerReferencing, "old", oldAlias, "new", newAlias))
 }
 
-// _parse_trigger_for_each (parser.py L2778).
 func (p *Parser) parseTriggerForEach() string {
 	if !p.matchTextSeq("FOR", "EACH") {
 		return ""
@@ -769,7 +785,6 @@ func (p *Parser) parseTriggerForEach() string {
 	return ""
 }
 
-// _parse_trigger_execute (parser.py L2784).
 func (p *Parser) parseTriggerExecute() *Expr {
 	if !p.match(TK_EXECUTE) {
 		return nil
@@ -783,7 +798,6 @@ func (p *Parser) parseTriggerExecute() *Expr {
 	return p.expression(New(KTriggerExecute, "this", funcCall))
 }
 
-// chunkAStrOrNil maps an optional string (Python `str | None`, "" meaning None) to an arg value.
 func chunkAStrOrNil(s string) any {
 	if s == "" {
 		return nil

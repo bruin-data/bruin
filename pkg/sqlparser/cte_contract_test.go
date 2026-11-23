@@ -114,7 +114,7 @@ func TestPrependCTEsContract(t *testing.T) {
 		{"malformed outer", "SELECT * FROM", "duckdb", []CTE{{"a", "SELECT 1"}}, contractSelectStarFromError},
 		{"malformed cte without existing with", "SELECT 1", "duckdb", []CTE{{"a", "SELECT * FROM"}}, contractSelectStarFromError},
 		{"malformed cte with existing with", "WITH x AS (SELECT 1) SELECT * FROM x", "duckdb", []CTE{{"a", "SELECT * FROM"}}, contractSelectStarFromError},
-		{"space in name without existing with", "SELECT 1", "duckdb", []CTE{{"Odd Name", "SELECT 1"}}, "Failed to parse 'Odd Name' into <class 'sqlglot.expressions.query.TableAlias'>"},
+		{"space in name without existing with", "SELECT 1", "duckdb", []CTE{{"Odd Name", "SELECT 1"}}, "Failed to parse 'Odd Name' into TableAlias"},
 		{"delete returning outer without existing with", "DELETE FROM t RETURNING id", "postgres", []CTE{{"seed", "SELECT 1"}}, "'Delete' object has no attribute 'with_'"},
 		{"multiple statements", "SELECT 1; SELECT 2", "duckdb", []CTE{{"a", "SELECT 3"}}, "'Block' object has no attribute 'with_'"},
 		{"invalid dialect", "SELECT 1", "not-a-dialect", nil, "Unknown dialect 'not-a-dialect'."},

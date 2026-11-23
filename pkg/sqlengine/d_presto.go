@@ -2,10 +2,6 @@ package sqlengine
 
 import "sync"
 
-// Port of sqlglot/dialects/presto.py and sqlglot/parsers/presto.py (sqlglot v30.13.0).
-// The generator (sqlglot/generators/presto.py) lives in d_presto_generator.go.
-// Data-only class attributes live in the generated zz_*_settings.go files.
-
 func init() { registerCustomizer("presto", customizePresto) }
 
 func customizePresto(d *Dialect) {
@@ -13,11 +9,8 @@ func customizePresto(d *Dialect) {
 	customizePrestoGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level builders of sqlglot/parsers/presto.py
-// ---------------------------------------------------------------------------------------------
-
-// prestoBuildApproxPercentile mirrors parsers.presto._build_approx_percentile.
+// prestoBuildApproxPercentile builds APPROX_PERCENTILE(x[, weight], quantile[, accuracy]) as an
+// ApproxQuantile node.
 func prestoBuildApproxPercentile(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 4 {
 		return New(
@@ -37,7 +30,8 @@ func prestoBuildApproxPercentile(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(KApproxQuantile, args)
 }
 
-// prestoBuildFromUnixtime mirrors parsers.presto._build_from_unixtime.
+// prestoBuildFromUnixtime builds FROM_UNIXTIME(x[, zone]) or FROM_UNIXTIME(x, hours, minutes) as a
+// UnixToTime node.
 func prestoBuildFromUnixtime(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 3 {
 		return New(
@@ -54,8 +48,8 @@ func prestoBuildFromUnixtime(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(KUnixToTime, args)
 }
 
-// prestoTeradataTimeMapping mirrors Teradata.TIME_MAPPING (the Teradata dialect is not ported;
-// _build_to_char formats with it on purpose).
+// prestoTeradataTimeMapping is the Teradata time format mapping. There is no Teradata dialect
+// here; prestoBuildToChar formats with this mapping on purpose.
 var prestoTeradataTimeMapping = map[string]string{
 	"YY": "%y", "Y4": "%Y", "YYYY": "%Y", "M4": "%B", "M3": "%b", "M": "%-M", "MI": "%M", "MM": "%m",
 	"MMM": "%b", "MMMM": "%B", "D": "%-d", "DD": "%d", "D3": "%j", "DDD": "%j", "H": "%-H", "HH": "%H",
@@ -68,7 +62,6 @@ var (
 	prestoTeradataTimeTrie     *trie
 )
 
-// prestoBuildToChar mirrors parsers.presto._build_to_char.
 func prestoBuildToChar(args []*Expr, _ *Dialect) *Expr {
 	fmt := seqGet(args, 1)
 	if fmt.IsA(KLiteral) {
@@ -78,7 +71,6 @@ func prestoBuildToChar(args []*Expr, _ *Dialect) *Expr {
 
 	// We use "teradata" on purpose here, because the time formats are different in Presto.
 	// See https://prestodb.io/docs/current/functions/teradata.html?highlight=to_char#to_char
-	// (build_formatted_time(exp.TimeToStr, "teradata") -> Teradata.format_time(fmt))
 	prestoTeradataTimeTrieOnce.Do(func() {
 		prestoTeradataTimeTrie = newTrieFromStrings(mapKeys(prestoTeradataTimeMapping)...)
 	})
@@ -90,10 +82,6 @@ func prestoBuildToChar(args []*Expr, _ *Dialect) *Expr {
 	}
 	return New(KTimeToStr, "this", seqGet(args, 0), "format", format)
 }
-
-// ---------------------------------------------------------------------------------------------
-// PrestoParser
-// ---------------------------------------------------------------------------------------------
 
 func customizePrestoParser(d *Dialect) {
 	P := d.P
@@ -181,6 +169,5 @@ func customizePrestoParser(d *Dialect) {
 	}
 	F["WEEK"] = fromArgList(KWeekOfYear)
 
-	// FUNCTION_PARSERS = {k: v for k, v in parser.Parser.FUNCTION_PARSERS.items() if k != "TRIM"}
 	delete(P.FUNCTION_PARSERS, "TRIM")
 }

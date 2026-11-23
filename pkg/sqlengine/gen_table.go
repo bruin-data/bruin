@@ -5,9 +5,6 @@ import (
 	"unicode/utf8"
 )
 
-// Generator chunk B (part 1): sqlglot/generator.py L2254-2715 (insert_sql .. values_sql).
-
-// insert_sql (generator.py L2254).
 func (g *Generator) insertSQL(expression *Expr) string {
 	hint := g.sqlKey(expression, "hint")
 	overwrite := expression.ArgB("overwrite")
@@ -52,6 +49,10 @@ func (g *Generator) insertSQL(expression *Expr) string {
 	if where != "" {
 		where = g.sep1() + "REPLACE WHERE " + where
 	}
+	using := g.expressions(expression, exprsOpts{key: "using", flat: true})
+	if using != "" {
+		using = g.sep1() + "REPLACE USING (" + using + ")"
+	}
 	expressionSQL := g.sep1() + g.sqlKey(expression, "expression")
 	onConflict := g.sqlKey(expression, "conflict")
 	if onConflict != "" {
@@ -87,16 +88,15 @@ func (g *Generator) insertSQL(expression *Expr) string {
 		source = "TABLE " + source
 	}
 
-	sql := "INSERT" + hint + alternative + ignore + this + stored + byName + exists + partitionBy + settings + where + expressionSQL + source
+	sql := "INSERT" + hint + alternative + ignore + this + stored + byName + exists + partitionBy + settings + where + using + expressionSQL + source
 	return g.prependCtes(expression, sql)
 }
 
-// introducer_sql (generator.py L2299).
+// introducerSQL renders a charset introducer followed by its value, e.g. _utf8 'abc'.
 func (g *Generator) introducerSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " " + g.sqlKey(expression, "expression")
 }
 
-// kill_sql (generator.py L2302).
 func (g *Generator) killSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if kind != "" {
@@ -109,17 +109,14 @@ func (g *Generator) killSQL(expression *Expr) string {
 	return "KILL" + kind + this
 }
 
-// pseudotype_sql (generator.py L2309).
 func (g *Generator) pseudotypeSQL(expression *Expr) string {
 	return expression.Name()
 }
 
-// objectidentifier_sql (generator.py L2312).
 func (g *Generator) objectidentifierSQL(expression *Expr) string {
 	return expression.Name()
 }
 
-// onconflict_sql (generator.py L2315).
 func (g *Generator) onconflictSQL(expression *Expr) string {
 	conflict := "ON CONFLICT"
 	if expression.ArgB("duplicate") {
@@ -154,12 +151,10 @@ func (g *Generator) onconflictSQL(expression *Expr) string {
 	return conflict + constraint + conflictKeys + action + expressions + where
 }
 
-// returning_sql (generator.py L2338).
 func (g *Generator) baseReturningSQL(expression *Expr) string {
 	return g.seg("RETURNING") + " " + g.expressions(expression, exprsOpts{flat: true})
 }
 
-// rowformatdelimitedproperty_sql (generator.py L2341).
 func (g *Generator) rowformatdelimitedpropertySQL(expression *Expr) string {
 	fields := g.sqlKey(expression, "fields")
 	if fields != "" {
@@ -188,12 +183,10 @@ func (g *Generator) rowformatdelimitedpropertySQL(expression *Expr) string {
 	return "ROW FORMAT DELIMITED" + fields + escaped + items + keys + lines + null
 }
 
-// withtablehint_sql (generator.py L2356).
 func (g *Generator) withtablehintSQL(expression *Expr) string {
 	return "WITH (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// indextablehint_sql (generator.py L2359).
 func (g *Generator) indextablehintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this") + " INDEX"
 	target := g.sqlKey(expression, "target")
@@ -203,7 +196,6 @@ func (g *Generator) indextablehintSQL(expression *Expr) string {
 	return this + target + " (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// historicaldata_sql (generator.py L2365).
 func (g *Generator) historicaldataSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kind := g.sqlKey(expression, "kind")
@@ -211,7 +203,6 @@ func (g *Generator) historicaldataSQL(expression *Expr) string {
 	return this + " (" + kind + " => " + expr + ")"
 }
 
-// table_parts (generator.py L2371).
 func (g *Generator) baseTableParts(expression *Expr) string {
 	var parts []string
 	for _, k := range []string{"catalog", "db", "this"} {
@@ -222,7 +213,7 @@ func (g *Generator) baseTableParts(expression *Expr) string {
 	return strings.Join(parts, ".")
 }
 
-// table_sql (generator.py L2382).
+// baseTableSQL renders a table reference; sep separates the table from its alias.
 func (g *Generator) baseTableSQL(expression *Expr, sep string) string {
 	table := g.tableParts(expression)
 	only := ""
@@ -318,7 +309,6 @@ func (g *Generator) baseTableSQL(expression *Expr, sep string) string {
 	return only + table + changes + partition + fileFormat + preAlias + alias + indexed + hints + pivots + postAlias + joins + laterals + ordinality
 }
 
-// tablefromrows_sql (generator.py L2449).
 func (g *Generator) baseTablefromrowsSQL(expression *Expr) string {
 	table := g.fn("TABLE", expression.Arg("this"))
 	alias := g.sqlKey(expression, "alias")
@@ -331,7 +321,8 @@ func (g *Generator) baseTablefromrowsSQL(expression *Expr) string {
 	return table + alias + pivots + sample + joins
 }
 
-// tablesample_sql (generator.py L2460).
+// baseTablesampleSQL renders a table sample clause; tablesampleKeyword "" uses the dialect's
+// keyword.
 func (g *Generator) baseTablesampleSQL(expression *Expr, tablesampleKeyword string) string {
 	method := g.sqlKey(expression, "method")
 	if method != "" && g.s.TABLESAMPLE_WITH_METHOD {
@@ -376,10 +367,10 @@ func (g *Generator) baseTablesampleSQL(expression *Expr, tablesampleKeyword stri
 	return " " + keyword + " " + method + expr + seed
 }
 
-// _pivot_in_value_aliases (generator.py L2489).
+// pivotInValueAliases returns PIVOT IN-list values with explicit aliases added where the source
+// dialect named the output columns differently from the target dialect, or nil when nothing
+// changes.
 func (g *Generator) pivotInValueAliases(expression *Expr) []*Expr {
-	// Returns the rewritten field.expressions list with PivotAlias wrappers injected where
-	// the stored column name differs from the target dialect's natural output.
 	columns := expression.ArgL("columns")
 	fields := expression.ArgL("fields")
 	if len(columns) == 0 || len(fields) != 1 {
@@ -392,7 +383,7 @@ func (g *Generator) pivotInValueAliases(expression *Expr) []*Expr {
 	tgtPrefixedPivotColumns := parserCls.PREFIXED_PIVOT_COLUMNS
 	tgtPivotColumnNaming := parserCls.PIVOT_COLUMN_NAMING
 
-	// args.get(key, default)
+	// The arg value when the key is present (even if nil), else def.
 	argGet := func(key string, def any) any {
 		if expression.HasArgKey(key) {
 			return expression.Arg(key)
@@ -454,7 +445,6 @@ func (g *Generator) pivotInValueAliases(expression *Expr) []*Expr {
 		storedFull := columns[i].Name()
 		storedValue := storedFull
 		if suffix != "" {
-			// stored_full[: -len(suffix)]
 			r := []rune(storedFull)
 			n := len(r) - utf8.RuneCountInString(suffix)
 			if n < 0 {
@@ -488,7 +478,8 @@ func (g *Generator) pivotInValueAliases(expression *Expr) []*Expr {
 	return nil
 }
 
-// pivot_sql (generator.py L2564).
+// pivotSQL renders PIVOT or UNPIVOT, both as a table operator and in the simplified
+// statement form (PIVOT table ON ... USING ...).
 func (g *Generator) pivotSQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{flat: true})
 	direction := "PIVOT"
@@ -519,7 +510,6 @@ func (g *Generator) pivotSQL(expression *Expr) string {
 	}
 
 	if !expression.ArgB("unpivot") {
-		// Wrap IN-list values with explicit aliases where the target dialect would differ
 		newFieldExprs := g.pivotInValueAliases(expression)
 		if newFieldExprs != nil {
 			expression.ArgL("fields")[0].Set("expressions", newFieldExprs)
@@ -528,7 +518,11 @@ func (g *Generator) pivotSQL(expression *Expr) string {
 
 	alias := g.sqlKey(expression, "alias")
 	if alias != "" {
-		alias = " AS " + alias
+		if g.s.PIVOT_ALIAS_WITH_AS {
+			alias = " AS " + alias
+		} else {
+			alias = " " + alias
+		}
 	}
 
 	fields := g.expressions(expression, exprsOpts{
@@ -557,7 +551,6 @@ func (g *Generator) pivotSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// version_sql (generator.py L2613).
 func (g *Generator) baseVersionSQL(expression *Expr) string {
 	this := "FOR " + expression.Name()
 	kind := expression.Text("kind")
@@ -565,16 +558,13 @@ func (g *Generator) baseVersionSQL(expression *Expr) string {
 	return this + " " + kind + " " + expr
 }
 
-// tuple_sql (generator.py L2619).
 func (g *Generator) tupleSQL(expression *Expr) string {
 	return "(" + g.expressions(expression, exprsOpts{dynamic: true, newLine: true, skipFirst: true, skipLast: true}) + ")"
 }
 
-// _update_from_joins_sql (generator.py L2622)
-//
-// Returns (join_sql, from_sql) for UPDATE statements.
-// - join_sql: placed after UPDATE table, before SET
-// - from_sql: placed after SET clause (standard position)
+// updateFromJoinsSQL returns (joinSQL, fromSQL) for UPDATE statements.
+// - joinSQL: placed after UPDATE table, before SET
+// - fromSQL: placed after SET clause (standard position)
 // Dialects like MySQL need to convert FROM to JOIN syntax.
 func (g *Generator) updateFromJoinsSQL(expression *Expr) (string, string) {
 	if g.s.UPDATE_STATEMENT_SUPPORTS_FROM || !expression.ArgB("from_") {
@@ -614,7 +604,6 @@ func (g *Generator) updateFromJoinsSQL(expression *Expr) (string, string) {
 	return joinSQL, ""
 }
 
-// update_sql (generator.py L2654).
 func (g *Generator) updateSQL(expression *Expr) string {
 	hint := g.sqlKey(expression, "hint")
 	this := g.sqlKey(expression, "this")
@@ -638,7 +627,8 @@ func (g *Generator) updateSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// values_sql (generator.py L2672).
+// baseValuesSQL renders a VALUES clause; inside FROM or JOIN, when the dialect cannot use VALUES
+// as a table there, it renders a UNION ALL of SELECTs instead.
 func (g *Generator) baseValuesSQL(expression *Expr, valuesAsTable bool) string {
 	valuesAsTable = valuesAsTable && g.s.VALUES_AS_TABLE
 
@@ -651,13 +641,13 @@ func (g *Generator) baseValuesSQL(expression *Expr, valuesAsTable bool) string {
 			values = "(" + values + ")"
 		}
 		values = g.queryModifiers(expression, values)
+		pivots := g.expressions(expression, exprsOpts{key: "pivots", sep: strp2(""), flat: true})
 		if alias != "" {
-			return values + " AS " + alias
+			return values + " AS " + alias + pivots
 		}
-		return values
+		return values + pivots
 	}
 
-	// Converts `VALUES...` expression into a series of select unions.
 	aliasNode := expression.ArgE("alias")
 	var columnNames []*Expr
 	if aliasNode != nil {
@@ -686,18 +676,26 @@ func (g *Generator) baseValuesSQL(expression *Expr, valuesAsTable bool) string {
 
 	if g.pretty {
 		// This may result in poor performance for large-cardinality `VALUES` tables, due to
-		// the deep nesting of the resulting exp.Unions.
+		// the deep nesting of the resulting Unions.
 		query := selects[0]
 		for _, y := range selects[1:] {
-			// exp.union(x, y, distinct=False, copy=False)
 			query = New(KUnion, "this", query, "expression", y, "distinct", false)
 		}
-		// query.subquery(alias_node and alias_node.this, copy=False)
+		for _, key := range []string{"order", "limit", "offset"} {
+			if value := expression.ArgE(key); value != nil {
+				query.Set(key, value.Pop())
+			}
+		}
 		var subAlias *Expr
 		if aliasNode != nil {
 			subAlias = aliasNode.This()
 		}
-		return g.subquerySQL(New(KSubquery, "this", query, "alias", subAlias), " AS ")
+		subquery := New(KSubquery, "this", query, "alias", subAlias)
+		if pivots := expression.Arg("pivots"); pivots != nil {
+			expression.Set("pivots", nil)
+			subquery.Set("pivots", pivots)
+		}
+		return g.subquerySQL(subquery, " AS ")
 	}
 
 	alias := ""
@@ -708,5 +706,6 @@ func (g *Generator) baseValuesSQL(expression *Expr, valuesAsTable bool) string {
 	for _, sel := range selects {
 		unions = append(unions, g.sql(sel))
 	}
-	return "(" + strings.Join(unions, " UNION ALL ") + ")" + alias
+	pivots := g.expressions(expression, exprsOpts{key: "pivots", sep: strp2(""), flat: true})
+	return "(" + g.queryModifiers(expression, strings.Join(unions, " UNION ALL ")) + ")" + alias + pivots
 }

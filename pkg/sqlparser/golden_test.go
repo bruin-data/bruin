@@ -1,23 +1,28 @@
 package sqlparser
 
-// Golden tests: Bruin's parser commands replayed against the responses recorded from the original
-// Python implementation (pythonsrc on sqlglot 30.13.0), see codegen/README.md.
+// Golden tests: Bruin's parser commands replayed against recorded responses. Each record is
+// {"cmd": {"command": ..., "contents": ...}, "want": <response>}; the test sends cmd through
+// dispatch and compares the JSON response.
 //
-//   - commands.json.gz: every statement of the sqlglot conformance corpus (Bruin dialects) through
-//     every command Bruin issues.
-//   - fixtures.json.gz: sqlglot's optimizer fixtures (TPC-H, TPC-DS, ...) through lineage, tables
-//     and rename, with their schemas, for every Bruin dialect.
+//   - commands.json.gz: the statements of the engine's golden corpus
+//     (pkg/sqlengine/testdata/golden/statements.jsonl) in a Bruin dialect, through every command
+//     Bruin issues.
+//   - fixtures.json.gz: optimizer fixtures (TPC-H, TPC-DS and smaller query sets) through
+//     lineage (with and without their schemas), tables and rename, for every Bruin dialect.
 //   - fuzz.json.gz: malformed variants of the corpus (truncated, dropped, duplicated and swapped
-//     tokens). Skipped with -short.
+//     tokens) through 7 commands. Skipped with -short.
 //   - hoist.json.gz: multi-statement scripts and hook lists composed around DECLAREs (procedural
 //     blocks, comments, separators, malformed variants) through hoist-declares and
 //     hoist-declares-list, in every dialect Bruin hoists for.
 //
-// After an intentional behavior change, rewrite them from the Go output with
+// The responses were first recorded from Bruin's former Python implementation and now pin the
+// Go behavior. After an intentional behavior change, rewrite them with
 //
 //	go test ./pkg/sqlparser -run TestGolden -update
 //
-// and review the diff (e.g. by decoding both versions with codegen/golden_diff.py).
+// and review the diff (decode both versions, e.g. `gzip -dc f.json.gz | jq -S .`). The inputs
+// exist only in these records: -update keeps every cmd and rewrites the responses. New cases
+// belong in the *_contract_test.go suites.
 
 import (
 	"bytes"
@@ -28,7 +33,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -61,10 +65,6 @@ func TestGoldenFuzz(t *testing.T) {
 	replayGolden(t, "fuzz")
 }
 
-// pythonTimeout marks commands on which the Python implementation hung (killed after 5 s). The Go
-// port returns an error for them instead (see TRADEOFFS.md); they are not compared.
-var pythonTimeout = map[string]any{"__timeout__": true}
-
 func replayGolden(t *testing.T, name string) {
 	t.Helper()
 	path := filepath.Join("testdata", "golden", name+".json.gz")
@@ -90,10 +90,6 @@ func replayGolden(t *testing.T, name string) {
 				if i >= len(recs) {
 					return
 				}
-				if reflect.DeepEqual(recs[i].Want, pythonTimeout) {
-					got[i] = pythonTimeout
-					continue
-				}
 				var pc parserCommand
 				if err := json.Unmarshal(recs[i].Cmd, &pc); err != nil {
 					got[i] = map[string]any{"__bad_record__": err.Error()}
@@ -117,15 +113,11 @@ func replayGolden(t *testing.T, name string) {
 		return
 	}
 
-	checked, hung, failed := 0, 0, map[string]int{}
+	checked, failed := 0, map[string]int{}
 	var examples []string
 	for i := 0; i < len(recs); i += step {
-		if reflect.DeepEqual(recs[i].Want, pythonTimeout) {
-			hung++
-			continue
-		}
 		checked++
-		if sameResponse(got[i], recs[i].Want) {
+		if reflect.DeepEqual(got[i], recs[i].Want) {
 			continue
 		}
 		var pc parserCommand
@@ -136,7 +128,7 @@ func replayGolden(t *testing.T, name string) {
 		}
 	}
 	if len(failed) == 0 {
-		t.Logf("%s: %d commands match (%d not compared: Python hung)", name, checked, hung)
+		t.Logf("%s: %d commands match", name, checked)
 		return
 	}
 	keys := make([]string, 0, len(failed))
@@ -151,19 +143,6 @@ func replayGolden(t *testing.T, name string) {
 		name, total, checked, path, strings.Join(keys, ", "), strings.Join(examples, "\n"))
 }
 
-// requiredKeywordRE matches the message naming one of several missing required arguments. Python
-// picks the keyword from a set, so which one it named depends on PYTHONHASHSEED.
-var requiredKeywordRE = regexp.MustCompile(`Required keyword: '[^']*' missing for`)
-
-func sameResponse(got, want any) bool {
-	if reflect.DeepEqual(got, want) {
-		return true
-	}
-	const anyKeyword = "Required keyword: '*' missing for"
-	return requiredKeywordRE.ReplaceAllString(string(mustJSON(got)), anyKeyword) ==
-		requiredKeywordRE.ReplaceAllString(string(mustJSON(want)), anyKeyword)
-}
-
 // mustJSON encodes a decoded JSON value, which always encodes.
 func mustJSON(v any) []byte {
 	b, err := json.Marshal(v)
@@ -173,22 +152,70 @@ func mustJSON(v any) []byte {
 	return b
 }
 
-func readGolden(t *testing.T, path string) []goldenRecord {
-	t.Helper()
+func readGolden(tb testing.TB, path string) []goldenRecord {
+	tb.Helper()
+	recs, err := loadGolden(path)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return recs
+}
+
+func loadGolden(path string) ([]goldenRecord, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	defer f.Close()
 	zr, err := gzip.NewReader(f)
 	if err != nil {
-		t.Fatal(err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	var recs []goldenRecord
 	if err := json.NewDecoder(zr).Decode(&recs); err != nil {
-		t.Fatalf("%s: %v", path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	return recs
+	return recs, nil
+}
+
+// corpusQuery is one statement of the golden corpus in a Bruin dialect.
+type corpusQuery struct {
+	dialect, sql string
+	// parses reports whether get-tables succeeded on it.
+	parses bool
+}
+
+// goldenCorpus lists the statements of commands.json.gz, taken from its get-tables commands.
+var goldenCorpus = sync.OnceValues(func() ([]corpusQuery, error) {
+	recs, err := loadGolden(filepath.Join("testdata", "golden", "commands.json.gz"))
+	if err != nil {
+		return nil, err
+	}
+	var out []corpusQuery
+	for _, r := range recs {
+		var pc parserCommand
+		if err := json.Unmarshal(r.Cmd, &pc); err != nil {
+			return nil, err
+		}
+		if pc.Command != "get-tables" {
+			continue
+		}
+		d, _ := pc.Contents["dialect"].(string)
+		q, _ := pc.Contents["query"].(string)
+		want, _ := r.Want.(map[string]any)
+		errText, _ := want["error"].(string)
+		out = append(out, corpusQuery{dialect: d, sql: q, parses: errText == ""})
+	}
+	return out, nil
+})
+
+func mustGoldenCorpus(tb testing.TB) []corpusQuery {
+	tb.Helper()
+	qs, err := goldenCorpus()
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return qs
 }
 
 func writeGolden(t *testing.T, path string, recs []goldenRecord) {

@@ -5,12 +5,11 @@ import (
 	"math/big"
 )
 
-// Port of sqlglot/parser.py (chunk F, part 2): the BigQuery-style pipe syntax (`|>`).
-
-// _build_pipe_cte (parser.py L9894).
+// buildPipeCte wraps query in a CTE (named by aliasCte, or a fresh __tmpN) and returns a SELECT
+// of expressions from it that carries over the query's existing CTEs.
 func (p *Parser) buildPipeCte(query *Expr, expressions []*Expr, aliasCte *Expr) *Expr {
-	// new_cte is either the given TableAlias or the string "__tmpN"; sqlglot's builders run
-	// strings through maybe_parse, so the string form is parsed here (default dialect).
+	// The CTE is named by the given TableAlias or by a generated "__tmpN", which is parsed (with
+	// the default dialect) into the FROM and alias nodes below.
 	newCteName := ""
 	if aliasCte == nil {
 		p.pipeCteCounter++
@@ -38,7 +37,6 @@ func (p *Parser) buildPipeCte(query *Expr, expressions []*Expr, aliasCte *Expr) 
 	return newSelect.QueryWith(aliasArg, query, nil, nil, true, false, nil)
 }
 
-// _parse_pipe_syntax_select (parser.py L9916).
 func (p *Parser) parsePipeSyntaxSelect(query *Expr) *Expr {
 	sel := p.parseSelect(false, false, true, true, false, nil)
 	if sel == nil {
@@ -48,17 +46,27 @@ func (p *Parser) parsePipeSyntaxSelect(query *Expr) *Expr {
 	return p.buildPipeCte(query.QuerySelect(sel.Expressions(), false, true), []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_limit (parser.py L9925).
+// parsePipeSyntaxLimit parses |> LIMIT [OFFSET]: the smaller of the current and new limits wins,
+// and offsets add up.
 func (p *Parser) parsePipeSyntaxLimit(query *Expr) *Expr {
 	limit := p.parseLimit(nil, false, false)
 	offset := p.parseOffset(nil)
-	if limit != nil {
-		// query.args.get("limit", limit)
+	if limit.IsA(KLimit) {
+		// the current limit, or the new one when the query has none
 		currLimit := limit
 		if query.HasArgKey("limit") {
 			currLimit = query.ArgE("limit")
 		}
-		if chunkFToPy(currLimit.Expression()).cmp(chunkFToPy(limit.Expression())) >= 0 {
+		currIsLimitAll := currLimit.isLimitAll()
+
+		// LIMIT ALL means "no cap", so it's never tighter than a numeric limit.
+		var replace bool
+		if limit.isLimitAll() {
+			replace = currIsLimitAll
+		} else {
+			replace = currIsLimitAll || chunkFToPy(currLimit.Expression()).cmp(chunkFToPy(limit.Expression())) >= 0
+		}
+		if replace {
 			query.QueryLimit(limit, false)
 		}
 	}
@@ -73,7 +81,6 @@ func (p *Parser) parsePipeSyntaxLimit(query *Expr) *Expr {
 	return query
 }
 
-// _parse_pipe_syntax_aggregate_fields (parser.py L9939).
 func (p *Parser) parsePipeSyntaxAggregateFields() *Expr {
 	this := p.parseDisjunction()
 	if p.matchTextSeqNoAdvance("GROUP", "AND") {
@@ -89,7 +96,9 @@ func (p *Parser) parsePipeSyntaxAggregateFields() *Expr {
 	return this
 }
 
-// _parse_pipe_syntax_aggregate_group_order_by (parser.py L9951).
+// parsePipeSyntaxAggregateGroupOrderBy parses the fields of AGGREGATE (or of GROUP BY, with
+// groupByExists), adding them to the projections (and grouping keys); ordered fields also go to
+// ORDER BY.
 func (p *Parser) parsePipeSyntaxAggregateGroupOrderBy(query *Expr, groupByExists bool) *Expr {
 	expr := p.parseCSV(p.parsePipeSyntaxAggregateFields, TK_COMMA)
 	aggregatesOrGroups, orders := []*Expr{}, []*Expr{}
@@ -112,7 +121,6 @@ func (p *Parser) parsePipeSyntaxAggregateGroupOrderBy(query *Expr, groupByExists
 		selected := query.QuerySelect(projections, false, false)
 		groups := make([]*Expr, 0, len(aggregatesOrGroups))
 		for _, projection := range aggregatesOrGroups {
-			// projection.args.get("alias", projection)
 			if projection.HasArgKey("alias") {
 				groups = append(groups, projection.ArgE("alias"))
 			} else {
@@ -131,7 +139,8 @@ func (p *Parser) parsePipeSyntaxAggregateGroupOrderBy(query *Expr, groupByExists
 	return query
 }
 
-// _parse_pipe_syntax_aggregate (parser.py L9981).
+// parsePipeSyntaxAggregate parses |> AGGREGATE ... [GROUP [AND ORDER] BY ...] and wraps the
+// result in a new CTE.
 func (p *Parser) parsePipeSyntaxAggregate(query *Expr) *Expr {
 	p.matchTextSeq("AGGREGATE")
 	query = p.parsePipeSyntaxAggregateGroupOrderBy(query, false)
@@ -143,9 +152,10 @@ func (p *Parser) parsePipeSyntaxAggregate(query *Expr) *Expr {
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_set_operator (parser.py L9992).
+// parsePipeSyntaxSetOperator parses |> UNION/EXCEPT/INTERSECT with one or more parenthesized
+// queries; it returns nil when no set operation follows.
 func (p *Parser) parsePipeSyntaxSetOperator(query *Expr) *Expr {
-	firstSetop := p.parseSetOperation(query, false)
+	firstSetop := p.parseSetOperation(query, false, false)
 	if firstSetop == nil {
 		return nil
 	}
@@ -169,8 +179,8 @@ func (p *Parser) parsePipeSyntaxSetOperator(query *Expr) *Expr {
 		ctes = with.Pop()
 	}
 
-	// query.union(*setops, copy=False, **first_setop.args): `distinct` binds to the named
-	// parameter, the remaining args become constructor kwargs of every set operation node.
+	// Build the set operation over query and setops: the parsed operation's distinct arg is
+	// passed on its own, and its remaining args are copied onto every set operation node.
 	var distinct any = true
 	var opts []any
 	for _, a := range firstSetop.args {
@@ -195,7 +205,6 @@ func (p *Parser) parsePipeSyntaxSetOperator(query *Expr) *Expr {
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_join (parser.py L10023).
 func (p *Parser) parsePipeSyntaxJoin(query *Expr) *Expr {
 	join := p.parseJoin(false, false, nil)
 	if join == nil {
@@ -209,7 +218,6 @@ func (p *Parser) parsePipeSyntaxJoin(query *Expr) *Expr {
 	return query
 }
 
-// _parse_pipe_syntax_pivot (parser.py L10033).
 func (p *Parser) parsePipeSyntaxPivot(query *Expr) *Expr {
 	pivots := p.parsePivots()
 	if len(pivots) == 0 {
@@ -223,14 +231,12 @@ func (p *Parser) parsePipeSyntaxPivot(query *Expr) *Expr {
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_extend (parser.py L10044).
 func (p *Parser) parsePipeSyntaxExtend(query *Expr) *Expr {
 	p.matchTextSeq("EXTEND")
 	query.QuerySelect(append([]*Expr{Star()}, p.parseExpressions()...), false, false)
 	return p.buildPipeCte(query, []*Expr{Star()}, nil)
 }
 
-// _parse_pipe_syntax_tablesample (parser.py L10049).
 func (p *Parser) parsePipeSyntaxTablesample(query *Expr) *Expr {
 	sample := p.parseTableSample(false)
 
@@ -244,7 +250,8 @@ func (p *Parser) parsePipeSyntaxTablesample(query *Expr) *Expr {
 	return query
 }
 
-// _parse_pipe_syntax_query (parser.py L10060).
+// parsePipeSyntaxQuery turns query into a SELECT * FROM ... when needed and applies each |>
+// operator in turn; an unsupported operator raises a parse error.
 func (p *Parser) parsePipeSyntaxQuery(query *Expr) *Expr {
 	if query.IsA(KSubquery) {
 		query = SelectExpr(MaybeParse("*", KExpr, "", nil)).SelectFrom(query, false)
@@ -281,19 +288,16 @@ func (p *Parser) parsePipeSyntaxQuery(query *Expr) *Expr {
 	return query
 }
 
-// ---------------------------------------------------------------------------------------------
-// Literal.to_py arithmetic used by _parse_pipe_syntax_limit
-// ---------------------------------------------------------------------------------------------
-
-// chunkFPyNum is a Python int or Decimal produced by Literal.to_py().
+// chunkFPyNum is the value of a numeric literal: an exact integer, or a decimal held as a
+// big.Float.
 type chunkFPyNum struct {
 	isInt bool
 	i     *big.Int
 	f     *big.Float
 }
 
-// chunkFToPy mirrors expression.to_py() for numeric literals (Literal / Neg); any other value
-// raises like sqlglot's Expr.to_py (comparisons with strings are reported the same way).
+// chunkFToPy returns the value of a numeric literal (pipe-syntax LIMIT and OFFSET values). Any
+// other expression, including a string literal, panics with a ValueError.
 func chunkFToPy(e *Expr) chunkFPyNum {
 	if e.IsNumber() {
 		f, isInt := e.toPyNumber()
@@ -305,7 +309,7 @@ func chunkFToPy(e *Expr) chunkFPyNum {
 			return chunkFPyNum{f: f}
 		}
 	}
-	panic(&ValueError{Msg: chunkFPyStr(e) + " cannot be converted to a Python object."})
+	panic(&ValueError{Msg: chunkFPyStr(e) + " is not a numeric literal."})
 }
 
 func (n chunkFPyNum) float() *big.Float {
@@ -315,7 +319,6 @@ func (n chunkFPyNum) float() *big.Float {
 	return n.f
 }
 
-// cmp compares two numbers like Python's int/Decimal comparison operators.
 func (n chunkFPyNum) cmp(o chunkFPyNum) int {
 	if n.isInt && o.isInt {
 		return n.i.Cmp(o.i)
@@ -323,7 +326,6 @@ func (n chunkFPyNum) cmp(o chunkFPyNum) int {
 	return n.float().Cmp(o.float())
 }
 
-// add mirrors int + int (int) or arithmetic involving a Decimal (Decimal).
 func (n chunkFPyNum) add(o chunkFPyNum) chunkFPyNum {
 	if n.isInt && o.isInt {
 		return chunkFPyNum{isInt: true, i: new(big.Int).Add(n.i, o.i)}
@@ -331,8 +333,8 @@ func (n chunkFPyNum) add(o chunkFPyNum) chunkFPyNum {
 	return chunkFPyNum{f: new(big.Float).SetPrec(200).Add(n.float(), o.float())}
 }
 
-// String mirrors str(number). Decimal formatting is best effort (Python keeps the exponent of
-// the operands, e.g. Decimal("1.0") + 1 -> "2.0").
+// String formats the number. Decimals use the shortest plain notation, so trailing zeros of the
+// operands are not kept (1.0 + 1 gives "2", not "2.0").
 func (n chunkFPyNum) String() string {
 	if n.isInt {
 		return n.i.String()

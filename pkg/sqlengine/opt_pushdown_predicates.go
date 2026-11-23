@@ -1,9 +1,7 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/pushdown_predicates.py.
-
-// PushdownPredicates mirrors optimizer.pushdown_predicates.pushdown_predicates: rewrites the AST
-// to pushdown predicates in FROMS and JOINS. d == nil means the default dialect.
+// PushdownPredicates pushes WHERE and JOIN ON predicates down into the FROM sources and joins
+// they reference, in place. d == nil means the default dialect.
 //
 // Example: "SELECT y.a AS a FROM (SELECT x.a AS a FROM x AS x) AS y WHERE y.a = 1"
 // -> "SELECT y.a AS a FROM (SELECT x.a AS a FROM x AS x WHERE x.a = 1) AS y WHERE TRUE".
@@ -24,6 +22,12 @@ func PushdownPredicates(expression *Expr, d *Dialect) *Expr {
 			sel := scope.Expression
 			where := sel.ArgE("where")
 			joins := sel.ArgL("joins")
+
+			// A nearest join's matches depend on its input rows, so nothing is pushed past it
+			if hasNearestJoin(joins) {
+				continue
+			}
+
 			if where != nil {
 				selectedSources := scope.SelectedSources()
 				joinIndex := map[string]int{}
@@ -73,8 +77,9 @@ func PushdownPredicates(expression *Expr, d *Dialect) *Expr {
 	return expression
 }
 
-// pushdownPredicatesPushdown mirrors pushdown_predicates.pushdown. joinIndex == nil (or empty)
-// mirrors a falsy join_index.
+// pushdownPredicatesPushdown simplifies condition and pushes its predicates down to sources,
+// splitting it as CNF or DNF. A nil or empty joinIndex (join name -> position) disables the
+// join-order check.
 func pushdownPredicatesPushdown(condition *Expr, sources *omap[SelectedSource], scopeRefCount map[any]int, d *Dialect, joinIndex map[string]int) {
 	if condition == nil {
 		return
@@ -101,7 +106,8 @@ func pushdownPredicatesPushdown(condition *Expr, sources *omap[SelectedSource], 
 	}
 }
 
-// pushdownPredicatesJoinIndexOf mirrors `join_index[name]` (KeyError when missing).
+// pushdownPredicatesJoinIndexOf returns the position of join name; a missing name panics with
+// the quoted name as the message.
 func pushdownPredicatesJoinIndexOf(joinIndex map[string]int, name string) int {
 	i, ok := joinIndex[name]
 	if !ok {
@@ -110,7 +116,6 @@ func pushdownPredicatesJoinIndexOf(joinIndex map[string]int, name string) int {
 	return i
 }
 
-// pushdownPredicatesJoinIndexGet mirrors `join_index.get(table, -1)`.
 func pushdownPredicatesJoinIndexGet(joinIndex map[string]int, name string) int {
 	if i, ok := joinIndex[name]; ok {
 		return i
@@ -118,8 +123,8 @@ func pushdownPredicatesJoinIndexGet(joinIndex map[string]int, name string) int {
 	return -1
 }
 
-// pushdownPredicatesPushdownCNF mirrors pushdown_predicates.pushdown_cnf: if the predicates are
-// in CNF like form, we can simply replace each block in the parent.
+// pushdownPredicatesPushdownCNF pushes down predicates in CNF-like form: each block can simply be
+// replaced (by TRUE) in the parent and added to the target.
 func pushdownPredicatesPushdownCNF(predicates []*Expr, sources *omap[SelectedSource], scopeRefCount map[any]int, joinIndex map[string]int) {
 	for _, predicate := range predicates {
 		nodes := pushdownPredicatesNodesForPredicate(predicate, sources, scopeRefCount)
@@ -159,9 +164,9 @@ func pushdownPredicatesPushdownCNF(predicates []*Expr, sources *omap[SelectedSou
 	}
 }
 
-// pushdownPredicatesPushdownDNF mirrors pushdown_predicates.pushdown_dnf: if the predicates are
-// in DNF form, we can only push down conditions that are in all blocks. Additionally, we can't
-// remove predicates from their original form.
+// pushdownPredicatesPushdownDNF pushes down predicates in DNF form: only conditions on tables
+// referenced in all blocks can be pushed down. Additionally, we can't remove predicates from
+// their original form.
 func pushdownPredicatesPushdownDNF(predicates []*Expr, sources *omap[SelectedSource], scopeRefCount map[any]int, joinIndex map[string]int) {
 	// find all the tables that can be pushdown too
 	// these are tables that are referenced in all blocks of a DNF
@@ -188,7 +193,6 @@ func pushdownPredicatesPushdownDNF(predicates []*Expr, sources *omap[SelectedSou
 
 	conditions := map[string]*Expr{}
 
-	// pushdown all predicates to their respective nodes
 	var nodes *omap[*Expr]
 	for _, table := range pushdownTables.Sorted() {
 		for _, predicate := range predicates {
@@ -241,7 +245,8 @@ func pushdownPredicatesPushdownDNF(predicates []*Expr, sources *omap[SelectedSou
 	}
 }
 
-// pushdownPredicatesNodesForPredicate mirrors pushdown_predicates.nodes_for_predicate.
+// pushdownPredicatesNodesForPredicate returns, per referenced table, the join or SELECT that
+// predicate can be pushed into; it is empty when the predicate cannot be pushed down.
 func pushdownPredicatesNodesForPredicate(predicate *Expr, sources *omap[SelectedSource], scopeRefCount map[any]int) *omap[*Expr] {
 	nodes := newOMap[*Expr]()
 	tables := ColumnTableNames(predicate, "")
@@ -308,7 +313,6 @@ func pushdownPredicatesNodesForPredicate(predicate *Expr, sources *omap[Selected
 	return nodes
 }
 
-// pushdownPredicatesReplaceAliases mirrors pushdown_predicates.replace_aliases.
 func pushdownPredicatesReplaceAliases(source *Expr, predicate *Expr) *Expr {
 	aliases := map[string]*Expr{}
 

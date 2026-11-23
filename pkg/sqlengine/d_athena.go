@@ -1,17 +1,14 @@
 package sqlengine
 
-// Port of sqlglot/dialects/athena.py, sqlglot/parsers/athena.py and sqlglot/generators/athena.py
-// (sqlglot v30.13.0). The Athena tokenizer routing lives in athena_tokenizer.go.
+// Athena is a router: statements are tokenized, parsed and generated either by the Hive dialect
+// or by an Athena flavor of the Trino dialect. The sub-dialects are the default hive and trino
+// prototypes.
 //
-// Athena is a router: statements are tokenized, parsed and generated either by the Hive machinery
-// or by (an Athena flavour of) the Trino machinery. The sub-dialects are the default Hive() and
-// Trino() instances, so their prototypes are used.
-//
-// Parsing: AthenaParser.parse / parse_into delegate to a Hive parser (when the token stream starts
-// with HIVE_TOKEN_STREAM) or to an AthenaTrinoParser. The Go Parser has no parse hook, so the
-// routing is done in place on the first statement: the Athena ParserSettings only contain routing
-// entries that switch the parser's dialect/settings (p.d, p.s) to the target before the first
-// token-dependent decision is taken; all subsequent statements are parsed with the target settings.
+// Parsing: a token stream that starts with HIVE_TOKEN_STREAM goes to the Hive parser, anything
+// else to the Athena Trino parser. The Parser has no top-level parse hook, so the routing is done
+// in place on the first statement: the Athena ParserSettings only contain routing entries that
+// switch the parser's dialect/settings (p.d, p.s) to the target before the first token-dependent
+// decision is taken; all subsequent statements are parsed with the target settings.
 
 func init() { registerCustomizer("athena", customizeAthena) }
 
@@ -23,14 +20,19 @@ func customizeAthena(d *Dialect) {
 	customizeAthenaGenerator(d, trino, hive)
 }
 
-// ---------------------------------------------------------------------------------------------
-// AthenaTrinoParser / AthenaParser
-// ---------------------------------------------------------------------------------------------
-
 func customizeAthenaParser(d *Dialect, trino, hive *Dialect) {
-	// class AthenaTrinoParser(TrinoParser)
+	// The Athena Trino parser: Trino's settings, with USING statements parsed as commands. A
+	// CREATE TABLE ... AS may also start its query with a USING EXTERNAL FUNCTION clause, which is
+	// parsed as a command too.
 	atp := cloneParserSettings(trino.P)
 	atp.STATEMENT_PARSERS[TK_USING] = func(p *Parser) *Expr { return p.parseAsCommand(p.prev) }
+	atp.DDL_SELECT_TOKENS = atp.DDL_SELECT_TOKENS.With(TK_USING)
+	atp.h.parseDdlSelect = func(p *Parser) *Expr {
+		if p.match(TK_USING) {
+			return p.parseAsCommand(p.prev)
+		}
+		return p.baseParseDdlSelect()
+	}
 
 	P := d.P
 
@@ -40,9 +42,9 @@ func customizeAthenaParser(d *Dialect, trino, hive *Dialect) {
 		}
 	}
 
-	// Statements starting with a token the Trino parser handles in STATEMENT_PARSERS: the token was
-	// consumed by _parse_statement exactly like AthenaTrinoParser._parse_statement would have done
-	// (including the comment handling), so only the dispatch is redirected.
+	// Statements starting with a token in the Trino STATEMENT_PARSERS: parseStatement has already
+	// consumed the token (and handled its comments) exactly as the Trino parser would, so only the
+	// dispatch is redirected.
 	statementParsers := make(map[TokenType]parseFn, len(atp.STATEMENT_PARSERS)+1)
 	for tt := range atp.STATEMENT_PARSERS {
 		statementParsers[tt] = func(p *Parser) *Expr {
@@ -50,7 +52,8 @@ func customizeAthenaParser(d *Dialect, trino, hive *Dialect) {
 			return p.s.STATEMENT_PARSERS[p.prev.Type](p)
 		}
 	}
-	// AthenaParser.parse: if raw_tokens[0].token_type == HIVE_TOKEN_STREAM -> hive parser (raw_tokens[1:])
+	// A leading HIVE_TOKEN_STREAM marker (already consumed here) sends the rest of the stream to
+	// the Hive parser.
 	statementParsers[TK_HIVE_TOKEN_STREAM] = func(p *Parser) *Expr {
 		if p.s == P {
 			p.d, p.s = hive, hive.P
@@ -59,15 +62,15 @@ func customizeAthenaParser(d *Dialect, trino, hive *Dialect) {
 	}
 	P.STATEMENT_PARSERS = statementParsers
 
-	// Any other statement (expressions, queries) starts with _parse_expression, before which no
-	// token has been consumed. (COMMANDS are identical for both tokenizers, and _parse_command
-	// does not depend on the parser tables.)
+	// Any other statement (expressions, queries) starts with parseExpression, before which no
+	// token has been consumed. (Both tokenizers have the same command set, and parseCommand does
+	// not depend on the parser tables.)
 	P.h.parseExpression = func(p *Parser) *Expr {
 		useTrino(p)
 		return p.parseExpression()
 	}
 
-	// AthenaParser.parse_into
+	// Parsing into a specific kind routes the same way, skipping the HIVE_TOKEN_STREAM marker.
 	expressionParsers := make(map[Kind]parseFn, len(P.EXPRESSION_PARSERS))
 	for k := range P.EXPRESSION_PARSERS {
 		expressionParsers[k] = func(p *Parser) *Expr {
@@ -85,11 +88,6 @@ func customizeAthenaParser(d *Dialect, trino, hive *Dialect) {
 	P.EXPRESSION_PARSERS = expressionParsers
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers of sqlglot/generators/athena.py
-// ---------------------------------------------------------------------------------------------
-
-// athenaIsIcebergTable mirrors generators.athena._is_iceberg_table.
 func athenaIsIcebergTable(properties *Expr) bool {
 	for _, p := range properties.Expressions() {
 		if p.IsA(KProperty) && p.Name() == "table_type" {
@@ -100,7 +98,6 @@ func athenaIsIcebergTable(properties *Expr) bool {
 	return false
 }
 
-// athenaLocationPropertySQL mirrors generators.athena._location_property_sql.
 func athenaLocationPropertySQL(g *Generator, e *Expr) string {
 	// If table_type='iceberg', the LocationProperty is called 'location'
 	// Otherwise, it's called 'external_location'
@@ -117,7 +114,6 @@ func athenaLocationPropertySQL(g *Generator, e *Expr) string {
 	return propName + "=" + g.sqlKey(e, "this")
 }
 
-// athenaPartitionedByPropertySQL mirrors generators.athena._partitioned_by_property_sql.
 func athenaPartitionedByPropertySQL(g *Generator, e *Expr) string {
 	// If table_type='iceberg' then the table property for partitioning is called 'partitioning'
 	// If table_type='hive' it's called 'partitioned_by'
@@ -134,23 +130,23 @@ func athenaPartitionedByPropertySQL(g *Generator, e *Expr) string {
 	return propName + "=" + g.sqlKey(e, "this")
 }
 
-// athenaGenerateAsHive mirrors generators.athena._generate_as_hive.
+// athenaGenerateAsHive reports whether e is generated with the Hive dialect (most DDL) rather
+// than Trino (queries, CREATE TABLE ... AS <query>, CREATE VIEW and DROP VIEW).
 func athenaGenerateAsHive(e *Expr) bool {
 	if e.IsA(KCreate) {
 		if pyUpper(e.ArgS("kind")) == "TABLE" {
 			properties := e.ArgE("properties")
 
-			// CREATE EXTERNAL TABLE is Hive
 			if properties != nil && properties.Find(KExternalProperty) != nil {
 				return true
 			}
 
-			// Any CREATE TABLE other than CREATE TABLE ... As <query> is Hive
-			if !e.Expression().IsA(KQuery) {
-				return true
+			// Any CREATE TABLE other than CREATE TABLE ... As <query> is Hive, except a CTAS with
+			// a leading USING EXTERNAL FUNCTION clause
+			if expression := e.Expression(); !expression.IsA(KQuery) {
+				return !(expression.IsA(KCommand) && pyUpper(expression.ArgS("this")) == "USING")
 			}
 		} else {
-			// CREATE VIEW is Trino, but CREATE SCHEMA, CREATE DATABASE, etc, is Hive
 			return pyUpper(e.ArgS("kind")) != "VIEW"
 		}
 	} else if e.IsA(KAlter, KDrop, KDescribe, KShow) {
@@ -159,19 +155,13 @@ func athenaGenerateAsHive(e *Expr) bool {
 			return false
 		}
 
-		// Everything else, e.g., ALTER statements, is Hive
 		return true
 	}
 
 	return false
 }
 
-// ---------------------------------------------------------------------------------------------
-// _HiveGenerator / AthenaTrinoGenerator / AthenaGenerator
-// ---------------------------------------------------------------------------------------------
-
 func customizeAthenaGenerator(d *Dialect, trino, hive *Dialect) {
-	// class _HiveGenerator(HiveGenerator)
 	hiveG := cloneGeneratorSettings(hive.G)
 	hiveAlterSQL := hiveG.h.alterSQL
 	hiveG.h.alterSQL = func(g *Generator, e *Expr) string {
@@ -188,11 +178,10 @@ func customizeAthenaGenerator(d *Dialect, trino, hive *Dialect) {
 	hiveDialect := *hive
 	hiveDialect.G = hiveG
 
-	// class AthenaTrinoGenerator(TrinoGenerator)
 	trinoG := cloneGeneratorSettings(trino.G)
 	trinoG.PROPERTIES_LOCATION[KLocationProperty] = Loc_POST_WITH
-	// AthenaTrinoGenerator.TRANSFORMS copies TrinoGenerator.TRANSFORMS before the Trino dialect class
-	// prunes its unsupported JSONPath parts, so all of PrestoGenerator's JSONPath transforms remain.
+	// Unlike Trino's own generator, which drops the JSONPath parts it does not support, the Athena
+	// Trino generator keeps all of Presto's JSONPath part transforms.
 	presto := prototypeLocked("presto")
 	for _, part := range allJSONPathPartKinds {
 		if f, ok := presto.G.TRANSFORMS[part]; ok {
@@ -205,10 +194,10 @@ func customizeAthenaGenerator(d *Dialect, trino, hive *Dialect) {
 	trinoDialect := *trino
 	trinoDialect.G = trinoG
 
-	// class AthenaGenerator(generator.Generator)
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module level)
+	// Only the base after-HAVING modifiers apply: the Hive CLUSTER BY, DISTRIBUTE BY and SORT BY
+	// entries are dropped.
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -220,8 +209,6 @@ func customizeAthenaGenerator(d *Dialect, trino, hive *Dialect) {
 	}
 	G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS = keys
 
-	// AthenaGenerator.__init__ builds the two sub-generators with the same options and
-	// AthenaGenerator.generate delegates to one of them.
 	G.h.generate = func(g *Generator, e *Expr, copy bool) string {
 		target := &trinoDialect
 		if athenaGenerateAsHive(e) {
@@ -231,8 +218,6 @@ func customizeAthenaGenerator(d *Dialect, trino, hive *Dialect) {
 	}
 }
 
-// athenaSubGenerator mirrors the construction of AthenaGenerator's sub-generators: same generator
-// options (_generator_kwargs), but the sub-dialect's own settings.
 func athenaSubGenerator(g *Generator, target *Dialect) *Generator {
 	normalizeFunctions := g.normalizeFunctions
 	unsupportedLevel := g.unsupportedLevel

@@ -1,15 +1,13 @@
 package sqlengine
 
-// Port of the Simplifier class of sqlglot/optimizer/simplify.py: the driver (simplify,
-// _simplify) and every rewrite rule. Rules decorated with @annotate_types_on_change in Python
-// are exported wrappers calling s.onChange around the unexported implementation.
+// Rules whose results must be re-annotated with the original type are exported wrappers calling
+// s.onChange around the unexported implementation.
 
 import (
 	"fmt"
 	"strings"
 )
 
-// Value ranges for byte-sized signed/unsigned integers.
 const (
 	smpTINYINT_MIN  = -128
 	smpTINYINT_MAX  = 127
@@ -71,7 +69,8 @@ var (
 	smpCONCATS = []Kind{KConcat, KDPipe}
 )
 
-// smpDatetruncBinaryTransform mirrors DateTruncBinaryTransform.
+// smpDatetruncBinaryTransform rewrites `DATE_TRUNC(unit, l) <op> date` into a comparison of l
+// itself against date boundaries (t is the date literal's type).
 type smpDatetruncBinaryTransform func(l *Expr, dt smpDT, u string, d *Dialect, t *Expr) *Expr
 
 var smpDATETRUNC_BINARY_COMPARISONS = map[Kind]smpDatetruncBinaryTransform{
@@ -99,9 +98,8 @@ var smpDATETRUNC_BINARY_COMPARISONS = map[Kind]smpDatetruncBinaryTransform{
 
 var smpDATETRUNCS = []Kind{KDateTrunc, KTimestampTrunc}
 
-// CROSS joins result in an empty table if the right table is empty.
-// So we can only simplify certain types of joins to CROSS.
-// Or in other words, LEFT JOIN x ON TRUE != CROSS JOIN x.
+// smpJOINS lists the (side, kind) joins that can be simplified to CROSS. A CROSS join is empty
+// when its right table is, so e.g. LEFT JOIN x ON TRUE != CROSS JOIN x.
 var smpJOINS = map[[2]string]bool{
 	{"", ""}:           true,
 	{"", "INNER"}:      true,
@@ -116,7 +114,10 @@ func smpKindOf(e *Expr) Kind {
 	return e.kind
 }
 
-// Simplify mirrors Simplifier.simplify.
+// Simplify simplifies every condition in expression until it stops changing, then drops WHERE
+// clauses that are always true and turns joins on an always-true condition into CROSS joins
+// where that is safe. GROUP BY keys, the projections and HAVING clauses containing them, and
+// Snowflake match conditions are left untouched.
 func (s *Simplifier) Simplify(expression *Expr, constantPropagation, coalesceSimplification bool) *Expr {
 	var wheres, joins []*Expr
 
@@ -199,7 +200,8 @@ func (s *Simplifier) Simplify(expression *Expr, constantPropagation, coalesceSim
 	return expression
 }
 
-// simplifyOnce mirrors Simplifier._simplify.
+// simplifyOnce runs one simplification pass over expression: the pre-order rules top-down, then
+// the post-order rules bottom-up. Nested queries are simplified separately.
 func (s *Simplifier) simplifyOnce(expression *Expr, constantPropagation, coalesceSimplification bool) *Expr {
 	type postItem struct{ node, parent *Expr }
 	preTransformationStack := []*Expr{expression}
@@ -251,10 +253,10 @@ func (s *Simplifier) simplifyOnce(expression *Expr, constantPropagation, coalesc
 		original, parent := item.node, item.parent
 		root := original == expression
 
-		// Resets parent, arg_key, index pointers– this is needed because some of the
+		// Resets parent, argKey, index pointers– this is needed because some of the
 		// previous transformations mutate the AST, leading to an inconsistent state.
-		// We only fix pointers instead of calling `set` because the values are unchanged
-		// (Python pops None-valued args from the dict directly, without invalidating hashes).
+		// We only fix pointers (and drop nil-valued args) instead of calling Set because the
+		// values are unchanged, and Set would invalidate the cached hashes.
 		kept := original.args[:0:0]
 		for _, a := range original.args {
 			if a.val == nil {
@@ -291,8 +293,8 @@ func (s *Simplifier) simplifyOnce(expression *Expr, constantPropagation, coalesc
 	return node
 }
 
-// RewriteBetween mirrors Simplifier.rewrite_between: rewrite x between y and z to
-// x >= y AND x <= z. This is done because comparison simplification is only done on lt/lte/gt/gte.
+// RewriteBetween rewrites x between y and z to x >= y AND x <= z. This is done because
+// comparison simplification is only done on lt/lte/gt/gte.
 func (s *Simplifier) RewriteBetween(expression *Expr) *Expr {
 	return s.onChange(expression, s.rewriteBetween(expression))
 }
@@ -314,7 +316,8 @@ func (s *Simplifier) rewriteBetween(expression *Expr) *Expr {
 	return expression
 }
 
-// SimplifyNot mirrors Simplifier.simplify_not (Demorgan's Law):
+// SimplifyNot pushes NOT inward (De Morgan's laws), complements comparisons and folds NOT over
+// constants:
 //
 //	NOT (x OR y) -> NOT x AND NOT y
 //	NOT (x AND y) -> NOT x OR NOT y
@@ -378,7 +381,8 @@ func (s *Simplifier) simplifyNot(expression *Expr) *Expr {
 	return expression
 }
 
-// SimplifyConnectors mirrors Simplifier.simplify_connectors.
+// SimplifyConnectors folds constants in AND/OR chains (e.g. x AND FALSE -> FALSE, x OR FALSE ->
+// x) and combines pairs of comparisons with SimplifyComparison.
 func (s *Simplifier) SimplifyConnectors(expression *Expr, root bool) *Expr {
 	return s.onChange(expression, s.simplifyConnectors(expression, root))
 }
@@ -455,7 +459,6 @@ func (s *Simplifier) simplifyConnectors(expression *Expr, root bool) *Expr {
 	return expression
 }
 
-// smpTwoArgs mirrors `a, b = expression.args.values()`.
 func smpTwoArgs(e *Expr) (*Expr, *Expr) {
 	if len(e.args) != 2 {
 		panic(&ValueError{Msg: fmt.Sprintf("expected 2 values to unpack, got %d", len(e.args))})
@@ -468,20 +471,27 @@ func smpTwoArgs(e *Expr) (*Expr, *Expr) {
 	return a, b
 }
 
-// SimplifyComparison mirrors Simplifier._simplify_comparison.
+// SimplifyComparison combines two comparisons of the same non-constant operand against literals
+// (numbers, strings or dates), joined by AND (or OR when or is set): it keeps the stricter (or
+// looser) one, or returns FALSE when an AND is contradictory. It returns nil when nothing
+// combines.
 func (s *Simplifier) SimplifyComparison(expression, left, right *Expr, or bool) *Expr {
 	return s.onChange(expression, s.simplifyComparison(expression, left, right, or))
 }
 
 func (s *Simplifier) simplifyComparison(expression, left, right *Expr, or bool) *Expr {
 	if left.IsA(smpCOMPARISONS...) && right.IsA(smpCOMPARISONS...) {
+		if (left.IsA(KIs) && left.ArgB("negate")) || (right.IsA(KIs) && right.ArgB("negate")) {
+			return nil
+		}
+
 		ll, lr := smpTwoArgs(left)
 		rl, rr := smpTwoArgs(right)
 
 		largs := newSmpExprSet(ll, lr)
 		rargs := newSmpExprSet(rl, rr)
 
-		// matching = largs & rargs (elements are taken from the smaller set)
+		// matching is the intersection of largs and rargs (elements are taken from the smaller set)
 		so, other := largs, rargs
 		if other.len() > so.len() {
 			so, other = other, so
@@ -533,7 +543,7 @@ func (s *Simplifier) simplifyComparison(expression, left, right *Expr, or bool) 
 				if !ok {
 					return nil
 				}
-				// python won't compare date and datetime, but many engines will upcast
+				// compare dates as datetimes: many engines upcast a date compared to a datetime
 				ld, _ = smpCastAsDatetime(&ld, "")
 				rd, _ = smpCastAsDatetime(&rd, "")
 				l, r = ld, rd
@@ -623,7 +633,7 @@ func (s *Simplifier) simplifyComparison(expression, left, right *Expr, or bool) 
 	return nil
 }
 
-// RemoveComplements mirrors Simplifier.remove_complements:
+// RemoveComplements folds a connector that contains an operand and its negation:
 //
 //	A AND NOT A -> FALSE (only for non-NULL A)
 //	A OR NOT A -> TRUE (only for non-NULL A)
@@ -650,7 +660,8 @@ func (s *Simplifier) removeComplements(expression *Expr, root bool) *Expr {
 	return expression
 }
 
-// UniqSort mirrors Simplifier.uniq_sort: uniq and sort a connector.
+// UniqSort deduplicates and sorts the operands of a connector by their SQL (XOR operands are
+// only sorted):
 //
 //	C AND A AND B AND B -> A AND B AND C
 func (s *Simplifier) UniqSort(expression *Expr, root bool) *Expr {
@@ -691,8 +702,6 @@ func (s *Simplifier) uniqSort(expression *Expr, root bool) *Expr {
 			}
 		}
 
-		// check if the operands are already sorted, if not sort them
-		// A AND C AND B -> A AND B AND C
 		isSorted := true
 		for i := 1; i < len(arr); i++ {
 			if arr[i].sql < arr[i-1].sql {
@@ -723,8 +732,9 @@ func (s *Simplifier) uniqSort(expression *Expr, root bool) *Expr {
 	return expression
 }
 
-// smpSQLItemLess mirrors `(sql_a, a) < (sql_b, b)` for tuples of (str, Expr): ties on the SQL
-// fall back to Expr.__lt__, which builds an (always truthy) LT expression.
+// smpSQLItemLess orders items by their SQL text. On equal text it reports true for any two
+// distinct, non-equal expressions, so the order of such ties depends on smpPySort's exact
+// comparison sequence.
 func smpSQLItemLess(x, y smpSQLItem) bool {
 	if x.sql != y.sql {
 		return x.sql < y.sql
@@ -735,8 +745,10 @@ func smpSQLItemLess(x, y smpSQLItem) bool {
 	return true
 }
 
-// smpPySort mirrors CPython 3.13's list.sort for runs shorter than MAX_MINRUN (count_run followed
-// by a binary insertion sort); this matters only for inconsistent comparators.
+// smpPySort sorts a short slice: it takes the initial run (ascending, or descending and then
+// reversed) and binary-insertion-sorts the remaining elements. The exact algorithm only matters
+// for inconsistent comparators such as smpSQLItemLess, whose result depends on the order of the
+// comparisons, so it must not be swapped for another sort.
 func smpPySort[T any](a []T, lt func(x, y T) bool) {
 	n := len(a)
 	if n < 2 {
@@ -824,7 +836,7 @@ func smpBinarySort[T any](a []T, ok int, lt func(x, y T) bool) {
 	}
 }
 
-// AbsorbAndEliminate mirrors Simplifier.absorb_and_eliminate:
+// AbsorbAndEliminate applies absorption and elimination to a connector:
 //
 //	absorption:
 //	    A AND (A OR B) -> A
@@ -838,7 +850,7 @@ func (s *Simplifier) AbsorbAndEliminate(expression *Expr, root bool) *Expr {
 	return s.onChange(expression, s.absorbAndEliminate(expression, root))
 }
 
-// smpFrozenset mirrors a frozenset of expressions used as a dict key.
+// smpFrozenset is an immutable set of expressions, used as a map key.
 type smpFrozenset struct{ entries []smpSetEntry }
 
 func newSmpFrozenset(exprs ...*Expr) smpFrozenset {
@@ -859,7 +871,8 @@ func (f smpFrozenset) hashKey() [3]uint64 {
 	return k
 }
 
-// equal mirrors stored == probe for frozensets (stored entry hashes are used for the lookups).
+// equal reports whether the stored key f and probe hold the same expressions (the stored entry
+// hashes are used for the lookups).
 func (f smpFrozenset) equal(probe smpFrozenset) bool {
 	if len(f.entries) != len(probe.entries) || f.hashKey() != probe.hashKey() {
 		return false
@@ -913,7 +926,6 @@ func (m *smpPairsMap) get(k smpFrozenset) []smpComplementPair {
 	return nil
 }
 
-// smpTwoOperands mirrors `a, b = op.unnest_operands()`.
 func smpTwoOperands(op *Expr) (*Expr, *Expr) {
 	ops := optxUnnestOperands(op)
 	if len(ops) != 2 {
@@ -944,7 +956,6 @@ func (s *Simplifier) absorbAndEliminate(expression *Expr, root bool) *Expr {
 			subops.set(key, append(list, set))
 		}
 
-		// Populate the lookup tables
 		for _, op := range ops {
 			opSet.add(op)
 
@@ -1029,8 +1040,8 @@ func (s *Simplifier) absorbAndEliminate(expression *Expr, root bool) *Expr {
 	return expression
 }
 
-// SimplifyEquality mirrors Simplifier.simplify_equality: use the subtraction and addition
-// properties of equality to simplify expressions:
+// SimplifyEquality uses the subtraction and addition properties of equality to simplify
+// expressions:
 //
 //	x + 1 = 3 becomes x = 2
 //
@@ -1071,7 +1082,7 @@ func (s *Simplifier) simplifyEquality(expression *Expr) *Expr {
 		}
 
 		if !aPredicate(a) && bPredicate(b) {
-			// pass
+			// the variable is already on the left: keep a and b
 		} else if !aPredicate(b) && bPredicate(a) {
 			if l.IsA(KSub) {
 				cls := expression.kind
@@ -1090,7 +1101,6 @@ func (s *Simplifier) simplifyEquality(expression *Expr) *Expr {
 	return expression
 }
 
-// smpIntervalOpInterval mirrors IntervalOp.interval().
 func smpIntervalOpInterval(e *Expr) *Expr {
 	expr := e.Expression()
 	var this, unit *Expr
@@ -1108,7 +1118,8 @@ func (s *Simplifier) isInverseDateOp(expression *Expr) bool {
 	return ok
 }
 
-// SimplifyLiterals mirrors Simplifier.simplify_literals.
+// SimplifyLiterals folds arithmetic and comparisons over literal operands, double negation
+// (- - x) and date arithmetic on date literals.
 func (s *Simplifier) SimplifyLiterals(expression *Expr, root bool) *Expr {
 	return s.onChange(expression, s.simplifyLiterals(expression, root))
 }
@@ -1132,7 +1143,8 @@ func (s *Simplifier) simplifyLiterals(expression *Expr, root bool) *Expr {
 	return expression
 }
 
-// simplifyIntegerCast mirrors Simplifier._simplify_integer_cast.
+// simplifyIntegerCast removes a cast of a byte-sized integer literal to a signed (or, for 0-255,
+// unsigned) integer type, looking through nested casts.
 func (s *Simplifier) simplifyIntegerCast(expr *Expr) *Expr {
 	var this *Expr
 	if expr.IsA(KCast) && expr.This().IsA(KCast) {
@@ -1160,7 +1172,8 @@ func (s *Simplifier) simplifyIntegerCast(expr *Expr) *Expr {
 	return expr
 }
 
-// simplifyBinary mirrors Simplifier._simplify_binary.
+// simplifyBinary folds the binary expression `a <op> b` when the operands are literals
+// (numbers, strings, dates and intervals) or NULL checks; it returns nil when nothing folds.
 func (s *Simplifier) simplifyBinary(expression, a, b *Expr) *Expr {
 	if expression.IsA(smpCOMPARISONS...) {
 		a = s.simplifyIntegerCast(a)
@@ -1176,6 +1189,10 @@ func (s *Simplifier) simplifyBinary(expression, a, b *Expr) *Expr {
 		} else {
 			c = b
 			not = false
+		}
+
+		if expression.ArgB("negate") {
+			not = !not
 		}
 
 		if smpIsNull(c) {
@@ -1256,7 +1273,9 @@ func (s *Simplifier) simplifyBinary(expression, a, b *Expr) *Expr {
 	return nil
 }
 
-// SimplifyCoalesce mirrors Simplifier.simplify_coalesce.
+// SimplifyCoalesce removes COALESCE calls with one argument or a non-NULL constant first
+// argument. Unless the dialect compares COALESCE non-standardly, it also rewrites a comparison of
+// COALESCE(x, ..., const) with a constant into explicit IS NULL branches.
 func (s *Simplifier) SimplifyCoalesce(expression *Expr) *Expr {
 	return s.onChange(expression, s.simplifyCoalesce(expression))
 }
@@ -1295,7 +1314,6 @@ func (s *Simplifier) simplifyCoalesce(expression *Expr) *Expr {
 		return expression
 	}
 
-	// Find the first constant arg
 	argIndex := -1
 	var arg *Expr
 	for i, x := range coalesce.Expressions() {
@@ -1333,8 +1351,7 @@ func (s *Simplifier) simplifyCoalesce(expression *Expr) *Expr {
 	)
 }
 
-// SimplifyConcat mirrors Simplifier.simplify_concat: reduces all groups that contain string
-// literals by concatenating them.
+// SimplifyConcat reduces all groups that contain string literals by concatenating them.
 func (s *Simplifier) SimplifyConcat(expression *Expr) *Expr {
 	return s.onChange(expression, s.simplifyConcat(expression))
 }
@@ -1417,8 +1434,8 @@ func (s *Simplifier) simplifyConcat(expression *Expr) *Expr {
 	return New(concatType, "expressions", newArgs, "safe", safe, "coalesce", coalesce)
 }
 
-// SimplifyConditionals mirrors Simplifier.simplify_conditionals: simplifies expressions like
-// IF, CASE if their condition is statically known.
+// SimplifyConditionals simplifies expressions like IF, CASE if their condition is statically
+// known.
 func (s *Simplifier) SimplifyConditionals(expression *Expr) *Expr {
 	return s.onChange(expression, s.simplifyConditionals(expression))
 }
@@ -1426,9 +1443,9 @@ func (s *Simplifier) SimplifyConditionals(expression *Expr) *Expr {
 func (s *Simplifier) simplifyConditionals(expression *Expr) *Expr {
 	if expression.IsA(KCase) {
 		this := expression.This()
-		// Python iterates the live `ifs` list while popping from it (popped elements shift the
-		// following ones, which are then skipped).
-		for idx := 0; idx < len(expression.ArgL("ifs")); idx++ { //nolint:intrange // the list shrinks while iterating, like the Python loop
+		// The loop re-reads the live `ifs` list while popping from it: a popped branch shifts
+		// the following ones down, so the branch right after it is skipped in this pass.
+		for idx := 0; idx < len(expression.ArgL("ifs")); idx++ { //nolint:intrange // the list shrinks while iterating
 			c := expression.ArgL("ifs")[idx]
 			cond := c.This()
 			if this != nil {
@@ -1464,8 +1481,8 @@ func (s *Simplifier) simplifyConditionals(expression *Expr) *Expr {
 	return expression
 }
 
-// SimplifyStartswith mirrors Simplifier.simplify_startswith: reduces a prefix check to either
-// TRUE or FALSE if both the string and the prefix are statically known.
+// SimplifyStartswith reduces a prefix check to either TRUE or FALSE if both the string and the
+// prefix are statically known.
 func (s *Simplifier) SimplifyStartswith(expression *Expr) *Expr {
 	return s.onChange(expression, s.simplifyStartswith(expression))
 }
@@ -1483,7 +1500,7 @@ func (s *Simplifier) isDatetruncPredicate(left, right *Expr) bool {
 	return left.IsA(smpDATETRUNCS...) && smpIsDateLiteral(right)
 }
 
-// SimplifyDatetrunc mirrors Simplifier.simplify_datetrunc: simplify expressions like
+// SimplifyDatetrunc simplifies expressions like
 // `DATE_TRUNC('year', x) >= CAST('2021-01-01' AS DATE)`.
 func (s *Simplifier) SimplifyDatetrunc(expression *Expr) *Expr {
 	return s.onChange(expression, smpCatch(expression, func() *Expr { return s.simplifyDatetrunc(expression) }))
@@ -1571,7 +1588,7 @@ func (s *Simplifier) simplifyDatetrunc(expression *Expr) *Expr {
 	return expression
 }
 
-// smpMergeRanges mirrors sqlglot.helper.merge_ranges for date ranges.
+// smpMergeRanges sorts date ranges and merges the ones that overlap or touch.
 func smpMergeRanges(ranges []smpDateRange) []smpDateRange {
 	if len(ranges) == 0 {
 		return nil
@@ -1579,7 +1596,7 @@ func smpMergeRanges(ranges []smpDateRange) []smpDateRange {
 
 	sorted := append([]smpDateRange(nil), ranges...)
 	smpStableSort(sorted, func(x, y smpDateRange) bool {
-		// tuple comparison: first differing element decides
+		// order by lo, then by hi
 		if !smpPyEq(x.lo, y.lo) {
 			return smpPyLt(x.lo, y.lo)
 		}
@@ -1617,7 +1634,8 @@ func smpStableSort[T any](a []T, lt func(x, y T) bool) {
 	}
 }
 
-// SortComparison mirrors Simplifier.sort_comparison.
+// SortComparison puts columns and non-constants on the left of a comparison and constants on the
+// right, flipping the operator; other operand pairs are ordered by their SQL text.
 func (s *Simplifier) SortComparison(expression *Expr) *Expr {
 	return s.onChange(expression, s.sortComparison(expression))
 }
@@ -1644,7 +1662,8 @@ func (s *Simplifier) sortComparison(expression *Expr) *Expr {
 	return expression
 }
 
-// flatSimplify mirrors Simplifier._flat_simplify.
+// flatSimplify flattens a chain of the same binary operator and repeatedly combines pairs of
+// operands with simplifier, rebuilding the chain when any pair combined.
 func (s *Simplifier) flatSimplify(expression *Expr, simplifier func(expression, a, b *Expr) *Expr, root bool) *Expr {
 	if root || !expression.SameParent() {
 		var operands []*Expr
@@ -1652,10 +1671,10 @@ func (s *Simplifier) flatSimplify(expression *Expr, simplifier func(expression, 
 		size := len(queue)
 
 		// The pairwise scan below is O(n^2). For connectors, a pair only combines if one side
-		// is a constant or both are comparisons (see _simplify_connectors / _simplify_comparison);
+		// is a constant or both are comparisons (see simplifyConnectors / simplifyComparison);
 		// if no operand is combinable the scan is a guaranteed no-op, so return early. This
 		// avoids the quadratic blowup on large connectors of inert operands (e.g. a 1000-way OR
-		// of ANDs). Non-connector callers (simplify_equality) are unaffected by the type guard.
+		// of ANDs). Non-connector callers (simplifyLiterals) are unaffected by the type guard.
 		if expression.IsA(KConnector) {
 			combinable := false
 			for _, op := range queue {
@@ -1678,7 +1697,7 @@ func (s *Simplifier) flatSimplify(expression *Expr, simplifier func(expression, 
 				result := simplifier(expression, a, b)
 
 				if result != nil && result != expression {
-					// deque.remove(b): removes the first element that is b or equal to b
+					// Remove the first element that is b or equal to b
 					for i, x := range queue {
 						if x == b || x.Equal(b) {
 							queue = append(queue[:i:i], queue[i+1:]...)

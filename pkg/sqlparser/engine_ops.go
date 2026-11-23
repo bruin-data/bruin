@@ -7,7 +7,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
-// attrErr mirrors the AttributeError Python raises when calling a Query builder on a non-Query.
+// attrErr is the error for calling a query builder (limit, with_, ...) on a node that is not a
+// query. The message keeps its historical wording ("'<kind>' object has no attribute '<attr>'").
 func attrErr(e *sqlengine.Expr, attr string) error {
 	name := "NoneType"
 	if e != nil {
@@ -17,7 +18,7 @@ func attrErr(e *sqlengine.Expr, attr string) error {
 }
 
 // ---------------------------------------------------------------------------
-// rename.py
+// Table renaming
 // ---------------------------------------------------------------------------
 
 type tablePath struct {
@@ -39,7 +40,9 @@ func splitTablePath(name string) tablePath {
 	return p
 }
 
-// replaceTableReferences mirrors rename.replace_table_references.
+// replaceTableReferences renames the tables in query according to a mapping of old to new
+// (dotted) table names, and drops the db / catalog from column references to mapped tables. A
+// renamed table without an alias keeps its old name as the alias.
 func replaceTableReferences(query, dialectName string, mappingAny any) (any, error) {
 	d, err := getDialect(dialectName)
 	if err != nil {
@@ -69,7 +72,7 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 	for k := range mapping {
 		keys = append(keys, k)
 	}
-	// Go's JSON encoder sorts map keys; Python iterates the received dict in that order.
+	// Apply the mapping in sorted key order, so overlapping entries resolve deterministically.
 	sortStrings(keys)
 
 	for _, pq := range parsed {
@@ -95,7 +98,8 @@ func replaceTableReferences(query, dialectName string, mappingAny any) (any, err
 				dst := splitTablePath(newTableName)
 				thisNode, ok := tableNode.Arg("this").(*sqlengine.Expr)
 				if !ok || thisNode == nil {
-					// Python: table_node.this.set(...) on None / a raw string.
+					// The table's name is not an expression (nil or a raw string), so it can't be
+					// renamed.
 					return nil, &pyError{fmt.Sprintf("'%s' object has no attribute 'set'", pyTypeName(tableNode.Arg("this")))}
 				}
 				thisNode.Set("this", *dst.table)
@@ -169,7 +173,9 @@ func sortStrings(s []string) {
 	}
 }
 
-// preserveTSQLInferredAliasCase mirrors rename._preserve_tsql_inferred_alias_case, except that it keeps user-written aliases.
+// preserveTSQLInferredAliasCase gives the aliases that T-SQL output qualification adds to derived
+// table columns the exact case and quoting of their source column. User-written aliases are left
+// alone.
 func preserveTSQLInferredAliasCase(q *sqlengine.Expr) {
 	userAliases := make(map[*sqlengine.Expr]struct{})
 	for alias := range q.FindAll(sqlengine.KAlias) {
@@ -210,18 +216,18 @@ func preserveTSQLInferredAliasCase(q *sqlengine.Expr) {
 }
 
 // ---------------------------------------------------------------------------
-// add_limit / is_single_select
+// add-limit / is-single-select
 // ---------------------------------------------------------------------------
 
 func addLimit(query string, limit int, dialectName string) (any, error) {
 	dialectName = normalizeDialect(dialectName)
 	d, err := getDialect(dialectName)
 	if err != nil {
-		return map[string]any{"error": "cannot parse query"}, nil //nolint:nilerr // reported in the response, like the Python command
+		return map[string]any{"error": "cannot parse query"}, nil //nolint:nilerr // reported in the response's error field
 	}
 	parsed, err := d.ParseOne(query, nil)
 	if err != nil || parsed == nil {
-		return map[string]any{"error": "cannot parse query"}, nil //nolint:nilerr // reported in the response, like the Python command
+		return map[string]any{"error": "cannot parse query"}, nil //nolint:nilerr // reported in the response's error field
 	}
 	if !parsed.IsA(sqlengine.KQuery) {
 		return nil, attrErr(parsed, "limit")
@@ -260,7 +266,7 @@ func isSingleSelectQuery(query, dialectName string) map[string]any {
 }
 
 // ---------------------------------------------------------------------------
-// extract_select / select_cte / freeze_time / add_ctes
+// Unit test helpers: extract-select / select-cte / freeze-time / add-ctes
 // ---------------------------------------------------------------------------
 
 func parseOneForUnitTest(query, dialectName string) (*sqlengine.Dialect, *sqlengine.Expr, map[string]any) {
@@ -284,7 +290,8 @@ func parseOneForUnitTest(query, dialectName string) (*sqlengine.Dialect, *sqleng
 
 var writeKinds = []sqlengine.Kind{sqlengine.KInsert, sqlengine.KUpdate, sqlengine.KDelete, sqlengine.KMerge}
 
-// preserveFabricDerivedColumnCase mirrors _preserve_fabric_derived_column_case.
+// preserveFabricDerivedColumnCase aliases the bare column projections of CTEs and subqueries that
+// have no column list to their own name (keeping their quoting), so Fabric keeps their case.
 func preserveFabricDerivedColumnCase(e *sqlengine.Expr) {
 	for derived := range e.FindAll(sqlengine.KCTE, sqlengine.KSubquery) {
 		alias := derived.ArgE("alias")
@@ -440,7 +447,7 @@ func addCTEs(query, dialectName string, ctesAny any) map[string]any {
 		}
 		cur := parsed
 		for _, c := range ctes {
-			// with_ is defined on Query, Insert and Update.
+			// Only queries, INSERT and UPDATE take a WITH clause.
 			if !cur.IsA(sqlengine.KQuery, sqlengine.KInsert, sqlengine.KUpdate) {
 				return nil, attrErr(cur, "with_")
 			}
@@ -605,7 +612,8 @@ func isReadOnlyStatement(stmt *sqlengine.Expr, d *sqlengine.Dialect, dialectName
 
 func pyUpper(s string) string { return sqlengine.PyUpper(s) }
 
-// pyTypeName mirrors type(v).__name__ for raw argument values.
+// pyTypeName names the type of a raw argument value for error messages: NoneType, str or the
+// expression kind.
 func pyTypeName(v any) string {
 	switch x := v.(type) {
 	case nil:

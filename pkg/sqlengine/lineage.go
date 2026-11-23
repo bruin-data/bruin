@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/lineage.py.
-
-// LineageNode mirrors sqlglot.lineage.Node.
+// LineageNode is one step in a column's lineage: a column (or set operation) in some scope,
+// with the nodes it reads from in Downstream.
 type LineageNode struct {
 	Name              string
 	Expression        *Expr
@@ -17,7 +16,7 @@ type LineageNode struct {
 	ReferenceNodeName string
 }
 
-// Walk mirrors Node.walk (DFS, visiting each node once).
+// Walk returns n and all nodes reachable through Downstream in depth-first order, each once.
 func (n *LineageNode) Walk() []*LineageNode {
 	visited := map[*LineageNode]bool{}
 	queue := []*LineageNode{n}
@@ -37,7 +36,8 @@ func (n *LineageNode) Walk() []*LineageNode {
 	return out
 }
 
-// LineageError mirrors sqlglot.errors.SqlglotError raised by lineage.
+// LineageError reports why lineage could not be computed, e.g. a statement that is not a query or
+// an unknown or unnamed column.
 type LineageError struct{ Msg string }
 
 func (e *LineageError) Error() string { return e.Msg }
@@ -65,7 +65,7 @@ type lineageState struct {
 	scopeMeta   map[*Scope]*lineageScopeMeta
 }
 
-// LineageOptions configures Lineage.
+// LineageOptions configures LineageAll and LineageColumn.
 type LineageOptions struct {
 	Schema      *MappingSchema
 	Dialect     *Dialect
@@ -74,8 +74,9 @@ type LineageOptions struct {
 	Copy        bool
 }
 
-// LineageAll mirrors lineage(None, sql, ...) returning an ordered map of output column -> node.
-// The expression must already be qualified when opts.Scope is provided.
+// LineageAll computes the lineage of every output column of expression, returning the column
+// names in projection order and a node per name. The expression must already be qualified when
+// opts.Scope is provided.
 func LineageAll(expression *Expr, opts LineageOptions) (names []string, nodes map[string]*LineageNode, err error) {
 	defer recoverLineage(&err)
 	scope, st := prepareLineage(expression, opts)
@@ -96,7 +97,7 @@ func LineageAll(expression *Expr, opts LineageOptions) (names []string, nodes ma
 	return names, nodes, nil
 }
 
-// LineageColumn mirrors lineage(column, sql, ...).
+// LineageColumn computes the lineage of one output column of expression.
 func LineageColumn(column string, expression *Expr, opts LineageOptions) (node *LineageNode, err error) {
 	defer recoverLineage(&err)
 	scope, st := prepareLineage(expression, opts)
@@ -167,7 +168,8 @@ func prepareLineage(expression *Expr, opts LineageOptions) (*Scope, *lineageStat
 	}
 }
 
-// toNode mirrors lineage.to_node. column is a name, or an index when isIdx.
+// toNode builds (or reuses from the cache) the lineage node of a column in scope and links it
+// under upstream. column is a name, or columnIdx is an index when isIdx.
 func (st *lineageState) toNode(column string, columnIdx int, isIdx bool, scope *Scope, scopeName string,
 	upstream *LineageNode, sourceName, referenceNodeName string,
 ) *LineageNode {
@@ -292,13 +294,11 @@ func (st *lineageState) toNode(column string, columnIdx int, isIdx bool, scope *
 			if src.Scope != nil {
 				srcExpr = src.Scope.Expression
 			}
-			// select.sql(comments=False): default dialect
 			starName := exprSQLNoComments(sel)
 			node.Downstream = append(node.Downstream, &LineageNode{Name: starName, Source: srcExpr, Expression: srcExpr})
 		}
 	}
 
-	// source_columns = set(find_all_in_scope(select, exp.Column))
 	sourceColumns := dedupeExprs(collectSeq(FindAllInScope(sel, KColumn)))
 
 	var derivedTables []*Expr
@@ -323,31 +323,37 @@ func (st *lineageState) toNode(column string, columnIdx int, isIdx bool, scope *
 		}
 	}
 
-	pivots := scope.Pivots()
-	var pivot *Expr
-	if len(pivots) == 1 {
-		pivot = pivots[0]
-	}
+	// The scope's pivots only form a chain when they all hang off of the same source; otherwise
+	// they can't be folded, so their columns degrade to unresolved leaves
+	var lastPivot *Expr
 	pivotRenames := newOMap[string]()
-	var pivotColumnMapping *omap[[]*Expr]
-	if pivot != nil {
-		pivotRenames = pivotOutputRenames(pivot, scope, st.schema)
-		pivotColumnMapping = pivotColumnMappingOf(pivot)
-		if pivotRenames.Len() > 0 {
-			remapped := newOMap[[]*Expr]()
-			for _, post := range pivotRenames.Keys() {
-				pre, _ := pivotRenames.Get(post)
-				if cols, ok := pivotColumnMapping.Get(pre); ok {
-					remapped.Set(post, cols)
-				}
-			}
-			pivotColumnMapping = remapped
-		}
+	pivotColumnMapping := newOMap[[]*Expr]()
+	if pivots := scope.Pivots(); len(pivots) > 0 && pivots[0].Parent() == pivots[len(pivots)-1].Parent() {
+		lastPivot = pivots[len(pivots)-1]
+		pivotRenames, pivotColumnMapping = pivotChainMapping(pivots, scope, st.schema)
 	}
 
 	for _, c := range sourceColumns {
 		table := c.TableName()
 		colSource, hasSource := scope.Sources.Get(table)
+
+		// A column the optimizer could not qualify (e.g. for lack of a schema) is attributed to
+		// the sole named source, so the graph doesn't degrade to a Placeholder leaf. Pseudocolumns
+		// (e.g. Oracle's LEVEL) are computed by the query itself, so they never belong to a source
+		if !hasSource && table == "" && !c.IsA(KPseudocolumn) {
+			var namedSources []string
+			for _, name := range scope.Sources.Keys() {
+				if name != "" {
+					namedSources = append(namedSources, name)
+				}
+			}
+			if len(namedSources) == 1 {
+				table = namedSources[0]
+				colSource, hasSource = scope.Sources.Get(table)
+				c.Set("table", ToIdentifier(table, nil))
+			}
+		}
+
 		if hasSource && colSource.Scope != nil {
 			refName := ""
 			if colSource.Scope.Type == ScopeDerivedTable {
@@ -364,7 +370,9 @@ func (st *lineageState) toNode(column string, columnIdx int, isIdx bool, scope *
 				sn = sourceName
 			}
 			st.toNode(c.Name(), -1, false, colSource.Scope, table, node, sn, refName)
-		} else if pivot != nil && pivot.AliasOrName() == c.TableName() {
+		} else if lastPivot != nil && lastPivot.AliasOrName() == c.TableName() {
+			// Only the last operator in a chain names the resulting source
+			pivot := lastPivot
 			var downstreamColumns []*Expr
 			columnName := c.Name()
 			if cols, ok := pivotColumnMapping.Get(columnName); ok {
@@ -427,7 +435,6 @@ func (st *lineageState) toNode(column string, columnIdx int, isIdx bool, scope *
 	return node
 }
 
-// lineageColumn mirrors exp.column(col, table=...) for lineage pivot handling.
 func lineageColumn(col any, table any) *Expr {
 	var this *Expr
 	switch c := col.(type) {
@@ -451,7 +458,6 @@ func collectSeq(seq func(func(*Expr) bool)) []*Expr {
 	return out
 }
 
-// dedupeExprs mirrors set(...) of expressions (structural equality), keeping first occurrences.
 func dedupeExprs(in []*Expr) []*Expr {
 	seen := map[uint64][]*Expr{}
 	var out []*Expr
@@ -469,14 +475,15 @@ outer:
 	return out
 }
 
-func pivotOutputRenames(pivot *Expr, scope *Scope, schema *MappingSchema) *omap[string] {
-	if len(pivot.AliasColumnNames()) == 0 {
-		return newOMap[string]()
-	}
+// prePivotColumns returns the columns the first operator of a (UN)PIVOT chain sees: the
+// projections of a derived table or CTE source, or the schema columns of a physical table. It is
+// empty when they can't be determined (e.g. an unexpanded star), since anything positional over
+// them would silently shift.
+func prePivotColumns(pivot *Expr, scope *Scope, schema *MappingSchema) []string {
 	parent := pivot.Parent()
-	var pre []string
+	var columns []string
 	if parent.IsA(KDerivedTable) && parent.This().IsA(KQuery) {
-		pre = parent.This().NamedSelects()
+		columns = parent.This().NamedSelects()
 	} else if parent.IsA(KTable) {
 		var cteSource Source
 		var hasCTE bool
@@ -484,23 +491,113 @@ func pivotOutputRenames(pivot *Expr, scope *Scope, schema *MappingSchema) *omap[
 			cteSource, hasCTE = scope.CTESources.Get(parent.Name())
 		}
 		if hasCTE && cteSource.Scope != nil && cteSource.Scope.Expression.IsA(KQuery) {
-			pre = cteSource.Scope.Expression.NamedSelects()
+			columns = cteSource.Scope.Expression.NamedSelects()
 		} else if schema != nil {
-			pre = schema.ColumnNames(parent, true, nil, nil)
+			columns = schema.ColumnNames(parent, true, nil, nil)
 		}
 	}
-	if len(pre) == 0 {
-		return newOMap[string]()
+	if containsStr(columns, "*") {
+		return nil
 	}
-	for _, c := range pre {
-		if c == "*" {
-			return newOMap[string]()
-		}
-	}
-	return PivotOutputColumns(pivot, pre)
+	return columns
 }
 
-// PivotOutputColumns mirrors Pivot.output_columns.
+// pivotChainMapping folds a chain of (UN)PIVOT operators into a single view of its output, as
+// each one consumes the previous one's columns rather than the pivoted source's. It returns the
+// composed output name -> pre-chain name renames (from alias column lists) and the composed
+// output name -> source columns it derives from.
+func pivotChainMapping(pivots []*Expr, scope *Scope, schema *MappingSchema) (*omap[string], *omap[[]*Expr]) {
+	available := prePivotColumns(pivots[0], scope, schema)
+	renames := newOMap[string]()
+	mapping := newOMap[[]*Expr]()
+
+	for _, pivot := range pivots {
+		// Renames are positional over the operator's full output, so they can only be applied
+		// when the columns going into it are known
+		stepRenames := newOMap[string]()
+		if len(pivot.AliasColumnNames()) > 0 && len(available) > 0 {
+			stepRenames = PivotOutputColumns(pivot, available)
+		}
+		stepMapping := pivotColumnMappingOf(pivot)
+		if stepRenames.Len() > 0 {
+			remapped := newOMap[[]*Expr]()
+			for _, post := range stepRenames.Keys() {
+				pre, _ := stepRenames.Get(post)
+				if cols, ok := stepMapping.Get(pre); ok {
+					remapped.Set(post, cols)
+				}
+			}
+			stepMapping = remapped
+		}
+
+		// Columns this operator consumed may have been produced by an earlier one, or be
+		// alias-list renames of passthroughs; they resolve through what was folded so far
+		resolve := func(col *Expr) []*Expr {
+			if cols, ok := mapping.Get(col.Name()); ok {
+				return cols
+			}
+			if r, ok := renames.Get(col.Name()); ok {
+				return []*Expr{lineageColumn(r, nil)}
+			}
+			return []*Expr{col}
+		}
+
+		composed := newOMap[[]*Expr]()
+		consumed := newStrSet()
+		for _, out := range stepMapping.Keys() {
+			cols, _ := stepMapping.Get(out)
+			var resolved []*Expr
+			for _, col := range cols {
+				consumed.Add(col.Name())
+				resolved = append(resolved, resolve(col)...)
+			}
+			composed.Set(out, resolved)
+		}
+
+		// Whatever an earlier operator produced and this one didn't consume passes through,
+		// under whatever name this operator's alias column list gives it
+		preToPost := map[string]string{}
+		for _, post := range stepRenames.Keys() {
+			pre, _ := stepRenames.Get(post)
+			preToPost[pre] = post
+		}
+		for _, out := range mapping.Keys() {
+			if consumed.Has(out) {
+				continue
+			}
+			name := out
+			if post, ok := preToPost[out]; ok {
+				name = post
+			}
+			if !composed.Has(name) {
+				cols, _ := mapping.Get(out)
+				composed.Set(name, cols)
+			}
+		}
+
+		if stepRenames.Len() > 0 {
+			composedRenames := newOMap[string]()
+			for _, post := range stepRenames.Keys() {
+				pre, _ := stepRenames.Get(post)
+				if r, ok := renames.Get(pre); ok {
+					pre = r
+				}
+				composedRenames.Set(post, pre)
+			}
+			renames = composedRenames
+		}
+		mapping = composed
+		if len(available) > 0 {
+			available = PivotOutputColumns(pivot, available).Keys()
+		}
+	}
+
+	return renames, mapping
+}
+
+// PivotOutputColumns maps each output column name of a PIVOT/UNPIVOT (after alias renames) to the
+// column name it has before the renames, given the input column names. It is empty when nothing
+// can be derived.
 func PivotOutputColumns(p *Expr, prePivotColumns []string) *omap[string] {
 	excluded := newStrSet()
 	var outputs []string
@@ -626,7 +723,6 @@ func pivotColumnMappingOf(pivot *Expr) *omap[[]*Expr] {
 	return mapping
 }
 
-// exprSQLNoComments mirrors expression.sql(comments=False) in the default dialect.
 func exprSQLNoComments(e *Expr) string {
 	s, err := prototype("").Generate(e, &GenerateOptions{NoComments: true})
 	if err != nil {

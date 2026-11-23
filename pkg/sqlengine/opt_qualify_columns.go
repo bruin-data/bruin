@@ -7,23 +7,20 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/optimizer/qualify_columns.py (plus simplify_parens from simplify.py).
-
-// QualifyColumns mirrors qualify_columns(expression, schema, expand_alias_refs, expand_stars,
-// infer_schema, allow_partial_qualification, dialect).
+// QualifyColumns rewrites the AST to have fully qualified columns.
 //
-// It rewrites the AST to have fully qualified columns. inferSchema TriNone means "infer the schema
-// iff it is empty". A nil schema is replaced by an empty MappingSchema for d (ensure_schema); d is
-// otherwise unused, like in Python (the schema dialect drives the qualification).
+// inferSchema TriNone means "infer the schema iff it is empty". A nil schema is replaced by an
+// empty MappingSchema for d; d is otherwise unused (the schema's dialect drives the
+// qualification).
 //
 // Notes:
-//   - Currently only handles a single PIVOT or UNPIVOT operator
+//   - Currently only handles a single PIVOT or UNPIVOT operator.
 func QualifyColumns(expression *Expr, schema *MappingSchema, expandAliasRefs, expandStars bool, inferSchema Tri, allowPartialQualification bool, d *Dialect) *Expr {
 	if schema == nil {
 		schema = NewMappingSchema(nil, nil, d, true, nil)
 	}
 
-	// TypeAnnotator(schema) is created lazily: it is stateless until first used.
+	// The TypeAnnotator for schema is created lazily: it is stateless until first used.
 	var annotator *TypeAnnotator
 	getAnnotator := func() *TypeAnnotator {
 		if annotator == nil {
@@ -55,7 +52,7 @@ func QualifyColumns(expression *Expr, schema *MappingSchema, expandAliasRefs, ex
 		resolver := NewResolver(scope, schema, infer)
 		qcPopTableColumnAliases(scope.CTEs())
 		qcPopTableColumnAliases(scope.DerivedTables())
-		usingColumnTables := qcExpandUsing(scope, resolver)
+		usingColumnTables, usingColumns := qcExpandUsing(scope, resolver)
 
 		if (schema.Empty() || dialect.S.FORCE_EARLY_ALIAS_REF_EXPANSION) && expandAliasRefs {
 			qcExpandAliasRefs(scope, resolver, dialect, dialect.S.EXPAND_ONLY_GROUP_ALIAS_REF)
@@ -64,13 +61,16 @@ func QualifyColumns(expression *Expr, schema *MappingSchema, expandAliasRefs, ex
 		qcConvertColumnsToDots(scope, resolver)
 		qcQualifyColumns(scope, resolver, allowPartialQualification)
 
+		// Columns just qualified in place may have been classified as external
+		scope.ClearColumnCache()
+
 		if !schema.Empty() && expandAliasRefs {
 			qcExpandAliasRefs(scope, resolver, dialect, false)
 		}
 
 		if isSelect {
 			if expandStars {
-				qcExpandStars(scope, resolver, usingColumnTables, pseudocolumns, getAnnotator)
+				qcExpandStars(scope, resolver, usingColumnTables, usingColumns, pseudocolumns, getAnnotator)
 			}
 			QualifyOutputsScope(scope, dialect)
 		}
@@ -89,8 +89,8 @@ func QualifyColumns(expression *Expr, schema *MappingSchema, expandAliasRefs, ex
 	return expression
 }
 
-// ValidateQualifyColumns mirrors validate_qualify_columns(expression, sql): it raises an
-// OptimizeError if any columns aren't qualified. sql "" means None.
+// ValidateQualifyColumns panics with an OptimizeError if any columns aren't qualified. When sql is
+// not "", the message quotes it with the offending column highlighted.
 func ValidateQualifyColumns(expression *Expr, sql string) *Expr {
 	var allUnqualifiedColumns []*Expr
 	for _, scope := range TraverseScope(expression) {
@@ -140,7 +140,6 @@ func ValidateQualifyColumns(expression *Expr, sql string) *Expr {
 	return expression
 }
 
-// qcPositions reads the line/col/start/end position metadata of a node (nil when absent).
 func qcPositions(e *Expr) (line, col, start, end any) {
 	if e == nil {
 		return nil, nil, nil, nil
@@ -148,7 +147,6 @@ func qcPositions(e *Expr) (line, col, start, end any) {
 	return e.MetaGet("line"), e.MetaGet("col"), e.MetaGet("start"), e.MetaGet("end")
 }
 
-// qcHighlight mirrors highlight_sql(sql, [(start, end)])[0].
 func qcHighlight(sql string, start, end any) string {
 	s, _ := start.(int)
 	e, _ := end.(int)
@@ -185,7 +183,7 @@ func qcSeparatePseudocolumns(scope *Scope, pseudocolumns StrSet) {
 	}
 }
 
-// qcPopTableColumnAliases mirrors _pop_table_column_aliases: remove table column aliases.
+// qcPopTableColumnAliases removes table column aliases (except on recursive CTEs).
 //
 // For example, `col1` and `col2` will be dropped in SELECT ... FROM (SELECT ...) AS foo(col1, col2).
 func qcPopTableColumnAliases(derivedTables []*Expr) {
@@ -199,11 +197,15 @@ func qcPopTableColumnAliases(derivedTables []*Expr) {
 	}
 }
 
-// usingColumnTables mirrors the dict[str, dict[str, None]] returned by _expand_using: automatically
-// joined column names mapped to an ordered set of source names.
+// usingColumnTables maps each automatically joined (USING / NATURAL) column name to the ordered
+// set of source names that provide it.
 type usingColumnTables = omap[*omap[struct{}]]
 
-func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
+// qcExpandUsing rewrites USING and NATURAL joins as ON joins and replaces unqualified references
+// to their columns with COALESCE over the joined sources. It returns the sources of each such
+// column and the USING columns that star expansion lists first (each join's columns preceding
+// those of earlier joins; empty when they keep their position).
+func qcExpandUsing(scope *Scope, resolver *Resolver) (*usingColumnTables, []string) {
 	columns := newOMap[string]()
 
 	updateSourceColumns := func(sourceName string) {
@@ -219,7 +221,7 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 		joins = append(joins, j)
 	}
 	if len(joins) == 0 {
-		return newOMap[*omap[struct{}]]()
+		return newOMap[*omap[struct{}]](), nil
 	}
 
 	names := newStrSet()
@@ -245,7 +247,6 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 		panic(&OptimizeError{Msg: fmt.Sprintf("Joins {%s} missing source table %s", strings.Join(reprs, ", "), chunkFPyStr(scope.Expression))})
 	}
 
-	// Mapping of automatically joined column names to an ordered set of source names (dict).
 	columnTables := newOMap[*omap[struct{}]]()
 
 	anyUsing := false
@@ -255,13 +256,17 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 			break
 		}
 	}
+	var usingColumns []string
 	if !anyUsing {
-		return columnTables
+		return columnTables, usingColumns
 	}
 
 	for _, sourceName := range ordered {
 		updateSourceColumns(sourceName)
 	}
+
+	columnOrder := resolver.dialect.S.USING_COLUMN_ORDER
+	moveUsingColumns := columnOrder != "IN_PLACE"
 
 	for i, join := range joins {
 		sourceTable := ordered[len(ordered)-1]
@@ -276,12 +281,28 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 
 		usingArg := join.Arg("using")
 		using := join.ArgL("using")
+		if !(len(using) > 0 || join.ArgB("on") || join.MethodText() != "" || join.SideText() != "" || join.KindText() != "") {
+			// `,` binds looser than JOIN, so in `a, b JOIN c USING (k)` k only moves ahead of b's
+			// columns, not a's. That isn't modeled, so after a comma join the USING columns stay
+			// in place
+			moveUsingColumns = false
+		}
+
+		// The order in which the left side outputs its columns
+		leftColumns := append([]string{}, usingColumns...)
+		for _, c := range columns.Keys() {
+			if !containsStr(usingColumns, c) {
+				leftColumns = append(leftColumns, c)
+			}
+		}
+
 		if usingArg == nil && join.MethodText() == "NATURAL" {
-			// A NATURAL JOIN is a USING join over the columns common to both sides; when
-			// those can't be determined (unknown schema, no common columns), NATURAL stays
+			// A NATURAL JOIN is a USING join over the columns common to both sides, in the order
+			// the left side outputs them; when those can't be determined (unknown schema, no
+			// common columns), NATURAL stays
 			if columns.Len() > 0 && !columns.Has("*") && len(joinColumns) > 0 && !containsStr(joinColumns, "*") {
 				using = nil
-				for _, columnName := range columns.Keys() {
+				for _, columnName := range leftColumns {
 					if containsStr(joinColumns, columnName) {
 						using = append(using, ToIdentifier(columnName, nil))
 					}
@@ -299,6 +320,28 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 		usingIdentifierCount := len(using)
 		isSemiOrAntiJoin := join.IsSemiOrAntiJoin()
 
+		if moveUsingColumns {
+			var joinKeys []string
+			for _, identifier := range using {
+				joinKeys = append(joinKeys, identifier.Name())
+			}
+			if columnOrder == "LEFT_TABLE" {
+				var keys []string
+				for _, name := range leftColumns {
+					if containsStr(joinKeys, name) {
+						keys = append(keys, name)
+					}
+				}
+				joinKeys = keys
+			}
+			for _, name := range usingColumns {
+				if !containsStr(joinKeys, name) {
+					joinKeys = append(joinKeys, name)
+				}
+			}
+			usingColumns = joinKeys
+		}
+
 		for _, identifierExpr := range using {
 			identifier := identifierExpr.Name()
 			table, _ := columns.Get(identifier)
@@ -314,7 +357,14 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 			}
 
 			var lhs *Expr
-			if i == 0 || usingIdentifierCount == 1 {
+			if tables, ok := columnTables.Get(identifier); ok && tables.Len() > 0 {
+				// A key merged by an earlier join compares against all of its sources
+				var coalesceColumns []*Expr
+				for _, t := range tables.Keys() {
+					coalesceColumns = append(coalesceColumns, ColumnExpr(identifier, t, nil, nil, nil, nil, true))
+				}
+				lhs = qcCoalesce(coalesceColumns)
+			} else if i == 0 || usingIdentifierCount == 1 {
 				lhs = ColumnExpr(identifier, table, nil, nil, nil, nil, true)
 			} else {
 				var coalesceColumns []*Expr
@@ -332,16 +382,15 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 
 			conditions = append(conditions, qcEQ(lhs, ColumnExpr(identifier, joinTable, nil, nil, nil, nil, true)))
 
-			// Set all values in the dict to None, because we only care about the key ordering
-			tables, ok := columnTables.Get(identifier)
-			if !ok {
-				tables = newOMap[struct{}]()
-				columnTables.Set(identifier, tables)
-			}
-
-			// Do not update the dict if this was a SEMI/ANTI join in
+			// Do not update the map if this was a SEMI/ANTI join in
 			// order to avoid generating COALESCE columns for this join pair
 			if !isSemiOrAntiJoin {
+				// The set's values are empty, because we only care about the key ordering
+				tables, ok := columnTables.Get(identifier)
+				if !ok {
+					tables = newOMap[struct{}]()
+					columnTables.Set(identifier, tables)
+				}
 				if !tables.Has(table) {
 					tables.Set(table, struct{}{})
 				}
@@ -378,10 +427,9 @@ func qcExpandUsing(scope *Scope, resolver *Resolver) *usingColumnTables {
 		}
 	}
 
-	return columnTables
+	return columnTables, usingColumns
 }
 
-// qcCoalesce mirrors exp.func("coalesce", *args) (base dialect parser: build_coalesce).
 func qcCoalesce(args []*Expr) *Expr {
 	converted := make([]*Expr, 0, len(args))
 	for _, a := range args {
@@ -401,7 +449,6 @@ func qcCoalesce(args []*Expr) *Expr {
 	return function
 }
 
-// qcEQ mirrors this.eq(other) (Expr._binop(EQ, other)).
 func qcEQ(this, other *Expr) *Expr {
 	this = this.Copy()
 	other = other.Copy()
@@ -417,7 +464,7 @@ type qcAliasRef struct {
 	index int
 }
 
-// qcExpandAliasRefs mirrors _expand_alias_refs: expand references to aliases.
+// qcExpandAliasRefs expands references to projection aliases.
 //
 // Example:
 //
@@ -461,7 +508,7 @@ func qcExpandAliasRefs(scope *Scope, resolver *Resolver, dialect *Dialect, expan
 			skipReplace := false
 			var table *Expr
 			if resolveTable && column.TableName() == "" {
-				table = resolver.GetTableByName(column.Name())
+				table = resolver.GetTable(column)
 			}
 			ref, hasAlias := aliasToExpression[column.Name()]
 			aliasExpr, i := ref.expr, ref.index
@@ -470,9 +517,10 @@ func qcExpandAliasRefs(scope *Scope, resolver *Resolver, dialect *Dialect, expan
 			}
 
 			if aliasExpr != nil {
-				skipReplace = aliasExpr.Find(KAggFunc) != nil &&
-					column.FindAncestor(KAggFunc) != nil &&
-					!column.FindAncestor(KWindow, KSelect).IsA(KWindow)
+				// An aggregate alias must not be expanded into a GROUP BY or another (non-window) aggregate.
+				skipReplace = FindInScope(aliasExpr, KAggFunc) != nil &&
+					(isGroupBy || (column.FindAncestor(KAggFunc) != nil &&
+						!column.FindAncestor(KWindow, KSelect).IsA(KWindow)))
 
 				// BigQuery's having clause gets confused if an alias matches a source.
 				// SELECT x.a, max(x.b) as x FROM x GROUP BY 1 HAVING x > 1;
@@ -508,6 +556,9 @@ func qcExpandAliasRefs(scope *Scope, resolver *Resolver, dialect *Dialect, expan
 			if table != nil && (aliasExpr == nil || skipReplace) {
 				column.Set("table", table)
 			} else if column.TableName() == "" && aliasExpr != nil && !skipReplace {
+				// In e.g. SELECT x + 1 AS y FROM read_parquet('f') WHERE y > 1, y may also be a
+				// column of a source whose columns are unknown (a table function, or a table
+				// missing from the schema). Such sources are common, so the alias is assumed.
 				if (aliasExpr.IsA(KLiteral) || aliasExpr.IsNumber()) && (literalIndex || resolveTable) {
 					if literalIndex {
 						column.Replace(LiteralInt(i))
@@ -519,6 +570,17 @@ func qcExpandAliasRefs(scope *Scope, resolver *Resolver, dialect *Dialect, expan
 					simplified := SimplifyParens(column, dialect)
 					if simplified != column {
 						column.Replace(simplified)
+						column = simplified
+					}
+
+					if resolveTable {
+						for inner := range WalkInScope(column, nil) {
+							if inner.IsA(KColumn) && inner.TableName() == "" {
+								if innerTable := resolver.GetTable(inner); innerTable != nil {
+									inner.Set("table", innerTable)
+								}
+							}
+						}
 					}
 				}
 			}
@@ -624,7 +686,10 @@ func qcExpandOrderByAndDistinctOn(scope *Scope, resolver *Resolver) {
 			for agg := range original.FindAll(KAggFunc) {
 				for col := range agg.FindAll(KColumn) {
 					if col.TableName() == "" {
-						col.Set("table", resolver.GetTableByName(col.Name()))
+						if table := resolver.GetTable(col); table != nil {
+							col.Set("table", table)
+							delete(col.Meta(), "dot_parts")
+						}
 					}
 				}
 			}
@@ -639,7 +704,7 @@ func qcExpandOrderByAndDistinctOn(scope *Scope, resolver *Resolver) {
 				selects = append(selects, selectEntry{s.This(), ColumnExpr(s.AliasOrName(), nil, nil, nil, nil, nil, true)})
 			}
 			lookup := func(node *Expr) *Expr {
-				// dict semantics: the value of the last entry whose key equals node
+				// the last projection whose expression equals node wins
 				for j := len(selects) - 1; j >= 0; j-- {
 					if selects[j].key != nil && selects[j].key.Equal(node) {
 						return selects[j].value
@@ -716,7 +781,8 @@ func qcExpandPositionalReferences(scope *Scope, expressions []*Expr, dialect *Di
 	return newNodes
 }
 
-// qcSelectByPos mirrors _select_by_pos (Python list indexing semantics, including negative indexes).
+// qcSelectByPos returns the projection at the 1-based position held by node, which must be an
+// Alias. Positions below 1 count back from the end (0 is the last projection).
 func qcSelectByPos(expression *Expr, node *Expr) *Expr {
 	selects := expression.Selects()
 	n, err := strconv.Atoi(strings.ReplaceAll(pyStrip(node.ThisS()), "_", ""))
@@ -730,14 +796,16 @@ func qcSelectByPos(expression *Expr, node *Expr) *Expr {
 	return chunkFAssertIs(selects[idx], KAlias)
 }
 
-// qcConvertColumnsToDots mirrors _convert_columns_to_dots.
-//
-// Converts `Column` instances that represent STRUCT or JSON field lookup into chained `Dots`.
+// qcConvertColumnsToDots converts `Column` instances that represent STRUCT or JSON field lookups
+// into chained `Dot`s.
 //
 // These lookups may be parsed as columns (e.g. "col"."field"."field2"), but they need to be
 // normalized to `Dot(Dot(...(<table>.<column>, field1), field2, ...))` to be qualified properly.
 func qcConvertColumnsToDots(scope *Scope, resolver *Resolver) {
 	converted := false
+	scopeSources := scope.SelectedSources()
+	semiOrAntiJoinTables := scope.SemiOrAntiJoinTables()
+	joinColumns := map[string]StrSet{}
 	all := append(append([]*Expr{}, scope.Columns()...), scope.Stars()...)
 	for _, column := range all {
 		if column.IsA(KDot) {
@@ -745,35 +813,115 @@ func qcConvertColumnsToDots(scope *Scope, resolver *Resolver) {
 		}
 
 		columnTableName := column.TableName()
+		isStar := column.This().IsA(KStar)
 		meta := column.Meta()
 		dotParts, _ := meta["dot_parts"].([]string)
 		delete(meta, "dot_parts")
+
+		var rootResolver *Resolver
+		if len(semiOrAntiJoinTables) > 0 && columnTableName != "" {
+			root := column.ArgE("catalog")
+			if root == nil {
+				root = column.ArgE("db")
+			}
+			rootName := columnTableName
+			if root != nil {
+				rootName = root.Name()
+			}
+			if join := column.FindAncestor(KJoin, KSelect); semiOrAntiJoinTables.Has(rootName) &&
+				join.IsA(KJoin) && join.IsSemiOrAntiJoin() && join.AliasOrName() == rootName {
+				sourceColumns, ok := joinColumns[rootName]
+				if !ok {
+					sourceColumns = newStrSet(resolver.GetSourceColumns(rootName, false)...)
+					joinColumns[rootName] = sourceColumns
+				}
+				field := column.This()
+				if root != nil {
+					field = column.Parts()[1]
+				}
+				if field.IsStar() || len(sourceColumns) == 0 || sourceColumns.Has(field.Name()) || sourceColumns.Has("*") {
+					// The join's own columns win, a missing one falling back to a struct field
+					if column.DbName() == "" {
+						continue
+					}
+					rootResolver = resolver
+				}
+			}
+		}
+
+		if rootResolver == nil && !isStar && column.DbName() != "" && scopeSources.Has(columnTableName) {
+			parts := column.Parts()
+			root, field := parts[0], parts[1]
+			for _, candidate := range append([]*Resolver{resolver}, resolver.OuterResolvers()...) {
+				if !candidate.scope.SelectedSources().Has(root.Name()) {
+					continue
+				}
+				if containsStr(candidate.GetSourceColumns(root.Name(), false), field.Name()) {
+					rootResolver = candidate
+				}
+				break
+			}
+		}
+
 		if columnTableName != "" &&
-			!scope.SelectedSources().Has(columnTableName) &&
-			(scope.Parent == nil ||
-				!scope.Parent.Sources.Has(columnTableName) ||
-				!scope.IsCorrelatedSubquery()) {
+			(!scopeSources.Has(columnTableName) || (isStar && column.DbName() != "") || rootResolver != nil) &&
+			(rootResolver != nil || isStar || scope.Parent == nil ||
+				!scope.Parent.Sources.Has(columnTableName) || !scope.IsCorrelatedSubquery()) {
 			parts := column.Parts()
 			root, parts := parts[0], parts[1:]
+			wasQualified := false
+
+			// Correlated stars can't be deferred; qualified paths use their root source's resolver
+			resolvers := []*Resolver{resolver}
+			if isStar {
+				resolvers = append(resolvers, resolver.OuterResolvers()...)
+			} else if rootResolver != nil {
+				resolvers = []*Resolver{rootResolver}
+			}
 
 			var columnTable *Expr
-			var wasQualified bool
-			if root.IsA(KIdentifier) && scope.SelectedSources().Has(root.Name()) {
-				// The struct is already qualified, but we still need to change the AST
-				columnTable = root
-				if len(parts) == 0 {
-					panic(&ValueError{Msg: "not enough values to unpack (expected at least 1, got 0)"})
+			for _, sourceResolver := range resolvers {
+				selectedSources := sourceResolver.scope.SelectedSources()
+				if column.DbName() == "" && selectedSources.Has(column.TableName()) {
+					// The star is over a table, so it's expanded as is
+					columnTable = nil
+					break
 				}
-				root, parts = parts[0], parts[1:]
-				wasQualified = true
-			} else {
-				columnTable = resolver.GetTableByName(root.Name())
-				wasQualified = false
+
+				if root.IsA(KIdentifier) && (rootResolver != nil || selectedSources.Has(root.Name())) {
+					// The struct is already qualified, but we still need to change the AST
+					columnTable = root
+					if len(parts) == 0 {
+						panic(&ValueError{Msg: "not enough values to unpack (expected at least 1, got 0)"})
+					}
+					root, parts = parts[0], parts[1:]
+					wasQualified = true
+					break
+				}
+
+				if isStar && !sourceResolver.AllColumns().Has(root.Name()) && sourceResolver.HasUnknownSources() {
+					// An unknown source may own the star, so it's preserved instead of inferred
+					columnTable = nil
+					break
+				}
+
+				columnTable = sourceResolver.GetTable(chunkFAssertIs(root, KIdentifier))
+				if columnTable != nil {
+					break
+				}
 			}
 
 			if columnTable != nil {
 				converted = true
-				newColumn := ColumnExpr(root, columnTable, nil, nil, nil, nil, true)
+
+				// The column becomes the root of the Dots, so other scopes' references to it, e.g.
+				// a correlated subquery's, stay in the tree
+				placeholder := New(KNull)
+				column.Replace(DotBuild(append([]*Expr{placeholder}, parts...)))
+				column.Set("catalog", nil)
+				column.Set("db", nil)
+				column.Set("this", root)
+				column.Set("table", ToIdentifierAny(columnTable, nil, true))
 
 				if len(dotParts) > 0 {
 					// Remove the actual column parts from the rest of dot parts
@@ -785,22 +933,21 @@ func qcConvertColumnsToDots(scope *Scope, resolver *Resolver) {
 					if skip < len(dotParts) {
 						rest = append(rest, dotParts[skip:]...)
 					}
-					newColumn.Meta()["dot_parts"] = rest
+					column.Meta()["dot_parts"] = rest
 				}
 
-				column.Replace(DotBuild(append([]*Expr{newColumn}, parts...)))
+				placeholder.Replace(column)
 			}
 		}
 	}
 
 	if converted {
 		// We want to re-aggregate the converted columns, otherwise they'd be skipped in
-		// a `for column in scope.columns` iteration, even though they shouldn't be
+		// an iteration over scope.Columns(), even though they shouldn't be
 		scope.ClearCache()
 	}
 }
 
-// qcQualifyColumns mirrors _qualify_columns: disambiguate columns, ensuring each column specifies a source.
 func qcQualifyColumns(scope *Scope, resolver *Resolver, allowPartialQualification bool) {
 	for _, column := range scope.Columns() {
 		columnTable := column.TableName()
@@ -809,12 +956,21 @@ func qcQualifyColumns(scope *Scope, resolver *Resolver, allowPartialQualificatio
 		if columnTable != "" && scope.Sources.Has(columnTable) {
 			columnSource, _ := scope.Sources.Get(columnTable)
 			sourceColumns := resolver.GetSourceColumns(columnTable, false)
-			// For pivoted sources, source_columns are pre-pivot; validate against the post-pivot set.
+			// For pivoted sources, sourceColumns are pre-pivot; validate against the post-pivot set.
+			var pivots []*Expr
 			if columnSource.Table != nil {
-				if pivots := columnSource.Table.ArgL("pivots"); len(pivots) > 0 {
-					sourceColumns = PivotOutputColumns(pivots[0], sourceColumns).Keys()
+				pivots = columnSource.Table.ArgL("pivots")
+			}
+			if len(pivots) > 0 && len(sourceColumns) > 0 && !containsStr(sourceColumns, "*") {
+				// Each operator's input is the previous one's output
+				for _, pivot := range pivots {
+					sourceColumns = PivotOutputColumns(pivot, sourceColumns).Keys()
 				}
 			}
+			if qcQualifyPositionalColumn(scope, resolver, column, columnTable, columnSource, sourceColumns, pivots, allowPartialQualification) {
+				continue
+			}
+			columnName = column.Name()
 			if !allowPartialQualification &&
 				len(sourceColumns) > 0 &&
 				!containsStr(sourceColumns, columnName) &&
@@ -825,13 +981,28 @@ func qcQualifyColumns(scope *Scope, resolver *Resolver, allowPartialQualificatio
 
 		if columnTable == "" {
 			if pivots := scope.Pivots(); len(pivots) > 0 && column.FindAncestor(KPivot) == nil {
+				if resolver.dialect.S.TABLE_ALIASES_SHADOW_COLUMN_NAMES {
+					shadowed := false
+					for _, pivot := range pivots {
+						if pivot.Alias() == columnName {
+							shadowed = true
+							break
+						}
+					}
+					if shadowed {
+						// A whole-row reference to the pivot's alias wins over a same-named column
+						scope.Replace(column, New(KTableColumn, "this", column.This()))
+						continue
+					}
+				}
+
 				// If the column is under the Pivot expression, we need to qualify it
 				// using the name of the pivoted source instead of the pivot's alias
-				column.Set("table", ToIdentifier(pivots[0].Alias(), nil))
+				column.Set("table", ToIdentifier(pivots[len(pivots)-1].Alias(), nil))
 				continue
 			}
 
-			// column_table can be a '' because bigquery unnest has no table alias
+			// columnTable can be "" because BigQuery UNNEST has no table alias
 			table := resolver.GetTable(column)
 
 			if table != nil {
@@ -842,43 +1013,253 @@ func qcQualifyColumns(scope *Scope, resolver *Resolver, allowPartialQualificatio
 				}
 			}
 
+			// With sources of unknown columns, a source's name may also be one of their columns.
+			// The name of a function's output or of a source with unknown columns still refers to
+			// that source (see qcIsOpaqueSource), even where outer columns are visible, since the
+			// local source shadows them.
 			if table != nil {
 				column.Set("table", table)
 			} else if resolver.dialect.S.TABLES_REFERENCEABLE_AS_COLUMNS &&
 				len(column.Parts()) == 1 &&
-				scope.SelectedSources().Has(columnName) {
-				// BigQuery and Postgres allow tables to be referenced as columns, treating them as structs/records
-				scope.Replace(column, New(KTableColumn, "this", column.This()))
+				scope.SelectedSources().Has(columnName) &&
+				(!resolver.HasUnknownSources() || qcIsOpaqueSource(scope, resolver, columnName)) {
+				var outerTable *Expr
+				if resolver.dialect.S.OUTER_COLUMNS_SHADOW_TABLE_ALIASES {
+					outerTable = qcGetOuterColumnTable(column, resolver)
+				}
+				if outerTable != nil {
+					column.Set("table", outerTable)
+				} else {
+					// BigQuery and Postgres allow tables to be referenced as columns, treating them as structs/records
+					scope.Replace(column, New(KTableColumn, "this", column.This()))
+				}
+			} else if scope.CanBeCorrelated && resolver.HasUnknownTVFSources() {
+				// The column may belong to the table function or to an outer source
+				panic(&OptimizeError{Msg: fmt.Sprintf("Cannot resolve '%s' due to missing source schemas", columnName)})
 			}
 		}
 	}
 
-	for _, pivot := range scope.Pivots() {
+	pivots := scope.Pivots()
+
+	// A chained operator's IN-list may name columns produced by earlier operators, which no
+	// source exposes; the chain's accumulated output resolves them. Attribution is only
+	// unambiguous when all pivots share one parent, i.e. there's a single pivoted source.
+	singleChain := len(pivots) > 0 && pivots[0].Parent() == pivots[len(pivots)-1].Parent()
+	produced := newStrSet()
+	pivotedSource := ""
+	if singleChain {
+		pivotedSource = pivots[len(pivots)-1].Alias()
+	}
+	var available []string
+	if scope.Sources.Has(pivotedSource) {
+		available = resolver.GetSourceColumns(pivotedSource, false)
+	}
+
+	for _, pivot := range pivots {
 		for column := range pivot.FindAll(KColumn) {
-			if column.TableName() == "" && resolver.AllColumns().Has(column.Name()) {
-				if table := resolver.GetTableByName(column.Name()); table != nil {
+			if column.TableName() != "" {
+				continue
+			}
+			if resolver.AllColumns().Has(column.Name()) {
+				if table := resolver.GetTable(column); table != nil {
 					column.Set("table", table)
 				}
+			} else if singleChain && produced.Has(column.Name()) {
+				column.Set("table", ToIdentifier(pivotedSource, nil))
 			}
+		}
+
+		if singleChain {
+			available = PivotOutputColumns(pivot, available).Keys()
+			produced.Add(available...)
 		}
 	}
 }
 
-// qcIsType mirrors Expr.is_type(dtype) (the annotated type) for a single DType.
+// qcIsOpaqueSource reports whether the source called name is the output of a function (a table
+// function, UNNEST or LATERAL) or has unknown columns. A reference to such a source's name reads
+// that source, as a whole row or as its column of the same name (e.g. Postgres names a scalar
+// function's only column after the source).
+func qcIsOpaqueSource(scope *Scope, resolver *Resolver, name string) bool {
+	source, ok := scope.Sources.Get(name)
+	if !ok {
+		return false
+	}
+	if (source.Scope != nil && source.Scope.IsUDTF()) || (source.Table.IsA(KTable) && source.Table.This().IsA(KFunc)) {
+		return true
+	}
+	columns := resolver.GetSourceColumns(name, false)
+	return len(columns) == 0 || containsStr(columns, "*")
+}
+
+// qcQualifyPositionalColumn resolves a qualified positional reference (`t.$N`, the Nth column of
+// source t) to the column's name, in dialects that support them. It reports whether the column
+// must be left as is, skipping any further qualification.
+func qcQualifyPositionalColumn(scope *Scope, resolver *Resolver, column *Expr, columnTable string, columnSource Source,
+	sourceColumns []string, pivots []*Expr, allowPartialQualification bool,
+) bool {
+	if !resolver.dialect.S.SUPPORTS_POSITIONAL_COLUMN_REFS || !column.This().IsA(KParameter) {
+		return false
+	}
+	position := column.This().This()
+	if !position.IsA(KLiteral) || !position.IsInt() {
+		return false
+	}
+
+	// Pivots of unrelated sources may share this scope, so an exact output alias match wins; for
+	// an aliasless chain, the last operator on the referenced source is used.
+	var scopePivot *Expr
+	for _, pivot := range scope.Pivots() {
+		if pivot.Alias() == columnTable {
+			scopePivot = pivot
+			break
+		}
+	}
+	if scopePivot == nil {
+		scopePivots := scope.Pivots()
+		for i := len(scopePivots) - 1; i >= 0; i-- {
+			if parent := scopePivots[i].Parent(); parent != nil && parent.AliasOrName() == columnTable {
+				scopePivot = scopePivots[i]
+				break
+			}
+		}
+	}
+
+	if len(pivots) > 0 || scopePivot != nil || len(sourceColumns) == 0 || containsStr(sourceColumns, "*") {
+		if scopePivot != nil {
+			column.Set("table", ToIdentifier(scopePivot.Alias(), nil))
+		}
+		return true
+	}
+
+	positionValue, err := strconv.Atoi(strings.ReplaceAll(position.ThisS(), "_", ""))
+	if err != nil {
+		return true
+	}
+
+	var aliasColumns []string
+	sourceColumnsIncomplete := false
+	if columnSource.Table != nil {
+		aliasColumns = columnSource.Table.AliasColumnNames()
+		withoutAliases := resolver.schema.ColumnNames(columnSource.Table, true, nil, nil)
+		sourceColumnsIncomplete = len(withoutAliases) == 0 || containsStr(withoutAliases, "*")
+	}
+
+	if len(aliasColumns) > 0 && positionValue > len(aliasColumns) && sourceColumnsIncomplete {
+		return true
+	}
+
+	positionalColumns := resolver.GetSourceColumns(columnTable, true)
+	if positionValue < 1 || positionValue > len(positionalColumns) {
+		if allowPartialQualification {
+			return true
+		}
+		panic(&OptimizeError{Msg: fmt.Sprintf("Positional reference $%d is out of range for source '%s'", positionValue, columnTable)})
+	}
+
+	positionalName := positionalColumns[positionValue-1]
+	count := 0
+	for _, name := range positionalColumns {
+		if name == positionalName {
+			count++
+		}
+	}
+	if count > 1 {
+		return true
+	}
+
+	var positionalIdentifier *Expr
+	if columnSource.Scope != nil {
+		sourceExpression := columnSource.Scope.Expression
+		if !sourceExpression.IsA(KQuery) {
+			return true
+		}
+
+		var selection *Expr
+		if sourceSelects := sourceExpression.Selects(); positionValue <= len(sourceSelects) {
+			selection = sourceSelects[positionValue-1]
+		}
+		sourceIdentifier := qcOutputIdentifier(selection)
+		if sourceIdentifier == nil || sourceIdentifier.Name() != positionalName {
+			return true
+		}
+
+		positionalIdentifier = sourceIdentifier.Copy()
+	} else {
+		positionalIdentifier = ToIdentifier(positionalName, nil)
+		resolver.dialect.QuoteIdentifier(positionalIdentifier, false)
+	}
+	column.Set("this", positionalIdentifier)
+
+	return false
+}
+
+// qcGetOuterColumnTable returns the outer source a subquery column refers to, in dialects where
+// outer columns shadow the subquery's own table aliases; nil when no outer source has it or a
+// source in between with the same name captures it.
+func qcGetOuterColumnTable(column *Expr, resolver *Resolver) *Expr {
+	columnName := column.Name()
+	scope := resolver.scope
+	shadowingSources := newStrSet(scope.SelectedSources().Keys()...)
+
+	// Correlated columns can reach this scope from a descendant with shadowing aliases
+	if _, ok := scope.ColumnIndex()[column]; !ok {
+		var columnScope *Scope
+		for _, inner := range scope.Traverse() {
+			if _, ok := inner.ColumnIndex()[column]; ok {
+				columnScope = inner
+				break
+			}
+		}
+		for columnScope != nil && columnScope != scope {
+			shadowingSources.Add(columnScope.SelectedSources().Keys()...)
+			columnScope = columnScope.Parent
+		}
+	}
+
+	for _, outerResolver := range resolver.OuterResolvers() {
+		sourceColumns := outerResolver.getAllSourceColumns()
+		if scope.IsSubquery() {
+			// A LATERAL's scope already holds the preceding sources it can reference
+			join := scope.Expression.FindAncestor(KJoin, KSelect)
+			if join.IsA(KJoin) && join.FindAncestor(KSelect) == outerResolver.scope.Expression {
+				sourceColumns = outerResolver.getAvailableSourceColumns(join, true)
+			}
+
+			for _, columns := range sourceColumns.Values() {
+				if containsStr(columns, columnName) {
+					// A source in between with the same name would capture the qualified column
+					table := outerResolver.getTable(columnName, column, sourceColumns)
+					if table != nil && !shadowingSources.Has(table.Name()) {
+						return table
+					}
+					return nil
+				}
+			}
+		}
+
+		scope = outerResolver.scope
+		shadowingSources.Add(sourceColumns.Keys()...)
+	}
+
+	return nil
+}
+
 func qcIsType(e *Expr, dtype DType) bool {
 	t := e.Type()
 	return t != nil && DataTypeIsType(t, []any{dtype}, false)
 }
 
-// qcExpandStructStarsNoParens mirrors _expand_struct_stars_no_parens:
-// [BigQuery] Expand/Flatten foo.bar.* where bar is a struct column.
+// qcExpandStructStarsNoParens expands (flattens) foo.bar.* where bar is a struct column
+// (BigQuery). It returns nil when the star can't be expanded.
 func qcExpandStructStarsNoParens(expression *Expr) []*Expr {
 	dotColumn := expression.Find(KColumn)
 	if !dotColumn.IsA(KColumn) || !qcIsType(dotColumn, DT_STRUCT) {
 		return nil
 	}
 
-	// All nested struct values are ColumnDefs, so normalize the first exp.Column in one
+	// All nested struct values are ColumnDefs, so normalize the first Column into one
 	dotColumn = dotColumn.Copy()
 	startingStruct := New(KColumnDef, "this", dotColumn.This(), "kind", dotColumn.Type())
 
@@ -906,7 +1287,6 @@ func qcExpandStructStarsNoParens(expression *Expr) []*Expr {
 				}
 			}
 			if !found {
-				// There is no matching field in the struct
 				return nil
 			}
 		}
@@ -947,15 +1327,13 @@ func qcExpandStructStarsNoParens(expression *Expr) []*Expr {
 	return newSelections
 }
 
-// qcExpandStructStarsWithParens mirrors _expand_struct_stars_with_parens:
-// [RisingWave] Expand/Flatten (<exp>.bar).*, where bar is a struct column.
+// qcExpandStructStarsWithParens expands (flattens) (<exp>.bar).*, where bar is a struct column
+// (RisingWave). It returns nil when the star can't be expanded.
 func qcExpandStructStarsWithParens(expression *Expr) []*Expr {
-	// it is not (<sub_exp>).* pattern, which means we can't expand
 	if !expression.This().IsA(KParen) {
 		return nil
 	}
 
-	// find column definition to get data-type
 	dotColumn := expression.Find(KColumn)
 	if !dotColumn.IsA(KColumn) || !qcIsType(dotColumn, DT_STRUCT) {
 		return nil
@@ -971,23 +1349,19 @@ func qcExpandStructStarsWithParens(expression *Expr) []*Expr {
 			continue
 		}
 
-		// if parent is not a dot, then something is wrong
 		if !parent.IsA(KDot) {
 			return nil
 		}
 
-		// if the rhs of the dot is star we are done
 		rhs := parent.Right()
 		if rhs.IsA(KStar) {
 			break
 		}
 
-		// if it is not identifier, then something is wrong
 		if !rhs.IsA(KIdentifier) {
 			return nil
 		}
 
-		// Check if current rhs identifier is in struct
 		matched := false
 		for _, structFieldDef := range startingStruct.Expressions() {
 			if structFieldDef.Name() == rhs.Name() {
@@ -1004,10 +1378,8 @@ func qcExpandStructStarsWithParens(expression *Expr) []*Expr {
 		parent = parent.Parent()
 	}
 
-	// build new aliases to expand star
 	var newSelections []*Expr
 
-	// fetch the outermost parentheses for new aliaes
 	outerParen := expression.This()
 
 	for _, structFieldDef := range startingStruct.Expressions() {
@@ -1020,25 +1392,9 @@ func qcExpandStructStarsWithParens(expression *Expr) []*Expr {
 	return newSelections
 }
 
-// qcStarTable is a table name referenced by a star projection. key mirrors Python's id(table): the
-// names taken from scope.selected_sources are shared by every `*`, while a `tbl.*` column owns its name.
-type qcStarTable struct {
-	name string
-	key  string
-}
-
-// qcExpandStars mirrors _expand_stars: expand stars to lists of column selections.
-func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingColumnTables, pseudocolumns StrSet, annotator func() *TypeAnnotator) {
+func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingColumnTables, usingColumns []string, pseudocolumns StrSet, annotator func() *TypeAnnotator) {
 	var newSelections []*Expr
-	exceptColumns := map[string]StrSet{}
-	replaceColumns := map[string]map[string]*Expr{}
-	renameColumns := map[string]map[string]string{}
-	ilikePattern := ""
-
-	coalescedColumns := newStrSet()
 	dialect := resolver.dialect
-
-	pivot := seqGet(scope.Pivots(), 0)
 
 	annotatedAhead := false
 	if dialect.S.SUPPORTS_STRUCT_STAR_EXPANSION {
@@ -1061,18 +1417,36 @@ func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingCol
 	}
 
 	for _, expression := range scopeExpression.Selects() {
-		var tables []qcStarTable
-		if expression.IsA(KStar) {
-			for _, name := range scope.SelectedSources().Keys() {
-				tables = append(tables, qcStarTable{name, "S\x00" + name})
+		// EXCEPT, REPLACE and RENAME modifiers apply to the star they belong to, keyed by the
+		// names of the sources it reads.
+		var tables []string
+		exceptColumns := map[string]StrSet{}
+		replaceColumns := map[string]map[string]*Expr{}
+		renameColumns := map[string]map[string]*Expr{}
+		ilikePattern := ""
+		isUnqualifiedStar := expression.IsA(KStar)
+		coalescedColumns := newStrSet()
+
+		if isUnqualifiedStar {
+			// Only a string literal ILIKE pattern can filter the expansion at optimization time
+			if ilike := expression.ArgE("ilike"); ilike != nil && !ilike.IsString() {
+				newSelections = append(newSelections, expression)
+				continue
 			}
+
+			tables = append(tables, scope.SelectedSources().Keys()...)
 			qcAddExceptColumns(expression, tables, exceptColumns)
 			qcAddReplaceColumns(expression, tables, replaceColumns)
 			qcAddRenameColumns(expression, tables, renameColumns)
 			ilikePattern = qcAddIlikeColumns(expression)
 		} else if expression.IsStar() {
 			if expression.IsA(KColumn) {
-				tables = append(tables, qcStarTable{expression.TableName(), fmt.Sprintf("C%p\x00%s", expression, expression.TableName())})
+				if ilike := expression.This().ArgE("ilike"); ilike != nil && !ilike.IsString() {
+					newSelections = append(newSelections, expression)
+					continue
+				}
+
+				tables = append(tables, expression.TableName())
 				qcAddExceptColumns(expression.This(), tables, exceptColumns)
 				qcAddReplaceColumns(expression.This(), tables, replaceColumns)
 				qcAddRenameColumns(expression.This(), tables, renameColumns)
@@ -1101,15 +1475,62 @@ func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingCol
 			continue
 		}
 
+		start := len(newSelections)
+		// The selections of the USING columns, which go first, in order
+		usingSelections := newOMap[*Expr]()
+		if isUnqualifiedStar {
+			for _, name := range usingColumns {
+				usingSelections.Set(name, nil)
+			}
+		}
+
 		var ilikeRe *regexp.Regexp
-		for _, tableRef := range tables {
-			table := tableRef.name
+		for _, table := range tables {
 			source, ok := scope.Sources.Get(table)
+			sourceResolver := resolver
+			var pivots []*Expr
+			pivotsKnown := false
+			sourceTable := table
+
 			if !ok {
-				panic(&OptimizeError{Msg: "Unknown table: " + table})
+				// The final alias of a (UN)PIVOT chain names the resulting source, but only the
+				// underlying source is registered, so it is resolved through the chain's parent.
+				// Attribution is only unambiguous for a single chain (all pivots share a parent)
+				chain := scope.Pivots()
+				var parent *Expr
+				if len(chain) > 0 && chain[0].Parent() == chain[len(chain)-1].Parent() && chain[len(chain)-1].Alias() == table {
+					parent = chain[len(chain)-1].Parent()
+				}
+				if parent != nil {
+					pivots, pivotsKnown = chain, true
+					sourceTable = parent.AliasOrName()
+					source, ok = scope.Sources.Get(sourceTable)
+				}
+
+				if !ok {
+					// Correlated stars, e.g. (SELECT AS STRUCT x.* EXCEPT (a)), expand an outer source
+					resolved := false
+					for _, r := range append([]*Resolver{resolver}, resolver.OuterResolvers()...) {
+						sourceResolver = r
+						source, ok = r.scope.Sources.Get(table)
+						if ok || r.HasUnknownSources() {
+							resolved = true
+							break
+						}
+					}
+					if !resolved {
+						panic(&OptimizeError{Msg: "Unknown table: " + table})
+					}
+				}
+
+				if !ok {
+					// An unknown source may own the star, so it's preserved instead of expanded
+					newSelections = append(newSelections, expression)
+					break
+				}
 			}
 
-			columns := resolver.GetSourceColumns(table, true)
+			columns := sourceResolver.GetSourceColumns(sourceTable, true)
 			if len(columns) == 0 {
 				columns = scope.OuterColumns
 			}
@@ -1124,13 +1545,16 @@ func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingCol
 				columns = filtered
 			}
 
-			if len(columns) == 0 || containsStr(columns, "*") {
+			// A source exposing duplicate output names (e.g. a derived table re-exposing colliding
+			// star-expanded columns) would make the expanded projections ambiguous, so the star
+			// is left as is.
+			if len(columns) == 0 || containsStr(columns, "*") || len(dedupeStrings(columns)) != len(columns) {
 				return
 			}
 
-			columnsToExclude := exceptColumns[tableRef.key]
-			renamedColumns := renameColumns[tableRef.key]
-			replacedColumns := replaceColumns[tableRef.key]
+			columnsToExclude := exceptColumns[table]
+			renamedColumns := renameColumns[table]
+			replacedColumns := replaceColumns[table]
 
 			// Preserve case-sensitivity of quoted source columns when expanding stars,
 			// so the generated alias isn't folded by dialect normalization
@@ -1143,15 +1567,35 @@ func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingCol
 				}
 			}
 
-			if pivot != nil {
-				pivotColumns := PivotOutputColumns(pivot, columns).Keys()
-				if len(pivotColumns) == 0 {
-					pivotColumns = pivot.AliasColumnNames()
+			// The operators belong to a specific source, so a star over a source joined
+			// alongside it expands from that source's own columns
+			if !pivotsKnown {
+				var selectedNode *Expr
+				if selected, ok := scope.SelectedSources().Get(table); ok {
+					selectedNode = selected.Node
+				}
+				if selectedNode == nil && source.Table != nil {
+					// A pivoted CTE reference is registered under the pivot's alias, which isn't
+					// one of the selected sources
+					selectedNode = source.Table
+				}
+				pivots = selectedNode.ArgL("pivots")
+			}
+
+			if len(pivots) > 0 {
+				// Each operator consumes the previous one's output, so they are folded in order
+				pivotColumns := columns
+				for _, pivot := range pivots {
+					if out := PivotOutputColumns(pivot, pivotColumns).Keys(); len(out) > 0 {
+						pivotColumns = out
+					} else {
+						pivotColumns = pivot.AliasColumnNames()
+					}
 				}
 
 				if len(pivotColumns) > 0 {
 					var pivotTable any
-					if a := pivot.Alias(); a != "" {
+					if a := pivots[len(pivots)-1].Alias(); a != "" {
 						pivotTable = a
 					}
 					for _, name := range pivotColumns {
@@ -1175,33 +1619,45 @@ func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingCol
 						continue
 					}
 				}
-				usingTables, isUsing := usingColumnTables.Get(name)
-				if isUsing && usingTables.Has(table) {
+
+				var selection *Expr
+				if usingTables, isUsing := usingColumnTables.Get(name); isUnqualifiedStar && isUsing && usingTables.Has(table) {
 					coalescedColumns.Add(name)
 					var coalesceArgs []*Expr
 					for _, t := range usingTables.Keys() {
 						coalesceArgs = append(coalesceArgs, ColumnExpr(name, t, nil, nil, nil, nil, true))
 					}
 
-					newSelections = append(newSelections, AliasExpr(qcCoalesce(coalesceArgs), name, nil, false))
+					selection = AliasExpr(qcCoalesce(coalesceArgs), name, nil, false)
 				} else {
-					alias := name
-					if r, ok := renamedColumns[name]; ok {
-						alias = r
-					}
 					// if it has characters that the dialect would have changed, infer that it was quoted.
 					quoted := quotedColumns.Has(name) || (source.Table != nil && dialect.CaseSensitive(name))
-					selectionExpr := replacedColumns[name]
-					if selectionExpr == nil {
-						selectionExpr = ColumnExpr(name, table, nil, nil, nil, boolp(quoted), true)
-					}
-					if alias != name {
-						newSelections = append(newSelections, AliasExpr(selectionExpr, alias, nil, false))
-					} else {
-						newSelections = append(newSelections, selectionExpr)
-					}
+					selection = ColumnExpr(name, table, nil, nil, nil, boolp(quoted), true)
+				}
+
+				if replaced := replacedColumns[name]; replaced != nil {
+					selection = replaced
+				}
+				if alias := renamedColumns[name]; alias != nil {
+					selection = AliasExpr(selection, alias, nil, true)
+				}
+
+				if pending, ok := usingSelections.Get(name); ok && pending == nil {
+					usingSelections.Set(name, selection)
+				} else {
+					newSelections = append(newSelections, selection)
 				}
 			}
+		}
+
+		var first []*Expr
+		for _, selection := range usingSelections.Values() {
+			if selection != nil {
+				first = append(first, selection)
+			}
+		}
+		if len(first) > 0 {
+			newSelections = append(newSelections[:start], append(first, newSelections[start:]...)...)
 		}
 
 		if annotatedAhead {
@@ -1218,12 +1674,12 @@ func qcExpandStars(scope *Scope, resolver *Resolver, usingColumnTables *usingCol
 		}
 
 		scopeExpression.Set("expressions", newSelections)
+		// The parent scope sees this scope's columns, so they must reflect the expansions
+		scope.ClearCache()
 	}
 }
 
-// qcOutputIdentifierQuoted mirrors _output_identifier_quoted: whether a projection's output column
-// name is a quoted (case-sensitive) identifier.
-func qcOutputIdentifierQuoted(selection *Expr) bool {
+func qcOutputIdentifier(selection *Expr) *Expr {
 	var identifier *Expr
 	if selection.IsA(KAlias) {
 		identifier = selection.ArgE("alias")
@@ -1231,10 +1687,18 @@ func qcOutputIdentifierQuoted(selection *Expr) bool {
 		identifier = selection.This()
 	}
 
-	return identifier.IsA(KIdentifier) && identifier.ArgB("quoted")
+	if !identifier.IsA(KIdentifier) {
+		return nil
+	}
+	return identifier
 }
 
-// qcAddIlikeColumns mirrors _add_ilike_columns; "" means None.
+func qcOutputIdentifierQuoted(selection *Expr) bool {
+	return qcOutputIdentifier(selection).ArgB("quoted")
+}
+
+// qcAddIlikeColumns converts the ILIKE pattern of a star (% and _ wildcards) to a regular
+// expression, or returns "" when the star has none.
 func qcAddIlikeColumns(expression *Expr) string {
 	ilike := expression.ArgE("ilike")
 
@@ -1256,7 +1720,7 @@ func qcAddIlikeColumns(expression *Expr) string {
 	return b.String()
 }
 
-func qcAddExceptColumns(expression *Expr, tables []qcStarTable, exceptColumns map[string]StrSet) {
+func qcAddExceptColumns(expression *Expr, tables []string, exceptColumns map[string]StrSet) {
 	except := expression.ArgL("except_")
 
 	if len(except) == 0 {
@@ -1264,33 +1728,55 @@ func qcAddExceptColumns(expression *Expr, tables []qcStarTable, exceptColumns ma
 	}
 
 	columns := newStrSet()
+	qualifiedColumns := map[string]StrSet{}
 	for _, e := range except {
-		columns.Add(e.Name())
+		// A qualified exclusion only applies to the source it references
+		if e.IsA(KColumn) && e.TableName() != "" {
+			if qualifiedColumns[e.TableName()] == nil {
+				qualifiedColumns[e.TableName()] = newStrSet()
+			}
+			qualifiedColumns[e.TableName()].Add(e.Name())
+		} else {
+			columns.Add(e.Name())
+		}
 	}
 
 	for _, table := range tables {
-		exceptColumns[table.key] = columns
+		tableColumns := columns
+		if qualified := qualifiedColumns[table]; len(qualified) > 0 {
+			tableColumns = newStrSet()
+			for c := range columns {
+				tableColumns.Add(c)
+			}
+			for c := range qualified {
+				tableColumns.Add(c)
+			}
+		}
+
+		if len(tableColumns) > 0 {
+			exceptColumns[table] = tableColumns
+		}
 	}
 }
 
-func qcAddRenameColumns(expression *Expr, tables []qcStarTable, renameColumns map[string]map[string]string) {
+func qcAddRenameColumns(expression *Expr, tables []string, renameColumns map[string]map[string]*Expr) {
 	rename := expression.ArgL("rename")
 
 	if len(rename) == 0 {
 		return
 	}
 
-	columns := map[string]string{}
+	columns := map[string]*Expr{}
 	for _, e := range rename {
-		columns[e.This().Name()] = e.Alias()
+		columns[e.This().Name()] = e.ArgE("alias")
 	}
 
 	for _, table := range tables {
-		renameColumns[table.key] = columns
+		renameColumns[table] = columns
 	}
 }
 
-func qcAddReplaceColumns(expression *Expr, tables []qcStarTable, replaceColumns map[string]map[string]*Expr) {
+func qcAddReplaceColumns(expression *Expr, tables []string, replaceColumns map[string]map[string]*Expr) {
 	replace := expression.ArgL("replace")
 
 	if len(replace) == 0 {
@@ -1303,12 +1789,11 @@ func qcAddReplaceColumns(expression *Expr, tables []qcStarTable, replaceColumns 
 	}
 
 	for _, table := range tables {
-		replaceColumns[table.key] = columns
+		replaceColumns[table] = columns
 	}
 }
 
-// QualifyOutputs mirrors qualify_outputs(expression, dialect) for an expression input: ensure all
-// output columns are aliased.
+// QualifyOutputs ensures all output columns of expression are aliased.
 func QualifyOutputs(expression *Expr, dialect *Dialect) {
 	scope := BuildScope(expression)
 	if scope == nil {
@@ -1317,7 +1802,7 @@ func QualifyOutputs(expression *Expr, dialect *Dialect) {
 	QualifyOutputsScope(scope, dialect)
 }
 
-// QualifyOutputsScope mirrors qualify_outputs(scope, dialect): ensure all output columns are aliased.
+// QualifyOutputsScope ensures all output columns of scope are aliased.
 func QualifyOutputsScope(scope *Scope, dialect *Dialect) {
 	if dialect == nil {
 		dialect = prototype("")
@@ -1356,29 +1841,27 @@ func QualifyOutputsScope(scope *Scope, dialect *Dialect) {
 				selection.Set("alias", New(KTableAlias, "this", aliasIdentifier))
 			}
 		} else if !selection.IsA(KAlias, KAliases) && !selection.IsStar() {
-			sourceQuoted := false
-			if selection.IsA(KColumn) {
-				// selection.this.quoted: only Identifier has `quoted`; Python raises AttributeError
-				// for any other `this` (e.g. a Dot in BigQuery's `p.d.t`.`c`.`f`, or a Parameter).
-				this := selection.This()
-				if !this.IsA(KIdentifier) {
-					className := "NoneType"
-					if this != nil {
-						className = this.Kind().Name()
-					}
-					panic(&ValueError{Msg: fmt.Sprintf("'%s' object has no attribute 'quoted'", className)})
-				}
-				sourceQuoted = this.ArgB("quoted")
+			var sourceIdentifier *Expr
+			if unwrapped := unnestMethod(selection); unwrapped.IsA(KColumn) {
+				sourceIdentifier = unwrapped.This()
+			} else if unwrapped.IsA(KDot) {
+				sourceIdentifier = unwrapped.Expression()
 			}
+
 			aliasName := selection.OutputName()
 			if aliasName == "" {
 				aliasName = fmt.Sprintf("_col_%d", i)
 			}
 			selection = AliasExpr(selection, aliasName, nil, false)
-			if sourceQuoted {
-				selection.ArgE("alias").Set("quoted", true)
+			if sourceIdentifier.IsA(KIdentifier) {
+				// The alias copies the spelling of an existing identifier, whose casing identifier
+				// normalization already settled, so it is only marked quoted like its source
+				if sourceIdentifier.ArgB("quoted") {
+					selection.ArgE("alias").Set("quoted", true)
+				}
+			} else {
+				dialect.NormalizeIdentifier(selection.ArgE("alias"))
 			}
-			dialect.NormalizeIdentifier(selection.ArgE("alias"))
 		}
 		if aliasedColumn != "" {
 			selection.Set("alias", ToIdentifier(aliasedColumn, nil))
@@ -1392,14 +1875,12 @@ func QualifyOutputsScope(scope *Scope, dialect *Dialect) {
 	}
 }
 
-// QuoteIdentifiers mirrors quote_identifiers(expression, dialect, identify): makes sure all
-// identifiers that need to be quoted are quoted.
 func QuoteIdentifiers(expression *Expr, d *Dialect, identify bool) *Expr {
 	if d == nil {
 		d = prototype("")
 	}
 
-	// `quote_identifier` only mutates identifiers in place, so we avoid `transform` here
+	// QuoteIdentifier only mutates identifiers in place, so we avoid Transform here
 	// because its node replacement machinery is wasteful for this case.
 	for node := range expression.Walk(true, nil) {
 		if node.IsA(KIdentifier) {
@@ -1410,8 +1891,7 @@ func QuoteIdentifiers(expression *Expr, d *Dialect, identify bool) *Expr {
 	return expression
 }
 
-// PushdownCTEAliasColumns mirrors pushdown_cte_alias_columns: pushes down the CTE alias columns
-// into the projection.
+// PushdownCTEAliasColumns pushes down the CTE alias columns into the projection.
 //
 // This step is useful in Snowflake where the CTE alias columns can be referenced in the HAVING.
 func PushdownCTEAliasColumns(scope *Scope) {
@@ -1434,7 +1914,8 @@ func PushdownCTEAliasColumns(scope *Scope) {
 	}
 }
 
-// SimplifyParens mirrors sqlglot.optimizer.simplify.simplify_parens.
+// SimplifyParens returns the inner expression of a Paren when the parentheses don't affect how it
+// binds in its parent, and expression itself otherwise.
 func SimplifyParens(expression *Expr, d *Dialect) *Expr {
 	if !expression.IsA(KParen) {
 		return expression

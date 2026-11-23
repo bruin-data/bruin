@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// LiteralString mirrors exp.Literal.string.
 func LiteralString(s string) *Expr { return New(KLiteral, "this", s, "is_string", true) }
 
-// LiteralNumber mirrors exp.Literal.number for an already-formatted number string.
+// LiteralNumber returns a number literal for an already-formatted number string. A negative
+// value becomes Neg wrapping the literal of its absolute value.
 func LiteralNumber(s string) *Expr {
 	lit := New(KLiteral, "this", s, "is_string", false)
 	if v, isInt := lit.toPyNumber(); v != nil {
@@ -22,7 +22,6 @@ func LiteralNumber(s string) *Expr {
 	return lit
 }
 
-// LiteralInt mirrors exp.Literal.number(int).
 func LiteralInt(i int) *Expr { return LiteralNumber(strconv.Itoa(i)) }
 
 func absNumString(v *big.Float, isInt bool, orig string) string {
@@ -35,8 +34,8 @@ func absNumString(v *big.Float, isInt bool, orig string) string {
 	return strings.TrimPrefix(strings.TrimSpace(orig), "-")
 }
 
-// toPyNumber mirrors Literal.to_py for numbers: returns the numeric value and whether it is
-// an int (as opposed to a Decimal). Returns nil if the text is not a valid number.
+// toPyNumber returns the numeric value of a number literal (or a Neg of one) and whether it is
+// an integer (as opposed to a decimal). Returns nil if the text is not a valid number.
 func (e *Expr) toPyNumber() (*big.Float, bool) {
 	if e.IsA(KNeg) {
 		v, isInt := e.This().toPyNumber()
@@ -58,7 +57,8 @@ func (e *Expr) toPyNumber() (*big.Float, bool) {
 	return nil, false
 }
 
-// isPyInt reports whether Python's int(s) would succeed (base 10).
+// isPyInt reports whether s is a base-10 integer: optional surrounding whitespace and sign,
+// then digits with single underscores allowed between them.
 func isPyInt(s string) bool {
 	s = pyStrip(s)
 	if s == "" {
@@ -87,11 +87,10 @@ func isPyInt(s string) bool {
 	return !prevUnderscore
 }
 
-// pyDecimalRE is the syntax decimal.Decimal(str) accepts (underscores already removed).
+// pyDecimalRE is the decimal number syntax parsePyDecimal accepts (underscores already removed):
+// digits with optional fraction and exponent, Inf/Infinity, and NaN/sNaN with an optional payload.
 var pyDecimalRE = regexp.MustCompile(`^[+-]?(((\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?)|[iI][nN][fF]([iI][nN][iI][tT][yY])?|[sS]?[nN][aA][nN]\d*)$`)
 
-// pyDecimalValid reports whether decimal.Decimal(s) accepts s (else it raises
-// InvalidOperation: [<class 'decimal.ConversionSyntax'>]).
 func pyDecimalValid(s string) bool {
 	return pyDecimalRE.MatchString(pyStrip(strings.ReplaceAll(s, "_", "")))
 }
@@ -108,7 +107,8 @@ func parsePyDecimal(s string) (*big.Float, bool) {
 	return f, true
 }
 
-// ToIdentifier mirrors exp.to_identifier for strings. quoted: nil means auto.
+// ToIdentifier returns an identifier for name. A nil quoted quotes the name only when it is not
+// a safe unquoted identifier.
 func ToIdentifier(name string, quoted *bool) *Expr {
 	var q bool
 	if quoted != nil {
@@ -121,10 +121,8 @@ func ToIdentifier(name string, quoted *bool) *Expr {
 
 func boolp(b bool) *bool { return &b }
 
-// NewDataType mirrors DataType(this=dtype).
 func NewDataType(d DType) *Expr { return New(KDataType, "this", d) }
 
-// DType returns args["this"] of a DataType.
 func (e *Expr) DTypeOf() DType {
 	if d, ok := e.Arg("this").(DType); ok {
 		return d
@@ -132,17 +130,12 @@ func (e *Expr) DTypeOf() DType {
 	return DT_NONE
 }
 
-// Null mirrors exp.null().
 func Null() *Expr { return New(KNull) }
 
-// Boolean mirrors exp.Boolean(this=b).
 func Boolean(b bool) *Expr { return New(KBoolean, "this", b) }
 
-// Paren mirrors exp.paren.
 func Paren(e *Expr) *Expr { return New(KParen, "this", e) }
 
-// Var mirrors exp.var.
 func VarExpr(name string) *Expr { return New(KVar, "this", name) }
 
-// Star mirrors exp.Star().
 func Star() *Expr { return New(KStar) }

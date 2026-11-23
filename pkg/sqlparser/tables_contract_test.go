@@ -93,6 +93,7 @@ func TestUsedTablesContractPlatformFeatures(t *testing.T) {
 		{"unload is opaque", "redshift", "UNLOAD ('SELECT * FROM orders') TO 's3://bucket/path' IAM_ROLE 'arn:aws:iam::123:role/x'", []string{}},
 		{"hierarchy", "oracle", "SELECT id, LEVEL FROM nodes START WITH parent IS NULL CONNECT BY PRIOR id = parent", []string{"nodes"}},
 		{"database link", "oracle", "SELECT * FROM orders@warehouse", []string{"orders@warehouse"}},
+		{"flashback query", "oracle", "SELECT * FROM orders AS OF TIMESTAMP TO_TIMESTAMP('2024-01-01', 'YYYY-MM-DD')", []string{"orders"}},
 		{"temp tables and variables lose sigils", "tsql", "SELECT * FROM #temp JOIN @rows r ON #temp.id=r.id", []string{"rows", "temp"}},
 		{"openjson apply", "tsql", "SELECT j.value FROM dbo.events e CROSS APPLY OPENJSON(e.payload) j", []string{"dbo.events"}},
 		{"temporal table", "tsql", "SELECT * FROM dbo.events FOR SYSTEM_TIME ALL", []string{"dbo.events"}},
@@ -126,9 +127,16 @@ func TestUsedTablesContractPlatformFeatures(t *testing.T) {
 		{"spark generator", "spark", "SELECT * FROM events LATERAL VIEW posexplode(items) p AS pos, item", []string{"events"}},
 		{"lambda json", "starrocks", "SELECT array_map(x -> x + 1, items), json_query(payload, '$.x') FROM events", []string{"events"}},
 		{"multi array unnest", "trino", "SELECT * FROM events CROSS JOIN UNNEST(a, b) u(x, y)", []string{"events"}},
+		// An inline function is local to its statement, so its name is not a table (its body's
+		// references are); a created function is reported like any other created object.
+		{"inline function", "trino", "WITH FUNCTION f(x bigint) RETURNS bigint RETURN x+1 SELECT * FROM t", []string{"t"}},
+		{"inline function reading a table", "trino", "WITH FUNCTION f() RETURNS bigint RETURN (SELECT max(v) FROM lookup) SELECT f() FROM t", []string{"lookup", "t"}},
+		{"created function", "trino", "CREATE FUNCTION f(x bigint) RETURNS bigint RETURN x+1", []string{"f"}},
 		{"tsql use qualifies", "tsql", "USE db; SELECT * FROM t", []string{"db.dbo.t"}},
 		{"fabric use is a table", "fabric", "USE db; SELECT * FROM t", []string{"db", "t"}},
 		{"update from output", "tsql", "UPDATE t SET x=s.x FROM dbo.target t JOIN dbo.source s ON t.id=s.id OUTPUT inserted.x", []string{"dbo.source", "dbo.target", "t"}},
+		// OUTPUT is a clause keyword, but where a table name is expected it names a table.
+		{"output as table name", "tsql", "SELECT * FROM output", []string{"output"}},
 		{"table variables and temp script", "tsql", "DECLARE @r TABLE(id INT); SELECT * FROM @r; CREATE TABLE #x(id INT); SELECT * FROM #x", []string{"r", "x"}},
 		{"temporary object script", "postgres", "CREATE TEMP TABLE x AS SELECT * FROM src; SELECT * FROM x", []string{"src", "x"}},
 	}
@@ -142,10 +150,7 @@ func TestUsedTablesContractPlatformFeatures(t *testing.T) {
 	for _, tc := range []struct{ name, query, dialect, errorText string }{
 		{"unknown dialect", "SELECT 1", "not-a-dialect", "Unknown dialect 'not-a-dialect'."},
 		{"unterminated identifier", "SELECT * FROM `oops", "bigquery", "Error tokenizing 'SELECT * FROM `oop'"},
-		{"reserved output keyword", "SELECT * FROM output", "tsql", "Expected table name but got <Token token_type: TokenType.RETURNING, text: output, line: 1, col: 20, start: 14, end: 19, comments: []>. Line 1, Col: 20.\n  SELECT * FROM \x1b[4moutput\x1b[0m"},
 		{"except needs qualifier", "SELECT id FROM a EXCEPT SELECT id FROM b", "bigquery", "Expected DISTINCT or ALL for Except. Line 1, Col: 30.\n  SELECT id FROM a EXCEPT \x1b[4mSELECT\x1b[0m id FROM b"},
-		{"unsupported flashback syntax", "SELECT * FROM orders AS OF TIMESTAMP TO_TIMESTAMP('2024-01-01', 'YYYY-MM-DD')", "oracle", "Invalid expression / Unexpected token. Line 1, Col: 36.\n  SELECT * FROM orders AS OF \x1b[4mTIMESTAMP\x1b[0m TO_TIMESTAMP('2024-01-01', 'YYYY-MM-DD')"},
-		{"trino inline function rejected", "WITH FUNCTION f(x bigint) RETURNS bigint RETURN x+1 SELECT * FROM t", "trino", "Expecting (. Line 1, Col: 15.\n  WITH FUNCTION \x1b[4mf\x1b[0m(x bigint) RETURNS bigint RETURN x+1 SELECT * FROM t"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

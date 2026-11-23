@@ -1,20 +1,21 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/resolver.py.
-
-// Resolver mirrors sqlglot.optimizer.resolver.Resolver: a helper for resolving columns.
+// Resolver resolves the source table of a column within a scope, using the scope's sources
+// and the schema.
 type Resolver struct {
 	scope   *Scope
 	schema  *MappingSchema
 	dialect *Dialect
 
-	sourceColumns      *omap[[]string] // nil = None
+	sourceColumns      *omap[[]string] // nil until computed
 	unambiguousColumns *unambiguousColumns
-	allColumns         StrSet // nil = None
+	allColumns         StrSet // nil until computed
 	inferSchema        bool
 
 	getSourceColumnsCache    map[resolverSourceKey][]string
 	columnTypeFromScopeCache map[resolverTypeKey]*Expr
+	outerResolvers           []*Resolver // nil until computed
+	selectAliasSet           StrSet      // nil until computed
 }
 
 type resolverSourceKey struct {
@@ -27,8 +28,8 @@ type resolverTypeKey struct {
 	name   string
 }
 
-// unambiguousColumns mirrors the Mapping[str, str] returned by _get_unambiguous_columns
-// (either a plain dict or a SingleValuedMapping).
+// unambiguousColumns maps column names to their source name. It is either a plain map or, when
+// there is a single source, a key set that maps every key to singleValue.
 type unambiguousColumns struct {
 	single      bool
 	singleKeys  StrSet
@@ -47,7 +48,7 @@ func (u *unambiguousColumns) get(column string) (string, bool) {
 	return v, ok
 }
 
-// NewResolver mirrors Resolver(scope, schema, infer_schema).
+// NewResolver returns a Resolver for scope. The dialect is the schema's (default when unset).
 func NewResolver(scope *Scope, schema *MappingSchema, inferSchema bool) *Resolver {
 	dialect := schema.Dialect()
 	if dialect == nil {
@@ -63,38 +64,62 @@ func NewResolver(scope *Scope, schema *MappingSchema, inferSchema bool) *Resolve
 	}
 }
 
-// Dialect returns the resolver dialect.
 func (r *Resolver) Dialect() *Dialect { return r.dialect }
 
-// GetTable mirrors Resolver.get_table(column) for a Column expression.
-func (r *Resolver) GetTable(column *Expr) *Expr { return r.getTable(column.Name(), column) }
+// GetTable returns the table identifier of a column (or struct root identifier) attached to the
+// query AST, or nil if it cannot be found or inferred.
+func (r *Resolver) GetTable(column *Expr) *Expr { return r.getTable(column.Name(), column, nil) }
 
-// GetTableByName mirrors Resolver.get_table(column_name) for a string.
-func (r *Resolver) GetTableByName(columnName string) *Expr { return r.getTable(columnName, nil) }
+// GetTableByName is GetTable for a plain column name, which can't use the column's position in
+// the query (its join or enclosing projection).
+func (r *Resolver) GetTableByName(columnName string) *Expr { return r.getTable(columnName, nil, nil) }
 
-// getTable mirrors Resolver.get_table. column is nil when a plain name was given.
-// The result is the table identifier, or nil if it cannot be found/inferred.
-func (r *Resolver) getTable(columnName string, column *Expr) *Expr {
-	tableName, hasTable := r.getTableNameFromSources(columnName, nil)
+// getTable resolves the table of columnName: from the unambiguous columns of sourceColumns (all
+// sources when nil), then from the sources available at the column's join, then by projecting it
+// back onto the only table function with unknown columns, then (with schema inference) from the
+// only source without a known schema. column is nil when a plain name was given. The result is
+// the table identifier, or nil if it cannot be found/inferred.
+func (r *Resolver) getTable(columnName string, column *Expr, sourceColumns *omap[[]string]) *Expr {
+	var joinContext *Expr
+	if sourceColumns == nil && column != nil {
+		joinContext = r.getColumnJoinContext(column)
+	}
 
-	if (!hasTable || tableName == "") && column.IsA(KColumn) {
+	// A SEMI/ANTI join's own table is excluded from the global lookup, so it is skipped here
+	tableName, hasTable := "", false
+	if joinContext == nil || !joinContext.IsSemiOrAntiJoin() {
+		tableName, hasTable = r.getTableNameFromSources(columnName, sourceColumns)
+	}
+
+	if (!hasTable || tableName == "") && joinContext != nil {
 		// Fall-back case: If we couldn't find the `table_name` from ALL of the sources,
 		// attempt to disambiguate the column based on other characteristics e.g if this column is in a join condition,
 		// we may be able to disambiguate based on the source order.
-		if joinContext := r.getColumnJoinContext(column); joinContext != nil {
-			// In this case, the return value will be the join that _may_ be able to disambiguate the column
-			// and we can use the source columns available at that join to get the table name
-			// catch OptimizeError if column is still ambiguous and try to resolve with schema inference below
-			func() {
-				defer func() {
-					if rec := recover(); rec != nil {
-						if _, ok := rec.(*OptimizeError); !ok {
-							panic(rec)
-						}
+		func() {
+			defer func() {
+				if rec := recover(); rec != nil {
+					if _, ok := rec.(*OptimizeError); !ok {
+						panic(rec)
 					}
-				}()
-				tableName, hasTable = r.getTableNameFromSources(columnName, r.getAvailableSourceColumns(joinContext))
+				}
 			}()
+			tableName, hasTable = r.getTableNameFromSources(columnName, r.getAvailableSourceColumns(joinContext, false))
+		}()
+	}
+
+	if (!hasTable || tableName == "") && sourceColumns == nil && column != nil &&
+		!r.AllColumns().Has(columnName) &&
+		column.FindAncestor(KSelect) == r.scope.Expression &&
+		!(r.dialect.S.TABLES_REFERENCEABLE_AS_COLUMNS && r.scope.SelectedSources().Has(columnName)) {
+		// Alias references are left to alias expansion, unless the column is in its own alias
+		ancestor := column.FindAncestor(KAlias, KSelect)
+		if !r.selectAliases().Has(columnName) || (ancestor.IsA(KAlias) && ancestor.Alias() == columnName) {
+			available := r.getAllSourceColumns()
+			if joinContext != nil {
+				available = r.getAvailableSourceColumns(joinContext, false)
+			}
+			tableName = r.getUnknownTVFTable(available)
+			hasTable = tableName != ""
 		}
 	}
 
@@ -112,11 +137,12 @@ func (r *Resolver) getTable(columnName string, column *Expr) *Expr {
 		}
 	}
 
+	if !hasTable || tableName == "" {
+		return nil
+	}
+
 	selected, ok := r.scope.SelectedSources().Get(tableName)
-	if !hasTable || !ok {
-		if !hasTable {
-			return nil
-		}
+	if !ok {
 		return ToIdentifier(tableName, nil)
 	}
 
@@ -135,7 +161,118 @@ func (r *Resolver) getTable(columnName string, column *Expr) *Expr {
 	return ToIdentifier(tableName, nil)
 }
 
-// AllColumns mirrors Resolver.all_columns: all available columns of all sources in this scope.
+// getUnknownTVFTable returns the only table function among sourceColumns whose columns are
+// unknown, provided every other source's columns are known and the scope can't be correlated;
+// "" otherwise.
+func (r *Resolver) getUnknownTVFTable(sourceColumns *omap[[]string]) string {
+	if !r.HasUnknownSources() || r.scope.CanBeCorrelated {
+		return ""
+	}
+
+	var unknownTVFNames []string
+	for _, name := range sourceColumns.Keys() {
+		columns, _ := sourceColumns.Get(name)
+		if len(columns) > 0 && !containsStr(columns, "*") {
+			continue
+		}
+		// Non-TVF tables are expected to have schemas supplied, so only functions can be unknown
+		if source, ok := r.scope.Sources.Get(name); ok && source.Table.IsA(KTable) && source.Table.This().IsA(KFunc) {
+			unknownTVFNames = append(unknownTVFNames, name)
+		} else {
+			return ""
+		}
+	}
+
+	if len(unknownTVFNames) == 1 {
+		return unknownTVFNames[0]
+	}
+	return ""
+}
+
+func (r *Resolver) selectAliases() StrSet {
+	if r.selectAliasSet == nil {
+		r.selectAliasSet = newStrSet()
+		if expression := r.scope.Expression; expression.IsA(KSelect) {
+			for _, s := range expression.Selects() {
+				if s.IsA(KAlias) {
+					r.selectAliasSet.Add(s.Alias())
+				}
+			}
+		}
+	}
+	return r.selectAliasSet
+}
+
+// OuterResolvers returns resolvers for the outer scopes a correlated subquery can reference,
+// innermost first.
+func (r *Resolver) OuterResolvers() []*Resolver {
+	if r.outerResolvers == nil {
+		r.outerResolvers = []*Resolver{}
+		scope := r.scope
+		for scope.CanBeCorrelated && scope.Parent != nil {
+			scope = scope.Parent
+			r.outerResolvers = append(r.outerResolvers, NewResolver(scope, r.schema, r.inferSchema))
+		}
+	}
+	return r.outerResolvers
+}
+
+// HasUnknownSources reports whether the columns of some source can't be determined, e.g. a table
+// missing from the schema.
+func (r *Resolver) HasUnknownSources() bool {
+	for _, columns := range r.getAllSourceColumns().Values() {
+		if len(columns) == 0 || containsStr(columns, "*") {
+			return true
+		}
+	}
+	return false
+}
+
+// HasUnknownTVFSources reports whether the columns of some table function source can't be
+// determined. Such a source can own any column, e.g. one an outer source also has.
+func (r *Resolver) HasUnknownTVFSources() bool {
+	return r.hasUnknownTVFSources(map[*Scope]bool{r.scope: true})
+}
+
+// scopeHasUnknownTVFSources reports whether a derived table, CTE or set operation scope selects
+// unknown columns from a table function; seen holds the scopes already visited.
+func (r *Resolver) scopeHasUnknownTVFSources(scope *Scope, seen map[*Scope]bool) bool {
+	if seen[scope] {
+		return false
+	}
+	seen[scope] = true
+	if len(scope.UnionScopes) > 0 {
+		for _, u := range scope.UnionScopes {
+			if r.scopeHasUnknownTVFSources(u, seen) {
+				return true
+			}
+		}
+		return false
+	}
+	return NewResolver(scope, r.schema, r.inferSchema).hasUnknownTVFSources(seen)
+}
+
+func (r *Resolver) hasUnknownTVFSources(seen map[*Scope]bool) bool {
+	all := r.getAllSourceColumns()
+	for _, name := range all.Keys() {
+		columns, _ := all.Get(name)
+		if len(columns) > 0 && !containsStr(columns, "*") {
+			continue
+		}
+		source, ok := r.scope.Sources.Get(name)
+		if !ok {
+			continue
+		}
+		if source.Table.IsA(KTable) && source.Table.This().IsA(KFunc) {
+			return true
+		}
+		if source.Scope != nil && r.scopeHasUnknownTVFSources(source.Scope, seen) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Resolver) AllColumns() StrSet {
 	if r.allColumns == nil {
 		r.allColumns = newStrSet()
@@ -148,14 +285,16 @@ func (r *Resolver) AllColumns() StrSet {
 	return r.allColumns
 }
 
-// GetSourceColumnsFromSetOp mirrors Resolver.get_source_columns_from_set_op.
+// GetSourceColumnsFromSetOp returns the output columns of a set operation (or of a SELECT
+// operand). With a side or kind modifier, LEFT keeps the left columns, FULL takes the union
+// and INNER the intersection; an ON column list overrides both.
 func (r *Resolver) GetSourceColumnsFromSetOp(expression *Expr) []string {
 	if expression.IsA(KSelect) {
 		return expression.NamedSelects()
 	}
-	if expression.IsA(KSubquery) && expression.This().IsA(KSetOperation) {
+	if expression.IsA(KSubquery) {
 		// Different types of SET modifiers can be chained together if they're explicitly grouped by nesting
-		return r.GetSourceColumnsFromSetOp(expression.This())
+		return r.GetSourceColumnsFromSetOp(expression.Unnest())
 	}
 	if !expression.IsA(KSetOperation) {
 		panic(&OptimizeError{Msg: "Unknown set operation: " + chunkFPyStr(expression)})
@@ -177,17 +316,15 @@ func (r *Resolver) GetSourceColumnsFromSetOp(expression *Expr) []string {
 		side := setOp.SideText()
 		kind := setOp.KindText()
 
-		// Visit the children UNIONs (if any) in a post-order traversal
 		left := r.GetSourceColumnsFromSetOp(setOp.This())
 		right := r.GetSourceColumnsFromSetOp(setOp.Expression())
 
-		// We use dict.fromkeys to deduplicate keys and maintain insertion order
 		if side == "LEFT" {
 			columns = left
 		} else if side == "FULL" {
 			columns = dedupeStrings(append(append([]string{}, left...), right...))
 		} else if kind == "INNER" {
-			// Python computes a set intersection here (unordered); keep the left-hand order.
+			// Set intersection; the result keeps the left-hand order.
 			rightSet := newStrSet(right...)
 			for _, c := range dedupeStrings(left) {
 				if rightSet.Has(c) {
@@ -195,6 +332,8 @@ func (r *Resolver) GetSourceColumnsFromSetOp(expression *Expr) []string {
 				}
 			}
 		} else {
+			// Any other side/kind combination is unsupported; the message keeps its historical
+			// wording.
 			panic(&ValueError{Msg: "cannot access local variable 'columns' where it is not associated with a value"})
 		}
 	} else {
@@ -204,7 +343,9 @@ func (r *Resolver) GetSourceColumnsFromSetOp(expression *Expr) []string {
 	return columns
 }
 
-// GetSourceColumns mirrors Resolver.get_source_columns(name, only_visible).
+// GetSourceColumns returns the columns of the named source (cached), with column aliases of
+// the selecting node shadowing the source's own names. It panics with an OptimizeError for an
+// unknown source.
 func (r *Resolver) GetSourceColumns(name string, onlyVisible bool) []string {
 	cacheKey := resolverSourceKey{name, onlyVisible}
 	if _, ok := r.getSourceColumnsCache[cacheKey]; !ok {
@@ -213,8 +354,8 @@ func (r *Resolver) GetSourceColumns(name string, onlyVisible bool) []string {
 			panic(&OptimizeError{Msg: "Unknown table: " + name})
 		}
 
-		// A pivoted CTE reference is stored as an exp.Table in the scope sources (see
-		// _traverse_tables in scope.py), but the underlying CTE Scope still holds the
+		// A pivoted CTE reference is stored as a Table in the scope sources (see
+		// traverseTablesInto in scope.go), but the underlying CTE Scope still holds the
 		// column information we need to resolve pre-pivot columns.
 		if source.Table != nil && source.Table.DbName() == "" && source.Table.ArgB("pivots") && r.scope.CTESources.Has(source.Table.Name()) {
 			source, _ = r.scope.CTESources.Get(source.Table.Name())
@@ -281,6 +422,13 @@ func (r *Resolver) GetSourceColumns(name string, onlyVisible bool) []string {
 		var columnAliases []string
 		if selected, ok := r.scope.SelectedSources().Get(name); ok && selected.Node != nil {
 			columnAliases = selected.Node.AliasColumnNames()
+		} else if !ok && r.scope.SemiOrAntiJoinTables().Has(name) {
+			// SEMI/ANTI sources are not selected, but their column alias lists still apply
+			for _, ref := range r.scope.References() {
+				if ref.Name == name {
+					columnAliases = ref.Node.AliasColumnNames()
+				}
+			}
 		}
 
 		if len(columnAliases) > 0 {
@@ -331,12 +479,11 @@ func (r *Resolver) getAllSourceColumns() *omap[[]string] {
 	return r.sourceColumns
 }
 
-// getTableNameFromSources mirrors Resolver._get_table_name_from_sources. The bool result is false
-// when Python would return None.
+// getTableNameFromSources returns the source that unambiguously owns columnName, among
+// sourceColumns or (when nil) all sources. The bool result is false when no source does.
 func (r *Resolver) getTableNameFromSources(columnName string, sourceColumns *omap[[]string]) (string, bool) {
 	var unambiguous *unambiguousColumns
-	if sourceColumns.Len() == 0 {
-		// If not supplied, get all sources to calculate unambiguous columns
+	if sourceColumns == nil {
 		if r.unambiguousColumns == nil {
 			r.unambiguousColumns = r.getUnambiguousColumns(r.getAllSourceColumns())
 		}
@@ -349,8 +496,8 @@ func (r *Resolver) getTableNameFromSources(columnName string, sourceColumns *oma
 	return unambiguous.get(columnName)
 }
 
-// getColumnJoinContext mirrors Resolver._get_column_join_context: check if a column participating
-// in a join can be qualified based on the source order.
+// getColumnJoinContext returns the join a column (or struct root identifier) appears in when
+// that join can qualify it based on the source order, or nil.
 func (r *Resolver) getColumnJoinContext(column *Expr) *Expr {
 	expr := r.scope.Expression
 
@@ -362,28 +509,34 @@ func (r *Resolver) getColumnJoinContext(column *Expr) *Expr {
 
 	joinAncestor := column.FindAncestor(KJoin, KSelect)
 
-	if joinAncestor.IsA(KJoin) && r.scope.SelectedSources().Has(joinAncestor.AliasOrName()) {
-		// Ensure that the found ancestor is a join that contains an actual source,
-		// e.g in Clickhouse `b` is an array expression in `a ARRAY JOIN b`
-		return joinAncestor
+	if joinAncestor.IsA(KJoin) {
+		joinName := joinAncestor.AliasOrName()
+		if r.scope.SelectedSources().Has(joinName) || r.scope.SemiOrAntiJoinTables().Has(joinName) {
+			// Ensure that the found ancestor is a join that contains an actual source,
+			// e.g in Clickhouse `b` is an array expression in `a ARRAY JOIN b`
+			return joinAncestor
+		}
 	}
 
 	return nil
 }
 
-// getAvailableSourceColumns mirrors Resolver._get_available_source_columns: the source columns
-// that are available at the point where a column is referenced (FROM + joins up to the given join).
-func (r *Resolver) getAvailableSourceColumns(joinAncestor *Expr) *omap[[]string] {
+// getAvailableSourceColumns returns the source columns that are available at the point where
+// a column is referenced: the FROM source and the sources joined up to the given join. An earlier
+// SEMI/ANTI join's table is only visible within its own ON clause. With joinGroup, the enclosing
+// join group is used instead of the scope, comma joins acting as boundaries.
+func (r *Resolver) getAvailableSourceColumns(joinAncestor *Expr, joinGroup bool) *omap[[]string] {
 	expr := r.scope.Expression
-
-	// Collect tables in order: FROM clause tables + joined tables up to current join
-	from := expr.ArgE("from_")
-	if from == nil {
-		panic(&ValueError{Msg: "'from_'"})
+	if joinGroup {
+		expr = joinAncestor.Parent()
 	}
-	fromName := from.AliasOrName()
-	availableSources := newOMap[[]string]()
-	availableSources.Set(fromName, r.GetSourceColumns(fromName, false))
+
+	var sources []*Expr
+	if from := expr.ArgE("from_"); from != nil {
+		sources = append(sources, from.This())
+	} else {
+		sources = append(sources, expr)
+	}
 
 	joins := expr.ArgL("joins")
 	end := joinAncestor.Index() + 1
@@ -391,14 +544,36 @@ func (r *Resolver) getAvailableSourceColumns(joinAncestor *Expr) *omap[[]string]
 		end = len(joins)
 	}
 	for _, join := range joins[:end] {
-		availableSources.Set(join.AliasOrName(), r.GetSourceColumns(join.AliasOrName(), false))
+		if joinGroup && !(join.ArgB("on") || join.ArgB("using") || join.MethodText() != "" || join.SideText() != "" || join.KindText() != "") {
+			sources = sources[:0]
+		}
+
+		if join == joinAncestor || !join.IsSemiOrAntiJoin() {
+			sources = append(sources, join.This())
+		}
+	}
+
+	availableSources := newOMap[[]string]()
+	for len(sources) > 0 {
+		source := sources[len(sources)-1]
+		sources = sources[:len(sources)-1]
+		if name := source.AliasOrName(); name != "" {
+			availableSources.Set(name, r.GetSourceColumns(name, false))
+		} else if source.IsA(KSubquery) {
+			sources = append(sources, source.This())
+			for _, join := range source.This().ArgL("joins") {
+				if !join.IsSemiOrAntiJoin() {
+					sources = append(sources, join.This())
+				}
+			}
+		}
 	}
 
 	return availableSources
 }
 
-// getUnambiguousColumns mirrors Resolver._get_unambiguous_columns: a mapping of column name to
-// source name for every column that appears in exactly one source.
+// getUnambiguousColumns returns a mapping of column name to source name for every column that
+// appears in exactly one source.
 func (r *Resolver) getUnambiguousColumns(sourceColumns *omap[[]string]) *unambiguousColumns {
 	if sourceColumns.Len() == 0 {
 		return &unambiguousColumns{m: map[string]string{}}
@@ -409,7 +584,7 @@ func (r *Resolver) getUnambiguousColumns(sourceColumns *omap[[]string]) *unambig
 	firstColumns, _ := sourceColumns.Get(firstTable)
 
 	if len(keys) == 1 {
-		// Performance optimization - avoid copying first_columns if there is only one table.
+		// Performance optimization - avoid copying firstColumns if there is only one table.
 		return &unambiguousColumns{single: true, singleKeys: newStrSet(firstColumns...), singleValue: firstTable}
 	}
 
@@ -472,7 +647,6 @@ func (r *Resolver) getUnambiguousColumns(sourceColumns *omap[[]string]) *unambig
 	return &unambiguousColumns{m: unambiguous}
 }
 
-// structFieldNames mirrors Resolver._struct_field_names.
 func (r *Resolver) structFieldNames(colType *Expr) []string {
 	if colType != nil && DataTypeIsType(colType, []any{DT_ARRAY}, false) {
 		colType = seqGet(colType.Expressions(), 0)
@@ -488,10 +662,9 @@ func (r *Resolver) structFieldNames(colType *Expr) []string {
 	return []string{}
 }
 
-// getUnnestColumnType mirrors Resolver._get_unnest_column_type: the type of a column being
-// unnested/exploded, tracing through CTEs/subqueries to find the base table.
+// getUnnestColumnType returns the type of a column being unnested/exploded, tracing through
+// CTEs/subqueries to find the base table.
 func (r *Resolver) getUnnestColumnType(column *Expr, scope *Scope) *Expr {
-	// if column is qualified, use that table, otherwise disambiguate using the resolver
 	var tableName string
 	if column.TableName() != "" {
 		tableName = column.TableName()
@@ -512,8 +685,8 @@ func (r *Resolver) getUnnestColumnType(column *Expr, scope *Scope) *Expr {
 	return r.getColumnTypeFromScope(source, column)
 }
 
-// getColumnTypeFromScope mirrors Resolver._get_column_type_from_scope: a column's type traced
-// through scopes/tables to the base table (nil if not found).
+// getColumnTypeFromScope returns a column's type traced through scopes/tables to the base
+// table (nil if not found).
 func (r *Resolver) getColumnTypeFromScope(source Source, column *Expr) *Expr {
 	// A single source can be reachable through many paths of a scope DAG (e.g. a CTE
 	// referenced by several other CTEs). The schema and scope are immutable during
@@ -524,16 +697,14 @@ func (r *Resolver) getColumnTypeFromScope(source Source, column *Expr) *Expr {
 		return cached
 	}
 
-	// None is a valid result if DataType could not be determined!
+	// nil is a valid result if the DataType could not be determined!
 	var result *Expr
 	if source.Table != nil {
-		// base table - get the column type from schema
 		colType := r.schema.GetColumnType(source.Table, column, "", nil, nil)
 		if colType != nil && !DataTypeIsType(colType, []any{DT_UNKNOWN}, false) {
 			result = colType
 		}
 	} else if source.Scope != nil {
-		// iterate over all sources in the scope
 		for _, nestedSource := range source.Scope.Sources.Values() {
 			nestedType := r.getColumnTypeFromScope(nestedSource, column)
 			if nestedType != nil && !DataTypeIsType(nestedType, []any{DT_UNKNOWN}, false) {
@@ -556,7 +727,15 @@ func containsStr(list []string, s string) bool {
 	return false
 }
 
-// dedupeStrings mirrors list(dict.fromkeys(items)).
+func indexOfStr(list []string, s string) int {
+	for i, x := range list {
+		if x == s {
+			return i
+		}
+	}
+	return -1
+}
+
 func dedupeStrings(items []string) []string {
 	seen := newStrSet()
 	out := []string{}

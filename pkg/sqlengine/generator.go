@@ -6,21 +6,20 @@ import (
 	"strings"
 )
 
-// GenFunc renders one expression kind (TRANSFORMS entries and <key>_sql methods).
+// GenFunc renders one expression kind (TRANSFORMS entries and per-kind generator methods).
 type GenFunc func(g *Generator, e *Expr) string
 
-// propLocations mirrors the defaultdict returned by Generator.locate_properties.
+// propLocations groups properties by the location in a statement where they render.
 type propLocations map[string][]*Expr
 
 // GeneratorSettings is the fully-resolved generator configuration of a dialect.
 type GeneratorSettings struct {
 	*GeneratorData
 
-	// TRANSFORMS mirrors Generator.TRANSFORMS (exact class -> callable).
+	// TRANSFORMS maps exact kinds to their rendering functions.
 	TRANSFORMS map[Kind]GenFunc
-	// methods mirrors the auto-discovered <key>_sql methods visible on the generator class.
-	methods map[Kind]GenFunc
-	// dispatch mirrors Generator._dispatch: TRANSFORMS first, then methods.
+	methods    map[Kind]GenFunc
+	// dispatch merges TRANSFORMS and methods, with TRANSFORMS taking precedence.
 	dispatch map[Kind]GenFunc
 
 	AFTER_HAVING_MODIFIER_TRANSFORMS      map[string]GenFunc
@@ -44,7 +43,7 @@ func (s *GeneratorSettings) buildDispatch() {
 	}
 }
 
-// GenerateOptions mirrors the generator keyword options.
+// GenerateOptions configures a Generator; zero values select the defaults.
 type GenerateOptions struct {
 	Pretty bool
 	// Identify: "" or "false" (default), "true", "safe", "unsafe".
@@ -60,7 +59,7 @@ type GenerateOptions struct {
 	NoComments         bool
 }
 
-// Generator mirrors sqlglot.generator.Generator.
+// Generator renders expression trees as SQL text for one dialect.
 type Generator struct {
 	d *Dialect
 	s *GeneratorSettings
@@ -88,7 +87,6 @@ type Generator struct {
 	quoteJSONPathKeyUsingBrackets bool
 }
 
-// NewGenerator creates a generator for the dialect.
 func (d *Dialect) NewGenerator(opts *GenerateOptions) *Generator {
 	g := &Generator{
 		d:                d,
@@ -142,8 +140,6 @@ func (d *Dialect) NewGenerator(opts *GenerateOptions) *Generator {
 	return g
 }
 
-// nameSequence mirrors sqlglot.helper.name_sequence.
-// nextName mirrors the generator's name_sequence("_t").
 func (g *Generator) nextName() string {
 	s := "_t" + strconv.Itoa(g.nextNameIndex)
 	g.nextNameIndex++
@@ -161,7 +157,8 @@ func nameSequence(prefix string) func() string {
 
 type genPanic struct{ err error }
 
-// Generate mirrors Generator.generate.
+// Generate renders e as SQL (copying it first when copy is set) and returns panics raised while
+// rendering as errors.
 func (g *Generator) Generate(e *Expr, copy bool) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -199,7 +196,7 @@ func (g *Generator) baseGenerate(e *Expr, copy bool) string {
 	}
 	if g.unsupportedLevel == ErrorLevelWarn {
 		for _, m := range g.unsupportedMessages {
-			_ = m // sqlglot logs a warning; we stay silent.
+			_ = m // Warnings are not logged; the messages are dropped.
 		}
 	} else if g.unsupportedLevel == ErrorLevelRaise && len(g.unsupportedMessages) > 0 {
 		errs := make([]error, len(g.unsupportedMessages))
@@ -211,7 +208,8 @@ func (g *Generator) baseGenerate(e *Expr, copy bool) string {
 	return sql
 }
 
-// preprocess mirrors Generator.preprocess.
+// preprocess moves nested CTEs to the top level and ensures boolean conditions where the dialect
+// requires them.
 func (g *Generator) preprocess(e *Expr) *Expr {
 	e = g.moveCtesToTopLevel(e)
 	if g.s.ENSURE_BOOLS {
@@ -236,7 +234,6 @@ func (g *Generator) moveCtesToTopLevel(e *Expr) *Expr {
 	return e
 }
 
-// unsupported mirrors Generator.unsupported.
 func (g *Generator) unsupported(message string) {
 	if g.unsupportedLevel == ErrorLevelImmediate {
 		panic(&UnsupportedError{Msg: message})
@@ -244,7 +241,6 @@ func (g *Generator) unsupported(message string) {
 	g.unsupportedMessages = append(g.unsupportedMessages, message)
 }
 
-// sep mirrors Generator.sep(sep=" ").
 func (g *Generator) sep(sep string) string {
 	if g.pretty {
 		return pyStrip(sep) + "\n"
@@ -252,16 +248,12 @@ func (g *Generator) sep(sep string) string {
 	return sep
 }
 
-// sep1 is sep(" ").
 func (g *Generator) sep1() string { return g.sep(" ") }
 
-// seg mirrors Generator.seg(sql, sep=" ").
 func (g *Generator) seg(sql string) string { return g.sep(" ") + sql }
 
-// segSep mirrors Generator.seg(sql, sep).
 func (g *Generator) segSep(sql, sep string) string { return g.sep(sep) + sql }
 
-// sanitizeComment mirrors Generator.sanitize_comment.
 func (g *Generator) sanitizeComment(comment string) string {
 	r := []rune(comment)
 	if len(r) > 0 && pyStrip(string(r[0])) != "" {
@@ -276,18 +268,17 @@ func (g *Generator) sanitizeComment(comment string) string {
 	return comment
 }
 
-// maybeComment mirrors Generator.maybe_comment(sql, expression).
 func (g *Generator) maybeComment(sql string, e *Expr) string {
 	return g.maybeCommentFull(sql, e, nil, false, false)
 }
 
-// maybeCommentC mirrors Generator.maybe_comment(sql, comments=comments).
 func (g *Generator) maybeCommentC(sql string, e *Expr, comments []string) string {
 	return g.maybeCommentFull(sql, e, comments, true, false)
 }
 
-// maybeCommentFull mirrors Generator.maybe_comment with all arguments. hasComments distinguishes
-// comments=None (use expression.comments) from an explicit list.
+// maybeCommentFull attaches comments to sql as /* ... */ blocks, before sql when separated or for
+// kinds with separated comments, after it otherwise. hasComments distinguishes an explicit
+// comments list from using e's comments.
 func (g *Generator) maybeCommentFull(sql string, e *Expr, comments []string, hasComments bool, separated bool) string {
 	var cs []string
 	if g.comments {
@@ -319,7 +310,8 @@ func (g *Generator) maybeCommentFull(sql string, e *Expr, comments []string, has
 	return sql + " " + strings.Join(list, " ")
 }
 
-// wrap mirrors Generator.wrap.
+// wrap renders x in parentheses: queries in full, other expressions by their this argument and
+// strings as is.
 func (g *Generator) wrap(x any) string {
 	var thisSQL string
 	if e, ok := x.(*Expr); ok && e.IsA(KSelect, KSetOperation) {
@@ -327,7 +319,6 @@ func (g *Generator) wrap(x any) string {
 	} else if e, ok := x.(*Expr); ok {
 		thisSQL = g.sqlKey(e, "this")
 	} else if s, ok := x.(string); ok {
-		// self.sql(str, "this") -> str
 		thisSQL = s
 	}
 	if thisSQL == "" {
@@ -337,7 +328,6 @@ func (g *Generator) wrap(x any) string {
 	return "(" + g.sep("") + thisSQL + g.segSep(")", "")
 }
 
-// noIdentify mirrors Generator.no_identify.
 func (g *Generator) noIdentify(fn func() string) string {
 	original := g.identify
 	g.identify = "false"
@@ -346,7 +336,6 @@ func (g *Generator) noIdentify(fn func() string) string {
 	return result
 }
 
-// normalizeFunc mirrors Generator.normalize_func.
 func (g *Generator) normalizeFunc(name string) string {
 	switch g.normalizeFunctions {
 	case "upper", "true":
@@ -357,7 +346,8 @@ func (g *Generator) normalizeFunc(name string) string {
 	return name
 }
 
-// indent mirrors Generator.indent. pad < 0 means None (use g.pad).
+// indent prefixes the lines of sql with level indents plus pad spaces in pretty mode. A negative
+// pad selects g.pad.
 func (g *Generator) indent(sql string, level int, pad int, skipFirst, skipLast bool) string {
 	if !g.pretty || sql == "" {
 		return sql
@@ -376,13 +366,11 @@ func (g *Generator) indent(sql string, level int, pad int, skipFirst, skipLast b
 	return strings.Join(lines, "\n")
 }
 
-// indentDefault mirrors Generator.indent(sql) with default arguments.
 func (g *Generator) indentDefault(sql string) string { return g.indent(sql, 0, -1, false, false) }
 
-// sql mirrors Generator.sql(expression).
+// sql renders x: nil, false and empty lists as "", strings as is and expressions via dispatch.
 func (g *Generator) sql(x any) string { return g.sqlFull(x, "", true) }
 
-// sqlKey mirrors Generator.sql(expression, key).
 func (g *Generator) sqlKey(e *Expr, key string) string {
 	if e == nil {
 		return ""
@@ -390,7 +378,6 @@ func (g *Generator) sqlKey(e *Expr, key string) string {
 	return g.sqlFull(e, key, true)
 }
 
-// sqlNoComment mirrors Generator.sql(expression, comment=False).
 func (g *Generator) sqlNoComment(x any) string { return g.sqlFull(x, "", false) }
 
 func (g *Generator) sqlFull(x any, key string, comment bool) string {
@@ -425,7 +412,7 @@ func (g *Generator) sqlFull(x any, key string, comment bool) string {
 		}
 		return sql
 	case bool:
-		// `if not expression: return ""` (e.g. an arg set to False by `self._match(...) and ...`)
+		// false renders as "" (e.g. an optional arg stored as false when its keyword was absent).
 		if !v {
 			return ""
 		}
@@ -439,7 +426,8 @@ func (g *Generator) sqlFull(x any, key string, comment bool) string {
 	panic(&ValueError{Msg: fmt.Sprintf("Unsupported expression type %T", x)})
 }
 
-// functionFallbackSQL mirrors Generator.function_fallback_sql.
+// functionFallbackSQL renders a function call from the kind's SQL name (or the original name
+// when preserved) and its arguments in declaration order.
 func (g *Generator) functionFallbackSQL(e *Expr) string {
 	var args []any
 	for _, at := range e.kind.ArgTypes() {
@@ -454,25 +442,22 @@ func (g *Generator) functionFallbackSQL(e *Expr) string {
 			args = append(args, x)
 		}
 	}
-	var name string
-	if g.d.S.PRESERVE_ORIGINAL_NAMES {
-		if n, ok := e.MetaGet("name").(string); ok && n != "" {
-			name = n
-		} else {
-			name = e.kind.SQLName()
-		}
-	} else {
-		name = e.kind.SQLName()
-	}
-	return g.fn(name, args...)
+	return g.fn(g.functionName(e), args...)
 }
 
-// fn mirrors Generator.func(name, *args).
+func (g *Generator) functionName(e *Expr) string {
+	if g.d.S.PRESERVE_ORIGINAL_NAMES {
+		if n, ok := e.MetaGet("name").(string); ok && n != "" {
+			return n
+		}
+	}
+	return e.kind.SQLName()
+}
+
 func (g *Generator) fn(name string, args ...any) string {
 	return g.funcFull(name, "(", ")", true, args...)
 }
 
-// funcFull mirrors Generator.func(name, *args, prefix, suffix, normalize).
 func (g *Generator) funcFull(name, prefix, suffix string, normalize bool, args ...any) string {
 	if normalize {
 		name = g.normalizeFunc(name)
@@ -480,7 +465,8 @@ func (g *Generator) funcFull(name, prefix, suffix string, normalize bool, args .
 	return name + prefix + g.formatArgs(", ", args...) + suffix
 }
 
-// formatArgs mirrors Generator.format_args(*args, sep).
+// formatArgs renders args joined by sep, skipping nil and boolean values; in pretty mode,
+// too-wide argument lists go one per line.
 func (g *Generator) formatArgs(sep string, args ...any) string {
 	var argSQLs []string
 	for _, a := range args {
@@ -502,7 +488,6 @@ func (g *Generator) formatArgs(sep string, args ...any) string {
 	return strings.Join(argSQLs, sep)
 }
 
-// tooWide mirrors Generator.too_wide.
 func (g *Generator) tooWide(args []string) bool {
 	n := 0
 	for _, a := range args {
@@ -511,13 +496,12 @@ func (g *Generator) tooWide(args []string) bool {
 	return n > g.maxTextWidth
 }
 
-// exprsOpts mirrors the keyword arguments of Generator.expressions.
 type exprsOpts struct {
 	key       string
 	sqls      []any
 	hasSqls   bool
 	flat      bool
-	noIndent  bool // indent=False
+	noIndent  bool
 	skipFirst bool
 	skipLast  bool
 	sep       *string // nil = ", "
@@ -528,7 +512,8 @@ type exprsOpts struct {
 
 func strp2(s string) *string { return &s }
 
-// expressions mirrors Generator.expressions(expression, ...).
+// expressions renders e's list argument o.key ("expressions" by default), or o.sqls when e is
+// nil, joined by o.sep with comments, indentation and pretty line breaks.
 func (g *Generator) expressions(e *Expr, o exprsOpts) string {
 	var items []any
 	if e != nil {
@@ -542,8 +527,8 @@ func (g *Generator) expressions(e *Expr, o exprsOpts) string {
 				items = append(items, x)
 			}
 		case *Expr:
-			// Python iterates the Expr: Expr.__iter__ yields its `expressions` when the class has
-			// that arg type and raises TypeError otherwise.
+			// A single expression stands for its own expressions list; kinds without that
+			// argument panic with a "not iterable" error.
 			if v != nil {
 				if !v.kind.hasArgType("expressions") {
 					panic(&ValueError{Msg: fmt.Sprintf("'%s' object is not iterable", v.kind.Name())})
@@ -634,7 +619,6 @@ func (g *Generator) expressions(e *Expr, o exprsOpts) string {
 	return resultSQL
 }
 
-// opExpressions mirrors Generator.op_expressions.
 func (g *Generator) opExpressions(op string, e *Expr, flat bool) string {
 	flat = flat || e.parent.IsA(KProperties)
 	exprsSQL := g.expressions(e, exprsOpts{flat: flat})
@@ -648,17 +632,28 @@ func (g *Generator) opExpressions(op string, e *Expr, flat bool) string {
 	return g.seg(op) + s + exprsSQL
 }
 
-// binary mirrors Generator.binary.
+// binary renders a chain of same-kind binary nodes iteratively (deep chains do not recurse),
+// with op between operands and any operator comments. Only nodes negated like e join the chain,
+// except in an IS / IS NOT chain, where each non-boolean test keeps its own negation.
 func (g *Generator) binary(e *Expr, op string) string {
 	var sqls []string
 	stack := []any{e}
 	binaryType := e.kind
+	isIs := binaryType == KIs && (op == "IS" || op == "IS NOT")
+	negate := e.ArgB("negate")
 	for len(stack) > 0 {
 		node := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		if n, ok := node.(*Expr); ok && n != nil && n.kind == binaryType {
+		// A nested node of the same kind joins the chain only when it renders the same operator
+		if n, ok := node.(*Expr); ok && n != nil && n.kind == binaryType &&
+			(n == e || (isIs && !n.Expression().IsA(KBoolean)) || n.ArgB("negate") == negate) {
 			if opFunc := n.Arg("operator"); truthy(opFunc) {
 				op = "OPERATOR(" + g.sql(opFunc) + ")"
+			} else if isIs {
+				op = "IS"
+				if n.ArgB("negate") {
+					op = "IS NOT"
+				}
 			}
 			stack = append(stack, n.Arg("expression"))
 			stack = append(stack, " "+g.maybeCommentC(op, nil, n.Comments())+" ")
@@ -670,7 +665,8 @@ func (g *Generator) binary(e *Expr, op string) string {
 	return strings.Join(sqls, "")
 }
 
-// nakedProperty mirrors Generator.naked_property.
+// nakedProperty renders a property as NAME value; unknown properties are unsupported and render
+// as None.
 func (g *Generator) nakedProperty(e *Expr) string {
 	name, ok := PROPERTY_TO_NAME[e.kind]
 	if !ok || name == "" {
@@ -680,7 +676,7 @@ func (g *Generator) nakedProperty(e *Expr) string {
 	return name + " " + g.sqlKey(e, "this")
 }
 
-// replaceLineBreaks mirrors Generator._replace_line_breaks.
+// replaceLineBreaks protects newlines in s from pretty-mode reformatting with a sentinel.
 func (g *Generator) replaceLineBreaks(s string) string {
 	if g.pretty {
 		return strings.ReplaceAll(s, "\n", g.s.SENTINEL_LINE_BREAK)
@@ -688,7 +684,7 @@ func (g *Generator) replaceLineBreaks(s string) string {
 	return s
 }
 
-// SQL renders the expression using the given dialect (mirrors Expression.sql(dialect)).
+// SQL renders a copy of the expression using the given dialect.
 func (e *Expr) SQL(dialect string, opts *GenerateOptions) (string, error) {
 	d, err := GetDialect(dialect)
 	if err != nil {
@@ -697,7 +693,7 @@ func (e *Expr) SQL(dialect string, opts *GenerateOptions) (string, error) {
 	return d.NewGenerator(opts).Generate(e, true)
 }
 
-// Generate renders an expression with this dialect (mirrors Dialect.generate).
+// Generate renders a copy of an expression with this dialect.
 func (d *Dialect) Generate(e *Expr, opts *GenerateOptions) (string, error) {
 	return d.NewGenerator(opts).Generate(e, true)
 }

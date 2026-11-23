@@ -6,11 +6,13 @@ import (
 	"sync"
 )
 
-// UNSUPPORTED_TEMPLATE mirrors sqlglot.generator.UNSUPPORTED_TEMPLATE.
+// UNSUPPORTED_TEMPLATE is the warning for an argument the target dialect cannot render; its
+// placeholders are the argument name, the expression kind and the dialect.
 const UNSUPPORTED_TEMPLATE = "Argument '%s' is not supported for expression '%s' when targeting %s."
 
-// baseAfterHavingModifierTransforms mirrors Generator.AFTER_HAVING_MODIFIER_TRANSFORMS, which is
-// {cluster, distribute, sort, **generator.AFTER_HAVING_MODIFIER_TRANSFORMS (windows, qualify)}.
+// baseAfterHavingModifierTransforms returns the base renderers of the clauses that follow HAVING
+// (CLUSTER BY, DISTRIBUTE BY, SORT BY, WINDOW, QUALIFY) and their order. Dialects without the
+// first three remove them.
 func baseAfterHavingModifierTransforms() (map[string]GenFunc, []string) {
 	return map[string]GenFunc{
 			"cluster":    func(g *Generator, e *Expr) string { return g.sqlKey(e, "cluster") },
@@ -27,8 +29,8 @@ func baseAfterHavingModifierTransforms() (map[string]GenFunc, []string) {
 		[]string{"cluster", "distribute", "sort", "windows", "qualify"}
 }
 
-// baseGeneratorTransforms mirrors Generator.TRANSFORMS (before the Dialect metaclass prunes the
-// unsupported JSONPathPart entries).
+// baseGeneratorTransforms returns the base per-kind render functions, including every JSON path
+// part renderer (pruneJSONPathTransforms later removes the unsupported ones).
 func baseGeneratorTransforms() map[Kind]GenFunc {
 	this := func(g *Generator, e *Expr) string { return g.sqlKey(e, "this") }
 	exprList := func(es []*Expr) []any {
@@ -85,6 +87,7 @@ func baseGeneratorTransforms() map[Kind]GenFunc {
 			return g.fn("CONVERT", e.Arg("this"), e.Arg("dest"), e.Arg("source"))
 		},
 		KCopyGrantsProperty: func(g *Generator, e *Expr) string { return "COPY GRANTS" },
+		KCopyTagsProperty:   func(g *Generator, e *Expr) string { return "COPY TAGS" },
 		KCredentialsProperty: func(g *Generator, e *Expr) string {
 			return "CREDENTIALS=(" + g.expressions(e, exprsOpts{key: "expressions", sep: strp2(" ")}) + ")"
 		},
@@ -139,6 +142,7 @@ func baseGeneratorTransforms() map[Kind]GenFunc {
 		},
 		KJSONBContainsAnyTopKeys: func(g *Generator, e *Expr) string { return g.binary(e, "?|") },
 		KJSONBContainsAllTopKeys: func(g *Generator, e *Expr) string { return g.binary(e, "?&") },
+		KJSONBContainsTopKey:     func(g *Generator, e *Expr) string { return g.binary(e, "?") },
 		KJSONBDeleteAtPath:       func(g *Generator, e *Expr) string { return g.binary(e, "#-") },
 		KJSONBPathExists:         func(g *Generator, e *Expr) string { return g.binary(e, "@?") },
 		KJSONObject:              func(g *Generator, e *Expr) string { return g.jsonobjectSQL(e, "") },
@@ -183,6 +187,7 @@ func baseGeneratorTransforms() map[Kind]GenFunc {
 		KProjectionPolicyColumnConstraint:  func(g *Generator, e *Expr) string { return "PROJECTION POLICY " + this(g, e) },
 		KInvisibleColumnConstraint:         func(g *Generator, e *Expr) string { return "INVISIBLE" },
 		KZeroFillColumnConstraint:          func(g *Generator, e *Expr) string { return "ZEROFILL" },
+		KBinaryColumnConstraint:            func(g *Generator, e *Expr) string { return "BINARY" },
 		KPut:                               func(g *Generator, e *Expr) string { return g.getPutSQL(e) },
 		KRemoteWithConnectionModelProperty: func(g *Generator, e *Expr) string { return "REMOTE WITH CONNECTION " + this(g, e) },
 		KReturnsProperty: func(g *Generator, e *Expr) string {
@@ -214,6 +219,7 @@ func baseGeneratorTransforms() map[Kind]GenFunc {
 		KStream:                 func(g *Generator, e *Expr) string { return "STREAM " + this(g, e) },
 		KStreamingTableProperty: func(g *Generator, e *Expr) string { return "STREAMING" },
 		KStrictProperty:         func(g *Generator, e *Expr) string { return "STRICT" },
+		KWithoutRowidProperty:   func(g *Generator, e *Expr) string { return "WITHOUT ROWID" },
 		KSwapTable:              func(g *Generator, e *Expr) string { return "SWAP WITH " + this(g, e) },
 		KTableColumn:            func(g *Generator, e *Expr) string { return g.sql(e.Arg("this")) },
 		KTags: func(g *Generator, e *Expr) string {
@@ -262,8 +268,6 @@ func baseGeneratorTransforms() map[Kind]GenFunc {
 	return t
 }
 
-// newBaseGeneratorSettings returns the resolved settings of sqlglot.generator.Generator as seen
-// through the base Dialect (i.e. after the Dialect metaclass pruned the JSONPath transforms).
 func newBaseGeneratorSettings() *GeneratorSettings {
 	ahm, ahmKeys := baseAfterHavingModifierTransforms()
 	s := &GeneratorSettings{
@@ -279,8 +283,6 @@ func newBaseGeneratorSettings() *GeneratorSettings {
 	return s
 }
 
-// pruneJSONPathTransforms mirrors the Dialect metaclass step that removes the TRANSFORMS
-// entries of JSONPathPart expressions that are not in SUPPORTED_JSON_PATH_PARTS.
 func pruneJSONPathTransforms(s *GeneratorSettings) {
 	for _, part := range allJSONPathPartKinds {
 		if !s.SUPPORTED_JSON_PATH_PARTS.Has(part) {
@@ -290,7 +292,7 @@ func pruneJSONPathTransforms(s *GeneratorSettings) {
 }
 
 // cloneGeneratorSettings returns a copy of s whose maps and slices can be mutated without
-// affecting s (mirrors `{**Parent.TRANSFORMS, ...}`-style subclassing). Hooks are copied by value.
+// affecting s, so a derived dialect can extend its parent's tables. Hooks are copied by value.
 // The dispatch table is not copied: the caller must call buildDispatch after customizing.
 func cloneGeneratorSettings(s *GeneratorSettings) *GeneratorSettings {
 	c := &GeneratorSettings{
@@ -362,13 +364,12 @@ var (
 	genTablesBaseTypeMapping     map[DType]string
 )
 
-// genTablesCast mirrors exp.cast(expression, to) with copy=True and dialect=None, for a DType
-// target (DataType.build(DType) == DataType(this=dtype)).
+// genTablesCast casts a copy of expression (an *Expr or SQL text) to the type to. A cast whose
+// target type already is, or renders like, to in the base dialect is returned unchanged.
 func genTablesCast(expression any, to DType) *Expr {
 	expr := genTablesMaybeParse(expression)
 	dataType := NewDataType(to)
 
-	// dont re-cast if the expression is already a cast to the correct type
 	if expr.IsA(KCast) {
 		genTablesBaseTypeMappingOnce.Do(func() {
 			genTablesBaseTypeMapping = generatorSettings_base().TYPE_MAPPING
@@ -395,7 +396,8 @@ func genTablesCast(expression any, to DType) *Expr {
 	return c
 }
 
-// genTablesMaybeParse mirrors exp.maybe_parse(sql_or_expression, copy=True) without a dialect.
+// genTablesMaybeParse returns a copy of an expression, or parses SQL text with the base dialect.
+// A parse error or a nil input panics.
 func genTablesMaybeParse(x any) *Expr {
 	switch v := x.(type) {
 	case *Expr:
@@ -415,8 +417,8 @@ func genTablesMaybeParse(x any) *Expr {
 	panic(parsePanic{&ParseError{Msg: "SQL cannot be None"}})
 }
 
-// genTablesIsType mirrors DataType.is_type(other) for a single DataType `other` without
-// expressions or nullability (check_nullable=False).
+// genTablesIsType reports whether dataType has the same type as other, ignoring type parameters
+// and nullability; user-defined types compare structurally.
 func genTablesIsType(dataType, other *Expr) bool {
 	if dataType == nil {
 		return false

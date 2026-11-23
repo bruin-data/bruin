@@ -1,7 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/generators/hive.py (HiveGenerator).
-
 import (
 	"fmt"
 	"math/big"
@@ -11,30 +9,27 @@ import (
 	"unicode"
 )
 
-// These constants are duplicated from the Hive dialect class to avoid circular imports.
-// They must be kept in sync with Hive.TIME_FORMAT, Hive.DATE_FORMAT, Hive.DATEINT_FORMAT.
+// These constants duplicate the Hive dialect settings TIME_FORMAT, DATE_FORMAT and
+// DATEINT_FORMAT (dialect_settings.go) and must be kept in sync with them.
 const (
 	HIVE_TIME_FORMAT    = "'yyyy-MM-dd HH:mm:ss'"
 	HIVE_DATE_FORMAT    = "'yyyy-MM-dd'"
 	HIVE_DATEINT_FORMAT = "'yyyyMMdd'"
 )
 
-// The default formats above, as rendered by the lenient rewrite (non-padded month/day).
+// HIVE_NON_PADDED_TIME_FORMATS are the default formats as rendered by the lenient rewrite.
 var HIVE_NON_PADDED_TIME_FORMATS = []string{"'yyyy-M-d HH:mm:ss'", "'yyyy-M-d'"}
 
-// Expressions that parse a string with a format (vs. formatting one, like TimeToStr).
 var hivePARSE_TIME_EXPRESSIONS = []Kind{KStrToTime, KStrToDate, KStrToUnix, KTsOrDsToDate}
 
 var hiveCANONICAL_TIME_FORMAT = regexp.MustCompile(`%(?:mstrict|dstrict|[-:].|.)`)
 
 var hiveLAX_TO_NON_PADDED_FORMATS = map[string]string{"%m": "%-m", "%d": "%-d"}
 
-// hiveLenientParseFormat mirrors generators.hive._lenient_parse_format.
-//
-// Changes the lax %m/%d in a canonical format to the non-padded %-m/%-d, which java.time
-// parses with or without a leading zero. This is only safe for delimited specifiers, because
-// adjacent fields parse greedily. A %m/%d is changed only when its neighbors don't touch a
-// digit run, i.e., neither side is another specifier or a literal digit.
+// hiveLenientParseFormat changes the lax %m/%d in a canonical format to the non-padded %-m/%-d,
+// which java.time parses with or without a leading zero. This is only safe for delimited
+// specifiers, because adjacent fields parse greedily. A %m/%d is changed only when its neighbors
+// don't touch a digit run, i.e., neither side is another specifier or a literal digit.
 func hiveLenientParseFormat(fmt_ string) string {
 	parts := hiveCANONICAL_TIME_FORMAT.Split(fmt_, -1)
 	formats := hiveCANONICAL_TIME_FORMAT.FindAllString(fmt_, -1)
@@ -68,7 +63,6 @@ func hiveLenientParseFormat(fmt_ string) string {
 	return b.String()
 }
 
-// (FuncType, Multiplier).
 type hiveDeltaInterval struct {
 	fn         string
 	multiplier int
@@ -91,7 +85,7 @@ var hiveTIME_DIFF_FACTOR = map[string]string{
 
 var hiveDIFF_MONTH_SWITCH = newStrSet("YEAR", "QUARTER", "MONTH")
 
-// hiveNilIfEmpty converts a Go "" (Python None) string result into nil for g.fn arguments.
+// hiveNilIfEmpty turns an empty string result into nil so g.fn omits the argument.
 func hiveNilIfEmpty(s string) any {
 	if s == "" {
 		return nil
@@ -99,20 +93,20 @@ func hiveNilIfEmpty(s string) any {
 	return s
 }
 
-// hiveMulNumberLiteral mirrors `exp.Literal.number(increment.to_py() * multiplier)` for a number literal.
+// hiveMulNumberLiteral returns a number literal for text times multiplier: exact for integers,
+// keeping the operand's exponent for decimals. Panics with a ValueError if text is not a number.
 func hiveMulNumberLiteral(text string, multiplier int) *Expr {
 	clean := strings.ReplaceAll(strings.TrimSpace(text), "_", "")
 	if i, ok := new(big.Int).SetString(clean, 10); ok {
 		return LiteralNumber(new(big.Int).Mul(i, big.NewInt(int64(multiplier))).String())
 	}
-	// Decimal(text) * multiplier (Decimal keeps the exponent of the operand)
+	// Decimal text: the product keeps the exponent of the operand (2.50 * 3 is 7.50).
 	if d, ok := hivePyDecimal(clean); ok {
 		return LiteralNumber(d.mulInt(multiplier).String())
 	}
 	panic(&ValueError{Msg: "[<class 'decimal.ConversionSyntax'>]"})
 }
 
-// hivePyDecimal is a minimal model of decimal.Decimal for plain/scientific numeric strings.
 type hiveDecimal struct {
 	neg      bool
 	coef     *big.Int
@@ -168,7 +162,9 @@ func (d hiveDecimal) mulInt(m int) hiveDecimal {
 	return out
 }
 
-// String mirrors Decimal.__str__ (to-scientific-string).
+// String formats d with the General Decimal Arithmetic to-scientific-string rules: plain notation
+// when the exponent is not positive and the adjusted exponent is at least -6, else scientific
+// notation such as 1.2E+3.
 func (d hiveDecimal) String() string {
 	digits := d.coef.String()
 	sign := ""
@@ -204,7 +200,9 @@ func (d hiveDecimal) String() string {
 	return sign + intPart + fracPart + expPart
 }
 
-// hiveAddDateSQL mirrors generators.hive._add_date_sql.
+// hiveAddDateSQL renders DateAdd, DateSub and TsOrDsAdd as DATE_ADD or ADD_MONTHS, scaling the
+// increment by the unit's multiplier (negated for DateSub). A unitless TsOrDsAdd is a plain
+// DATE_ADD.
 func hiveAddDateSQL(g *Generator, e *Expr) string {
 	if e.IsA(KTsOrDsAdd) && !e.ArgB("unit") {
 		return g.fn("DATE_ADD", e.Arg("this"), e.Arg("expression"))
@@ -239,7 +237,8 @@ func hiveAddDateSQL(g *Generator, e *Expr) string {
 	return g.fn(fn, e.Arg("this"), increment)
 }
 
-// hiveDateDiffSQL mirrors generators.hive._date_diff_sql.
+// hiveDateDiffSQL renders DateDiff and TsOrDsDiff: sub-day units as a scaled UNIX_TIMESTAMP
+// difference, YEAR/QUARTER/MONTH via MONTHS_BETWEEN and other units via DATEDIFF.
 func hiveDateDiffSQL(g *Generator, e *Expr) string {
 	unit := pyUpper(e.Text("unit"))
 
@@ -277,7 +276,6 @@ func hiveDateDiffSQL(g *Generator, e *Expr) string {
 	return diffSQL
 }
 
-// hiveArraySortSQL mirrors generators.hive._array_sort_sql.
 func hiveArraySortSQL(g *Generator, e *Expr) string {
 	if e.ArgB("expression") {
 		g.unsupported("Hive's SORT_ARRAY does not support a comparator.")
@@ -285,12 +283,10 @@ func hiveArraySortSQL(g *Generator, e *Expr) string {
 	return g.fn("SORT_ARRAY", e.Arg("this"))
 }
 
-// hiveStrToUnixSQL mirrors generators.hive._str_to_unix_sql.
 func hiveStrToUnixSQL(g *Generator, e *Expr) string {
 	return g.fn("UNIX_TIMESTAMP", e.Arg("this"), timeFormat("hive")(g, e))
 }
 
-// hiveUnixToTimeSQL mirrors generators.hive._unix_to_time_sql.
 func hiveUnixToTimeSQL(g *Generator, e *Expr) string {
 	timestamp := g.sqlKey(e, "this")
 	scale := e.ArgE("scale")
@@ -301,8 +297,8 @@ func hiveUnixToTimeSQL(g *Generator, e *Expr) string {
 	return "FROM_UNIXTIME(" + timestamp + " / POW(10, " + exprSQL(scale) + "))"
 }
 
-// hiveIsCastTimeFormat mirrors generators.hive._is_cast_time_format.
-// Checks whether CAST subsumes the expression's parse format.
+// hiveIsCastTimeFormat reports whether a plain CAST subsumes the expression's parse format: the
+// default time or date format, padded or (for a lax %m/%d) non-padded.
 func hiveIsCastTimeFormat(g *Generator, e *Expr, timeFormat string) bool {
 	if timeFormat == HIVE_TIME_FORMAT || timeFormat == HIVE_DATE_FORMAT {
 		return true
@@ -317,7 +313,6 @@ func hiveIsCastTimeFormat(g *Generator, e *Expr, timeFormat string) bool {
 	return false
 }
 
-// hiveStrToDateSQL mirrors generators.hive._str_to_date_sql.
 func hiveStrToDateSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	timeFormat := g.formatTime(e, nil, nil)
@@ -327,7 +322,6 @@ func hiveStrToDateSQL(g *Generator, e *Expr) string {
 	return "CAST(" + this + " AS DATE)"
 }
 
-// hiveStrToTimeSQL mirrors generators.hive._str_to_time_sql.
 func hiveStrToTimeSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	timeFormat := g.formatTime(e, nil, nil)
@@ -337,7 +331,6 @@ func hiveStrToTimeSQL(g *Generator, e *Expr) string {
 	return "CAST(" + this + " AS TIMESTAMP)"
 }
 
-// hiveToDateSQL mirrors generators.hive._to_date_sql.
 func hiveToDateSQL(g *Generator, e *Expr) string {
 	timeFormat := g.formatTime(e, nil, nil)
 	if timeFormat != "" && !hiveIsCastTimeFormat(g, e, timeFormat) {
@@ -350,10 +343,6 @@ func hiveToDateSQL(g *Generator, e *Expr) string {
 
 	return g.fn("TO_DATE", e.Arg("this"))
 }
-
-// ---------------------------------------------------------------------------------------------
-// HiveGenerator
-// ---------------------------------------------------------------------------------------------
 
 func customizeHiveGenerator(d *Dialect) {
 	T := d.G.TRANSFORMS
@@ -508,9 +497,10 @@ func customizeHiveGenerator(d *Dialect) {
 	h.usingpropertySQL = hiveUsingpropertySQL
 }
 
-// hiveFormatTime mirrors HiveGenerator.format_time.
+// hiveFormatTime renders a format argument. In a strict-month dialect, the format of an
+// expression that parses a string renders lax %m/%d as non-padded M/d.
 func hiveFormatTime(g *Generator, e *Expr, inverseTimeMapping map[string]string, inverseTimeTrie *trie) string {
-	// Inferred property because this method is reused by other dialects under Hive
+	// Inferred from the time mapping because dialects derived from Hive reuse this function.
 	isDialectStrict := g.d.S.TIME_MAPPING["MM"] == "%mstrict"
 
 	if isDialectStrict && inverseTimeMapping == nil && e.IsA(hivePARSE_TIME_EXPRESSIONS...) {
@@ -526,7 +516,8 @@ func hiveFormatTime(g *Generator, e *Expr, inverseTimeMapping map[string]string,
 	return g.baseFormatTime(e, inverseTimeMapping, inverseTimeTrie)
 }
 
-// hiveIgnorenullsSQL mirrors HiveGenerator.ignorenulls_sql.
+// hiveIgnorenullsSQL renders IGNORE NULLS on a FIRST/LAST-style function as a TRUE second
+// argument, e.g. FIRST(x, TRUE).
 func hiveIgnorenullsSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(g.s.IGNORE_NULLS_FUNCS...) {
@@ -536,12 +527,10 @@ func hiveIgnorenullsSQL(g *Generator, e *Expr) string {
 	return g.baseIgnorenullsSQL(e)
 }
 
-// hiveUnnestSQL mirrors HiveGenerator.unnest_sql.
 func hiveUnnestSQL(g *Generator, e *Expr) string {
 	return renameFunc("EXPLODE")(g, e)
 }
 
-// hiveJsonpathkeySQL mirrors HiveGenerator._jsonpathkey_sql.
 func hiveJsonpathkeySQL(g *Generator, e *Expr) string {
 	if e.This().IsA(KJSONPathWildcard) {
 		g.unsupported("Unsupported wildcard in JSONPathKey expression")
@@ -551,7 +540,6 @@ func hiveJsonpathkeySQL(g *Generator, e *Expr) string {
 	return g.baseJsonpathkeySQL(e)
 }
 
-// hiveParameterSQL mirrors HiveGenerator.parameter_sql.
 func hiveParameterSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	expressionSQL := g.sqlKey(e, "expression")
@@ -569,7 +557,8 @@ func hiveParameterSQL(g *Generator, e *Expr) string {
 	return "${" + this + "}"
 }
 
-// hiveSchemaSQL mirrors HiveGenerator.schema_sql.
+// hiveSchemaSQL renders a schema, dropping explicit ascending order (desc=false) from ordered
+// columns.
 func hiveSchemaSQL(g *Generator, e *Expr) string {
 	for ordered := range e.FindAll(KOrdered) {
 		if v, ok := ordered.Arg("desc").(bool); ok && !v {
@@ -580,7 +569,6 @@ func hiveSchemaSQL(g *Generator, e *Expr) string {
 	return g.baseSchemaSQL(e)
 }
 
-// hiveConstraintSQL mirrors HiveGenerator.constraint_sql.
 func hiveConstraintSQL(g *Generator, e *Expr) string {
 	for _, prop := range e.FindAllList(KProperties) {
 		prop.Pop()
@@ -591,7 +579,6 @@ func hiveConstraintSQL(g *Generator, e *Expr) string {
 	return "CONSTRAINT " + this + " " + expressions
 }
 
-// hiveRowformatserdepropertySQL mirrors HiveGenerator.rowformatserdeproperty_sql.
 func hiveRowformatserdepropertySQL(g *Generator, e *Expr) string {
 	serdeProps := g.sqlKey(e, "serde_properties")
 	if serdeProps != "" {
@@ -600,7 +587,6 @@ func hiveRowformatserdepropertySQL(g *Generator, e *Expr) string {
 	return "ROW FORMAT SERDE " + g.sqlKey(e, "this") + serdeProps
 }
 
-// hiveArrayaggSQL mirrors HiveGenerator.arrayagg_sql.
 func hiveArrayaggSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KOrder) {
@@ -609,14 +595,15 @@ func hiveArrayaggSQL(g *Generator, e *Expr) string {
 	return g.fn("COLLECT_LIST", this)
 }
 
-// hiveTruncSQL mirrors HiveGenerator.trunc_sql.
-// Hive/Spark lack native numeric TRUNC. CAST to BIGINT truncates toward zero (not rounds).
+// hiveTruncSQL renders numeric TRUNC as a CAST to BIGINT: Hive/Spark lack a native numeric
+// TRUNC, and the cast truncates toward zero (it does not round). Decimals are unsupported.
 func hiveTruncSQL(g *Generator, e *Expr) string {
 	dhUnsupportedArgs(g, e, "decimals")
 	return g.sql(CastExpr(e.This(), DT_BIGINT, true, nil))
 }
 
-// hiveDatatypeSQL mirrors HiveGenerator.datatype_sql.
+// hiveDatatypeSQL renders a data type: unsized (or MAX) text types become TEXT, sized TEXT
+// becomes VARCHAR, temporal types drop their precision and FLOAT(n) becomes FLOAT or DOUBLE.
 func hiveDatatypeSQL(g *Generator, e *Expr) string {
 	dt, isDType := e.Arg("this").(DType)
 	exprs := e.Expressions()
@@ -625,7 +612,7 @@ func hiveDatatypeSQL(g *Generator, e *Expr) string {
 		e.Set("expressions", nil)
 	} else if dhIsType(e, DT_TEXT) && len(exprs) > 0 {
 		e.Set("this", DT_VARCHAR)
-	} else if isDType && DataType_TEMPORAL_TYPES.Has(dt) {
+	} else if isDType && !g.s.SUPPORTS_TEMPORAL_PRECISION && DataType_TEMPORAL_TYPES.Has(dt) {
 		e.Set("expressions", nil)
 	} else if dhIsType(e, DT_FLOAT) {
 		sizeExpression := e.Find(KDataTypeParam)
@@ -645,13 +632,11 @@ func hiveDatatypeSQL(g *Generator, e *Expr) string {
 	return g.baseDatatypeSQL(e)
 }
 
-// hiveVersionSQL mirrors HiveGenerator.version_sql.
 func hiveVersionSQL(g *Generator, e *Expr) string {
 	sql := g.baseVersionSQL(e)
 	return strings.Replace(sql, "FOR ", "", 1)
 }
 
-// hiveStructSQL mirrors HiveGenerator.struct_sql.
 func hiveStructSQL(g *Generator, e *Expr) string {
 	values := []any{}
 
@@ -667,7 +652,6 @@ func hiveStructSQL(g *Generator, e *Expr) string {
 	return g.fn("STRUCT", values...)
 }
 
-// hiveColumndefSQL mirrors HiveGenerator.columndef_sql.
 func hiveColumndefSQL(g *Generator, e *Expr, sep string) string {
 	if e.Parent().IsA(KDataType) && dhIsType(e.Parent(), DT_STRUCT) {
 		sep = ": "
@@ -675,8 +659,11 @@ func hiveColumndefSQL(g *Generator, e *Expr, sep string) string {
 	return g.baseColumndefSQL(e, sep)
 }
 
-// hiveAltercolumnSQL mirrors HiveGenerator.altercolumn_sql.
 func hiveAltercolumnSQL(g *Generator, e *Expr) string {
+	if e.ArgB("exists") {
+		g.unsupported("ALTER COLUMN IF EXISTS is not supported by this dialect")
+	}
+
 	this := g.sqlKey(e, "this")
 	newName := g.sqlKey(e, "rename_to")
 	if newName == "" {
@@ -703,13 +690,11 @@ func hiveAltercolumnSQL(g *Generator, e *Expr) string {
 	return "CHANGE COLUMN " + this + " " + newName + " " + dtype + comment
 }
 
-// hiveRenamecolumnSQL mirrors HiveGenerator.renamecolumn_sql.
 func hiveRenamecolumnSQL(g *Generator, e *Expr) string {
 	g.unsupported("Cannot rename columns without data type defined in Hive")
 	return ""
 }
 
-// hiveAltersetSQL mirrors HiveGenerator.alterset_sql.
 func hiveAltersetSQL(g *Generator, e *Expr) string {
 	exprs := g.expressions(e, exprsOpts{flat: true})
 	if exprs != "" {
@@ -735,7 +720,6 @@ func hiveAltersetSQL(g *Generator, e *Expr) string {
 	return "SET" + serde + exprs + location + fileFormat + tags
 }
 
-// hiveSerdepropertiesSQL mirrors HiveGenerator.serdeproperties_sql.
 func hiveSerdepropertiesSQL(g *Generator, e *Expr) string {
 	prefix := ""
 	if e.ArgB("with_") {
@@ -746,7 +730,8 @@ func hiveSerdepropertiesSQL(g *Generator, e *Expr) string {
 	return prefix + "SERDEPROPERTIES (" + exprs + ")"
 }
 
-// hiveExistsSQL mirrors HiveGenerator.exists_sql.
+// hiveExistsSQL renders EXISTS; the two-argument function form is rendered as a plain function
+// call.
 func hiveExistsSQL(g *Generator, e *Expr) string {
 	if e.Expression() != nil {
 		return g.functionFallbackSQL(e)
@@ -755,7 +740,6 @@ func hiveExistsSQL(g *Generator, e *Expr) string {
 	return g.baseExistsSQL(e)
 }
 
-// hiveTimetostrSQL mirrors HiveGenerator.timetostr_sql.
 func hiveTimetostrSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KTimeStrToTime) {
@@ -765,13 +749,11 @@ func hiveTimetostrSQL(g *Generator, e *Expr) string {
 	return g.fn("DATE_FORMAT", this, hiveNilIfEmpty(g.formatTime(e, nil, nil)))
 }
 
-// hiveUsingpropertySQL mirrors HiveGenerator.usingproperty_sql.
 func hiveUsingpropertySQL(g *Generator, e *Expr) string {
 	kind := e.Arg("kind")
 	return "USING " + chunkAPyStr(kind) + " " + g.sqlKey(e, "this")
 }
 
-// hiveFileformatpropertySQL mirrors HiveGenerator.fileformatproperty_sql.
 func hiveFileformatpropertySQL(g *Generator, e *Expr) string {
 	var this string
 	if e.This().IsA(KInputOutputFormat) {

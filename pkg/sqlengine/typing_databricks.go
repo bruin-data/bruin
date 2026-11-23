@@ -1,7 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/typing/databricks.py.
-
 func typingDatabricksMetadata() ExprMetadataType {
 	m := typingMetadata("spark").copy()
 
@@ -25,8 +23,8 @@ func typingDatabricksMetadata() ExprMetadataType {
 	m.returns(DT_VARCHAR, KRegexpSubstr)
 	m.returns(DT_BIGINT, KRegrCount)
 	m.returns(DT_BOOLEAN, KSearch)
-	m.returns(DT_VARCHAR, KTrim)
-	m.annotators("typing/databricks.py:34", func(a *TypeAnnotator, e *Expr) {
+	m.returns(DT_TIMESTAMP, KTimestampTrunc)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<STRING>", MustDialect("databricks"), false, true))
 	}, KRegexpExtractAll)
 

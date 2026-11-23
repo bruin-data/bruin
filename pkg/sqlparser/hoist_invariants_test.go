@@ -68,7 +68,7 @@ func checkHoistDeclaresListInvariants(t *testing.T, queries []string, dialect st
 }
 
 // TestHoistInvariantsOnGoldenCorpus checks properties every hoist must satisfy on the composed
-// scripts of testdata/golden/hoist.json.gz, independently of the recorded Python answers.
+// scripts of testdata/golden/hoist.json.gz, independently of the recorded answers.
 func TestHoistInvariantsOnGoldenCorpus(t *testing.T) {
 	t.Parallel()
 	recs := readGolden(t, filepath.Join("testdata", "golden", "hoist.json.gz"))

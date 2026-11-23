@@ -20,6 +20,7 @@ type parserHooks struct {
 	parseCheckConstraint               func(p *Parser) *Expr
 	parseClusterProperty               func(p *Parser) *Expr
 	parseColumn                        func(p *Parser) *Expr
+	parseColumnConstraint              func(p *Parser) *Expr
 	parseColumnDef                     func(p *Parser, this *Expr, computedColumn bool) *Expr
 	parseColumnOps                     func(p *Parser, this *Expr) *Expr
 	parseCommitOrRollback              func(p *Parser) *Expr
@@ -29,11 +30,14 @@ type parserHooks struct {
 	parseCreate                        func(p *Parser) *Expr
 	parseCte                           func(p *Parser) *Expr
 	parseDcolon                        func(p *Parser) *Expr
+	parseDdlSelect                     func(p *Parser) *Expr
 	parseDefiner                       func(p *Parser) *Expr
 	parseDescribe                      func(p *Parser) *Expr
 	parseDropColumn                    func(p *Parser) *Expr
 	parseExpression                    func(p *Parser) *Expr
 	parseExtract                       func(p *Parser) *Expr
+	parseFactorOperand                 func(p *Parser) *Expr
+	parseFieldDef                      func(p *Parser) *Expr
 	parseFileLocation                  func(p *Parser) *Expr
 	parseForeignKey                    func(p *Parser) *Expr
 	parseFunction                      func(p *Parser, functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr
@@ -47,6 +51,7 @@ type parserHooks struct {
 	parseIf                            func(p *Parser) *Expr
 	parseInsertTable                   func(p *Parser) *Expr
 	parseInto                          func(p *Parser) *Expr
+	parseIsRhs                         func(p *Parser, distinct bool) *Expr
 	parseJoin                          func(p *Parser, skipJoinToken bool, parseBracket bool, aliasTokens *TokenSet) *Expr
 	parseJoinParts                     func(p *Parser) (*Token, *Token, *Token)
 	parseJsonObject                    func(p *Parser, agg bool) *Expr
@@ -64,12 +69,15 @@ type parserHooks struct {
 	parsePrimaryKey                    func(p *Parser, wrappedOptional bool, inProps bool, namedPrimaryKey bool) *Expr
 	parsePrimaryKeyPart                func(p *Parser) *Expr
 	parseProjections                   func(p *Parser) ([]*Expr, []*Expr)
+	parseProperty                      func(p *Parser) any
 	parsePropertyBefore                func(p *Parser) any
+	parseRange                         func(p *Parser, this *Expr, parseIs bool) *Expr
 	parseReturns                       func(p *Parser) *Expr
 	parseSet                           func(p *Parser, unset bool, tag bool) *Expr
 	parseStructTypes                   func(p *Parser, typeRequired bool) *Expr
 	parseSubstring                     func(p *Parser) *Expr
 	parseTable                         func(p *Parser, schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr
+	parseTableAlias                    func(p *Parser, aliasTokens *TokenSet) *Expr
 	parseTablePart                     func(p *Parser, schema bool) *Expr
 	parseTableParts                    func(p *Parser, schema bool, isDbReference bool, wildcard bool, fast bool) *Expr
 	parseTableSample                   func(p *Parser, asModifier bool) *Expr
@@ -109,6 +117,7 @@ func defaultParserHooks() parserHooks {
 		parseCheckConstraint:               (*Parser).baseParseCheckConstraint,
 		parseClusterProperty:               (*Parser).baseParseClusterProperty,
 		parseColumn:                        (*Parser).baseParseColumn,
+		parseColumnConstraint:              (*Parser).baseParseColumnConstraint,
 		parseColumnDef:                     (*Parser).baseParseColumnDef,
 		parseColumnOps:                     (*Parser).baseParseColumnOps,
 		parseCommitOrRollback:              (*Parser).baseParseCommitOrRollback,
@@ -118,11 +127,14 @@ func defaultParserHooks() parserHooks {
 		parseCreate:                        (*Parser).baseParseCreate,
 		parseCte:                           (*Parser).baseParseCte,
 		parseDcolon:                        (*Parser).baseParseDcolon,
+		parseDdlSelect:                     (*Parser).baseParseDdlSelect,
 		parseDefiner:                       (*Parser).baseParseDefiner,
 		parseDescribe:                      (*Parser).baseParseDescribe,
 		parseDropColumn:                    (*Parser).baseParseDropColumn,
 		parseExpression:                    (*Parser).baseParseExpression,
 		parseExtract:                       (*Parser).baseParseExtract,
+		parseFactorOperand:                 (*Parser).baseParseFactorOperand,
+		parseFieldDef:                      (*Parser).baseParseFieldDef,
 		parseFileLocation:                  (*Parser).baseParseFileLocation,
 		parseForeignKey:                    (*Parser).baseParseForeignKey,
 		parseFunction:                      (*Parser).baseParseFunction,
@@ -136,6 +148,7 @@ func defaultParserHooks() parserHooks {
 		parseIf:                            (*Parser).baseParseIf,
 		parseInsertTable:                   (*Parser).baseParseInsertTable,
 		parseInto:                          (*Parser).baseParseInto,
+		parseIsRhs:                         (*Parser).baseParseIsRhs,
 		parseJoin:                          (*Parser).baseParseJoin,
 		parseJoinParts:                     (*Parser).baseParseJoinParts,
 		parseJsonObject:                    (*Parser).baseParseJsonObject,
@@ -153,12 +166,15 @@ func defaultParserHooks() parserHooks {
 		parsePrimaryKey:                    (*Parser).baseParsePrimaryKey,
 		parsePrimaryKeyPart:                (*Parser).baseParsePrimaryKeyPart,
 		parseProjections:                   (*Parser).baseParseProjections,
+		parseProperty:                      (*Parser).baseParseProperty,
 		parsePropertyBefore:                (*Parser).baseParsePropertyBefore,
+		parseRange:                         (*Parser).baseParseRange,
 		parseReturns:                       (*Parser).baseParseReturns,
 		parseSet:                           (*Parser).baseParseSet,
 		parseStructTypes:                   (*Parser).baseParseStructTypes,
 		parseSubstring:                     (*Parser).baseParseSubstring,
 		parseTable:                         (*Parser).baseParseTable,
+		parseTableAlias:                    (*Parser).baseParseTableAlias,
 		parseTablePart:                     (*Parser).baseParseTablePart,
 		parseTableParts:                    (*Parser).baseParseTableParts,
 		parseTableSample:                   (*Parser).baseParseTableSample,
@@ -238,6 +254,10 @@ func (p *Parser) parseColumn() *Expr {
 	return p.s.h.parseColumn(p)
 }
 
+func (p *Parser) parseColumnConstraint() *Expr {
+	return p.s.h.parseColumnConstraint(p)
+}
+
 func (p *Parser) parseColumnDef(this *Expr, computedColumn bool) *Expr {
 	return p.s.h.parseColumnDef(p, this, computedColumn)
 }
@@ -274,6 +294,10 @@ func (p *Parser) parseDcolon() *Expr {
 	return p.s.h.parseDcolon(p)
 }
 
+func (p *Parser) parseDdlSelect() *Expr {
+	return p.s.h.parseDdlSelect(p)
+}
+
 func (p *Parser) parseDefiner() *Expr {
 	return p.s.h.parseDefiner(p)
 }
@@ -294,6 +318,14 @@ func (p *Parser) parseExpression() *Expr {
 
 func (p *Parser) parseExtract() *Expr {
 	return p.s.h.parseExtract(p)
+}
+
+func (p *Parser) parseFieldDef() *Expr {
+	return p.s.h.parseFieldDef(p)
+}
+
+func (p *Parser) parseFactorOperand() *Expr {
+	return p.s.h.parseFactorOperand(p)
 }
 
 func (p *Parser) parseFileLocation() *Expr {
@@ -346,6 +378,10 @@ func (p *Parser) parseInsertTable() *Expr {
 
 func (p *Parser) parseInto() *Expr {
 	return p.s.h.parseInto(p)
+}
+
+func (p *Parser) parseIsRhs(distinct bool) *Expr {
+	return p.s.h.parseIsRhs(p, distinct)
 }
 
 func (p *Parser) parseJoin(skipJoinToken bool, parseBracket bool, aliasTokens *TokenSet) *Expr {
@@ -418,8 +454,16 @@ func (p *Parser) parseProjections() ([]*Expr, []*Expr) {
 	return p.s.h.parseProjections(p)
 }
 
+func (p *Parser) parseProperty() any {
+	return p.s.h.parseProperty(p)
+}
+
 func (p *Parser) parsePropertyBefore() any {
 	return p.s.h.parsePropertyBefore(p)
+}
+
+func (p *Parser) parseRange(this *Expr, parseIs bool) *Expr {
+	return p.s.h.parseRange(p, this, parseIs)
 }
 
 func (p *Parser) parseReturns() *Expr {
@@ -442,6 +486,10 @@ func (p *Parser) parseTable(schema bool, joins bool, aliasTokens *TokenSet, pars
 	p.enter()
 	defer p.leave()
 	return p.s.h.parseTable(p, schema, joins, aliasTokens, parseBracket, isDbReference, parsePartition, consumePipe)
+}
+
+func (p *Parser) parseTableAlias(aliasTokens *TokenSet) *Expr {
+	return p.s.h.parseTableAlias(p, aliasTokens)
 }
 
 func (p *Parser) parseTablePart(schema bool) *Expr {

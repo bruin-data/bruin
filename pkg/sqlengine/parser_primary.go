@@ -2,13 +2,13 @@ package sqlengine
 
 import "strings"
 
-// Port of sqlglot.parser.Parser (chunk D, part 2): atoms, columns, JSON/variant extraction,
-// column operators, parens, primaries, fields, function calls, UDFs, lambdas and schemas.
+// anonymousFuncHint is the comment prefix that makes a known function call parse as an
+// anonymous function.
+const anonymousFuncHint = "sqlglot.anonymous"
 
-// SQLGLOT_ANONYMOUS mirrors exp.SQLGLOT_ANONYMOUS.
-const chunkDSQLGlotAnonymous = "sqlglot.anonymous"
-
-// _parse_atom (parser.py L6607).
+// parseAtom parses a simple operand quickly: a column (when the current token can start one)
+// or a primary literal not followed by a column operator, a postfix token or another string.
+// Returns nil, consuming nothing, when the full expression parser is needed.
 func (p *Parser) parseAtom() *Expr {
 	if p.s.IDENTIFIER_TOKENS.Has(p.curr.Type) {
 		if column := p.parseColumn(); column != nil {
@@ -36,7 +36,8 @@ func (p *Parser) parseAtom() *Expr {
 	return primaryParser(p, token)
 }
 
-// _parse_column (parser.py L6632).
+// baseParseColumn parses a column reference with its column operators (dots, brackets, casts),
+// an optional join mark and, with COLON_IS_VARIANT_EXTRACT, a :path variant extraction.
 func (p *Parser) baseParseColumn() *Expr {
 	column := p.parseColumnPartsFast()
 	if column == nil {
@@ -52,8 +53,8 @@ func (p *Parser) baseParseColumn() *Expr {
 	}
 
 	if column != nil {
-		if p.d.S.SUPPORTS_COLUMN_JOIN_MARKS {
-			column.Set("join_mark", p.match(TK_JOIN_MARKER))
+		if p.d.S.SUPPORTS_COLUMN_JOIN_MARKS && p.match(TK_JOIN_MARKER) {
+			column.Set("join_mark", true)
 		}
 		if p.s.COLON_IS_VARIANT_EXTRACT {
 			column = p.parseColonAsVariantExtract(column)
@@ -63,13 +64,11 @@ func (p *Parser) baseParseColumn() *Expr {
 	return column
 }
 
-// _parse_column_parts_fast (parser.py L6648)
-//
-// Fast path for simple column and dot references (a, a.b, ...).
+// parseColumnPartsFast is the fast path for simple column and dot references (a, a.b, ...).
 //
 // Greedily consumes VAR/IDENTIFIER tokens separated by DOTs, then checks
-// that nothing complex follows. If it does, retreats and returns None so
-// the slow path can handle it. For >4 parts, wraps in exp.Dot nodes.
+// that nothing complex follows. If it does, retreats and returns nil so
+// the slow path can handle it. For >4 parts, wraps in Dot nodes.
 func (p *Parser) parseColumnPartsFast() *Expr {
 	index := p.index
 	var parts []*Expr
@@ -152,7 +151,8 @@ func (p *Parser) parseColumnPartsFast() *Expr {
 	return column
 }
 
-// _parse_column_reference (parser.py L6721).
+// parseColumnReference parses a field (or a VALUES keyword used as a name) and wraps a bare
+// identifier in a Column.
 func (p *Parser) parseColumnReference() *Expr {
 	this := p.parseField(false, nil, false)
 	if this == nil &&
@@ -171,7 +171,8 @@ func (p *Parser) parseColumnReference() *Expr {
 	return this
 }
 
-// _build_json_extract (parser.py L6737).
+// buildJsonExtract wraps this in a variant JSONExtract over the collected path parts, when
+// there is more than the root, and returns it with a new path holding only the root.
 func (p *Parser) buildJsonExtract(this *Expr, pathParts []*Expr) (*Expr, []*Expr) {
 	if len(pathParts) > 1 {
 		this = p.expression(New(
@@ -189,10 +190,12 @@ func (p *Parser) buildJsonExtract(this *Expr, pathParts []*Expr) (*Expr, []*Expr
 
 var selectTokenSet = newTokenSet(TK_SELECT)
 
-// _parse_colon_as_variant_extract (parser.py L6755).
+// parseColonAsVariantExtract parses a variant extraction, this:key[.key | [index] | ::type]...,
+// into JSONExtract nodes, with Bracket nodes for non-literal subscripts and casts in between.
+// With COLON_CHAIN_IS_SINGLE_EXTRACT, chained colons build a single path.
 func (p *Parser) parseColonAsVariantExtract(this *Expr) *Expr {
 	if !p.match(TK_COLON) {
-		// No path: the final _build_json_extract on a lone JSONPathRoot is a no-op.
+		// No path: the final buildJsonExtract on a lone JSONPathRoot is a no-op.
 		return this
 	}
 	pathParts := []*Expr{New(KJSONPathRoot)}
@@ -263,12 +266,13 @@ func (p *Parser) parseColonAsVariantExtract(this *Expr) *Expr {
 	return this
 }
 
-// _parse_dcolon (parser.py L6812).
 func (p *Parser) baseParseDcolon() *Expr {
 	return p.parseTypes(false, false, true, false)
 }
 
-// _parse_column_ops (parser.py L6815).
+// baseParseColumnOps parses the operators following a column: brackets, dots (building
+// qualified columns or Dot chains), casts and the dialect's COLUMN_OPERATORS. Qualified function
+// calls (x.y.FOO()) become Dot chains.
 func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 	for p.s.BRACKETS.Has(p.curr.Type) {
 		this = p.parseBracket(this)
@@ -332,7 +336,7 @@ func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 				"catalog", this.Arg("db"),
 			), this.Comments())
 		} else if field.IsA(KWindow) {
-			// Move the exp.Dot's to the window's function
+			// Move the Dots to the window's function
 			windowFunc := p.expression(New(KDot, "this", this, "expression", field.This()))
 			field.Set("this", windowFunc)
 			this = field
@@ -350,7 +354,8 @@ func (p *Parser) baseParseColumnOps(this *Expr) *Expr {
 	return this
 }
 
-// _parse_paren (parser.py L6883).
+// parseParen parses a parenthesized expression: () or (a, b) as a Tuple, a parenthesized query
+// as a subquery, otherwise a Paren. A parenthesized aggregate may be followed by a window.
 func (p *Parser) parseParen() *Expr {
 	if !p.match(TK_L_PAREN) {
 		return nil
@@ -393,7 +398,8 @@ func (p *Parser) parseParen() *Expr {
 	return this
 }
 
-// _parse_primary (parser.py L6921).
+// baseParsePrimary parses a primary through PRIMARY_PARSERS (adjacent strings become a CONCAT),
+// .5 as 0.5, or else a parenthesized expression.
 func (p *Parser) baseParsePrimary() *Expr {
 	if chunkDMatchKey(p, p.s.PRIMARY_PARSERS) {
 		tokenType := p.prev.Type
@@ -429,8 +435,12 @@ func (p *Parser) baseParsePrimary() *Expr {
 	return p.parseParen()
 }
 
-// _parse_field (parser.py L6949).
+// parseField parses a primary or a function call (the function first with anonymousFunc), or
+// else an identifier. Where field names can be digit-prefixed, a number after a dot is a quoted
+// identifier, joined with a name glued to it (data.144A_FLAG).
 func (p *Parser) parseField(anyToken bool, tokens *TokenSet, anonymousFunc bool) *Expr {
+	afterDot := p.s.SUPPORTS_DIGIT_PREFIXED_FIELD_NAMES && p.prev.ok() && p.prev.Type == TK_DOT
+
 	var field *Expr
 	if anonymousFunc {
 		field = p.parseFunction(nil, anonymousFunc, true, anyToken)
@@ -443,13 +453,22 @@ func (p *Parser) parseField(anyToken bool, tokens *TokenSet, anonymousFunc bool)
 			field = p.parseFunction(nil, anonymousFunc, true, anyToken)
 		}
 	}
-	if field != nil {
-		return field
+	if field == nil {
+		field = p.parseIdVar(anyToken, tokens)
 	}
-	return p.parseIdVar(anyToken, tokens)
+
+	if afterDot && field.IsA(KLiteral) && field.IsNumber() {
+		name := field.Name()
+		if p.isConnected() && p.parseVar(true, nil, false) != nil {
+			name += p.prev.Text
+		}
+
+		field = New(KIdentifier, "this", name, "quoted", true).updatePositionsFrom(field)
+	}
+
+	return field
 }
 
-// _parse_function (parser.py L6966).
 func (p *Parser) baseParseFunction(functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr {
 	// This allows us to also parse {fn <function>} syntax (Snowflake, MySQL support this)
 	// See: https://community.snowflake.com/s/article/SQL-Escape-Sequences
@@ -468,12 +487,25 @@ func (p *Parser) baseParseFunction(functions map[string]FuncBuilder, anonymous b
 	return fn
 }
 
-// _parse_function_args (parser.py L6996).
 func (p *Parser) parseFunctionArgs(alias bool) []*Expr {
 	return p.parseCSV(func() *Expr { return p.parseLambda(alias) }, TK_COMMA)
 }
 
-// _parse_function_call (parser.py L6999).
+// parseConnectorFunction parses the arguments of a function form of AND / OR (kind) and joins
+// them with the connector, parenthesized so it keeps its precedence where it is used.
+func (p *Parser) parseConnectorFunction(kind Kind) *Expr {
+	args := p.parseFunctionArgs(false)
+	if len(args) == 0 {
+		p.raiseError("Expected at least one argument", nil)
+	}
+	return New(KParen, "this", combineConditions(args, kind, false, true))
+}
+
+// baseParseFunctionCall parses a function call at the current token: a no-paren function, a
+// FUNCTION_PARSERS entry, a subquery predicate (EXISTS/ANY/... (query)), a known function
+// through its builder or an anonymous function, followed by any window. It returns nil when
+// the current token does not start a function call. A non-nil functions replaces FUNCTIONS;
+// anonymous forces an anonymous function.
 func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr {
 	if !p.curr.ok() {
 		return nil
@@ -517,8 +549,8 @@ func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymo
 
 	p.advance(2)
 
-	// Note: Python reuses the `parser` variable here, so the final R_PAREN match below
-	// depends on FUNCTION_PARSERS even when `anonymous` is set.
+	// Note: the final R_PAREN match below depends on FUNCTION_PARSERS even when `anonymous`
+	// is set.
 	parser := p.s.FUNCTION_PARSERS[upper]
 	var result *Expr
 	if parser != nil && !anonymous {
@@ -531,7 +563,7 @@ func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymo
 				p.matchRParen(nil)
 			} else if prev.ok() && (prev.Type == TK_LIKE || prev.Type == TK_ILIKE) {
 				// Backtrack one token since we've consumed the L_PAREN here. Instead, we'd like
-				// to parse "LIKE [ANY | ALL] (...)" as a whole into an exp.Tuple or exp.Paren
+				// to parse "LIKE [ANY | ALL] (...)" as a whole into a Tuple or Paren
 				p.advance(-1)
 				expr = p.parseBitwise()
 			}
@@ -556,10 +588,10 @@ func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymo
 			postFuncComments = p.curr.Comments
 		}
 		if knownFunction && len(postFuncComments) > 0 {
-			// If the user-inputted comment "/* sqlglot.anonymous */" is following the function
-			// call we'll construct it as exp.Anonymous, even if it's "known"
+			// If a user comment starting with anonymousFuncHint follows the function call,
+			// we'll construct it as an Anonymous function, even if it's "known"
 			for _, comment := range postFuncComments {
-				if strings.HasPrefix(strings.TrimLeftFunc(comment, pyIsSpaceRune), chunkDSQLGlotAnonymous) {
+				if strings.HasPrefix(strings.TrimLeftFunc(comment, pyIsSpaceRune), anonymousFuncHint) {
 					knownFunction = false
 					break
 				}
@@ -605,12 +637,14 @@ func (p *Parser) baseParseFunctionCall(functions map[string]FuncBuilder, anonymo
 	return p.parseWindow(result, false)
 }
 
-// _to_prop_eq (parser.py L7116).
+// baseToPropEq converts a non key-value argument for kvToPropEq; the base parser keeps it as is.
 func (p *Parser) baseToPropEq(expression *Expr, index int) *Expr {
 	return expression
 }
 
-// _kv_to_prop_eq (parser.py L7119).
+// kvToPropEq converts key-value function arguments (aliases, key/value pairs) into PropertyEQ
+// nodes with identifier keys (expression keys with parseMap); other arguments go through
+// toPropEq.
 func (p *Parser) kvToPropEq(expressions []*Expr, parseMap bool) []*Expr {
 	transformed := []*Expr{}
 
@@ -626,7 +660,8 @@ func (p *Parser) kvToPropEq(expressions []*Expr, parseMap bool) []*Expr {
 					this = e.This()
 				} else {
 					if e.This() == nil {
-						// e.this.name raises AttributeError when `this` is missing (e.g. `{: 1}`)
+						// A missing key (e.g. `{: 1}`) is an error; the message keeps its
+						// historical wording
 						panic(&ValueError{Msg: "'NoneType' object has no attribute 'name'"})
 					}
 					this = ToIdentifier(e.This().Name(), nil)
@@ -634,7 +669,7 @@ func (p *Parser) kvToPropEq(expressions []*Expr, parseMap bool) []*Expr {
 				e = p.expression(New(KPropertyEQ, "this", this, "expression", e.Expression()))
 			}
 
-			if e.This().IsA(KColumn) {
+			if !parseMap && e.This().IsA(KColumn) {
 				e.This().Replace(e.This().This())
 			}
 		} else {
@@ -647,9 +682,10 @@ func (p *Parser) kvToPropEq(expressions []*Expr, parseMap bool) []*Expr {
 	return transformed
 }
 
-// _parse_function_properties (parser.py L7146).
+// baseParseFunctionProperties parses the properties following a function body (keyword
+// PROPERTY_PARSERS only, optionally after DEFAULT); nil when there are none.
 func (p *Parser) baseParseFunctionProperties() *Expr {
-	// Skip the generic `key = value` fallback in _parse_property since this
+	// Skip the generic `key = value` fallback in parseProperty since this
 	// runs post-AS where a function body like `name = expr` can be misread
 	// as a property.
 	properties := []*Expr{}
@@ -658,7 +694,7 @@ func (p *Parser) baseParseFunctionProperties() *Expr {
 		if matchTextKeys(p, p.s.PROPERTY_PARSERS) {
 			prop = p.s.PROPERTY_PARSERS[upperText(p.prev)](p, propKwargs{})
 		} else if p.match(TK_DEFAULT) && matchTextKeys(p, p.s.PROPERTY_PARSERS) {
-			prop = p.s.PROPERTY_PARSERS[upperText(p.prev)](p, propKwargs{default_: true})
+			prop = p.callPropertyParser(p.s.PROPERTY_PARSERS[upperText(p.prev)], propKwargs{default_: true})
 		} else {
 			break
 		}
@@ -678,17 +714,14 @@ func (p *Parser) baseParseFunctionProperties() *Expr {
 	return nil
 }
 
-// _parse_user_defined_function_expression (parser.py L7163).
 func (p *Parser) baseParseUserDefinedFunctionExpression() *Expr {
 	return p.parseStatement()
 }
 
-// _parse_function_parameter (parser.py L7166).
 func (p *Parser) baseParseFunctionParameter() *Expr {
 	return p.parseColumnDef(p.parseIdVar(true, nil), false)
 }
 
-// _parse_user_defined_function (parser.py L7169).
 func (p *Parser) baseParseUserDefinedFunction(kind TokenType) *Expr {
 	this := p.parseTableParts(true, false, false, false)
 
@@ -701,7 +734,9 @@ func (p *Parser) baseParseUserDefinedFunction(kind TokenType) *Expr {
 	return p.expression(New(KUserDefinedFunction, "this", this, "expressions", expressions, "wrapped", true))
 }
 
-// _parse_macro_overloads (parser.py L7181).
+// parseMacroOverloads collects a macro's first definition and the following
+// `, (params) AS [TABLE] body` overloads into MacroOverloads, moving the first parameter list
+// off this.
 func (p *Parser) parseMacroOverloads(this *Expr, firstBody *Expr, firstIsTable bool) *Expr {
 	var firstExpressions any
 	if exprs := this.Expressions(); len(exprs) > 0 {
@@ -739,7 +774,8 @@ func (p *Parser) parseMacroOverloads(this *Expr, firstBody *Expr, firstIsTable b
 	return p.expression(New(KMacroOverloads, "expressions", overloads))
 }
 
-// _parse_introducer (parser.py L7216).
+// parseIntroducer parses a charset introducer followed by a literal (e.g. _utf8'x'); without a
+// literal the token is an identifier.
 func (p *Parser) parseIntroducer(token *Token) *Expr {
 	literal := p.parsePrimary()
 	if literal != nil {
@@ -749,7 +785,7 @@ func (p *Parser) parseIntroducer(token *Token) *Expr {
 	return p.identifierExpression(token, TriNone)
 }
 
-// _parse_session_parameter (parser.py L7223).
+// parseSessionParameter parses a session parameter name after @@, as [kind.]name.
 func (p *Parser) parseSessionParameter() *Expr {
 	var kind any
 	this := p.parseIdVar(true, nil)
@@ -768,12 +804,12 @@ func (p *Parser) parseSessionParameter() *Expr {
 	return p.expression(New(KSessionParameter, "this", this, "kind", kind))
 }
 
-// _parse_lambda_arg (parser.py L7233).
 func (p *Parser) baseParseLambdaArg() *Expr {
 	return p.parseIdVar(true, nil)
 }
 
-// _parse_lambda (parser.py L7236).
+// baseParseLambda parses a function argument: a lambda ((a, b) -> ... or a -> ...), or else
+// [DISTINCT|ALL] expression with IGNORE/RESPECT NULLS, HAVING MAX, ORDER BY and LIMIT suffixes.
 func (p *Parser) baseParseLambda(alias bool) *Expr {
 	nextTokenType := p.next.Type
 
@@ -809,10 +845,10 @@ func (p *Parser) baseParseLambda(alias bool) *Expr {
 	var this *Expr
 
 	if p.match(TK_DISTINCT) {
-		this = p.expression(New(KDistinct, "expressions", p.parseCSV(p.parseDisjunction, TK_COMMA)))
+		this = p.expression(New(KDistinct, "expressions", p.parseCSV(func() *Expr { return p.parsePer(p.parseDisjunction()) }, TK_COMMA)))
 	} else {
 		p.match(TK_ALL) // ALL is the default/no-op aggregate modifier (SQL-92)
-		this = p.parseSelectOrExpression(alias)
+		this = p.parsePer(p.parseSelectOrExpression(alias))
 	}
 
 	return p.parseLimit(
@@ -824,7 +860,8 @@ func (p *Parser) baseParseLambda(alias bool) *Expr {
 	)
 }
 
-// _parse_schema (parser.py L7283).
+// parseSchema parses a parenthesized list of column definitions and constraints after this; it
+// retreats when the parenthesis opens a query.
 func (p *Parser) parseSchema(this *Expr) *Expr {
 	index := p.index
 	if !p.match(TK_L_PAREN) {
@@ -833,7 +870,7 @@ func (p *Parser) parseSchema(this *Expr) *Expr {
 
 	// Disambiguate between schema and subquery/CTE, e.g. in INSERT INTO table (<expr>),
 	// expr can be of both types
-	if p.matchSet(p.s.SELECT_START_TOKENS) {
+	if p.matchSet(p.s.SELECT_START_TOKENS) || p.isTableQuery() {
 		p.retreat(index)
 		return this
 	}
@@ -847,7 +884,7 @@ func (p *Parser) parseSchema(this *Expr) *Expr {
 	return p.expression(New(KSchema, "this", this, "expressions", args))
 }
 
-// _parse_field_def (parser.py L7297).
-func (p *Parser) parseFieldDef() *Expr {
+// baseParseFieldDef parses a column definition whose name may be any token.
+func (p *Parser) baseParseFieldDef() *Expr {
 	return p.parseColumnDef(p.parseField(true, nil, false), true)
 }

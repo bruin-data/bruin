@@ -8,8 +8,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
-// cmdLineage mirrors get_column_lineage(query, schema, dialect) including the error a
-// missing (null) schema produces in Python.
+// cmdLineage runs the lineage command. A missing (null) schema is an error, whose message keeps
+// its historical wording ("'NoneType' object is not iterable").
 func cmdLineage(c map[string]any) (any, error) {
 	query := str(c["query"])
 	dialect := str(c["dialect"])
@@ -25,14 +25,14 @@ func cmdLineage(c map[string]any) (any, error) {
 type rawSchema struct {
 	keys   []string
 	tables map[string]*sqlengine.SchemaMap
-	// nested holds values that are not flat column maps (nested catalog/db dicts).
+	// nested holds values that are not flat column maps (nested catalog/db maps).
 	nested map[string]any
 }
 
 func toRawSchema(v any) (*rawSchema, error) {
 	switch s := v.(type) {
 	case nil:
-		// Python: dict(None) -> TypeError
+		// a null schema is an error
 		return nil, &pyError{"'NoneType' object is not iterable"}
 	case Schema:
 		if s == nil {
@@ -43,12 +43,13 @@ func toRawSchema(v any) (*rawSchema, error) {
 		for k := range s {
 			keys = append(keys, k)
 		}
-		// Go's JSON encoder sorts map keys; Python receives them in that order.
+		// Take tables in sorted key order, the order a JSON-encoded Schema has, so results are
+		// deterministic.
 		sort.Strings(keys)
 		rs.keys = keys
 		for _, k := range keys {
 			if s[k] == nil {
-				// A nil column map is sent as JSON null (Python None).
+				// A nil column map stays nil (a JSON null).
 				rs.tables[k] = nil
 				continue
 			}
@@ -117,7 +118,8 @@ func anyToSchemaMap(v any) *sqlengine.SchemaMap {
 	return m
 }
 
-// alignSchemaCasing mirrors align_schema_casing.
+// alignSchemaCasing returns a copy of schema that also lists each table whose name matches a
+// table in parsed only case-insensitively under the query's spelling of the name.
 func alignSchemaCasing(schema *rawSchema, parsed *sqlengine.Expr) *rawSchema {
 	queryTables := map[string]bool{}
 	var ordered []string
@@ -158,7 +160,8 @@ func alignSchemaCasing(schema *rawSchema, parsed *sqlengine.Expr) *rawSchema {
 	return out
 }
 
-// schemaDictToSchemaObject mirrors schema_dict_to_schema_object.
+// schemaDictToSchemaObject nests the dotted table paths of schema into a catalog / db / table
+// SchemaMap.
 func schemaDictToSchemaObject(schema *rawSchema) *sqlengine.SchemaMap {
 	result := sqlengine.NewSchemaMap()
 	for _, path := range schema.keys {
@@ -174,7 +177,8 @@ func schemaDictToSchemaObject(schema *rawSchema) *sqlengine.SchemaMap {
 			}
 			nm, isMap := v.(*sqlengine.SchemaMap)
 			if !isMap {
-				// Python would fail on item assignment into a non-dict.
+				// Nesting below a part that is not a map (a table without columns) is an error;
+				// the message keeps its historical wording.
 				panic(&pyError{"'str' object does not support item assignment"})
 			}
 			current = nm
@@ -184,7 +188,8 @@ func schemaDictToSchemaObject(schema *rawSchema) *sqlengine.SchemaMap {
 	return result
 }
 
-// schemaValue converts a table's column map to a SchemaMap value; a nil map is Python None.
+// schemaValue converts a table's column map to a SchemaMap value, turning a nil map into an
+// untyped nil.
 func schemaValue(m *sqlengine.SchemaMap) any {
 	if m == nil {
 		return nil
@@ -215,17 +220,19 @@ func lineageError(msg string) map[string]any {
 	return map[string]any{"columns": []any{}, "non_selected_columns": []any{}, "errors": errs}
 }
 
-// getColumnLineage mirrors get_column_lineage.
+// getColumnLineage computes the upstream columns of each output column of query, plus the
+// columns used in WHERE / JOIN / GROUP BY that are not selected. Failures are reported in the
+// response's errors field rather than as an error.
 func getColumnLineage(query string, schema *rawSchema, dialectName string) (out any, err error) {
 	dialectName = normalizeDialect(dialectName)
 
 	d, derr := getDialect(dialectName)
 	if derr != nil {
-		return lineageError("Parse error: " + derr.Error()), nil //nolint:nilerr // reported in the response, like the Python command
+		return lineageError("Parse error: " + derr.Error()), nil //nolint:nilerr // reported in the response's errors field
 	}
 	parsed, perr := d.ParseOne(query, nil)
 	if perr != nil {
-		return lineageError("Parse error: " + perr.Error()), nil //nolint:nilerr // reported in the response, like the Python command
+		return lineageError("Parse error: " + perr.Error()), nil //nolint:nilerr // reported in the response's errors field
 	}
 	if !parsed.IsA(sqlengine.KQuery) {
 		return lineageError("Failed to parse query"), nil
@@ -241,17 +248,18 @@ func getColumnLineage(query string, schema *rawSchema, dialectName string) (out 
 		base, _ := getDialect("")
 		optimized, oerr = sqlengine.OptimizeSafe(parsed, nested, base, nil)
 		if oerr != nil {
-			return lineageError("Schema Error: " + oerr.Error()), nil //nolint:nilerr // reported in the response, like the Python command
+			return lineageError("Schema Error: " + oerr.Error()), nil //nolint:nilerr // reported in the response's errors field
 		}
 	}
 
 	cols, cerr := extractColumns(optimized)
 	if cerr != nil {
-		return map[string]any{"columns": []any{}, "non_selected_columns": []any{}, "errors": []string{}}, nil //nolint:nilerr // reported in the response, like the Python command
+		return map[string]any{"columns": []any{}, "non_selected_columns": []any{}, "errors": []string{}}, nil //nolint:nilerr // an empty result, not a command error
 	}
 
 	scope := sqlengine.BuildScope(optimized)
-	// lineage() builds its MappingSchema from the raw schema; failures make every lineage call fail.
+	// Lineage uses a MappingSchema built from the raw (flat) schema; if it can't be built, no
+	// column gets lineage.
 	var lineageSchema *sqlengine.MappingSchema
 	schemaOK := func() (ok bool) {
 		defer func() {
@@ -383,7 +391,7 @@ type selectedCol struct {
 	name, typ string
 }
 
-// extractColumns mirrors extract_columns.
+// extractColumns returns the name and type of each projection of the first SELECT in parsed.
 func extractColumns(parsed *sqlengine.Expr) (cols []selectedCol, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -403,7 +411,7 @@ func extractColumns(parsed *sqlengine.Expr) (cols []selectedCol, err error) {
 	return cols, nil
 }
 
-// typeString mirrors str(expression.type).
+// typeString renders an annotated type as SQL, or "None" when there is none.
 func typeString(t *sqlengine.Expr) string {
 	if t == nil {
 		return "None"
@@ -413,7 +421,8 @@ func typeString(t *sqlengine.Expr) string {
 
 type tableCol struct{ name, table string }
 
-// extractNonSelectedColumns mirrors extract_non_selected_columns.
+// extractNonSelectedColumns returns the distinct table columns referenced in WHERE, JOIN and
+// GROUP BY clauses, with table aliases resolved, sorted by name and table.
 func extractNonSelectedColumns(parsed *sqlengine.Expr) []tableCol {
 	tables := extractTables(parsed)
 	tableAlias := map[string]string{}

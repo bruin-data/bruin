@@ -35,7 +35,7 @@ func TestAddLimitContract(t *testing.T) {
 		{"union outer not branch", "SELECT 1 AS n UNION ALL SELECT 2 AS n LIMIT 9", "postgres", "SELECT 1 AS n UNION ALL SELECT 2 AS n LIMIT 4", 4},
 		{"subquery outer not inner", "SELECT * FROM (SELECT * FROM t LIMIT 8) AS x", "duckdb", "SELECT * FROM (SELECT * FROM t LIMIT 8) AS x LIMIT 2", 2},
 		{"zero", "SELECT * FROM t", "mysql", "SELECT * FROM t LIMIT 0", 0},
-		// SQLGlot currently emits a negative LIMIT rather than rejecting it.
+		// The engine currently emits a negative LIMIT rather than rejecting it.
 		{"negative", "SELECT * FROM t", "postgres", "SELECT * FROM t LIMIT -1", -1},
 		{"tsql top replaced", "SELECT TOP 20 id FROM t", "tsql", "SELECT TOP 6 id FROM t", 6},
 		{"tsql percent and ties removed", "SELECT TOP 10 PERCENT WITH TIES id FROM t ORDER BY id", "tsql", "SELECT TOP 7 id FROM t ORDER BY id", 7},
@@ -63,7 +63,7 @@ func TestAddLimitContract(t *testing.T) {
 		{"insert is not limitable", "INSERT INTO dest SELECT id FROM src", "postgres", "'Insert' object has no attribute 'limit'"},
 		{"invalid dialect", "SELECT 1", "not-a-dialect", "cannot parse query"},
 		{"malformed query wins no detail over invalid dialect", "SELECT * FROM", "not-a-dialect", "cannot parse query"},
-		// SQLGlot currently rejects ClickHouse's valid per-key plus global LIMIT form.
+		// The engine currently rejects ClickHouse's valid per-key plus global LIMIT form.
 		{"clickhouse per-key and global limit", "SELECT * FROM t LIMIT 2 BY id LIMIT 9", "clickhouse", "cannot parse query"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

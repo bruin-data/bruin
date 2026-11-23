@@ -1,10 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/simplify.py (sqlglot v30.13.0): module-level helpers and the
-// Simplifier entry points. The rewrite rules live in opt_simplify_rules.go, the pseudo SQL
-// generator `gen` in opt_simplify_gen.go and the Python number / date models in
-// opt_simplify_num.go and opt_simplify_dates.go.
-
 import (
 	"math/big"
 )
@@ -14,40 +9,34 @@ const smpFINAL = "final"
 
 var smpSIMPLIFIABLE = []Kind{KBinary, KFunc, KLambda, KPredicate, KUnary}
 
-// SimplifyOptions mirrors the keyword arguments of sqlglot.optimizer.simplify.simplify.
 type SimplifyOptions struct {
-	// ConstantPropagation mirrors constant_propagation.
+	// ConstantPropagation enables propagating column = literal equalities within conjunctions.
 	ConstantPropagation bool
-	// Coalesce mirrors coalesce_simplification.
-	Coalesce bool
-	// Dialect mirrors dialect (nil means the default dialect).
+	Coalesce            bool
+	// Dialect is the dialect used by the rules (nil means the default dialect).
 	Dialect *Dialect
-	// MaxDepth is accepted for API compatibility only: sqlglot 30.13's simplify has no max_depth
-	// parameter, so it is ignored.
+	// MaxDepth is accepted for API compatibility only; it is ignored.
 	MaxDepth int
 }
 
-// Simplify mirrors sqlglot.optimizer.simplify.simplify: rewrites a sqlglot AST to simplify
-// expressions, e.g. "TRUE AND TRUE" -> "TRUE". The expression is mutated in place.
+// Simplify rewrites an AST to simplify expressions, e.g. "TRUE AND TRUE" -> "TRUE". The
+// expression is mutated in place.
 //
-// Python exceptions that simplify lets escape (e.g. decimal.DivisionByZero for `1.0 / 0`,
-// OverflowError for out-of-range date arithmetic) are raised as panics.
+// Errors the rules let escape (e.g. decimal division by zero for `1.0 / 0`, overflow in
+// out-of-range date arithmetic) are raised as panics.
 func Simplify(e *Expr, o SimplifyOptions) *Expr {
 	return NewSimplifier(o.Dialect, true).Simplify(e, o.ConstantPropagation, o.Coalesce)
 }
 
-// simplifyExpr mirrors simplify(expression, dialect=d) with default options.
 func simplifyExpr(e *Expr, d *Dialect) *Expr {
 	return Simplify(e, SimplifyOptions{Dialect: d})
 }
 
-// smpUnsupportedUnit mirrors simplify.UnsupportedUnit.
+// smpUnsupportedUnit is raised (as a panic) for a date unit the date helpers do not support.
 type smpUnsupportedUnit struct{ msg string }
 
 func (e *smpUnsupportedUnit) Error() string { return e.msg }
 
-// smpCatch mirrors the @catch(ModuleNotFoundError, UnsupportedUnit) decorator: if fn raises
-// UnsupportedUnit, the original expression is returned.
 func smpCatch(expression *Expr, fn func() *Expr) (res *Expr) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -61,29 +50,27 @@ func smpCatch(expression *Expr, fn func() *Expr) (res *Expr) {
 	return fn()
 }
 
-// smpTypeAnnotator is the part of sqlglot.optimizer.annotate_types.TypeAnnotator used by the
-// Simplifier (`annotate_types_on_change`).
+// smpTypeAnnotator is the part of TypeAnnotator the Simplifier uses to annotate the
+// expressions its rules produce.
 type smpTypeAnnotator interface {
-	// Clear mirrors TypeAnnotator.clear().
+	// Clear resets the annotator's per-run caches.
 	Clear()
-	// Annotate mirrors TypeAnnotator.annotate(expression, annotate_scope=annotateScope).
 	Annotate(e *Expr, annotateScope bool) *Expr
 }
 
-// smpNewTypeAnnotator builds the Simplifier's annotator, mirroring
-// TypeAnnotator(schema=ensure_schema(None, dialect=d), overwrite_types=False). It is wired by the
-// annotate_types port; while it is nil, Simplifier behaves like annotate_new_expressions=False.
+// smpNewTypeAnnotator builds the Simplifier's annotator: an empty schema in dialect d, without
+// overwriting existing types. It is set by opt_annotate.go; while it is nil, the Simplifier does
+// not annotate new expressions.
 var smpNewTypeAnnotator func(d *Dialect) smpTypeAnnotator
 
-// Simplifier mirrors sqlglot.optimizer.simplify.Simplifier.
 type Simplifier struct {
 	dialect                *Dialect
 	annotateNewExpressions bool
 	annotator              smpTypeAnnotator
 }
 
-// NewSimplifier mirrors Simplifier(dialect=d, annotate_new_expressions=...). d == nil means the
-// default dialect.
+// NewSimplifier returns a Simplifier for dialect d (nil means the default dialect).
+// annotateNewExpressions makes rewritten expressions carry types.
 func NewSimplifier(d *Dialect, annotateNewExpressions bool) *Simplifier {
 	if d == nil {
 		d = prototype("")
@@ -95,11 +82,8 @@ func NewSimplifier(d *Dialect, annotateNewExpressions bool) *Simplifier {
 	return s
 }
 
-// Dialect returns the Simplifier's dialect.
 func (s *Simplifier) Dialect() *Dialect { return s.dialect }
 
-// onChange mirrors the @annotate_types_on_change decorator applied to a rule that turned
-// `expression` into `newExpression`.
 func (s *Simplifier) onChange(expression, newExpression *Expr) *Expr {
 	if newExpression == nil {
 		return newExpression
@@ -117,7 +101,7 @@ func (s *Simplifier) onChange(expression, newExpression *Expr) *Expr {
 	return newExpression
 }
 
-// simplifyFlatten mirrors simplify.flatten:
+// simplifyFlatten merges nested connectors of the same kind:
 //
 //	A AND (B AND C) -> A AND B AND C
 //	A OR (B OR C) -> A OR B OR C
@@ -137,7 +121,6 @@ func simplifyFlatten(expression *Expr) *Expr {
 	return expression
 }
 
-// simplifyParens mirrors simplify.simplify_parens (d == nil means the default dialect).
 func simplifyParens(expression *Expr, d *Dialect) *Expr {
 	if !expression.IsA(KParen) {
 		return expression
@@ -179,8 +162,7 @@ func simplifyParens(expression *Expr, d *Dialect) *Expr {
 	return expression
 }
 
-// smpPropagateConstants mirrors simplify.propagate_constants: propagate constants for
-// conjunctions in DNF:
+// smpPropagateConstants propagates constants for conjunctions in DNF:
 //
 //	SELECT * FROM t WHERE a = b AND b = 5 becomes
 //	SELECT * FROM t WHERE a = 5 AND b = 5
@@ -239,23 +221,22 @@ func smpIsConstant(expression *Expr) bool {
 	return expr.IsA(KLiteral, KBoolean, KNull) || smpIsDateLiteral(expr)
 }
 
-// smpDateRange mirrors DateRange = tuple[date, date].
+// smpDateRange is a [lo, hi) range of dates.
 type smpDateRange struct{ lo, hi smpDT }
 
-// smpDatetruncRange mirrors simplify._datetrunc_range: the [min, max) date range for a DATE_TRUNC
-// equality comparison, or ok=false if a value can never be equal to `date` for `unit`.
+// smpDatetruncRange returns the [min, max) date range for a DATE_TRUNC equality comparison, or
+// ok=false if a value can never be equal to `date` for `unit`.
 func smpDatetruncRange(date smpDT, unit string, d *Dialect) (smpDateRange, bool) {
 	floor := smpDatetimeFloor(date, unit, d)
 
 	if !smpDTEq(date, floor) {
-		// This will always be False, except for NULL values.
+		// This will always be FALSE, except for NULL values.
 		return smpDateRange{}, false
 	}
 
 	return smpDateRange{floor, smpIntervalOne(unit).addTo(floor)}, true
 }
 
-// smpDatetruncEqExpression mirrors simplify._datetrunc_eq_expression.
 func smpDatetruncEqExpression(left *Expr, drange smpDateRange, targetType *Expr) *Expr {
 	return AndExprOpts([]*Expr{
 		smpBinop(KGTE, left, smpDateLiteral(drange.lo, targetType)),
@@ -263,7 +244,8 @@ func smpDatetruncEqExpression(left *Expr, drange smpDateRange, targetType *Expr)
 	}, false, true)
 }
 
-// smpDatetruncEq mirrors simplify._datetrunc_eq.
+// smpDatetruncEq rewrites DATE_TRUNC(unit, left) = date as a range check on left, or returns
+// nil when date is not aligned to unit.
 func smpDatetruncEq(left *Expr, date smpDT, unit string, d *Dialect, targetType *Expr) *Expr {
 	drange, ok := smpDatetruncRange(date, unit, d)
 	if !ok {
@@ -273,7 +255,8 @@ func smpDatetruncEq(left *Expr, date smpDT, unit string, d *Dialect, targetType 
 	return smpDatetruncEqExpression(left, drange, targetType)
 }
 
-// smpDatetruncNeq mirrors simplify._datetrunc_neq.
+// smpDatetruncNeq rewrites DATE_TRUNC(unit, left) <> date as `left < lo AND left >= hi`, or
+// returns nil when date is not aligned to unit.
 func smpDatetruncNeq(left *Expr, date smpDT, unit string, d *Dialect, targetType *Expr) *Expr {
 	drange, ok := smpDatetruncRange(date, unit, d)
 	if !ok {
@@ -286,18 +269,15 @@ func smpDatetruncNeq(left *Expr, date smpDT, unit string, d *Dialect, targetType
 	}, false, true)
 }
 
-// smpAlwaysTrue mirrors simplify.always_true.
 func smpAlwaysTrue(expression *Expr) bool {
 	return (expression.IsA(KBoolean) && expression.ArgB("this")) ||
 		(expression.IsA(KLiteral) && expression.IsNumber() && !smpIsZero(expression))
 }
 
-// smpAlwaysFalse mirrors simplify.always_false.
 func smpAlwaysFalse(expression *Expr) bool {
 	return smpIsFalse(expression) || smpIsNull(expression) || smpIsZero(expression)
 }
 
-// smpIsZero mirrors simplify.is_zero.
 func smpIsZero(expression *Expr) bool {
 	if !expression.IsA(KLiteral) {
 		return false
@@ -306,18 +286,18 @@ func smpIsZero(expression *Expr) bool {
 	return ok && smpNumEq(v, smpIntNum(new(big.Int)))
 }
 
-// smpIsFalse mirrors simplify.is_false.
 func smpIsFalse(a *Expr) bool {
 	return a.Is(KBoolean) && !a.ArgB("this")
 }
 
-// smpIsNull mirrors simplify.is_null.
 func smpIsNull(a *Expr) bool { return a.Is(KNull) }
 
-// smpEvalBoolean mirrors simplify.eval_boolean for Python values a, b (numbers, strings, dates).
 func smpEvalBoolean(expression *Expr, a, b any) *Expr {
 	switch {
 	case expression.IsA(KEQ, KIs):
+		if expression.IsA(KIs) && expression.ArgB("negate") {
+			return smpBooleanLiteral(!smpPyEq(a, b))
+		}
 		return smpBooleanLiteral(smpPyEq(a, b))
 	case expression.IsA(KNEQ):
 		return smpBooleanLiteral(!smpPyEq(a, b))
@@ -333,7 +313,7 @@ func smpEvalBoolean(expression *Expr, a, b any) *Expr {
 	return nil
 }
 
-// smpCastAsDate mirrors simplify.cast_as_date for a date/datetime (dt != nil) or a string.
+// smpCastAsDate converts a date/datetime (dt != nil) or an ISO-format string to a date.
 func smpCastAsDate(dt *smpDT, s string) (smpDT, bool) {
 	if dt != nil {
 		if dt.isDatetime {
@@ -348,7 +328,7 @@ func smpCastAsDate(dt *smpDT, s string) (smpDT, bool) {
 	return v.date(), true
 }
 
-// smpCastAsDatetime mirrors simplify.cast_as_datetime for a date/datetime (dt != nil) or a string.
+// smpCastAsDatetime converts a date/datetime (dt != nil) or an ISO-format string to a datetime.
 func smpCastAsDatetime(dt *smpDT, s string) (smpDT, bool) {
 	if dt != nil {
 		if dt.isDatetime {
@@ -359,7 +339,8 @@ func smpCastAsDatetime(dt *smpDT, s string) (smpDT, bool) {
 	return smpFromISOFormat(s)
 }
 
-// smpCastValue mirrors simplify.cast_value. value is a *smpDT, a string or nil (None).
+// smpCastValue casts a date/datetime (dt != nil) or a string to the temporal type `to`. isNone
+// marks a missing value; ok is false for missing values, empty strings and non-temporal types.
 func smpCastValue(dt *smpDT, s string, isNone bool, to *Expr) (smpDT, bool) {
 	if isNone || (dt == nil && s == "") {
 		return smpDT{}, false
@@ -373,7 +354,6 @@ func smpCastValue(dt *smpDT, s string, isNone bool, to *Expr) (smpDT, bool) {
 	return smpDT{}, false
 }
 
-// smpExtractDate mirrors simplify.extract_date.
 func smpExtractDate(cast *Expr) (smpDT, bool) {
 	var to *Expr
 	if cast.IsA(KCast) {
@@ -402,7 +382,6 @@ func smpIsDateLiteral(expression *Expr) bool {
 	return ok
 }
 
-// smpExtractInterval mirrors simplify.extract_interval (ok=false means None).
 func smpExtractInterval(expression *Expr) (rd smpRelDelta, ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -423,7 +402,6 @@ func smpExtractInterval(expression *Expr) (rd smpRelDelta, ok bool) {
 	return smpInterval(unit, n), true
 }
 
-// smpExtractType mirrors simplify.extract_type.
 func smpExtractType(expressions ...*Expr) *Expr {
 	var targetType *Expr
 	for _, expression := range expressions {
@@ -440,7 +418,6 @@ func smpExtractType(expressions ...*Expr) *Expr {
 	return targetType
 }
 
-// smpDateLiteral mirrors simplify.date_literal.
 func smpDateLiteral(date smpDT, targetType *Expr) *Expr {
 	var to any = targetType
 	if targetType == nil || !smpDataTypeIsType(targetType, smpTemporalTypes...) {
@@ -454,7 +431,8 @@ func smpDateLiteral(date smpDT, targetType *Expr) *Expr {
 	return CastExpr(LiteralString(date.String()), to, true, nil)
 }
 
-// smpDatetimeFloor mirrors simplify.datetime_floor.
+// smpDatetimeFloor truncates d to the start of unit. Weeks start at the dialect's WEEK_OFFSET;
+// unsupported units panic with smpUnsupportedUnit.
 func smpDatetimeFloor(d smpDT, unit string, dialect *Dialect) smpDT {
 	// Truncate sub-day units — only valid for datetime inputs
 	if d.isDatetime {
@@ -476,7 +454,6 @@ func smpDatetimeFloor(d smpDT, unit string, dialect *Dialect) smpDT {
 		}
 	}
 
-	// Truncate date-level units, shared for both date and datetime
 	var result smpDT
 	switch unit {
 	case "year":
@@ -504,14 +481,12 @@ func smpDatetimeFloor(d smpDT, unit string, dialect *Dialect) smpDT {
 		panic(&smpUnsupportedUnit{msg: "Unsupported unit: " + unit})
 	}
 
-	// For datetime inputs, zero out the time component after date-level truncation
 	if result.isDatetime {
 		result.hour, result.minute, result.second, result.usec = 0, 0, 0, 0
 	}
 	return result
 }
 
-// smpDateCeil mirrors simplify.date_ceil.
 func smpDateCeil(d smpDT, unit string, dialect *Dialect) smpDT {
 	floor := smpDatetimeFloor(d, unit, dialect)
 
@@ -522,7 +497,6 @@ func smpDateCeil(d smpDT, unit string, dialect *Dialect) smpDT {
 	return smpIntervalOne(unit).addTo(floor)
 }
 
-// smpBooleanLiteral mirrors simplify.boolean_literal.
 func smpBooleanLiteral(condition bool) *Expr {
 	if condition {
 		return Boolean(true)
@@ -530,13 +504,8 @@ func smpBooleanLiteral(condition bool) *Expr {
 	return Boolean(false)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Small helpers (not part of simplify.py)
-// ---------------------------------------------------------------------------------------------
-
 var smpTemporalTypes = DataType_TEMPORAL_TYPES.Items()
 
-// smpDataTypeIsType mirrors DataType.is_type(*dtypes) for plain DType arguments.
 func smpDataTypeIsType(dt *Expr, dtypes ...DType) bool {
 	if dt == nil {
 		return false
@@ -556,7 +525,6 @@ func smpDataTypeIsType(dt *Expr, dtypes ...DType) bool {
 	return false
 }
 
-// smpIsType mirrors Expr.is_type(*dtypes) (DataType.is_type / Cast.is_type overrides included).
 func smpIsType(e *Expr, dtypes ...DType) bool {
 	if e == nil {
 		return false
@@ -570,7 +538,6 @@ func smpIsType(e *Expr, dtypes ...DType) bool {
 	return e.typ != nil && smpDataTypeIsType(e.typ, dtypes...)
 }
 
-// smpBinop mirrors Expr._binop(klass, other) (used by the Python operators <, >=, .eq(), .is_()).
 func smpBinop(kind Kind, this, other *Expr) *Expr {
 	this = this.Copy()
 	other = other.Copy()
@@ -581,7 +548,6 @@ func smpBinop(kind Kind, this, other *Expr) *Expr {
 	return New(kind, "this", this, "expression", other)
 }
 
-// smpWhileChanging mirrors sqlglot.helper.while_changing.
 func smpWhileChanging(expression *Expr, fn func(*Expr) *Expr) *Expr {
 	for {
 		startHash := smpHash(expression)
@@ -602,14 +568,14 @@ func smpHash(e *Expr) uint64 {
 	return e.Hash()
 }
 
-// smpSetEntry is an element of a Python set/dict keyed by expressions: the hash is the one
-// computed when the element was inserted (Python never rehashes stored keys).
+// smpSetEntry is an element of an expression set or map: the hash is the one computed when the
+// element was inserted (stored keys are never rehashed).
 type smpSetEntry struct {
 	e *Expr
 	h uint64
 }
 
-// smpExprSet mirrors a Python set of expressions (structural equality, stored hashes).
+// smpExprSet is an insertion-ordered set of expressions (structural equality, stored hashes).
 type smpExprSet struct {
 	entries []smpSetEntry
 	index   map[uint64][]int
@@ -623,8 +589,6 @@ func newSmpExprSet(exprs ...*Expr) *smpExprSet {
 	return s
 }
 
-// lookup mirrors set_lookkey: an entry with the same stored hash that is the same object or
-// compares equal.
 func (s *smpExprSet) lookup(e *Expr, h uint64) int {
 	for _, i := range s.index[h] {
 		if s.entries[i].e == e || s.entries[i].e.Equal(e) {
@@ -647,7 +611,6 @@ func (s *smpExprSet) has(e *Expr) bool { return s.lookup(e, e.Hash()) >= 0 }
 
 func (s *smpExprSet) len() int { return len(s.entries) }
 
-// properSubsetOf mirrors `s < o`.
 func (s *smpExprSet) properSubsetOf(o *smpExprSet) bool {
 	if s.len() >= o.len() {
 		return false
@@ -660,7 +623,8 @@ func (s *smpExprSet) properSubsetOf(o *smpExprSet) bool {
 	return true
 }
 
-// smpExprMap mirrors a Python dict keyed by expressions (structural equality, stored hashes).
+// smpExprMap is an insertion-ordered map keyed by expressions (structural equality, stored
+// hashes).
 type smpExprMap[V any] struct {
 	keys   *smpExprSet
 	values []V

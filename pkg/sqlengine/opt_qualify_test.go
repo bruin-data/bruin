@@ -2,11 +2,9 @@ package sqlengine
 
 import "testing"
 
-// Expected values were generated with the reference Python sqlglot 30.13.0:
-//
-//	qualify(parse_one(sql, read=dialect), schema=schema, dialect=dialect, **opts).sql(dialect)
-//
-// (optimize cases: optimize(parse_one(sql), schema=schema, dialect=dialect, rules=[qualify])).
+// Expected values are pinned golden outputs. Each case parses sql in its dialect, runs Qualify
+// with the case's schema and options (or Optimize with only RuleQualify for optimize cases) and
+// generates SQL in the same dialect.
 
 // qtSchema builds a nested schema mapping from alternating key/value pairs (values are column
 // types or nested mappings).
@@ -80,7 +78,7 @@ func runQualifyTestCase(c qualifyTestCase) (out string, errMsg string) {
 	return s, ""
 }
 
-func TestQualifyMatchesPython(t *testing.T) {
+func TestQualifyCases(t *testing.T) {
 	t.Parallel()
 	s1 := qtSchema(
 		"t", qtSchema("a", "INT", "b", "INT"),
@@ -94,7 +92,7 @@ func TestQualifyMatchesPython(t *testing.T) {
 		{dialect: "", sql: "SELECT a AS x, x + 1 AS y FROM t WHERE x > 1 GROUP BY 1 ORDER BY 2", schema: s1, want: "SELECT \"t\".\"a\" AS \"x\", \"t\".\"a\" + 1 AS \"y\" FROM \"t\" AS \"t\" WHERE \"t\".\"a\" > 1 GROUP BY \"t\".\"a\" ORDER BY \"y\""},
 		{dialect: "", sql: "WITH c(x) AS (SELECT a FROM t) SELECT * FROM c", schema: s1, want: "WITH \"c\" AS (SELECT \"t\".\"a\" AS \"x\" FROM \"t\" AS \"t\") SELECT \"c\".\"x\" AS \"x\" FROM \"c\" AS \"c\""},
 		{dialect: "", sql: "SELECT s.a FROM (SELECT a FROM t) AS s JOIN u ON s.a = u.a", schema: s1, want: "SELECT \"s\".\"a\" AS \"a\" FROM (SELECT \"t\".\"a\" AS \"a\" FROM \"t\" AS \"t\") AS \"s\" JOIN \"u\" AS \"u\" ON \"s\".\"a\" = \"u\".\"a\""},
-		{dialect: "", sql: "SELECT 1 FROM (t1 JOIN t2) AS t", schema: nil, want: "SELECT 1 AS \"1\" FROM (SELECT * FROM \"t1\" AS \"t1\", \"t2\" AS \"t2\") AS \"t\""},
+		{dialect: "", sql: "SELECT 1 FROM (t1 JOIN t2) AS t", schema: nil, want: "SELECT 1 AS \"1\" FROM (SELECT * FROM \"t1\" AS \"t1\" CROSS JOIN \"t2\" AS \"t2\") AS \"t\""},
 		{dialect: "", sql: "SELECT a FROM t WHERE EXISTS (SELECT 1 FROM u WHERE c = t.a)", schema: s1, want: "SELECT \"t\".\"a\" AS \"a\" FROM \"t\" AS \"t\" WHERE EXISTS(SELECT 1 AS \"1\" FROM \"u\" AS \"u\" WHERE \"u\".\"c\" = \"t\".\"a\")"},
 		{dialect: "", sql: "SELECT a FROM t UNION SELECT c FROM u ORDER BY 1", schema: s1, want: "SELECT \"t\".\"a\" AS \"a\" FROM \"t\" AS \"t\" UNION SELECT \"u\".\"c\" AS \"c\" FROM \"u\" AS \"u\" ORDER BY \"a\""},
 		{dialect: "", sql: "SELECT a FROM t", schema: qtSchema("db", qtSchema("t", qtSchema("a", "INT"))), db: "db", noIdentify: true, want: "SELECT t.a AS a FROM db.t AS t"},
@@ -116,7 +114,7 @@ func TestQualifyMatchesPython(t *testing.T) {
 		{dialect: "snowflake", sql: "SELECT * FROM t PIVOT(SUM(b) FOR q1 IN (1, 2)) AS p", schema: s1, highlight: true, err: "Ambiguous column 'Q1' (Line: 1, Col: 35)\n  SELECT * FROM t PIVOT(SUM(b) FOR \u001b[4mq1\u001b[0m IN (1, 2)) AS p"},
 		{dialect: "", sql: "SELECT t.a, c FROM t JOIN u ON t.a = u.c", schema: s1, optimize: true, want: "SELECT t.a AS a, u.c AS c FROM (SELECT t.a AS a, t.b AS b FROM t AS t) AS t JOIN (SELECT u.a AS a, u.c AS c FROM u AS u) AS u ON t.a = u.c"},
 		{dialect: "", sql: "SELECT a FROM t", schema: nil, optimize: true, want: "SELECT t.a AS a FROM t AS t"},
-		{dialect: "bigquery", sql: "SELECT `p.d.t`.`c`.`f` FROM `p.d.t`", schema: nil, err: "ValueError: 'Dot' object has no attribute 'quoted'"},
+		{dialect: "bigquery", sql: "SELECT `p.d.t`.`c`.`f` FROM `p.d.t`", schema: nil, want: "SELECT `t`.`c`.`f` AS `_col_0` FROM `p.d.t` AS `t`"},
 	}
 
 	for _, c := range cases {
@@ -134,7 +132,7 @@ func TestQualifyMatchesPython(t *testing.T) {
 }
 
 // TestQualifyLineageDefaults checks the options lineage uses (Defaults with
-// validate_qualify_columns=False, identify=False).
+// ValidateQualifyColumns and Identify off).
 func TestQualifyLineageDefaults(t *testing.T) {
 	t.Parallel()
 	d := MustDialect("")

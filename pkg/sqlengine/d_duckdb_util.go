@@ -1,9 +1,5 @@
 package sqlengine
 
-// Local ports of sqlglot expression builders / helpers used by the DuckDB generator
-// (prefixed `duckdb`), plus the lazily parsed class-level templates of
-// sqlglot/generators/duckdb.py.
-
 import (
 	"fmt"
 	"math/big"
@@ -12,8 +8,9 @@ import (
 	"sync"
 )
 
-// duckdbFunc mirrors exp.func(name, *args) with the default dialect (copy=True). Args may be
-// *Expr, string (parsed as SQL) or int (parsed from its string form).
+// duckdbFunc builds a function call by name with the default dialect, using the registered
+// function builder when there is one and an Anonymous call otherwise. Args may be *Expr (copied),
+// string (parsed as SQL) or int (parsed from its string form); nil panics with a ParseError.
 func duckdbFunc(name string, args ...any) *Expr {
 	d := MustDialect("")
 
@@ -54,7 +51,8 @@ func duckdbFunc(name string, args ...any) *Expr {
 	return function
 }
 
-// duckdbConvert mirrors exp.convert(value, copy).
+// duckdbConvert turns a Go value into an expression: nil as NULL, and strings, bools and ints as
+// literals; expressions are copied when copy is set.
 func duckdbConvert(v any, copy bool) *Expr {
 	switch x := v.(type) {
 	case *Expr:
@@ -77,7 +75,9 @@ func duckdbConvert(v any, copy bool) *Expr {
 	panic(&ValueError{Msg: fmt.Sprintf("Cannot convert %v", v)})
 }
 
-// duckdbBinop mirrors Expr._binop(klass, other, reverse) (the Python operator overloads).
+// duckdbBinop builds the binary expression `self klass other` (operands swapped when reverse is
+// set) over a copy of self and other converted with duckdbConvert. Binary operands are
+// parenthesized unless either side already has kind klass.
 func duckdbBinop(klass Kind, self *Expr, other any, reverse bool) *Expr {
 	this := self.Copy()
 	o := duckdbConvert(other, true)
@@ -101,12 +101,12 @@ func duckdbLT(a *Expr, b any) *Expr     { return duckdbBinop(KLT, a, b, false) }
 func duckdbEQ(a *Expr, b any) *Expr     { return duckdbBinop(KEQ, a, b, false) }
 func duckdbIs(a *Expr, b any) *Expr     { return duckdbBinop(KIs, a, b, false) }
 
-// duckdbGetItem mirrors Expr.__getitem__ (a[index]).
 func duckdbGetItem(a *Expr, index any) *Expr {
 	return New(KBracket, "this", a.Copy(), "expressions", []*Expr{duckdbConvert(index, true)})
 }
 
-// duckdbMaybeParse mirrors exp.maybe_parse(value, copy=copy) for Case builder inputs.
+// duckdbMaybeParse turns a CASE builder input into an expression: expressions as is (copied when
+// copy is set), strings parsed as SQL, ints parsed from their string form; nil panics.
 func duckdbMaybeParse(v any, copy bool) *Expr {
 	switch x := v.(type) {
 	case *Expr:
@@ -121,10 +121,8 @@ func duckdbMaybeParse(v any, copy bool) *Expr {
 	return MaybeParse(fmt.Sprint(v), KNone, "", nil)
 }
 
-// duckdbCase mirrors exp.case().
 func duckdbCase() *Expr { return CaseExpr(nil, true) }
 
-// duckdbWhen mirrors Case.when(condition, then, copy=copy).
 func duckdbWhen(c *Expr, condition, then any, copy bool) *Expr {
 	instance := maybeCopy(c, copy)
 	instance.Append("ifs", New(
@@ -135,14 +133,14 @@ func duckdbWhen(c *Expr, condition, then any, copy bool) *Expr {
 	return instance
 }
 
-// duckdbElse mirrors Case.else_(condition, copy=copy).
 func duckdbElse(c *Expr, condition any, copy bool) *Expr {
 	instance := maybeCopy(c, copy)
 	instance.Set("default", duckdbMaybeParse(condition, copy))
 	return instance
 }
 
-// duckdbReplacePlaceholders mirrors exp.replace_placeholders(expression, **kwargs).
+// duckdbReplacePlaceholders returns a copy of expression with each named placeholder (:name)
+// replaced by kwargs[name], when present.
 func duckdbReplacePlaceholders(expression *Expr, kwargs map[string]*Expr) *Expr {
 	return expression.Transform(func(node *Expr) *Expr {
 		if node.IsA(KPlaceholder) {
@@ -156,7 +154,8 @@ func duckdbReplacePlaceholders(expression *Expr, kwargs map[string]*Expr) *Expr 
 	}, true)
 }
 
-// duckdbIsType mirrors Expr.is_type(*dtypes).
+// duckdbIsType reports whether e is one of dtypes: a DataType node is compared structurally, a
+// cast by its target type, and any other expression by its annotated type.
 func duckdbIsType(e *Expr, dtypes ...DType) bool {
 	if e == nil {
 		return false
@@ -176,7 +175,6 @@ func duckdbIsType(e *Expr, dtypes ...DType) bool {
 	return t != nil && DataTypeIsType(t, args, false)
 }
 
-// duckdbTypes concatenates data type sets (mirrors `*exp.DataType.X_TYPES, ...`).
 func duckdbTypes(sets []DTypeSet, extra ...DType) []DType {
 	var out []DType
 	for _, s := range sets {
@@ -185,7 +183,6 @@ func duckdbTypes(sets []DTypeSet, extra ...DType) []DType {
 	return append(out, extra...)
 }
 
-// duckdbToPyInt mirrors int(expr.to_py()) for an integer literal; ok=false otherwise.
 func duckdbToPyInt(e *Expr) (int, bool) {
 	v, isInt := e.toPyNumber()
 	if v == nil || !isInt {
@@ -195,13 +192,12 @@ func duckdbToPyInt(e *Expr) (int, bool) {
 	return int(i), true
 }
 
-// duckdbArgInt returns an int-valued arg (e.g. Bracket/ArrayInsert "offset"), or def when unset.
 func duckdbArgInt(e *Expr, key string, def int) int {
 	switch v := e.Arg(key).(type) {
 	case int:
 		return v
 	case bool:
-		// Python bools are ints (True == 1).
+		// A boolean counts as 0 or 1.
 		if v {
 			return 1
 		}
@@ -214,18 +210,17 @@ func duckdbArgInt(e *Expr, key string, def int) int {
 	return def
 }
 
-// duckdbDataTypeFromStr mirrors exp.DataType.from_str(s, dialect=d) (d nil = default dialect).
+// duckdbDataTypeFromStr parses the type string s in dialect d (nil for the default dialect).
 func duckdbDataTypeFromStr(s string, d *Dialect) *Expr { return dataTypeFromStr(s, d, false) }
 
-// duckdbNewTypeExpr mirrors exp.DType.X.into_expr() / exp.DataType(this=X).
 func duckdbNewTypeExpr(dt DType) *Expr { return New(KDataType, "this", dt) }
 
-// duckdbPow2 returns str(2**bits).
 func duckdbPow2(bits int) string {
 	return new(big.Int).Lsh(big.NewInt(1), uint(bits)).String()
 }
 
-// duckdbDecimalDivStr mirrors str(Decimal(i) / Decimal(n)) (default context, 28 digits).
+// duckdbDecimalDivStr formats i/n as a decimal number with at most 28 significant digits
+// (rounded half to even): exact results keep their natural scale, e.g. "0.25".
 func duckdbDecimalDivStr(i, n int) string {
 	if i == 0 {
 		return "0"
@@ -292,7 +287,6 @@ func duckdbDecimalDivStr(i, n int) string {
 		}
 		p := new(big.Int).Mul(num, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil))
 		q, rem := new(big.Int).QuoRem(p, den, new(big.Int))
-		// rounding
 		twice := new(big.Int).Mul(rem, big.NewInt(2))
 		cmp := twice.Cmp(den)
 		if cmp > 0 || (cmp == 0 && q.Bit(0) == 1) {
@@ -304,7 +298,8 @@ func duckdbDecimalDivStr(i, n int) string {
 			scale--
 		}
 	}
-	// Python Decimal.__str__ (to-scientific-string)
+	// Decimal to-scientific-string formatting: plain notation unless the exponent is positive or
+	// the adjusted exponent is below -6
 	exp := -scale
 	adjusted := exp + len(digits) - 1
 	var s string
@@ -333,11 +328,6 @@ func duckdbDecimalDivStr(i, n int) string {
 	return s
 }
 
-// ---------------------------------------------------------------------------------------------
-// Class-level templates (exp.maybe_parse(...) at import time), parsed lazily once with the
-// default dialect.
-// ---------------------------------------------------------------------------------------------
-
 type duckdbLazyTemplate struct {
 	once sync.Once
 	sql  string
@@ -351,16 +341,13 @@ func (t *duckdbLazyTemplate) get() *Expr {
 
 func duckdbTemplate(sql string) *duckdbLazyTemplate { return &duckdbLazyTemplate{sql: sql} }
 
-// RANDSTR transpilation constants.
 const (
 	duckdbRandstrCharPool = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	duckdbRandstrSeed     = 123456
 )
 
 var (
-	// SEQ function constants.
-	duckdbSeqBase = duckdbTemplate("(ROW_NUMBER() OVER (ORDER BY 1) - 1)")
-	// Template for generating signed and unsigned SEQ values within a specified range.
+	duckdbSeqBase     = duckdbTemplate("(ROW_NUMBER() OVER (ORDER BY 1) - 1)")
 	duckdbSeqUnsigned = duckdbTemplate(":base % :max_val")
 	duckdbSeqSigned   = duckdbTemplate(
 		"(CASE WHEN :base % :max_val >= :half " +
@@ -368,7 +355,6 @@ var (
 			"ELSE :base % :max_val END)",
 	)
 
-	// Template for ZIPF transpilation - placeholders get replaced with actual parameters.
 	duckdbZipfTemplate = duckdbTemplate(`
         WITH rand AS (SELECT :random_expr AS r),
         weights AS (
@@ -390,7 +376,6 @@ var (
 		":mean + (:stddev * SQRT(-2 * LN(GREATEST(:u1, 1e-10))) * COS(2 * PI() * :u2))",
 	)
 
-	// Template for generating a seeded pseudo-random value in [0, 1) from a hash.
 	duckdbSeededRandomTemplate = duckdbTemplate("(ABS(HASH(:seed)) % 1000000) / 1000000.0")
 
 	// Template for MAP_CAT transpilation - Snowflake semantics:
@@ -407,7 +392,9 @@ var (
         END
         `)
 
-	// Template for BITMAP_CONSTRUCT_AGG transpilation (see generators/duckdb.py for the format).
+	// Template for BITMAP_CONSTRUCT_AGG transpilation: a binary bitmap of the sorted distinct
+	// values (each 0-32767, as little-endian 16-bit words), or NULL for an empty input or
+	// out-of-range values.
 	duckdbBitmapConstructAggTemplate = duckdbTemplate(`
         SELECT CASE
             WHEN l IS NULL OR LENGTH(l) = 0 THEN NULL
@@ -424,7 +411,6 @@ var (
         )
         `)
 
-	// Template for RANDSTR transpilation - placeholders get replaced with actual parameters.
 	duckdbRandstrTemplate = duckdbTemplate(`
         SELECT LISTAGG(
             SUBSTRING(
@@ -440,7 +426,6 @@ var (
         )
         `)
 
-	// Template for MINHASH transpilation.
 	duckdbMinhashTemplate = duckdbTemplate(`
         SELECT JSON_OBJECT('state', LIST(min_h ORDER BY seed), 'type', 'minhash', 'version', 1)
         FROM (
@@ -449,7 +434,6 @@ var (
         )
         `)
 
-	// Template for MINHASH_COMBINE transpilation.
 	duckdbMinhashCombineTemplate = duckdbTemplate(`
         SELECT JSON_OBJECT('state', LIST(min_h ORDER BY idx), 'type', 'minhash', 'version', 1)
         FROM (
@@ -463,7 +447,6 @@ var (
         )
         `)
 
-	// Template for APPROXIMATE_SIMILARITY transpilation.
 	duckdbApproximateSimilarityTemplate = duckdbTemplate(`
         SELECT CAST(SUM(CASE WHEN num_distinct = 1 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*)
         FROM (
@@ -477,7 +460,6 @@ var (
         )
         `)
 
-	// Template for ARRAYS_ZIP transpilation.
 	duckdbArraysZipTemplate = duckdbTemplate(`
         CASE WHEN :null_check THEN NULL
         WHEN :all_empty_check THEN [:empty_struct]
@@ -491,7 +473,7 @@ var (
                 SUBSTR(h, 1, 8) || '-' ||
                 SUBSTR(h, 9, 4) || '-' ||
                 '5' || SUBSTR(h, 14, 3) || '-' ||
-                FORMAT('{:02x}', CAST('0x' || SUBSTR(h, 17, 2) AS INT) & 63 | 128) || SUBSTR(h, 19, 2) || '-' ||
+                PRINTF('%02x', CAST('0x' || SUBSTR(h, 17, 2) AS INT) & 63 | 128) || SUBSTR(h, 19, 2) || '-' ||
                 SUBSTR(h, 21, 12)
             )
         FROM (
@@ -542,7 +524,6 @@ var (
         ) END
         `)
 
-	// Template for STRTOK function transpilation.
 	duckdbStrtokTemplate = duckdbTemplate(`
         CASE
             WHEN :delimiter = '' AND :string = '' THEN NULL

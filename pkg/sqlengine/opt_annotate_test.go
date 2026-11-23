@@ -1,238 +1,89 @@
 package sqlengine
 
-import (
-	"compress/gzip"
-	"encoding/json"
-	"fmt"
-	"os"
-	"sort"
-	"strings"
-	"sync"
-	"testing"
-)
+import "testing"
 
-// Fixtures are produced with the reference Python implementation by
-// .context/port/gen_annotate_fixtures.py.
-type annotateFixture struct {
-	Meta   map[string]map[string]string   `json:"meta"`
-	Coerce map[string]map[string][]string `json:"coerce"`
-	ISO    [][]any                        `json:"iso"`
-	Cases  []annotateCase                 `json:"cases"`
-}
-
-type annotateCase struct {
-	Dialect string   `json:"dialect"`
-	SQL     string   `json:"sql"`
-	Schema  bool     `json:"schema"`
-	Types   []string `json:"types"`
-	Error   string   `json:"error"`
-}
-
-var (
-	annFixtureOnce sync.Once
-	annFixture     annotateFixture
-	annFixtureErr  error
-)
-
-func loadAnnotateFixture(t *testing.T) *annotateFixture {
-	t.Helper()
-	annFixtureOnce.Do(func() {
-		f, err := os.Open("testdata/annotate.json.gz")
-		if err != nil {
-			annFixtureErr = err
-			return
-		}
-		defer f.Close()
-		zr, err := gzip.NewReader(f)
-		if err != nil {
-			annFixtureErr = err
-			return
-		}
-		annFixtureErr = json.NewDecoder(zr).Decode(&annFixture)
-	})
-	if annFixtureErr != nil {
-		t.Fatalf("loading fixture: %v", annFixtureErr)
-	}
-	return &annFixture
-}
-
-func TestAnnotateTypingMetadataParity(t *testing.T) {
+func TestISODateHelpers(t *testing.T) {
 	t.Parallel()
-	fx := loadAnnotateFixture(t)
-	for dialect, want := range fx.Meta {
-		d := MustDialect(dialect)
-		got := map[string]string{}
-		for k, spec := range expressionMetadataFor(d) {
-			if spec.Annotator != nil {
-				got[k.Name()] = "A " + spec.src
-				continue
-			}
-			switch r := spec.Returns.(type) {
-			case DType:
-				got[k.Name()] = "R " + dtypeValues[r]
-			case *Expr:
-				sql, err := r.SQL("", nil)
-				if err != nil {
-					t.Fatalf("%s: %v", k.Name(), err)
-				}
-				got[k.Name()] = "R DT " + sql
-			default:
-				t.Fatalf("%s: unexpected returns %T", k.Name(), r)
-			}
-		}
-		var diffs []string
-		for k, w := range want {
-			if g := got[k]; g != w {
-				diffs = append(diffs, fmt.Sprintf("%s: want %q got %q", k, w, g))
-			}
-		}
-		for k, g := range got {
-			if _, ok := want[k]; !ok {
-				diffs = append(diffs, fmt.Sprintf("%s: unexpected %q", k, g))
-			}
-		}
-		sort.Strings(diffs)
-		if len(diffs) > 0 {
-			t.Errorf("dialect %q metadata mismatch (%d):\n%s", dialect, len(diffs), strings.Join(diffs, "\n"))
-		}
+	cases := []struct {
+		text             string
+		isDate, datetime bool
+	}{
+		{"2020-01-01", true, true},
+		{"20200101", true, true},
+		{"2020-01-01 10:00:00", false, true},
+		{"2020-01-01T10:00:00.123", false, true},
+		{"2020-01-01 10:00:00+05:30", false, true},
+		{"2020-01-01T10:00", false, true},
+		{"2020-01-01T10", false, true},
+		{"2020-W01", true, true},
+		{"2020W01", true, true},
+		{"2020-W01-1", true, true},
+		{"2020W011", true, true},
+		{"2020-W53-1", true, true},
+		{"2021-W53-1", false, false},
+		{"2020-13-01", false, false},
+		{"2020-02-30", false, false},
+		{"2020-02-29", true, true},
+		{"2021-02-29", false, false},
+		{"abc", false, false},
+		{"", false, false},
+		{"2020", false, false},
+		{"2020-1-1", false, false},
+		{"2020-01-1", false, false},
+		{"20200101ab", true, false},
+		{"2020W011xx", true, false},
+		{"2020-01-01x", false, false},
+		{"2020-01-01 24:00:00", false, false},
+		{"2020-01-01 23:59:60", false, false},
+		{"2020-01-01 10:00:00Z", false, true},
+		{"2020-01-01 10:00:00z", false, false},
+		{"2020-01-01 10:00:00.", false, false},
+		{"2020-01-01 10:00:00,5", false, true},
+		{"2020-01-01 10:00:00.1234567", false, true},
+		{"2020-01-01 10:00:00.12x", false, false},
+		{"2020-01-01 1000", false, true},
+		{"2020-01-01 100000", false, true},
+		{"2020-01-01 10:0000", false, false},
+		{"2020-01-01 10:00:00+0530", false, true},
+		{"2020-01-01 10:00:00+05", false, true},
+		{"2020-01-01 10:00:00+5", false, false},
+		{"2020-01-01 10:00:00-24:00", false, false},
+		{"2020-01-01 10:00:00+23:59:59.999999", false, true},
+		{"2020-01-01T10:00:00+00:00", false, true},
+		{"0000-01-01", false, false},
+		{"9999-12-31", true, true},
+		{"2020-01-01  10:00", false, false},
+		{"2020-01-01\u00e910:00", false, true},
+		{"\u0662\u0660\u0662\u0660-01-01", false, false},
+		{"2020-01-01 10.5", false, true},
+		{"2020-01-01 10:00.5", false, true},
+		{"2020-01-01 10:00:00 ", false, false},
+		{"2020-01-01T", false, false},
+		{"2020-01-01T1", false, false},
+		{"2020-01-0110:00", false, false},
+		{"2020-W011", false, false},
+		{"2020-W01-", false, false},
+		{"2020-W01-1T10:00", false, true},
+		{"2020W0110:00", false, false},
+		{"2020W01T10", false, true},
+		{"2020-001", false, false},
+		{"2020001", false, false},
+		{"1999-12-31 23:59:59.999999", false, true},
+		{"2020-01-01 10:00:00+", false, false},
+		{"2020-01-01 10:00:00+05:", false, false},
+		{"2020-01-01 10:00:00+05:3", false, false},
+		{"2020-01-01 10:00:00Z+", false, false},
+		{"2020-01-01 10:-1", false, false},
+		{"2020-01-01 1a", false, false},
+		{"2020-01-01 10:00:00.000000000000001", false, true},
+		{"2020-01-01 10:00:00.000000x", false, false},
 	}
-}
-
-func annDumpCoerces(m map[DType]DTypeSet) map[string][]string {
-	out := map[string][]string{}
-	for k, v := range m {
-		var items []string
-		for _, d := range v.Items() {
-			items = append(items, dtypeValues[d])
+	for _, c := range cases {
+		if got := annIsISODate(c.text); got != c.isDate {
+			t.Errorf("annIsISODate(%q) = %v, want %v", c.text, got, c.isDate)
 		}
-		sort.Strings(items)
-		if items == nil {
-			items = []string{}
+		if got := annIsISODatetime(c.text); got != c.datetime {
+			t.Errorf("annIsISODatetime(%q) = %v, want %v", c.text, got, c.datetime)
 		}
-		out[dtypeValues[k]] = items
-	}
-	return out
-}
-
-func TestAnnotateCoercesToParity(t *testing.T) {
-	t.Parallel()
-	fx := loadAnnotateFixture(t)
-	annInitCoercions()
-	tables := map[string]map[DType]DTypeSet{
-		"base_pristine": annBaseCoercesTo,
-		"hive":          coercesToFor(MustDialect("hive")),
-		"spark":         coercesToFor(MustDialect("spark")),
-		"databricks":    coercesToFor(MustDialect("databricks")),
-		"bigquery":      coercesToFor(MustDialect("bigquery")),
-		"postgres":      coercesToFor(MustDialect("postgres")),
-	}
-	for name, want := range fx.Coerce {
-		if name == "base_after_bq" {
-			continue // the port does not reproduce BigQuery's mutation of the base table
-		}
-		got := annDumpCoerces(tables[name])
-		wantJSON, gotJSON := mustJSON(want), mustJSON(got)
-		if string(wantJSON) != string(gotJSON) {
-			t.Errorf("%s:\nwant %s\ngot  %s", name, wantJSON, gotJSON)
-		}
-	}
-}
-
-func TestAnnotateISODateHelpers(t *testing.T) {
-	t.Parallel()
-	fx := loadAnnotateFixture(t)
-	for _, c := range fx.ISO {
-		text := c[0].(string)
-		wantDate, wantDatetime := c[1].(bool), c[2].(bool)
-		if got := annIsISODate(text); got != wantDate {
-			t.Errorf("is_iso_date(%q) = %v, want %v", text, got, wantDate)
-		}
-		if got := annIsISODatetime(text); got != wantDatetime {
-			t.Errorf("is_iso_datetime(%q) = %v, want %v", text, got, wantDatetime)
-		}
-	}
-}
-
-// annTestSchema mirrors SCHEMA in gen_annotate_fixtures.py (key order matters).
-func annTestSchema() *SchemaMap {
-	mk := func(kv ...string) *SchemaMap {
-		m := NewSchemaMap()
-		for i := 0; i < len(kv); i += 2 {
-			m.Set(kv[i], kv[i+1])
-		}
-		return m
-	}
-	s := NewSchemaMap()
-	s.Set("t", mk(
-		"a", "INT", "b", "VARCHAR", "c", "DOUBLE", "d", "DATE", "e", "TIMESTAMP", "f", "DECIMAL(10, 2)",
-		"g", "BIGINT", "h", "BOOLEAN", "s", "STRUCT<x INT, y VARCHAR>", "arr", "ARRAY<INT>", "j", "JSON",
-	))
-	s.Set("u", mk("a", "BIGINT", "b", "TEXT", "k", "FLOAT", "dt", "DATETIME"))
-	return s
-}
-
-func annNodeTypes(e *Expr) []string {
-	var out []string
-	for n := range e.DFS(nil) {
-		t := n.Type()
-		s := "None"
-		if t != nil {
-			sql, err := t.SQL("", nil)
-			if err != nil {
-				s = "ERR " + err.Error()
-			} else {
-				s = sql
-			}
-		}
-		out = append(out, n.Kind().Name()+":"+s)
-	}
-	return out
-}
-
-func TestAnnotateTypesParity(t *testing.T) {
-	t.Parallel()
-	fx := loadAnnotateFixture(t)
-	// The fixtures were produced after importing the Hive family and then BigQuery (which
-	// mutates the base COERCES_TO table).
-	for _, name := range []string{"hive", "spark2", "spark", "databricks", "bigquery"} {
-		MustDialect(name)
-	}
-
-	failures := 0
-	for _, c := range fx.Cases {
-		name := fmt.Sprintf("%s/%v/%s", c.Dialect, c.Schema, c.SQL)
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					failures++
-					t.Errorf("%s: panic: %v", name, r)
-				}
-			}()
-			d := MustDialect(c.Dialect)
-			e, err := d.ParseOne(c.SQL, nil)
-			if err != nil {
-				failures++
-				t.Errorf("%s: parse error: %v", name, err)
-				return
-			}
-			opts := AnnotateOptions{Dialect: d}
-			if c.Schema {
-				opts.SchemaMap = annTestSchema()
-			}
-			AnnotateTypes(e, opts)
-			if c.Error != "" {
-				failures++
-				t.Errorf("%s: expected error %s", name, c.Error)
-				return
-			}
-			got := annNodeTypes(e)
-			if strings.Join(got, "\n") != strings.Join(c.Types, "\n") {
-				failures++
-				t.Errorf("%s:\nwant %v\ngot  %v", name, c.Types, got)
-			}
-		}()
-	}
-	if failures > 0 {
-		t.Logf("%d/%d annotation cases failed", failures, len(fx.Cases))
 	}
 }

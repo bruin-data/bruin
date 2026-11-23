@@ -1,14 +1,34 @@
 package sqlengine
 
 import (
+	"encoding/hex"
 	"math/big"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
-// Port of sqlglot/generators/postgres.py (PostgresGenerator).
+func postgresBytesHex(s string) string {
+	var b []byte
+	for _, r := range s {
+		if r <= 0xFF {
+			b = append(b, byte(r))
+		} else {
+			b = utf8.AppendRune(b, r)
+		}
+	}
+	return hex.EncodeToString(b)
+}
 
-// postgresDateDiffFactor mirrors generators.postgres.DATE_DIFF_FACTOR.
+func postgresBytestringSQL(g *Generator, e *Expr) string {
+	if !e.ArgB("is_bytes") {
+		return g.bytestringSQL(e)
+	}
+	return g.fn("DECODE", LiteralString(postgresBytesHex(e.ThisS())), LiteralString("hex"))
+}
+
+// postgresDateDiffFactor maps DATEDIFF units to the factor applied to an epoch difference in
+// seconds.
 var postgresDateDiffFactor = map[string]string{
 	"MICROSECOND": " * 1000000",
 	"MILLISECOND": " * 1000",
@@ -18,7 +38,6 @@ var postgresDateDiffFactor = map[string]string{
 	"DAY":         " / 86400",
 }
 
-// postgresOptStr maps an Optional[str] result ("" = None) to a g.fn argument.
 func postgresOptStr(s string) any {
 	if s == "" {
 		return nil
@@ -26,34 +45,42 @@ func postgresOptStr(s string) any {
 	return s
 }
 
-// postgresDateAddSQL mirrors generators.postgres._date_add_sql(kind).
 func postgresDateAddSQL(kind string) GenFunc {
 	return func(g *Generator, expression *Expr) string {
 		if expression.IsA(KTsOrDsAdd) {
 			expression = tsOrDsAddCast(expression)
 		}
 
-		this := g.sqlKey(expression, "this")
+		this := expression.This()
 		unit := expression.Arg("unit")
 
 		e := g.simplifyUnlessLiteral(expression.Expression())
+		var interval *Expr
 		if e.IsA(KInterval) {
-			return this + " " + kind + " " + g.sql(e)
-		} else if e.IsA(KLiteral) {
-			e.Set("is_string", true)
+			interval = e
 		} else if e.IsNumber() {
-			e = LiteralString(chunkDPyNumberStr(e))
+			interval = New(KInterval, "this", LiteralString(chunkDPyNumberStr(e)), "unit", unit)
+		} else if e.IsString() {
+			interval = New(KInterval, "this", LiteralString(e.Name()), "unit", unit)
 		} else {
 			one := LiteralInt(1)
-			intervalTimesValue := dhBinop(KMul, New(KInterval, "this", one, "unit", unit), e)
-			return this + " " + kind + " " + g.sql(intervalTimesValue)
+			interval = dhBinop(KMul, New(KInterval, "this", one, "unit", unit), e)
 		}
 
-		return this + " " + kind + " " + g.sql(New(KInterval, "this", e, "unit", unit))
+		op := KAdd
+		if kind == "-" {
+			op = KSub
+		}
+		return dateDeltaToBinarySQL(g, expression, dhBinop(op, this, interval))
 	}
 }
 
-// postgresDateDiffSQL mirrors generators.postgres._date_diff_sql.
+func postgresDayMonthYearSQL(g *Generator, e *Expr) string {
+	return g.sql(New(KExtract, "this", VarExpr(e.Kind().SQLName()), "expression", e.This()))
+}
+
+// postgresDateDiffSQL renders DATEDIFF with DATE subtraction, an EXTRACT(epoch ...) factor or
+// AGE(), depending on the unit.
 func postgresDateDiffSQL(g *Generator, expression *Expr) string {
 	unit := pyUpper(expression.Text("unit"))
 	if unit == "" {
@@ -94,7 +121,6 @@ func postgresDateDiffSQL(g *Generator, expression *Expr) string {
 	return "CAST(" + unit + " AS BIGINT)"
 }
 
-// postgresSubstringSQL mirrors generators.postgres._substring_sql.
 func postgresSubstringSQL(g *Generator, expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	start := g.sqlKey(expression, "start")
@@ -112,7 +138,6 @@ func postgresSubstringSQL(g *Generator, expression *Expr) string {
 	return "SUBSTRING(" + this + fromPart + forPart + ")"
 }
 
-// postgresRemoveFirstEqual mirrors list.remove(x) (structural equality) on an args list.
 func postgresRemoveFirstEqual(list []*Expr, x *Expr) []*Expr {
 	for i, y := range list {
 		if y.Equal(x) {
@@ -124,7 +149,6 @@ func postgresRemoveFirstEqual(list []*Expr, x *Expr) []*Expr {
 	panic(&ValueError{Msg: "list.remove(x): x not in list"})
 }
 
-// postgresAutoIncrementToSerial mirrors generators.postgres._auto_increment_to_serial.
 func postgresAutoIncrementToSerial(expression *Expr) *Expr {
 	auto := expression.Find(KAutoIncrementColumnConstraint)
 
@@ -145,7 +169,6 @@ func postgresAutoIncrementToSerial(expression *Expr) *Expr {
 	return expression
 }
 
-// postgresSerialToGenerated mirrors generators.postgres._serial_to_generated.
 func postgresSerialToGenerated(expression *Expr) *Expr {
 	if !expression.IsA(KColumnDef) {
 		return expression
@@ -168,7 +191,7 @@ func postgresSerialToGenerated(expression *Expr) *Expr {
 	if dataType != nil {
 		expression.ArgE("kind").Replace(dataType)
 		if !expression.HasArgKey("constraints") {
-			// expression.args["constraints"] raises KeyError in Python
+			// A missing constraints arg is an error; the message keeps its historical wording.
 			panic(&ValueError{Msg: "'constraints'"})
 		}
 		constraints := expression.ArgL("constraints")
@@ -184,7 +207,7 @@ func postgresSerialToGenerated(expression *Expr) *Expr {
 			return false
 		}
 
-		// Python inserts into the args list in place (no parent bookkeeping).
+		// Prepend in place, without parent bookkeeping.
 		if !contains(constraints, notnull) {
 			constraints = append([]*Expr{notnull}, constraints...)
 		}
@@ -197,9 +220,19 @@ func postgresSerialToGenerated(expression *Expr) *Expr {
 	return expression
 }
 
-// postgresJSONExtractSQL mirrors generators.postgres._json_extract_sql(name, op).
 func postgresJSONExtractSQL(name, op string) GenFunc {
 	return func(g *Generator, expression *Expr) string {
+		// a single non-literal path segment is written infix, since JSON_EXTRACT_PATH[_TEXT] is
+		// not safe for jsonb
+		if !expression.Expression().IsA(KJSONPath, KVariadic) && len(expression.Expressions()) == 0 {
+			return arrowJSONExtractOpSQL(g, expression, op)
+		}
+
+		// JSON_EXTRACT_PATH requires a key, so the root path becomes an empty variadic array
+		if parts := expression.Expression().Expressions(); len(parts) == 1 && parts[0].IsA(KJSONPathRoot) {
+			expression.Set("expression", New(KVariadic, "this", LiteralString("{}")))
+		}
+
 		if expression.ArgB("only_json_types") {
 			return jsonExtractSegments(name, false, op)(g, expression)
 		}
@@ -207,7 +240,6 @@ func postgresJSONExtractSQL(name, op string) GenFunc {
 	}
 }
 
-// postgresUnixToTimeSQL mirrors generators.postgres._unix_to_time_sql.
 func postgresUnixToTimeSQL(g *Generator, expression *Expr) string {
 	scale := expression.ArgE("scale")
 	timestamp := expression.This()
@@ -223,7 +255,6 @@ func postgresUnixToTimeSQL(g *Generator, expression *Expr) string {
 	)
 }
 
-// postgresLevenshteinSQL mirrors generators.postgres._levenshtein_sql.
 func postgresLevenshteinSQL(g *Generator, expression *Expr) string {
 	name := "LEVENSHTEIN"
 	if expression.ArgB("max_dist") {
@@ -233,7 +264,6 @@ func postgresLevenshteinSQL(g *Generator, expression *Expr) string {
 	return renameFunc(name)(g, expression)
 }
 
-// postgresVersionedAnyvalueSQL mirrors generators.postgres._versioned_anyvalue_sql.
 func postgresVersionedAnyvalueSQL(g *Generator, expression *Expr) string {
 	// https://www.postgresql.org/docs/16/functions-aggregate.html
 	// https://www.postgresql.org/about/featurematrix/
@@ -244,7 +274,6 @@ func postgresVersionedAnyvalueSQL(g *Generator, expression *Expr) string {
 	return renameFunc("ANY_VALUE")(g, expression)
 }
 
-// postgresRoundSQL mirrors generators.postgres._round_sql.
 func postgresRoundSQL(g *Generator, expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	decimals := g.sqlKey(expression, "decimals")
@@ -271,7 +300,6 @@ func postgresRoundSQL(g *Generator, expression *Expr) string {
 func customizePostgresGenerator(d *Dialect) {
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module-level dict)
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -282,6 +310,8 @@ func customizePostgresGenerator(d *Dialect) {
 		}
 	}
 	G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS = keys
+
+	G.methods[KByteString] = postgresBytestringSQL
 
 	T := G.TRANSFORMS
 	delete(T, KCommentColumnConstraint)
@@ -297,6 +327,9 @@ func customizePostgresGenerator(d *Dialect) {
 	T[KBitwiseXorAgg] = renameFunc("BIT_XOR")
 	T[KColumnDef] = transformPreprocess([]func(*Expr) *Expr{postgresAutoIncrementToSerial, postgresSerialToGenerated}, nil)
 	T[KCurrentDate] = noParenCurrentDateSQL
+	T[KConvertToCharset] = func(g *Generator, e *Expr) string {
+		return g.fn("CONVERT", e.Arg("this"), e.Arg("source"), e.Arg("dest"))
+	}
 	T[KCurrentTimestamp] = func(g *Generator, e *Expr) string { return "CURRENT_TIMESTAMP" }
 	T[KCurrentUser] = func(g *Generator, e *Expr) string { return "CURRENT_USER" }
 	T[KCurrentVersion] = renameFunc("VERSION")
@@ -304,6 +337,9 @@ func customizePostgresGenerator(d *Dialect) {
 	T[KDateDiff] = postgresDateDiffSQL
 	T[KDateStrToDate] = datestrtodateSQL
 	T[KDateSub] = postgresDateAddSQL("-")
+	T[KDay] = postgresDayMonthYearSQL
+	T[KDatetimeAdd] = postgresDateAddSQL("+")
+	T[KDatetimeSub] = postgresDateAddSQL("-")
 	T[KExplode] = renameFunc("UNNEST")
 	T[KExplodingGenerateSeries] = renameFunc("GENERATE_SERIES")
 	T[KGenerateSeries] = generateSeriesSQL("GENERATE_SERIES", "")
@@ -317,9 +353,8 @@ func customizePostgresGenerator(d *Dialect) {
 	}
 	T[KJSONExtract] = postgresJSONExtractSQL("JSON_EXTRACT_PATH", "->")
 	T[KJSONExtractScalar] = postgresJSONExtractSQL("JSON_EXTRACT_PATH_TEXT", "->>")
-	T[KJSONBExtract] = func(g *Generator, e *Expr) string { return g.binary(e, "#>") }
-	T[KJSONBExtractScalar] = func(g *Generator, e *Expr) string { return g.binary(e, "#>>") }
-	T[KJSONBContains] = func(g *Generator, e *Expr) string { return g.binary(e, "?") }
+	T[KJSONBExtract] = func(g *Generator, e *Expr) string { return arrowJSONExtractOpSQL(g, e, "#>") }
+	T[KJSONBExtractScalar] = func(g *Generator, e *Expr) string { return arrowJSONExtractOpSQL(g, e, "#>>") }
 	T[KParseJSON] = func(g *Generator, e *Expr) string {
 		return g.sql(CastExpr(e.This(), DT_JSON, true, nil))
 	}
@@ -332,6 +367,7 @@ func customizePostgresGenerator(d *Dialect) {
 	T[KMax] = maxOrGreatest
 	T[KMapFromEntries] = noMapFromEntriesSQL
 	T[KMin] = minOrLeast
+	T[KMonth] = postgresDayMonthYearSQL
 	T[KMerge] = mergeWithoutTargetSQL
 	T[KPartitionedByProperty] = func(g *Generator, e *Expr) string {
 		return "PARTITION BY " + g.sqlKey(e, "this")
@@ -374,6 +410,8 @@ func customizePostgresGenerator(d *Dialect) {
 	T[KTimeFromParts] = renameFunc("MAKE_TIME")
 	T[KTimestampFromParts] = renameFunc("MAKE_TIMESTAMP")
 	T[KTimestampTrunc] = timestamptruncSQL("DATE_TRUNC", true)
+	T[KTimestampAdd] = postgresDateAddSQL("+")
+	T[KTimestampSub] = postgresDateAddSQL("-")
 	T[KTimeStrToTime] = func(g *Generator, e *Expr) string { return timestrtotimeSQL(g, e, false) }
 	T[KTimeToStr] = func(g *Generator, e *Expr) string {
 		return g.fn("TO_CHAR", e.Arg("this"), postgresOptStr(g.formatTime(e, nil, nil)))
@@ -393,23 +431,24 @@ func customizePostgresGenerator(d *Dialect) {
 		return g.fn("DATE_PART", LiteralString("epoch"), e.Arg("this"))
 	}
 	T[KVariancePop] = renameFunc("VAR_POP")
-	T[KVariance] = renameFunc("VAR_SAMP")
 	T[KXor] = boolXorSQL
+	T[KYear] = postgresDayMonthYearSQL
 	T[KUnicode] = renameFunc("ASCII")
-	// exp.UnixToTime appears twice in the Python dict literal; the later entry wins.
 	T[KUnixToTime] = postgresUnixToTimeSQL
 	T[KLevenshtein] = postgresLevenshteinSQL
 	T[KJSONObjectAgg] = renameFunc("JSON_OBJECT_AGG")
 	T[KJSONBObjectAgg] = renameFunc("JSONB_OBJECT_AGG")
 	T[KCountIf] = countIfToSum
+	T[KFileFormatProperty] = func(g *Generator, e *Expr) string { return "USING " + g.sqlKey(e, "this") }
+	T[KTableSpaceProperty] = func(g *Generator, e *Expr) string { return "TABLESPACE " + g.sqlKey(e, "this") }
 
-	// <key>_sql method overrides
 	G.h.lateralSQL = postgresLateralSQL
 	G.h.columndefSQL = postgresColumndefSQL
 	G.h.unnestSQL = postgresUnnestSQL
 	G.h.bracketSQL = postgresBracketSQL
 	G.h.matchagainstSQL = postgresMatchagainstSQL
 	G.h.altersetSQL = postgresAltersetSQL
+	G.h.withProperties = postgresWithProperties
 	G.h.datatypeSQL = postgresDatatypeSQL
 	G.h.castSQL = postgresCastSQL
 	G.h.computedcolumnconstraintSQL = postgresComputedcolumnconstraintSQL
@@ -418,7 +457,6 @@ func customizePostgresGenerator(d *Dialect) {
 	G.h.intervalSQL = postgresIntervalSQL
 	G.h.placeholderSQL = postgresPlaceholderSQL
 
-	// dialect-only <key>_sql methods
 	G.methods[KSchemaCommentProperty] = postgresSchemacommentpropertySQL
 	G.methods[KCommentColumnConstraint] = postgresCommentcolumnconstraintSQL
 	G.methods[KArray] = postgresArraySQL
@@ -515,7 +553,7 @@ func postgresUnnestSQL(g *Generator, expression *Expr) string {
 	return g.baseUnnestSQL(expression)
 }
 
-// Forms like ARRAY[1, 2, 3][3] aren't allowed; we need to wrap the ARRAY.
+// postgresBracketSQL parenthesizes a subscripted ARRAY: forms like ARRAY[1, 2, 3][3] aren't allowed.
 func postgresBracketSQL(g *Generator, expression *Expr) string {
 	if expression.This().IsA(KArray) {
 		expression.Set("this", ParenExpr(expression.This(), false))
@@ -535,6 +573,34 @@ func postgresMatchagainstSQL(g *Generator, expression *Expr) string {
 		return "(" + sql + ")"
 	}
 	return sql
+}
+
+// postgresWithProperties renders the WITH (...) properties, then ON COMMIT and TABLESPACE (in
+// that order), which follow the WITH list unwrapped.
+func postgresWithProperties(g *Generator, properties *Expr) string {
+	var withProperties []*Expr
+	var onCommit, tablespace []any
+	for _, prop := range properties.Expressions() {
+		switch {
+		case prop.IsA(KOnCommitProperty):
+			onCommit = append(onCommit, prop)
+		case prop.IsA(KTableSpaceProperty):
+			tablespace = append(tablespace, prop)
+		default:
+			withProperties = append(withProperties, prop)
+		}
+	}
+
+	sql := g.baseWithProperties(New(KProperties, "expressions", withProperties))
+	postSQL := g.expressions(nil, exprsOpts{sqls: append(onCommit, tablespace...), hasSqls: true, sep: strp2(" "), noIndent: true})
+	if postSQL == "" {
+		return sql
+	}
+	sep := ""
+	if sql != "" {
+		sep = " "
+	}
+	return sql + g.segSep(postSQL, sep)
 }
 
 func postgresAltersetSQL(g *Generator, expression *Expr) string {

@@ -1,9 +1,6 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/eliminate_joins.py.
-
-// EliminateJoins mirrors optimizer.eliminate_joins.eliminate_joins: removes unused joins from an
-// expression.
+// EliminateJoins removes unused joins from an expression.
 //
 // This only removes joins when we know that the join condition doesn't produce duplicate rows.
 //
@@ -26,7 +23,7 @@ func EliminateJoins(expression *Expr) *Expr {
 		// Reverse the joins so we can remove chains of unused joins
 		for i := len(joins) - 1; i >= 0; i-- {
 			join := joins[i]
-			if join.IsSemiOrAntiJoin() {
+			if join.IsSemiOrAntiJoin() || join.ArgB("nearest") {
 				continue
 			}
 
@@ -41,7 +38,9 @@ func EliminateJoins(expression *Expr) *Expr {
 	return expression
 }
 
-// eliminateJoinsShouldEliminateJoin mirrors eliminate_joins._should_eliminate_join.
+// eliminateJoinsShouldEliminateJoin reports whether join can be dropped: it joins a derived table
+// that is not otherwise referenced, and the join cannot change the outer rows (a LEFT JOIN on all
+// unique outputs, or a condition-less join of a single row).
 func eliminateJoinsShouldEliminateJoin(scope *Scope, join *Expr, alias string) bool {
 	innerSource, ok := scope.Sources.Get(alias)
 	if !ok || !innerSource.IsScope() {
@@ -53,10 +52,9 @@ func eliminateJoinsShouldEliminateJoin(scope *Scope, join *Expr, alias string) b
 			(!join.ArgB("on") && eliminateJoinsHasSingleOutputRow(inner)))
 }
 
-// eliminateJoinsJoinIsUsed mirrors eliminate_joins._join_is_used.
+// eliminateJoinsJoinIsUsed reports whether any column outside the join's ON clause references
+// alias.
 func eliminateJoinsJoinIsUsed(scope *Scope, join *Expr, alias string) bool {
-	// We need to find all columns that reference this join.
-	// But columns in the ON clause shouldn't count.
 	on := join.ArgE("on")
 	onClauseColumns := map[*Expr]struct{}{}
 	if on != nil {
@@ -72,7 +70,8 @@ func eliminateJoinsJoinIsUsed(scope *Scope, join *Expr, alias string) bool {
 	return false
 }
 
-// eliminateJoinsIsJoinedOnAllUniqueOutputs mirrors eliminate_joins._is_joined_on_all_unique_outputs.
+// eliminateJoinsIsJoinedOnAllUniqueOutputs reports whether join's keys cover every unique output
+// of scope, so each outer row matches at most one inner row.
 func eliminateJoinsIsJoinedOnAllUniqueOutputs(scope *Scope, join *Expr) bool {
 	uniqueOutputs := eliminateJoinsUniqueOutputs(scope)
 	if len(uniqueOutputs) == 0 {
@@ -87,8 +86,8 @@ func eliminateJoinsIsJoinedOnAllUniqueOutputs(scope *Scope, join *Expr) bool {
 	return len(remaining) == 0
 }
 
-// eliminateJoinsUniqueOutputs mirrors eliminate_joins._unique_outputs: determine output columns
-// of `scope` that must have a unique combination per row.
+// eliminateJoinsUniqueOutputs determines the output columns of `scope` that must have a unique
+// combination per row.
 func eliminateJoinsUniqueOutputs(scope *Scope) StrSet {
 	expr := scope.Expression
 	if expr.Arg("distinct") != nil {
@@ -96,7 +95,7 @@ func eliminateJoinsUniqueOutputs(scope *Scope) StrSet {
 	}
 
 	if group := expr.ArgE("group"); group != nil {
-		// Python sets of expressions: membership is structural equality.
+		// Expression sets: membership is structural equality.
 		groupedExpressions := optxExprSet(group.Expressions())
 		var groupedOutputs []*Expr
 
@@ -127,7 +126,8 @@ func eliminateJoinsUniqueOutputs(scope *Scope) StrSet {
 	return newStrSet()
 }
 
-// eliminateJoinsHasSingleOutputRow mirrors eliminate_joins._has_single_output_row.
+// eliminateJoinsHasSingleOutputRow reports whether scope yields at most one row: a SELECT of only
+// aggregates, with LIMIT 1, or without FROM.
 func eliminateJoinsHasSingleOutputRow(scope *Scope) bool {
 	if !scope.Expression.IsA(KSelect) {
 		return false
@@ -142,19 +142,17 @@ func eliminateJoinsHasSingleOutputRow(scope *Scope) bool {
 	return allAgg || eliminateJoinsIsLimit1(scope) || !scope.Expression.ArgB("from_")
 }
 
-// eliminateJoinsIsLimit1 mirrors eliminate_joins._is_limit_1.
 func eliminateJoinsIsLimit1(scope *Scope) bool {
 	limit := scope.Expression.ArgE("limit")
 	if limit == nil {
 		return false
 	}
-	// limit.expression.this == "1"
 	this, ok := limit.Expression().Arg("this").(string)
 	return ok && this == "1"
 }
 
-// JoinCondition mirrors eliminate_joins.join_condition: extracts the join condition from a join
-// expression. Returns (source key, join key, remaining predicate).
+// JoinCondition extracts the join condition from a join expression. Returns (source key,
+// join key, remaining predicate).
 func JoinCondition(join *Expr) ([]*Expr, []*Expr, *Expr) {
 	name := join.AliasOrName()
 	on := join.ArgE("on")
@@ -241,8 +239,7 @@ func JoinCondition(join *Expr) ([]*Expr, []*Expr, *Expr) {
 	return sourceKey, joinKey, on
 }
 
-// optxExprSet mirrors set(list_of_expressions): deduplicates by structural equality, keeping the
-// first occurrence.
+// optxExprSet deduplicates exprs by structural equality, keeping the first occurrence.
 func optxExprSet(exprs []*Expr) []*Expr {
 	var out []*Expr
 	for _, e := range exprs {
@@ -253,10 +250,18 @@ func optxExprSet(exprs []*Expr) []*Expr {
 	return out
 }
 
-// optxExprIn mirrors `e in collection_of_expressions` (structural equality).
 func optxExprIn(e *Expr, exprs []*Expr) bool {
 	for _, x := range exprs {
 		if x.Equal(e) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNearestJoin(joins []*Expr) bool {
+	for _, join := range joins {
+		if join.ArgB("nearest") {
 			return true
 		}
 	}

@@ -6,12 +6,8 @@ import (
 	"sync"
 )
 
-// Port of sqlglot/schema.py (MappingSchema and helpers).
-//
-// Schema mappings are nested insertion-ordered dicts: *omap[any] whose values are either
-// nested *omap[any] (catalog/db/table levels), or column types (string, *Expr DataType, or nil).
-
-// SchemaMap is a nested, ordered schema mapping.
+// SchemaMap is a nested, insertion-ordered schema mapping: its values are either nested mappings
+// (catalog/db/table levels) or column types (string, *Expr DataType, or nil).
 type SchemaMap = omap[any]
 
 // NewSchemaMap creates an empty schema mapping.
@@ -24,7 +20,8 @@ func NewSchemaMapSize(n int) *SchemaMap {
 	return m
 }
 
-// MappingSchema mirrors sqlglot.schema.MappingSchema.
+// MappingSchema resolves tables, columns, column types and UDF return types against a nested
+// schema mapping, optionally normalizing names for its dialect.
 type MappingSchema struct {
 	mapping            *SchemaMap
 	mappingTrie        *trie
@@ -42,7 +39,7 @@ type MappingSchema struct {
 	depthCache           int
 }
 
-// findCacheKey and tableCacheKey mirror the (hash(table), ...) tuple cache keys.
+// findCacheKey and tableCacheKey key the lookup caches by table hash plus the lookup options.
 type findCacheKey struct {
 	hash            uint64
 	ensureDataTypes bool
@@ -58,7 +55,8 @@ type findCacheEntry struct {
 	schema *SchemaMap
 }
 
-// NewMappingSchema mirrors MappingSchema(schema, visible, dialect, normalize, udf_mapping).
+// NewMappingSchema builds a schema from a table mapping, an optional visible-columns mapping and a
+// UDF mapping. A nil dialect means the default dialect; normalize normalizes all names up front.
 func NewMappingSchema(schema *SchemaMap, visible *SchemaMap, dialect *Dialect, normalize bool, udfMapping *SchemaMap) *MappingSchema {
 	if dialect == nil {
 		dialect = prototype("")
@@ -85,7 +83,6 @@ func NewMappingSchema(schema *SchemaMap, visible *SchemaMap, dialect *Dialect, n
 		schema = s.normalizeSchema(schema)
 		udfMapping = s.normalizeUDFs(udfMapping)
 	}
-	// AbstractMappingSchema.__init__
 	s.mapping = schema
 	s.mappingTrie = newTrie()
 	for _, keys := range flattenSchema(s.mapping, s.Depth(), nil) {
@@ -107,13 +104,12 @@ func reversedStrings(in []string) []string {
 	return out
 }
 
-// Dialect returns the schema dialect.
 func (s *MappingSchema) Dialect() *Dialect { return s.dialect }
 
-// Empty mirrors AbstractMappingSchema.empty.
 func (s *MappingSchema) Empty() bool { return s.mapping.Len() == 0 }
 
-// Depth mirrors MappingSchema.depth.
+// Depth returns the number of table name levels (1: table, 2: db.table, 3: catalog.db.table),
+// computed once.
 func (s *MappingSchema) Depth() int {
 	if !s.Empty() && s.depthCache == 0 {
 		s.depthCache = dictDepth(s.mapping) - 1
@@ -121,7 +117,8 @@ func (s *MappingSchema) Depth() int {
 	return s.depthCache
 }
 
-// SupportedTableArgs mirrors AbstractMappingSchema.supported_table_args.
+// SupportedTableArgs returns the table parts the mapping is keyed by, innermost first (this, db,
+// catalog), according to Depth. A depth above 3 panics.
 func (s *MappingSchema) SupportedTableArgs() []string {
 	if len(s.supportedTableArgs) == 0 && s.mapping.Len() > 0 {
 		depth := s.Depth()
@@ -136,7 +133,7 @@ func (s *MappingSchema) SupportedTableArgs() []string {
 	return s.supportedTableArgs
 }
 
-// tableParts mirrors AbstractMappingSchema.table_parts.
+// tableParts returns the names of table's parts, innermost (the table name) first.
 func (s *MappingSchema) tableParts(table *Expr) []string {
 	parts := table.Parts()
 	out := make([]string, len(parts))
@@ -169,7 +166,6 @@ func (s *MappingSchema) findInTrie(parts []string, tr *trie, raiseOnMissing bool
 	return parts
 }
 
-// flattenTrie mirrors flatten_schema(trie) applied to a trie node.
 func flattenTrie(t *trie) [][]string {
 	var out [][]string
 	var walk func(n *trie, keys []string)
@@ -187,13 +183,14 @@ func flattenTrie(t *trie) [][]string {
 	return out
 }
 
-// Find mirrors MappingSchema.find.
+// Find returns the column mapping of table. A partially qualified name matches when it is
+// unambiguous; ambiguity panics when raiseOnMissing is set. With ensureDataTypes, string column
+// types are converted to DataTypes. Results are cached.
 func (s *MappingSchema) Find(table *Expr, raiseOnMissing bool, ensureDataTypes bool) *SchemaMap {
 	key := findCacheKey{table.Hash(), ensureDataTypes}
 	if e, ok := s.findCache[key]; ok && e.schema != nil {
 		return e.schema
 	}
-	// AbstractMappingSchema.find
 	tp := s.tableParts(table)
 	n := len(s.SupportedTableArgs())
 	if n < len(tp) {
@@ -234,7 +231,8 @@ func (s *MappingSchema) nestedGet(parts []string, d *SchemaMap, raiseOnMissing b
 	return nestedGet(d, path, raiseOnMissing)
 }
 
-// AddTable mirrors MappingSchema.add_table for an already-built Table expression.
+// AddTable registers table with its columns. With matchDepth, the table must have as many parts
+// as the schema has levels. A table that is already known is only replaced when columns are given.
 func (s *MappingSchema) AddTable(table *Expr, columnMapping *SchemaMap, dialect *Dialect, normalize *bool, matchDepth bool) {
 	normalizedTable := s.normalizeTable(table, dialect, normalize)
 	if matchDepth && !s.Empty() && len(normalizedTable.Parts()) != s.Depth() {
@@ -258,7 +256,8 @@ func (s *MappingSchema) AddTable(table *Expr, columnMapping *SchemaMap, dialect 
 	delete(s.findCache, findCacheKey{normalizedTable.Hash(), false})
 }
 
-// ColumnNames mirrors MappingSchema.column_names.
+// ColumnNames returns the column names of table, limited to the visible columns when onlyVisible
+// is set and a visible mapping exists.
 func (s *MappingSchema) ColumnNames(table *Expr, onlyVisible bool, dialect *Dialect, normalize *bool) []string {
 	normalizedTable := s.normalizeTable(table, dialect, normalize)
 	schema := s.Find(normalizedTable, true, false)
@@ -288,7 +287,8 @@ func (s *MappingSchema) ColumnNames(table *Expr, onlyVisible bool, dialect *Dial
 	return out
 }
 
-// GetColumnType mirrors MappingSchema.get_column_type.
+// GetColumnType returns the type of a column of table (given as an expression or by name), or
+// UNKNOWN.
 func (s *MappingSchema) GetColumnType(table *Expr, column *Expr, columnName string, dialect *Dialect, normalize *bool) *Expr {
 	normalizedTable := s.normalizeTable(table, dialect, normalize)
 	var name string
@@ -312,7 +312,7 @@ func (s *MappingSchema) GetColumnType(table *Expr, column *Expr, columnName stri
 	return NewDataType(DT_UNKNOWN)
 }
 
-// HasColumn mirrors MappingSchema.has_column.
+// HasColumn reports whether table has the column (given as an expression or by name).
 func (s *MappingSchema) HasColumn(table *Expr, column *Expr, columnName string, dialect *Dialect, normalize *bool) bool {
 	normalizedTable := s.normalizeTable(table, dialect, normalize)
 	var name string
@@ -328,7 +328,8 @@ func (s *MappingSchema) HasColumn(table *Expr, column *Expr, columnName string, 
 	return tableSchema.Has(name)
 }
 
-// GetUDFType mirrors MappingSchema.get_udf_type for an Anonymous expression.
+// GetUDFType returns the return type of the UDF called by an Anonymous expression (qualified
+// through its parent Dot), or UNKNOWN.
 func (s *MappingSchema) GetUDFType(udf *Expr, dialect *Dialect, normalize *bool) *Expr {
 	parts := s.normalizeUDF(udf, dialect, normalize)
 	resolved := s.findInTrie(parts, s.udfTrie, false)
@@ -419,7 +420,7 @@ func (s *MappingSchema) normalizeSchema(schema *SchemaMap) *SchemaMap {
 		for _, k := range keys {
 			normKeys = append(normKeys, s.normalizeName(k, nil, true, nil))
 		}
-		// nested_set(normalized, normKeys + [column], type) for every column; the path is
+		// set normalized[normKeys...][column] = type for every column; the path is
 		// walked (and created) once per table.
 		table := nestedSubMap(normalized, normKeys)
 		table.reserve(columns.Len())
@@ -487,7 +488,8 @@ func (s *MappingSchema) normalizeTable(table *Expr, dialect *Dialect, normalize 
 	return normalized
 }
 
-// TableFromString parses a table path the way maybe_parse(str, into=exp.Table) does.
+// TableFromString parses name as a table reference with dialect (nil: the schema's dialect);
+// parse errors panic.
 func (s *MappingSchema) TableFromString(name string, dialect *Dialect) *Expr {
 	if dialect == nil {
 		dialect = s.dialect
@@ -516,7 +518,6 @@ func (s *MappingSchema) normalizeName(name string, dialect *Dialect, isTable boo
 	return result
 }
 
-// normNameKey mirrors the (name, dialect, is_table, normalize) cache key of _normalize_name.
 type normNameKey struct {
 	name    string
 	dialect *Dialect
@@ -524,9 +525,9 @@ type normNameKey struct {
 	norm    bool
 }
 
-// globalNormNames memoizes normalize_name(str, ...).name across schemas: for string input it is a
-// pure function of the key (parse_identifier + the dialect's normalize_identifier on a fresh node),
-// and MappingSchema construction would otherwise re-parse every table and column name.
+// globalNormNames memoizes normalized string names across schemas: for a string the result is a
+// pure function of the key (parseIdentifier plus the dialect's NormalizeIdentifier on a fresh
+// node), and MappingSchema construction would otherwise re-parse every table and column name.
 var globalNormNames struct {
 	sync.RWMutex
 	m map[normNameKey]string
@@ -566,7 +567,8 @@ func (s *MappingSchema) normalizeIdentName(id *Expr, dialect *Dialect, isTable b
 	return result
 }
 
-// toDataType mirrors MappingSchema._to_data_type.
+// toDataType parses a column type string with dialect (nil: the schema's dialect) and normalizes
+// the identifiers in it; results are cached by type string.
 func (s *MappingSchema) toDataType(schemaType string, dialect *Dialect) *Expr {
 	if dt, ok := s.typeMappingCache[schemaType]; ok {
 		return dt
@@ -581,7 +583,8 @@ func (s *MappingSchema) toDataType(schemaType string, dialect *Dialect) *Expr {
 	return expression
 }
 
-// DataTypeFromStr mirrors exp.DataType.from_str(dtype, dialect, udt).
+// DataTypeFromStr parses a type string with dialect. With udt, a string that does not parse
+// becomes a user-defined type; other errors panic.
 func DataTypeFromStr(dtype string, dialect *Dialect, udt bool) *Expr {
 	if pyUpper(dtype) == "UNKNOWN" {
 		return NewDataType(DT_UNKNOWN)
@@ -597,21 +600,23 @@ func DataTypeFromStr(dtype string, dialect *Dialect, udt bool) *Expr {
 	return e
 }
 
-// normalizeNameStr mirrors schema.normalize_name for a string identifier.
 func normalizeNameStr(name string, dialect *Dialect, isTable bool, normalize bool) *Expr {
 	return normalizeNameIdent(parseIdentifier(name, dialect), dialect, isTable, normalize)
 }
 
-// normalizeNameIdent mirrors schema.normalize_name for an Identifier.
+// normalizeNameIdent returns a copy of id normalized for dialect when normalize is set, recording
+// whether it names a table; id itself otherwise.
 func normalizeNameIdent(id *Expr, dialect *Dialect, isTable bool, normalize bool) *Expr {
 	if !normalize {
 		return id
 	}
+	id = id.Copy()
 	id.Meta()["is_table"] = isTable
 	return dialect.NormalizeIdentifier(id)
 }
 
-// parseIdentifier mirrors exp.parse_identifier.
+// parseIdentifier parses name as an identifier with dialect, falling back to a plain Identifier
+// when it does not tokenize or parse.
 func parseIdentifier(name string, dialect *Dialect) *Expr {
 	e, err := dialect.ParseOneInto(KIdentifier, name, nil)
 	if err != nil {
@@ -624,7 +629,8 @@ func parseIdentifier(name string, dialect *Dialect) *Expr {
 	return e
 }
 
-// dictDepth mirrors sqlglot.helper.dict_depth.
+// dictDepth returns the nesting depth of a schema mapping, following the first entry at each
+// level: 0 for a non-mapping, 1 for an empty mapping.
 func dictDepth(d any) int {
 	m, ok := d.(*SchemaMap)
 	if !ok || m == nil {
@@ -637,7 +643,8 @@ func dictDepth(d any) int {
 	return 1 + dictDepth(v)
 }
 
-// flattenSchema mirrors sqlglot.schema.flatten_schema.
+// flattenSchema returns the key paths of schema, depth levels deep (or down to the first
+// non-mapping value).
 func flattenSchema(schema *SchemaMap, depth int, keys []string) [][]string {
 	var tables [][]string
 	for _, k := range schema.Keys() {
@@ -652,7 +659,8 @@ func flattenSchema(schema *SchemaMap, depth int, keys []string) [][]string {
 	return tables
 }
 
-// nestedGet mirrors sqlglot.schema.nested_get with (name, key) path tuples.
+// nestedGet follows path, a list of (part name, key) pairs, through d. A missing key returns nil,
+// or panics with "Unknown <part>: <key>" when raiseOnMissing is set.
 func nestedGet(d *SchemaMap, path [][2]string, raiseOnMissing bool) any {
 	var result any = d
 	for _, p := range path {
@@ -678,7 +686,6 @@ func nestedGet(d *SchemaMap, path [][2]string, raiseOnMissing bool) any {
 	return result
 }
 
-// nestedSubMap walks keys like nested_set's setdefault loop and returns the innermost mapping.
 func nestedSubMap(d *SchemaMap, keys []string) *SchemaMap {
 	sub := d
 	for _, k := range keys {
@@ -694,7 +701,6 @@ func nestedSubMap(d *SchemaMap, keys []string) *SchemaMap {
 	return sub
 }
 
-// nestedSet mirrors sqlglot.schema.nested_set.
 func nestedSet(d *SchemaMap, keys []string, value any) *SchemaMap {
 	if len(keys) == 0 {
 		return d

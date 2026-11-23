@@ -1,18 +1,11 @@
 package sqlengine
 
-// Port of sqlglot/generators/mysql.py (MySQLGenerator).
-
 import (
 	"fmt"
 	"strings"
 )
 
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers of sqlglot/generators/mysql.py
-// ---------------------------------------------------------------------------------------------
-
-// mysqlFormatTimeArg returns Generator.format_time(expression) as a Generator.func argument
-// (nil for Python None).
+// mysqlFormatTimeArg returns nil when e has no format, so g.fn drops the argument.
 func mysqlFormatTimeArg(g *Generator, e *Expr) any {
 	if s := g.formatTime(e, nil, nil); s != "" {
 		return s
@@ -20,7 +13,8 @@ func mysqlFormatTimeArg(g *Generator, e *Expr) any {
 	return nil
 }
 
-// mysqlDateTruncSQL mirrors _date_trunc_sql.
+// mysqlDateTruncSQL renders DATE_TRUNC as STR_TO_DATE over a CONCAT of the kept date parts, or
+// DATE(x) for DAY.
 func mysqlDateTruncSQL(g *Generator, e *Expr) string {
 	expr := g.sqlKey(e, "this")
 	unit := pyUpper(e.Text("unit"))
@@ -49,22 +43,18 @@ func mysqlDateTruncSQL(g *Generator, e *Expr) string {
 	return g.fn("STR_TO_DATE", concat, "'"+dateFormat+"'")
 }
 
-// mysqlStrToDateSQL mirrors _str_to_date_sql.
 func mysqlStrToDateSQL(g *Generator, e *Expr) string {
 	return g.fn("STR_TO_DATE", e.Arg("this"), mysqlFormatTimeArg(g, e))
 }
 
-// mysqlUnixToTimeSQL mirrors _unix_to_time_sql.
 func mysqlUnixToTimeSQL(g *Generator, e *Expr) string {
 	scale := e.ArgE("scale")
 	timestamp := e.Arg("this")
 
-	// scale in (None, exp.UnixToTime.SECONDS)
 	if scale == nil || scale.Equal(LiteralInt(0)) {
 		return g.fn("FROM_UNIXTIME", timestamp, mysqlFormatTimeArg(g, e))
 	}
 
-	// exp.func("POW", 10, scale)
 	pow := New(KPow, "this", LiteralNumber("10"), "expression", scale.Copy())
 	return g.fn(
 		"FROM_UNIXTIME",
@@ -73,7 +63,6 @@ func mysqlUnixToTimeSQL(g *Generator, e *Expr) string {
 	)
 }
 
-// mysqlDateAddSQL mirrors date_add_sql(kind).
 func mysqlDateAddSQL(kind string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		return g.fn(
@@ -84,7 +73,6 @@ func mysqlDateAddSQL(kind string) GenFunc {
 	}
 }
 
-// mysqlMakeIntervalUnitAliases mirrors _MAKE_INTERVAL_UNIT_ALIASES.
 var mysqlMakeIntervalUnitAliases = map[string]string{
 	"years":   "year",
 	"months":  "month",
@@ -97,7 +85,6 @@ var mysqlMakeIntervalUnitAliases = map[string]string{
 	"secs":    "second",
 }
 
-// mysqlTsOrDsToDateSQL mirrors _ts_or_ds_to_date_sql.
 func mysqlTsOrDsToDateSQL(g *Generator, e *Expr) string {
 	if e.ArgB("format") {
 		return mysqlStrToDateSQL(g, e)
@@ -105,8 +92,6 @@ func mysqlTsOrDsToDateSQL(g *Generator, e *Expr) string {
 	return g.fn("DATE", e.Arg("this"))
 }
 
-// mysqlRemoveTsOrDsToDate mirrors _remove_ts_or_ds_to_date(to_sql=None, args=("this",)).
-// toSQL nil means None; args nil means ("this",).
 func mysqlRemoveTsOrDsToDate(toSQL GenFunc, args ...string) GenFunc {
 	if len(args) == 0 {
 		args = []string{"this"}
@@ -126,14 +111,9 @@ func mysqlRemoveTsOrDsToDate(toSQL GenFunc, args ...string) GenFunc {
 	}
 }
 
-// ---------------------------------------------------------------------------------------------
-// Customizer (class body of MySQLGenerator)
-// ---------------------------------------------------------------------------------------------
-
 func customizeMySQLGenerator(d *Dialect) {
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module-level)
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -147,6 +127,8 @@ func customizeMySQLGenerator(d *Dialect) {
 
 	T := G.TRANSFORMS
 	T[KArrayAgg] = renameFunc("GROUP_CONCAT")
+	T[KStddev] = renameFunc("STDDEV_SAMP")
+	T[KVariancePop] = renameFunc("VAR_POP")
 	T[KBitwiseAndAgg] = renameFunc("BIT_AND")
 	T[KBitwiseOrAgg] = renameFunc("BIT_OR")
 	T[KBitwiseXorAgg] = renameFunc("BIT_XOR")
@@ -157,9 +139,9 @@ func customizeMySQLGenerator(d *Dialect) {
 	T[KDateDiff] = mysqlRemoveTsOrDsToDate(func(g *Generator, e *Expr) string {
 		return g.fn("DATEDIFF", e.Arg("this"), e.Arg("expression"))
 	}, "this", "expression")
-	T[KDateAdd] = mysqlRemoveTsOrDsToDate(mysqlDateAddSQL("ADD"))
+	T[KDateAdd] = mysqlDateAddSQL("ADD")
 	T[KDateStrToDate] = datestrtodateSQL
-	T[KDateSub] = mysqlRemoveTsOrDsToDate(mysqlDateAddSQL("SUB"))
+	T[KDateSub] = mysqlDateAddSQL("SUB")
 	T[KDateTrunc] = mysqlDateTruncSQL
 	T[KDay] = mysqlRemoveTsOrDsToDate(nil)
 	T[KDayOfMonth] = mysqlRemoveTsOrDsToDate(renameFunc("DAYOFMONTH"))
@@ -173,6 +155,8 @@ func customizeMySQLGenerator(d *Dialect) {
 		return "GROUP_CONCAT(" + g.sqlKey(e, "this") + " SEPARATOR " + sep + ")"
 	}
 	T[KILike] = noIlikeSQL
+	// https://dev.mysql.com/doc/refman/9.7/en/flow-control-functions.html#function_if
+	T[KIf] = ifSQL("IF", "NULL")
 	T[KJSONExtractScalar] = arrowJSONExtractSQL
 	T[KLength] = lengthOrCharLengthSQL
 	T[KLogicalOr] = renameFunc("MAX")
@@ -213,7 +197,13 @@ func customizeMySQLGenerator(d *Dialect) {
 		return g.fn("DATE_FORMAT", e.Arg("this"), mysqlFormatTimeArg(g, e))
 	})
 	T[KTrim] = func(g *Generator, e *Expr) string { return trimSQL(g, e, "") }
-	T[KTrunc] = renameFunc("TRUNCATE")
+	T[KTrunc] = func(g *Generator, e *Expr) string {
+		decimals := e.ArgE("decimals")
+		if decimals == nil {
+			decimals = LiteralNumber("0")
+		}
+		return g.fn("TRUNCATE", e.This(), decimals)
+	}
 	T[KTryCast] = noTrycastSQL
 	T[KTsOrDsAdd] = mysqlDateAddSQL("ADD")
 	T[KTsOrDsDiff] = func(g *Generator, e *Expr) string {
@@ -230,7 +220,6 @@ func customizeMySQLGenerator(d *Dialect) {
 	T[KUtcTimestamp] = renameFunc("UTC_TIMESTAMP")
 	T[KUtcTime] = renameFunc("UTC_TIME")
 
-	// Method overrides (hooks)
 	G.h.locateProperties = mysqlLocateProperties
 	G.h.computedcolumnconstraintSQL = mysqlComputedcolumnconstraintSQL
 	G.h.dpipeSQL = mysqlDpipeSQL
@@ -247,8 +236,8 @@ func customizeMySQLGenerator(d *Dialect) {
 	G.h.partitionbyrangepropertySQL = mysqlPartitionbyrangepropertySQL
 	G.h.partitionrangeSQL = mysqlPartitionrangeSQL
 
-	// Dialect-only <key>_sql methods
 	G.methods[KMakeInterval] = mysqlMakeintervalSQL
+	G.methods[KIntDiv] = mysqlIntdivSQL
 	G.methods[KArray] = mysqlArraySQL
 	G.methods[KArrayContainsAll] = mysqlArraycontainsallSQL
 	G.methods[KArrayContainedBy] = mysqlArraycontainedbySQL
@@ -260,11 +249,8 @@ func customizeMySQLGenerator(d *Dialect) {
 	G.methods[KPartitionList] = mysqlPartitionlistSQL
 }
 
-// ---------------------------------------------------------------------------------------------
-// MySQLGenerator methods
-// ---------------------------------------------------------------------------------------------
-
-// mysqlMakeintervalSQL mirrors MySQLGenerator.makeinterval_sql.
+// mysqlMakeintervalSQL renders MAKE_INTERVAL as a sum of INTERVAL terms (a difference when it is
+// the subtrahend of a subtraction).
 func mysqlMakeintervalSQL(g *Generator, e *Expr) string {
 	var intervals []*Expr
 	for _, a := range e.args {
@@ -309,7 +295,6 @@ func mysqlMakeintervalSQL(g *Generator, e *Expr) string {
 	return strings.Join(parts, sep)
 }
 
-// mysqlLocateProperties mirrors MySQLGenerator.locate_properties.
 func mysqlLocateProperties(g *Generator, properties *Expr) propLocations {
 	locations := g.baseLocateProperties(properties)
 
@@ -328,7 +313,6 @@ func mysqlLocateProperties(g *Generator, properties *Expr) propLocations {
 	return locations
 }
 
-// mysqlComputedcolumnconstraintSQL mirrors MySQLGenerator.computedcolumnconstraint_sql.
 func mysqlComputedcolumnconstraintSQL(g *Generator, e *Expr) string {
 	persisted := "VIRTUAL"
 	if e.ArgB("persisted") {
@@ -337,25 +321,21 @@ func mysqlComputedcolumnconstraintSQL(g *Generator, e *Expr) string {
 	return "GENERATED ALWAYS AS (" + g.sql(e.This().Unnest()) + ") " + persisted
 }
 
-// mysqlArraySQL mirrors MySQLGenerator.array_sql.
 func mysqlArraySQL(g *Generator, e *Expr) string {
 	g.unsupported("Arrays are not supported by MySQL")
 	return g.functionFallbackSQL(e)
 }
 
-// mysqlArraycontainsallSQL mirrors MySQLGenerator.arraycontainsall_sql.
 func mysqlArraycontainsallSQL(g *Generator, e *Expr) string {
 	g.unsupported("Array operations are not supported by MySQL")
 	return g.functionFallbackSQL(e)
 }
 
-// mysqlArraycontainedbySQL mirrors MySQLGenerator.arraycontainedby_sql.
 func mysqlArraycontainedbySQL(g *Generator, e *Expr) string {
 	g.unsupported("Array operations are not supported by MySQL")
 	return g.functionFallbackSQL(e)
 }
 
-// mysqlDpipeSQL mirrors MySQLGenerator.dpipe_sql.
 func mysqlDpipeSQL(g *Generator, e *Expr) string {
 	parts := e.Flatten(true)
 	args := make([]any, len(parts))
@@ -365,7 +345,21 @@ func mysqlDpipeSQL(g *Generator, e *Expr) string {
 	return g.fn("CONCAT", args...)
 }
 
-// mysqlExtractSQL mirrors MySQLGenerator.extract_sql.
+// mysqlIntdivSQL renders a DIV b, parenthesizing binary operands. The whole expression is
+// parenthesized under a unary minus or bitwise NOT and as the right operand of *, /, DIV or %,
+// where DIV would otherwise bind differently.
+func mysqlIntdivSQL(g *Generator, e *Expr) string {
+	this := g.sql(wrapIfKind(e.This(), KBinary))
+	divisor := g.sql(wrapIfKind(e.Expression(), KBinary))
+	sql := this + " " + g.maybeCommentC("DIV", nil, e.Comments()) + " " + divisor
+
+	parent := e.Parent()
+	if parent.IsA(KNeg, KBitwiseNot) || (parent.IsA(KMul, KDiv, KIntDiv, KMod) && parent.Expression() == e) {
+		return "(" + sql + ")"
+	}
+	return sql
+}
+
 func mysqlExtractSQL(g *Generator, e *Expr) string {
 	unit := e.Name()
 	if unit != "" && pyLower(unit) == "epoch" {
@@ -375,7 +369,6 @@ func mysqlExtractSQL(g *Generator, e *Expr) string {
 	return g.baseExtractSQL(e)
 }
 
-// mysqlDatatypeSQL mirrors MySQLGenerator.datatype_sql.
 func mysqlDatatypeSQL(g *Generator, e *Expr) string {
 	if g.s.VARCHAR_REQUIRES_SIZE && DataTypeIsType(e, []any{DT_VARCHAR}, false) && len(e.Expressions()) == 0 {
 		// `VARCHAR` must always have a size - if it doesn't, we always generate `TEXT`
@@ -393,12 +386,10 @@ func mysqlDatatypeSQL(g *Generator, e *Expr) string {
 	return result
 }
 
-// mysqlJsonarraycontainsSQL mirrors MySQLGenerator.jsonarraycontains_sql.
 func mysqlJsonarraycontainsSQL(g *Generator, e *Expr) string {
 	return g.sqlKey(e, "this") + " MEMBER OF(" + g.sqlKey(e, "expression") + ")"
 }
 
-// mysqlCastSQL mirrors MySQLGenerator.cast_sql.
 func mysqlCastSQL(g *Generator, e *Expr, safePrefix string) string {
 	to := e.ArgE("to")
 	toThis, isDType := to.Arg("this").(DType)
@@ -414,7 +405,6 @@ func mysqlCastSQL(g *Generator, e *Expr, safePrefix string) string {
 	return g.baseCastSQL(e, "")
 }
 
-// mysqlShowSQL mirrors MySQLGenerator.show_sql.
 func mysqlShowSQL(g *Generator, e *Expr) string {
 	name := e.Name()
 	this := " " + name
@@ -428,6 +418,16 @@ func mysqlShowSQL(g *Generator, e *Expr) string {
 	}
 
 	target := g.sqlKey(e, "target")
+
+	// SHOW CREATE ... takes a possibly qualified name, it has no FROM clause
+	// https://dev.mysql.com/doc/refman/8.4/en/show-create-table.html
+	var db string
+	if dbID := g.sqlKey(e, "db"); strings.HasPrefix(name, "CREATE") && dbID != "" {
+		target = dbID + "." + target
+	} else {
+		db = mysqlPrefixedSQL(g, "FROM", e, "db")
+	}
+
 	if target != "" {
 		target = " " + target
 	}
@@ -445,8 +445,6 @@ func mysqlShowSQL(g *Generator, e *Expr) string {
 			target = " ON TABLE" + target
 		}
 	}
-
-	db := mysqlPrefixedSQL(g, "FROM", e, "db")
 
 	like := mysqlPrefixedSQL(g, "LIKE", e, "like")
 	where := g.sqlKey(e, "where")
@@ -494,26 +492,26 @@ func mysqlShowSQL(g *Generator, e *Expr) string {
 		channel + mutexOrStatus + like + where + offset + limit + forGroup + forUser + forRole + intoOutfile
 }
 
-// mysqlAlterrenameSQL mirrors MySQLGenerator.alterrename_sql.
-//
-// To avoid TO keyword in ALTER ... RENAME statements.
-// It's moved from Doris, because it's the same for all MySQL, Doris, and StarRocks.
+// mysqlAlterrenameSQL omits the TO keyword of ALTER ... RENAME, which MySQL, Doris and StarRocks
+// all leave out.
 func mysqlAlterrenameSQL(g *Generator, e *Expr, includeTo bool) string {
 	return g.baseAlterrenameSQL(e, false)
 }
 
-// mysqlAltercolumnSQL mirrors MySQLGenerator.altercolumn_sql.
 func mysqlAltercolumnSQL(g *Generator, e *Expr) string {
 	dtype := g.sqlKey(e, "dtype")
 	if dtype == "" {
 		return g.baseAltercolumnSQL(e)
 	}
 
+	if e.ArgB("exists") {
+		g.unsupported("ALTER COLUMN IF EXISTS is not supported by this dialect")
+	}
+
 	this := g.sqlKey(e, "this")
 	return "MODIFY COLUMN " + this + " " + dtype
 }
 
-// mysqlPrefixedSQL mirrors MySQLGenerator._prefixed_sql.
 func mysqlPrefixedSQL(g *Generator, prefix string, e *Expr, arg string) string {
 	sql := g.sqlKey(e, arg)
 	if sql != "" {
@@ -522,7 +520,6 @@ func mysqlPrefixedSQL(g *Generator, prefix string, e *Expr, arg string) string {
 	return ""
 }
 
-// mysqlOldstyleLimitSQL mirrors MySQLGenerator._oldstyle_limit_sql.
 func mysqlOldstyleLimitSQL(g *Generator, e *Expr) string {
 	limit := g.sqlKey(e, "limit")
 	offset := g.sqlKey(e, "offset")
@@ -536,7 +533,8 @@ func mysqlOldstyleLimitSQL(g *Generator, e *Expr) string {
 	return ""
 }
 
-// mysqlTimestamptruncSQL mirrors MySQLGenerator.timestamptrunc_sql.
+// mysqlTimestamptruncSQL renders TIMESTAMP_TRUNC as DATE_ADD(start, INTERVAL
+// TIMESTAMPDIFF(unit, start, x) unit) from an old fixed start date.
 func mysqlTimestamptruncSQL(g *Generator, e *Expr) string {
 	unit := e.Arg("unit")
 
@@ -544,16 +542,13 @@ func mysqlTimestamptruncSQL(g *Generator, e *Expr) string {
 	startTS := "'0000-01-01 00:00:00'"
 
 	// Source: https://stackoverflow.com/a/32955740
-	// build_date_delta(exp.TimestampDiff)([unit, start_ts, expression.this])
 	timestampDiff := New(KTimestampDiff, "this", e.Arg("this"), "expression", startTS, "unit", unit)
 	interval := New(KInterval, "this", timestampDiff, "unit", unit)
-	// build_date_delta_with_interval(exp.DateAdd)([start_ts, interval])
 	dateadd := New(KDateAdd, "this", startTS, "expression", interval.This(), "unit", unitToStr(interval, "DAY"))
 
 	return g.sql(dateadd)
 }
 
-// mysqlConverttimezoneSQL mirrors MySQLGenerator.converttimezone_sql.
 func mysqlConverttimezoneSQL(g *Generator, e *Expr) string {
 	fromTz := e.Arg("source_tz")
 	toTz := e.Arg("target_tz")
@@ -562,25 +557,21 @@ func mysqlConverttimezoneSQL(g *Generator, e *Expr) string {
 	return g.fn("CONVERT_TZ", dt, fromTz, toTz)
 }
 
-// mysqlAttimezoneSQL mirrors MySQLGenerator.attimezone_sql.
 func mysqlAttimezoneSQL(g *Generator, e *Expr) string {
 	g.unsupported("AT TIME ZONE is not supported by MySQL")
 	return g.sql(e.Arg("this"))
 }
 
-// mysqlIsasciiSQL mirrors MySQLGenerator.isascii_sql.
 func mysqlIsasciiSQL(g *Generator, e *Expr) string {
 	return "REGEXP_LIKE(" + g.sql(e.Arg("this")) + ", '^[[:ascii:]]*$')"
 }
 
-// mysqlIgnorenullsSQL mirrors MySQLGenerator.ignorenulls_sql.
 func mysqlIgnorenullsSQL(g *Generator, e *Expr) string {
 	// https://dev.mysql.com/doc/refman/8.4/en/window-function-descriptions.html
 	g.unsupported("MySQL does not support IGNORE NULLS.")
 	return g.sql(e.Arg("this"))
 }
 
-// mysqlCurrentschemaSQL mirrors MySQLGenerator.currentschema_sql (@unsupported_args("this")).
 func mysqlCurrentschemaSQL(g *Generator, e *Expr) string {
 	if e.ArgB("this") {
 		g.unsupported(fmt.Sprintf("Argument '%s' is not supported for expression '%s' when targeting %s.", "this", e.Kind().Name(), g.d.ClassName))
@@ -588,7 +579,6 @@ func mysqlCurrentschemaSQL(g *Generator, e *Expr) string {
 	return g.fn("SCHEMA")
 }
 
-// mysqlPartitionSQL mirrors MySQLGenerator.partition_sql.
 func mysqlPartitionSQL(g *Generator, e *Expr) string {
 	parent := e.Parent()
 	if parent.IsA(KPartitionByRangeProperty, KPartitionByListProperty) {
@@ -597,31 +587,26 @@ func mysqlPartitionSQL(g *Generator, e *Expr) string {
 	return g.basePartitionSQL(e)
 }
 
-// mysqlPartitionBySQL mirrors MySQLGenerator._partition_by_sql.
 func mysqlPartitionBySQL(g *Generator, e *Expr, kind string) string {
 	partitions := g.expressions(e, exprsOpts{key: "partition_expressions", flat: true})
 	create := g.expressions(e, exprsOpts{key: "create_expressions", flat: true})
 	return "PARTITION BY " + kind + " (" + partitions + ") (" + create + ")"
 }
 
-// mysqlPartitionbyrangepropertySQL mirrors MySQLGenerator.partitionbyrangeproperty_sql.
 func mysqlPartitionbyrangepropertySQL(g *Generator, e *Expr) string {
 	return mysqlPartitionBySQL(g, e, "RANGE")
 }
 
-// mysqlPartitionbylistpropertySQL mirrors MySQLGenerator.partitionbylistproperty_sql.
 func mysqlPartitionbylistpropertySQL(g *Generator, e *Expr) string {
 	return mysqlPartitionBySQL(g, e, "LIST")
 }
 
-// mysqlPartitionlistSQL mirrors MySQLGenerator.partitionlist_sql.
 func mysqlPartitionlistSQL(g *Generator, e *Expr) string {
 	name := g.sqlKey(e, "this")
 	values := g.expressions(e, exprsOpts{flat: true})
 	return "PARTITION " + name + " VALUES IN (" + values + ")"
 }
 
-// mysqlPartitionrangeSQL mirrors MySQLGenerator.partitionrange_sql.
 func mysqlPartitionrangeSQL(g *Generator, e *Expr) string {
 	name := g.sqlKey(e, "this")
 	values := g.expressions(e, exprsOpts{flat: true})

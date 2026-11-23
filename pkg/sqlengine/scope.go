@@ -6,9 +6,7 @@ import (
 	"sync"
 )
 
-// Port of sqlglot/optimizer/scope.py.
-
-// ScopeType mirrors sqlglot.optimizer.scope.ScopeType.
+// ScopeType says how a scope relates to its parent.
 type ScopeType uint8
 
 const (
@@ -20,13 +18,12 @@ const (
 	ScopeUDTF
 )
 
-// Source is a scope source: exactly one of Table (an exp.Table) or Scope is set.
+// Source is a scope source: exactly one of Table (a Table expression) or Scope is set.
 type Source struct {
 	Table *Expr
 	Scope *Scope
 }
 
-// IsScope reports whether the source is a Scope (isinstance(source, Scope)).
 func (s Source) IsScope() bool { return s.Scope != nil }
 
 func (s Source) id() any {
@@ -36,7 +33,7 @@ func (s Source) id() any {
 	return s.Table
 }
 
-// SelectedSource is a value of Scope.selected_sources: (node, source).
+// SelectedSource is an entry of SelectedSources: the referencing node and its source.
 type SelectedSource struct {
 	Node   *Expr
 	Source Source
@@ -47,7 +44,8 @@ type scopeRef struct {
 	Node *Expr
 }
 
-// Scope mirrors sqlglot.optimizer.scope.Scope.
+// Scope is a SELECT-like expression with its sources (tables, CTEs, derived tables), its child
+// scopes and the columns, tables and subqueries collected from it on demand.
 type Scope struct {
 	Expression         *Expr
 	Sources            *omap[Source]
@@ -74,6 +72,7 @@ type Scope struct {
 	derivedTables      []*Expr
 	udtfs              []*Expr
 	tables             []*Expr
+	orderedSources     []*Expr // tables, UDTFs and derived tables in walk order
 	ctes               []*Expr
 	subqueries         []*Expr
 	joinHints          []*Expr
@@ -102,7 +101,8 @@ type scopeWithMaps struct {
 	maps [3]omap[Source]
 }
 
-// NewScope mirrors Scope(expression, sources, outer_columns, parent, scope_type, lateral_sources, cte_sources, can_be_correlated).
+// NewScope creates a scope for expression. Nil source maps start empty, and the lateral and CTE
+// sources are added to sources. A zero scopeType means ScopeRoot.
 func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, parent *Scope, scopeType ScopeType,
 	lateralSources, cteSources *omap[Source], canBeCorrelated bool,
 ) *Scope {
@@ -145,7 +145,6 @@ func NewScope(expression *Expr, sources *omap[Source], outerColumns []string, pa
 	return s
 }
 
-// ClearCache mirrors Scope.clear_cache.
 func (s *Scope) ClearCache() {
 	s.collected = false
 	s.scansAllSubscopeColumns = false
@@ -155,6 +154,7 @@ func (s *Scope) ClearCache() {
 	s.derivedTables = nil
 	s.udtfs = nil
 	s.tables = nil
+	s.orderedSources = nil
 	s.ctes = nil
 	s.subqueries = nil
 	s.joinHints = nil
@@ -166,7 +166,15 @@ func (s *Scope) ClearCache() {
 	s.cached = 0
 }
 
-// Branch mirrors Scope.branch.
+// ClearColumnCache drops the column classifications (columns, external and local columns), e.g.
+// after columns were qualified in place.
+func (s *Scope) ClearColumnCache() {
+	s.columns, s.externalColumns, s.localColumns = nil, nil, nil
+	s.cached &^= cacheColumns | cacheExternalColumns | cacheLocalColumns
+}
+
+// Branch creates a child scope for expression (unnested) that inherits the CTE sources. The child
+// can be correlated when s can, or when it is a subquery or UDTF scope.
 func (s *Scope) Branch(expression *Expr, scopeType ScopeType, sources, cteSources, lateralSources *omap[Source], outerColumns []string) *Scope {
 	var src *omap[Source]
 	if sources.Len() > 0 {
@@ -227,9 +235,23 @@ func (s *Scope) collect() {
 	bufp := collectBufPool.Get().(*[]collectedNode)
 	items := (*bufp)[:0]
 	var counts [numCollected]int
+	var orderedSources []*Expr
+	// The right-hand side source of a SEMI/ANTI join is only visible within the join's own ON
+	// clause, not the rest of the scope
+	addSemiOrAntiJoinTable := func(node *Expr) {
+		if parent := node.Parent(); parent.IsA(KJoin) && parent.IsSemiOrAntiJoin() {
+			if s.semiAntiJoinTables == nil {
+				s.semiAntiJoinTables = newStrSet()
+			}
+			s.semiAntiJoinTables.Add(node.AliasOrName())
+		}
+	}
 	add := func(cat uint8, node *Expr) {
 		items = append(items, collectedNode{cat, node})
 		counts[cat]++
+		if cat == collTables || cat == collUDTFs || cat == collDerivedTables {
+			orderedSources = append(orderedSources, node)
+		}
 	}
 	for node := range s.Walk(nil) {
 		if node == s.Expression || !scopeCollectible.Has(node.kind) {
@@ -245,21 +267,17 @@ func (s *Scope) collect() {
 				add(collRawColumns, node)
 			}
 		case node.IsA(KTable) && !node.Parent().IsA(KJoinHint):
-			parent := node.Parent()
-			if parent.IsA(KJoin) && parent.IsSemiOrAntiJoin() {
-				if s.semiAntiJoinTables == nil {
-					s.semiAntiJoinTables = newStrSet()
-				}
-				s.semiAntiJoinTables.Add(node.AliasOrName())
-			}
+			addSemiOrAntiJoinTable(node)
 			add(collTables, node)
 		case node.IsA(KJoinHint):
 			add(collJoinHints, node)
 		case node.Is(KLateral) || (node.IsA(KUDTF) && node.Parent().IsA(KFrom, KJoin)):
+			addSemiOrAntiJoinTable(node)
 			add(collUDTFs, node)
 		case node.IsA(KCTE):
 			add(collCTEs, node)
 		case isDerivedTable(node) && isFromOrJoin(node):
+			addSemiOrAntiJoinTable(node)
 			add(collDerivedTables, node)
 		case node.IsA(KSelect, KSetOperation) && !isFromOrJoin(node):
 			add(collSubqueries, node)
@@ -290,6 +308,7 @@ func (s *Scope) collect() {
 	s.stars, s.rawColumns, s.tables = lists[collStars], lists[collRawColumns], lists[collTables]
 	s.joinHints, s.udtfs, s.ctes = lists[collJoinHints], lists[collUDTFs], lists[collCTEs]
 	s.derivedTables, s.subqueries, s.tableColumns = lists[collDerivedTables], lists[collSubqueries], lists[collTableColumns]
+	s.orderedSources = orderedSources
 
 	clear(items)
 	if cap(items) <= 4096 {
@@ -305,44 +324,43 @@ func (s *Scope) ensureCollected() {
 	}
 }
 
-// Walk mirrors Scope.walk.
+// Walk yields the nodes of the scope's expression without entering child scopes (see
+// WalkInScope).
 func (s *Scope) Walk(prune func(*Expr) bool) iter.Seq[*Expr] { return WalkInScope(s.Expression, prune) }
 
-// Find mirrors Scope.find.
 func (s *Scope) Find(kinds ...Kind) *Expr { return FindInScope(s.Expression, kinds...) }
 
-// FindAll mirrors Scope.find_all.
 func (s *Scope) FindAll(kinds ...Kind) iter.Seq[*Expr] { return FindAllInScope(s.Expression, kinds...) }
 
-// Replace mirrors Scope.replace.
+// Replace replaces old with new and clears the scope's cache.
 func (s *Scope) Replace(old, new *Expr) {
 	old.Replace(new)
 	s.ClearCache()
 }
 
-// Tables mirrors Scope.tables.
 func (s *Scope) Tables() []*Expr { s.ensureCollected(); return s.tables }
 
-// CTEs mirrors Scope.ctes.
 func (s *Scope) CTEs() []*Expr { s.ensureCollected(); return s.ctes }
 
-// DerivedTables mirrors Scope.derived_tables.
+// DerivedTables returns the subqueries used as FROM or JOIN sources.
 func (s *Scope) DerivedTables() []*Expr { s.ensureCollected(); return s.derivedTables }
 
-// UDTFs mirrors Scope.udtfs.
+// UDTFs returns the table functions (UNNEST, LATERAL, ...) used as sources.
 func (s *Scope) UDTFs() []*Expr { s.ensureCollected(); return s.udtfs }
 
-// Subqueries mirrors Scope.subqueries.
+// Subqueries returns the queries nested in the scope outside FROM and JOIN, such as in WHERE or
+// in the projections.
 func (s *Scope) Subqueries() []*Expr { s.ensureCollected(); return s.subqueries }
 
-// ScansAllSubscopeColumns mirrors Scope.scans_all_subscope_columns.
+// ScansAllSubscopeColumns reports whether the scope has a star that reads every column of its
+// sources: any star except the one in COUNT(*), unless it has EXCEPT.
 func (s *Scope) ScansAllSubscopeColumns() bool { s.ensureCollected(); return s.scansAllSubscopeColumns }
 
-// Stars mirrors Scope.stars.
+// Stars returns the star projections: dotted stars and columns named *.
 func (s *Scope) Stars() []*Expr { s.ensureCollected(); return s.stars }
 
-// ColumnIndex mirrors Scope.column_index (object identity set of the collected Column nodes). It is
-// rarely needed, so it is built on first use from the collected columns and column stars.
+// ColumnIndex returns the set of collected Column nodes, by identity. It is rarely needed, so it is
+// built on first use from the collected columns and column stars.
 func (s *Scope) ColumnIndex() map[*Expr]struct{} {
 	s.ensureCollected()
 	if s.columnIndex == nil {
@@ -360,7 +378,9 @@ func (s *Scope) ColumnIndex() map[*Expr]struct{} {
 	return s.columnIndex
 }
 
-// Columns mirrors Scope.columns.
+// Columns returns the columns that reference sources: the scope's own columns plus the external
+// columns of its subquery, UDTF and correlated derived table scopes, minus unqualified names that
+// refer to something else, such as projection aliases in ORDER BY.
 func (s *Scope) Columns() []*Expr {
 	if s.cached&cacheColumns == 0 {
 		s.ensureCollected()
@@ -388,6 +408,11 @@ func (s *Scope) Columns() []*Expr {
 		s.columns = []*Expr{}
 		all := append(append([]*Expr{}, columns...), external...)
 		for _, column := range all {
+			// Star RENAME sources are column labels, not references.
+			if column.Parent().IsA(KAlias) && column.Parent().ArgKey() == "rename" {
+				continue
+			}
+
 			ancestor := column.findAncestorIn(columnAncestorKinds)
 			if ancestor == nil ||
 				column.Text("table") != "" ||
@@ -406,10 +431,10 @@ func (s *Scope) Columns() []*Expr {
 	return s.columns
 }
 
-// TableColumns mirrors Scope.table_columns.
 func (s *Scope) TableColumns() []*Expr { s.ensureCollected(); return s.tableColumns }
 
-// SelectedSources mirrors Scope.selected_sources.
+// SelectedSources maps each referenced source name to its node and source, skipping semi and
+// anti join tables. A name that is used twice panics.
 func (s *Scope) SelectedSources() *omap[SelectedSource] {
 	if s.selectedSources == nil {
 		result := newOMap[SelectedSource]()
@@ -429,20 +454,23 @@ func (s *Scope) SelectedSources() *omap[SelectedSource] {
 	return s.selectedSources
 }
 
-// References mirrors Scope.references.
+// References returns the (alias, node) pairs of the tables, derived tables and UDTFs the scope
+// selects from, in the order they appear (which star expansion relies on).
 func (s *Scope) References() []scopeRef {
 	if s.cached&cacheReferences == 0 {
+		s.ensureCollected()
 		s.references = []scopeRef{}
-		for _, table := range s.Tables() {
-			s.references = append(s.references, scopeRef{table.AliasOrName(), table})
-		}
-		for _, e := range append(append([]*Expr{}, s.DerivedTables()...), s.UDTFs()...) {
+		for _, e := range s.orderedSources {
+			if e.IsA(KTable) {
+				s.references = append(s.references, scopeRef{e.AliasOrName(), e})
+				continue
+			}
 			node := e
 			if !e.ArgB("pivots") {
 				node = e.UnnestSubqueryOrParen()
 			}
 			if !node.IsA(KSelectable) {
-				panic(&ValueError{Msg: exprSQL(node) + " is not <class 'sqlglot.expressions.query.Selectable'>."})
+				panic(&ValueError{Msg: exprSQL(node) + " is not Selectable."})
 			}
 			s.references = append(s.references, scopeRef{getSourceAlias(e), node})
 		}
@@ -451,8 +479,6 @@ func (s *Scope) References() []scopeRef {
 	return s.references
 }
 
-// UnnestSubqueryOrParen mirrors Expr.unnest() as dispatched for the receiver's class: Subquery.unnest
-// strips nested subqueries, the default strips parentheses.
 func (e *Expr) UnnestSubqueryOrParen() *Expr {
 	if e.IsA(KSubquery) {
 		return e.UnnestSubquery()
@@ -460,11 +486,13 @@ func (e *Expr) UnnestSubqueryOrParen() *Expr {
 	return e.Unnest()
 }
 
-// ExternalColumns mirrors Scope.external_columns.
+// ExternalColumns returns the columns that reference no source of the scope, such as the outer
+// columns of a correlated subquery. For a set operation they are those of both sides.
 func (s *Scope) ExternalColumns() []*Expr { return s.externalColumnsDepth(0) }
 
 // maxScopeDepth bounds recursion through union scopes, which can be self-referential for malformed
-// set operations (see traverseUnion); Python fails with RecursionError there.
+// set operations (see traverseUnionInto); deeper recursion panics with "maximum recursion depth
+// exceeded".
 const maxScopeDepth = 5000
 
 // maxTraverseScopes bounds Scope.Traverse (see there).
@@ -499,7 +527,7 @@ func (s *Scope) externalColumnsDepth(depth int) []*Expr {
 	return s.externalColumns
 }
 
-// LocalColumns mirrors Scope.local_columns.
+// LocalColumns returns the columns that reference a source of the scope.
 func (s *Scope) LocalColumns() []*Expr {
 	if s.cached&cacheLocalColumns == 0 {
 		ext := map[*Expr]struct{}{}
@@ -517,7 +545,6 @@ func (s *Scope) LocalColumns() []*Expr {
 	return s.localColumns
 }
 
-// UnqualifiedColumns mirrors Scope.unqualified_columns.
 func (s *Scope) UnqualifiedColumns() []*Expr {
 	out := []*Expr{}
 	for _, c := range s.Columns() {
@@ -528,10 +555,9 @@ func (s *Scope) UnqualifiedColumns() []*Expr {
 	return out
 }
 
-// JoinHints mirrors Scope.join_hints.
 func (s *Scope) JoinHints() []*Expr { s.ensureCollected(); return s.joinHints }
 
-// Pivots mirrors Scope.pivots.
+// Pivots returns the pivots attached to the scope's sources.
 func (s *Scope) Pivots() []*Expr {
 	if s.cached&cachePivots == 0 {
 		s.pivots = []*Expr{}
@@ -543,7 +569,6 @@ func (s *Scope) Pivots() []*Expr {
 	return s.pivots
 }
 
-// SemiOrAntiJoinTables mirrors Scope.semi_or_anti_join_tables.
 func (s *Scope) SemiOrAntiJoinTables() StrSet {
 	s.ensureCollected()
 	if s.semiAntiJoinTables == nil {
@@ -552,7 +577,6 @@ func (s *Scope) SemiOrAntiJoinTables() StrSet {
 	return s.semiAntiJoinTables
 }
 
-// SourceColumns mirrors Scope.source_columns.
 func (s *Scope) SourceColumns(sourceName string) []*Expr {
 	out := []*Expr{}
 	for _, c := range s.Columns() {
@@ -570,12 +594,12 @@ func (s *Scope) IsCTE() bool          { return s.Type == ScopeCTE }
 func (s *Scope) IsRoot() bool         { return s.Type == ScopeRoot }
 func (s *Scope) IsUDTF() bool         { return s.Type == ScopeUDTF }
 
-// IsCorrelatedSubquery mirrors Scope.is_correlated_subquery.
+// IsCorrelatedSubquery reports whether the scope can be correlated and references outer columns.
 func (s *Scope) IsCorrelatedSubquery() bool {
 	return s.CanBeCorrelated && len(s.ExternalColumns()) > 0
 }
 
-// RenameSource mirrors Scope.rename_source.
+// RenameSource renames a source, which moves it to the end of the source order.
 func (s *Scope) RenameSource(oldName, newName string) {
 	if v, ok := s.Sources.Get(oldName); ok {
 		s.Sources.Delete(oldName)
@@ -583,19 +607,19 @@ func (s *Scope) RenameSource(oldName, newName string) {
 	}
 }
 
-// AddSource mirrors Scope.add_source.
+// AddSource adds or replaces a source and clears the cache.
 func (s *Scope) AddSource(name string, src Source) {
 	s.Sources.Set(name, src)
 	s.ClearCache()
 }
 
-// RemoveSource mirrors Scope.remove_source.
+// RemoveSource removes a source and clears the cache.
 func (s *Scope) RemoveSource(name string) {
 	s.Sources.Delete(name)
 	s.ClearCache()
 }
 
-// Traverse mirrors Scope.traverse (DFS post-order).
+// Traverse returns s and all its descendant scopes, children before parents.
 func (s *Scope) Traverse() []*Scope {
 	stack := []*Scope{s}
 	var result []*Scope
@@ -605,7 +629,7 @@ func (s *Scope) Traverse() []*Scope {
 		result = append(result, sc)
 		if len(result) > maxTraverseScopes {
 			// Self-referential union scopes (malformed set operations) would make this loop
-			// forever, as in Python; fail instead of exhausting memory.
+			// forever; fail instead of exhausting memory.
 			panic(&ValueError{Msg: "maximum recursion depth exceeded"})
 		}
 		stack = append(stack, sc.CTEScopes...)
@@ -619,7 +643,8 @@ func (s *Scope) Traverse() []*Scope {
 	return result
 }
 
-// RefCount mirrors Scope.ref_count, keyed by source identity (*Scope or *Expr).
+// RefCount counts, over s and its descendant scopes, how often each source is selected, keyed by
+// source identity (*Scope or *Expr).
 func (s *Scope) RefCount() map[any]int {
 	counts := map[any]int{}
 	for _, sc := range s.Traverse() {
@@ -635,13 +660,13 @@ func (s *Scope) RefCount() map[any]int {
 	return counts
 }
 
-// TraverseScope mirrors sqlglot.optimizer.scope.traverse_scope.
+// TraverseScope builds the scopes of a query, DDL or DML statement and returns them children
+// first, the root last; other expressions yield nil.
 //
-// Python's _traverse_scope is a generator that traverse_scope fully consumes into a list; the
-// port appends to that list directly. The bookkeeping Python runs after each yielded child scope
-// (remembering the last child, registering it as a source) is done in the same order once the
-// child traversal returns: none of the child traversals read that state (branches copy their
-// source maps), so the result is identical.
+// Scopes are appended to a single list as they are completed. The bookkeeping after each child
+// scope (remembering the last child, registering it as a source) runs once that child's traversal
+// returns; child traversals never read that state (branches copy their source maps), so this does
+// not affect the result.
 func TraverseScope(e *Expr) []*Scope {
 	if e.IsA(KQuery, KDDL, KDML) {
 		var out []*Scope
@@ -651,7 +676,7 @@ func TraverseScope(e *Expr) []*Scope {
 	return nil
 }
 
-// BuildScope mirrors sqlglot.optimizer.scope.build_scope.
+// BuildScope returns the root scope of e, or nil when e is not a query, DDL or DML statement.
 func BuildScope(e *Expr) *Scope {
 	scopes := TraverseScope(e)
 	if len(scopes) == 0 {
@@ -660,7 +685,6 @@ func BuildScope(e *Expr) *Scope {
 	return scopes[len(scopes)-1]
 }
 
-// lastAdded returns the last scope appended to out after index start, or nil.
 func lastAdded(out []*Scope, start int) *Scope {
 	if len(out) > start {
 		return out[len(out)-1]
@@ -731,9 +755,9 @@ func traverseUnionInto(scope *Scope, out *[]*Scope) {
 			exprStack = append(exprStack, expression.ArgE("expression"), expression.ArgE("this"))
 			continue
 		}
-		// Python's loop variable `scope` shadows the parameter and keeps its last value across
-		// iterations; when a branch yields no scope (an operand that is not a query), the
-		// previous value — initially the set operation's own scope — is used.
+		// last keeps its value across iterations: when a branch yields no scope (an operand
+		// that is not a query), the previous value, initially the set operation's own scope,
+		// is used.
 		start := len(*out)
 		traverseScopeInto(newScope, out)
 		if sc := lastAdded(*out, start); sc != nil {
@@ -772,12 +796,14 @@ func traverseCTEsInto(scope *Scope, out *[]*Scope) {
 	scope.CTESources.Update(sources)
 }
 
-// isDerivedTable mirrors scope._is_derived_table.
+// isDerivedTable reports whether e is a subquery used as a table: aliased, pivoted, or wrapping a
+// SELECT or set operation.
 func isDerivedTable(e *Expr) bool {
-	return e.IsA(KSubquery) && (e.Alias() != "" || e.This().IsA(KSelect, KSetOperation))
+	return e.IsA(KSubquery) && (e.Alias() != "" || e.ArgB("pivots") || e.This().IsA(KSelect, KSetOperation))
 }
 
-// isFromOrJoin mirrors scope._is_from_or_join.
+// isFromOrJoin reports whether e, looking through enclosing subqueries, is the source of a FROM or
+// JOIN.
 func isFromOrJoin(e *Expr) bool {
 	parent := e.Parent()
 	for parent.Is(KSubquery) {
@@ -822,11 +848,12 @@ func traverseTablesInto(scope *Scope, out *[]*Scope) {
 			tableName := expression.Name()
 			sourceName := expression.AliasOrName()
 			if scope.Sources.Has(tableName) && expression.DbName() == "" {
+				// A reference to a parent source (e.g. a CTE), not an actual table. If it is
+				// pivoted, the pivot's alias is also registered as a new table source.
+				src, _ := scope.Sources.Get(tableName)
+				sources.Set(sourceName, src)
 				if pivots := expression.ArgL("pivots"); len(pivots) > 0 {
-					sources.Set(pivots[0].Alias(), Source{Table: expression})
-				} else {
-					src, _ := scope.Sources.Get(tableName)
-					sources.Set(sourceName, src)
+					sources.Set(pivots[len(pivots)-1].Alias(), Source{Table: expression})
 				}
 			} else if sources.Has(sourceName) {
 				sources.Set(findNewNameOMap(sources.Has, tableName), Source{Table: expression})
@@ -910,7 +937,9 @@ func traverseUDTFsInto(scope *Scope, out *[]*Scope) {
 	scope.Sources.Update(sources)
 }
 
-// WalkInScope mirrors sqlglot.optimizer.scope.walk_in_scope.
+// WalkInScope yields the nodes of expression depth-first without descending into child scopes
+// (CTEs, derived tables, UDTF arguments and nested queries); the joins, laterals and pivots of a
+// derived table or UDTF are still walked. prune stops the descent below a node.
 func WalkInScope(expression *Expr, prune func(*Expr) bool) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		walkInScopeImpl(expression, prune, yield)
@@ -946,7 +975,7 @@ func walkInScopeImpl(expression *Expr, prune func(*Expr) bool, yield func(*Expr)
 			continue
 		}
 		if node == nil {
-			// Python: walking None fails on `node.args`.
+			// a nil node is an error; the message keeps its historical wording
 			panic(&ValueError{Msg: "'NoneType' object has no attribute 'args'"})
 		}
 		stack = node.appendChildren(stack, true)
@@ -954,7 +983,8 @@ func walkInScopeImpl(expression *Expr, prune func(*Expr) bool, yield func(*Expr)
 	return true
 }
 
-// FindAllInScope mirrors sqlglot.optimizer.scope.find_all_in_scope.
+// FindAllInScope yields the nodes of the given kinds in the scope of expression (see
+// WalkInScope).
 func FindAllInScope(expression *Expr, kinds ...Kind) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		for node := range WalkInScope(expression, nil) {
@@ -967,7 +997,6 @@ func FindAllInScope(expression *Expr, kinds ...Kind) iter.Seq[*Expr] {
 	}
 }
 
-// FindInScope mirrors sqlglot.optimizer.scope.find_in_scope.
 func FindInScope(expression *Expr, kinds ...Kind) *Expr {
 	for n := range FindAllInScope(expression, kinds...) {
 		return n
@@ -975,7 +1004,8 @@ func FindInScope(expression *Expr, kinds ...Kind) *Expr {
 	return nil
 }
 
-// getSourceAlias mirrors scope._get_source_alias.
+// getSourceAlias returns the alias of a source, or its only column alias when the table alias has
+// no name.
 func getSourceAlias(e *Expr) string {
 	aliasArg := e.ArgE("alias")
 	aliasName := e.Alias()

@@ -1,21 +1,17 @@
 package sqlengine
 
-// Port of the DuckDBGenerator class of sqlglot/generators/duckdb.py (continued).
-
 import (
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-// duckdbRegexpcountSQL mirrors regexpcount_sql.
 func duckdbRegexpcountSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	pattern := e.Expression()
 	position := e.ArgE("position")
 	parameters := e.ArgE("parameters")
 
-	// Validate flags - only "ims" flags are supported for embedded patterns
 	validatedFlags := duckdbValidateRegexpFlags(g, parameters, "ims")
 
 	if position != nil {
@@ -38,7 +34,6 @@ func duckdbRegexpcountSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbRegexpreplaceSQL mirrors regexpreplace_sql.
 func duckdbRegexpreplaceSQL(g *Generator, e *Expr) string {
 	subject := e.This()
 	pattern := e.Expression()
@@ -52,7 +47,6 @@ func duckdbRegexpreplaceSQL(g *Generator, e *Expr) string {
 
 	validatedFlags := duckdbValidateRegexpFlags(g, modifiers, "cimsg")
 
-	// Handle occurrence (only literals supported)
 	if occurrence != nil && !occurrence.IsInt() {
 		g.unsupported("REGEXP_REPLACE with non-literal occurrence")
 	} else {
@@ -68,7 +62,6 @@ func duckdbRegexpreplaceSQL(g *Generator, e *Expr) string {
 		}
 	}
 
-	// Handle position (only literals supported)
 	var prefix *Expr
 	if position != nil && !position.IsInt() {
 		g.unsupported("REGEXP_REPLACE with non-literal position")
@@ -92,8 +85,10 @@ func duckdbRegexpreplaceSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbRegexplikeSQL mirrors regexplike_sql.
 func duckdbRegexplikeSQL(g *Generator, e *Expr) string {
+	if duckdbKeepsTilde(g, e) {
+		return duckdbTildeSQL(g, e, "~")
+	}
 	this := e.This()
 	pattern := e.Expression()
 	flag := e.ArgE("flag")
@@ -110,7 +105,41 @@ func duckdbRegexplikeSQL(g *Generator, e *Expr) string {
 	return g.fn("REGEXP_MATCHES", this, pattern, flag)
 }
 
-// duckdbLevenshteinSQL mirrors levenshtein_sql.
+func duckdbRegexpfullmatchSQL(g *Generator, e *Expr) string {
+	if duckdbKeepsTilde(g, e) {
+		return duckdbTildeSQL(g, e, "~")
+	}
+	return g.functionFallbackSQL(e)
+}
+
+func duckdbNotSQL(g *Generator, e *Expr) string {
+	if match := e.This(); truthy(e.MetaGet(duckdbTildeMeta)) && duckdbKeepsTilde(g, match) {
+		return duckdbTildeSQL(g, match, "!~")
+	}
+	return g.baseNotSQL(e)
+}
+
+// duckdbKeepsTilde reports whether the regexp match e, parsed from DuckDB's ~ operator, is
+// written back as the operator: it means the same here, a match anywhere in the string
+// (REGEXP_MATCHES) from DuckDB 2.0 on and a whole-string match (REGEXP_FULL_MATCH) before, and it
+// carries no flags the operator cannot express.
+func duckdbKeepsTilde(g *Generator, e *Expr) bool {
+	if e == nil || !truthy(e.MetaGet(duckdbTildeMeta)) {
+		return false
+	}
+	switch {
+	case e.IsA(KRegexpLike):
+		return !duckdbVersionLT(g.d, 2, 0) && e.ArgE("flag") == nil && !e.ArgB("full_match")
+	case e.IsA(KRegexpFullMatch):
+		return duckdbVersionLT(g.d, 2, 0) && e.ArgE("options") == nil
+	}
+	return false
+}
+
+func duckdbTildeSQL(g *Generator, e *Expr, op string) string {
+	return g.sqlKey(e, "this") + " " + g.maybeCommentC(op, nil, e.Comments()) + " " + g.sqlKey(e, "expression")
+}
+
 func duckdbLevenshteinSQL(g *Generator, e *Expr) string {
 	duckdbUnsupportedArgs(g, e, "ins_cost", "del_cost", "sub_cost")
 	this := e.This()
@@ -126,9 +155,6 @@ func duckdbLevenshteinSQL(g *Generator, e *Expr) string {
 	return g.sql(New(KLeast, "this", levenshtein, "expressions", []*Expr{maxDist}))
 }
 
-// duckdbPadSQL mirrors pad_sql.
-//
-// Handle RPAD/LPAD for VARCHAR and BINARY types.
 func duckdbPadSQL(g *Generator, e *Expr) string {
 	stringArg := e.This()
 	fillArg := e.ArgE("fill_pattern")
@@ -154,11 +180,10 @@ func duckdbPadSQL(g *Generator, e *Expr) string {
 		return g.sql(result)
 	}
 
-	// For VARCHAR: Delegate to parent class (handles PAD_FILL_PATTERN_IS_REQUIRED)
+	// For VARCHAR: delegate to the base generator (handles PAD_FILL_PATTERN_IS_REQUIRED)
 	return g.basePadSQL(e)
 }
 
-// duckdbMinhashSQL mirrors minhash_sql.
 func duckdbMinhashSQL(g *Generator, e *Expr) string {
 	k := e.This()
 	exprs := e.Expressions()
@@ -177,21 +202,18 @@ func duckdbMinhashSQL(g *Generator, e *Expr) string {
 	return "(" + g.sql(result) + ")"
 }
 
-// duckdbMinhashcombineSQL mirrors minhashcombine_sql.
 func duckdbMinhashcombineSQL(g *Generator, e *Expr) string {
 	expr := e.This()
 	result := duckdbReplacePlaceholders(duckdbMinhashCombineTemplate.get().Copy(), map[string]*Expr{"expr": expr})
 	return "(" + g.sql(result) + ")"
 }
 
-// duckdbApproximatesimilaritySQL mirrors approximatesimilarity_sql.
 func duckdbApproximatesimilaritySQL(g *Generator, e *Expr) string {
 	expr := e.This()
 	result := duckdbReplacePlaceholders(duckdbApproximateSimilarityTemplate.get().Copy(), map[string]*Expr{"expr": expr})
 	return "(" + g.sql(result) + ")"
 }
 
-// duckdbArrayuniqueaggSQL mirrors arrayuniqueagg_sql.
 func duckdbArrayuniqueaggSQL(g *Generator, e *Expr) string {
 	return g.sql(New(
 		KFilter,
@@ -200,7 +222,7 @@ func duckdbArrayuniqueaggSQL(g *Generator, e *Expr) string {
 	))
 }
 
-// duckdbArraydistinctSQL mirrors arraydistinct_sql.
+// duckdbArraydistinctSQL keeps a NULL element once, at the end, when check_null is set.
 func duckdbArraydistinctSQL(g *Generator, e *Expr) string {
 	arr := e.This()
 	fn := g.fn("LIST_DISTINCT", arr)
@@ -222,7 +244,6 @@ func duckdbArraydistinctSQL(g *Generator, e *Expr) string {
 	return fn
 }
 
-// duckdbArrayintersectSQL mirrors arrayintersect_sql.
 func duckdbArrayintersectSQL(g *Generator, e *Expr) string {
 	if e.ArgB("is_multiset") && len(e.Expressions()) == 2 {
 		return duckdbArrayBagSQL(g, duckdbArrayIntersectionCondition.get(), e.Expressions()[0], e.Expressions()[1])
@@ -230,7 +251,6 @@ func duckdbArrayintersectSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// duckdbArrayexceptSQL mirrors arrayexcept_sql.
 func duckdbArrayexceptSQL(g *Generator, e *Expr) string {
 	arr1, arr2 := e.This(), e.Expression()
 	if e.ArgB("is_multiset") {
@@ -239,10 +259,8 @@ func duckdbArrayexceptSQL(g *Generator, e *Expr) string {
 	return g.sql(duckdbReplacePlaceholders(duckdbArrayExceptSetTemplate.get(), map[string]*Expr{"arr1": arr1, "arr2": arr2}))
 }
 
-// duckdbArraysliceSQL mirrors arrayslice_sql.
-//
-// Transpiles Snowflake's ARRAY_SLICE (0-indexed, exclusive end) to DuckDB's
-// ARRAY_SLICE (1-indexed, inclusive end).
+// duckdbArraysliceSQL renders ARRAY_SLICE. Zero-based slices (Snowflake's: 0-indexed, exclusive
+// end) are converted to DuckDB's 1-indexed, inclusive bounds.
 func duckdbArraysliceSQL(g *Generator, e *Expr) string {
 	start, end := e.ArgE("start"), e.ArgE("end")
 
@@ -266,7 +284,8 @@ func duckdbArraysliceSQL(g *Generator, e *Expr) string {
 	return g.fn("ARRAY_SLICE", e.Arg("this"), start, end, e.ArgE("step"))
 }
 
-// duckdbArrayszipSQL mirrors arrayszip_sql.
+// duckdbArrayszipSQL renders ARRAYS_ZIP as a list of structs with fields $1, $2, ..., padding
+// shorter arrays with NULLs.
 func duckdbArrayszipSQL(g *Generator, e *Expr) string {
 	args := e.Expressions()
 
@@ -275,7 +294,6 @@ func duckdbArrayszipSQL(g *Generator, e *Expr) string {
 		return g.sql(ArrayExpr([]*Expr{New(KMap, "keys", ArrayExpr(nil, true), "values", ArrayExpr(nil, true))}, true))
 	}
 
-	// Build placeholder values for template
 	lengths := make([]*Expr, len(args))
 	for i, arg := range args {
 		lengths[i] = New(KLength, "this", arg)
@@ -322,7 +340,6 @@ func duckdbArrayszipSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbLeftRightSQL mirrors _left_right_sql.
 func duckdbLeftRightSQL(g *Generator, e *Expr, funcName string) string {
 	arg := e.This()
 	length := e.Expression()
@@ -351,7 +368,6 @@ func duckdbLeftRightSQL(g *Generator, e *Expr, funcName string) string {
 	return g.sql(result)
 }
 
-// duckdbStuffSQL mirrors stuff_sql.
 func duckdbStuffSQL(g *Generator, e *Expr) string {
 	base := e.This()
 	start := e.ArgE("start")
@@ -398,7 +414,6 @@ func duckdbStuffSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbRandSQL mirrors rand_sql.
 func duckdbRandSQL(g *Generator, e *Expr) string {
 	if e.This() != nil {
 		g.unsupported("RANDOM with seed is not supported in DuckDB")
@@ -417,15 +432,12 @@ func duckdbRandSQL(g *Generator, e *Expr) string {
 		return g.sql(result)
 	}
 
-	// Default DuckDB behavior - just return RANDOM() as float
 	return "RANDOM()"
 }
 
-// duckdbBytelengthSQL mirrors bytelength_sql.
 func duckdbBytelengthSQL(g *Generator, e *Expr) string {
 	arg := e.This()
 
-	// Check if it's a text type (handles both literals and annotated expressions)
 	if duckdbIsType(arg, DataType_TEXT_TYPES.Items()...) {
 		return g.fn("OCTET_LENGTH", New(KEncode, "this", arg))
 	}
@@ -434,14 +446,13 @@ func duckdbBytelengthSQL(g *Generator, e *Expr) string {
 	return g.fn("OCTET_LENGTH", arg)
 }
 
-// duckdbBase64encodeSQL mirrors base64encode_sql.
 func duckdbBase64encodeSQL(g *Generator, e *Expr) string {
 	// DuckDB TO_BASE64 requires BLOB input
 	// Snowflake BASE64_ENCODE accepts both VARCHAR and BINARY - for VARCHAR it implicitly
 	// encodes UTF-8 bytes. We add ENCODE unless the input is a binary type.
 	result := e.This()
 
-	// Check if input is a string type - ENCODE only accepts VARCHAR
+	// ENCODE only accepts VARCHAR.
 	if duckdbIsType(result, DataType_TEXT_TYPES.Items()...) {
 		result = New(KEncode, "this", result)
 	}
@@ -451,10 +462,9 @@ func duckdbBase64encodeSQL(g *Generator, e *Expr) string {
 	maxLineLength := e.ArgE("max_line_length")
 	alphabet := e.ArgE("alphabet")
 
-	// Handle custom alphabet by replacing standard chars with custom ones
 	result = duckdbApplyBase64AlphabetReplacements(result, alphabet, false)
 
-	// Handle max_line_length by inserting newlines every N characters
+	// Insert a newline every max_line_length characters.
 	lineLength := "0"
 	positive := false
 	if maxLineLength.IsA(KLiteral) && maxLineLength.IsNumber() {
@@ -486,7 +496,6 @@ func duckdbBase64encodeSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbHexSQL mirrors hex_sql.
 func duckdbHexSQL(g *Generator, e *Expr) string {
 	c := e.ArgE("case")
 
@@ -501,7 +510,6 @@ func duckdbHexSQL(g *Generator, e *Expr) string {
 	return g.sql(r)
 }
 
-// duckdbReplaceSQL mirrors replace_sql.
 func duckdbReplaceSQL(g *Generator, e *Expr) string {
 	resultSQL := g.fn(
 		"REPLACE",
@@ -512,21 +520,18 @@ func duckdbReplaceSQL(g *Generator, e *Expr) string {
 	return duckdbGenWithCastToBlob(g, e, resultSQL)
 }
 
-// duckdbBitwiseOp mirrors DuckDBGenerator._bitwise_op.
 func duckdbBitwiseOp(g *Generator, e *Expr, op string) string {
 	duckdbPrepareBinaryBitwiseArgs(e)
 	resultSQL := g.binary(e, op)
 	return duckdbGenWithCastToBlob(g, e, resultSQL)
 }
 
-// duckdbBitwisexorSQL mirrors bitwisexor_sql.
 func duckdbBitwisexorSQL(g *Generator, e *Expr) string {
 	duckdbPrepareBinaryBitwiseArgs(e)
 	resultSQL := g.fn("XOR", e.Arg("this"), e.Arg("expression"))
 	return duckdbGenWithCastToBlob(g, e, resultSQL)
 }
 
-// duckdbObjectinsertSQL mirrors objectinsert_sql.
 func duckdbObjectinsertSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	keySQL := ""
@@ -546,7 +551,6 @@ func duckdbObjectinsertSQL(g *Generator, e *Expr) string {
 	return g.fn("STRUCT_INSERT", this, kvSQL)
 }
 
-// duckdbMapdeleteSQL mirrors mapdelete_sql.
 func duckdbMapdeleteSQL(g *Generator, e *Expr) string {
 	mapArg := e.This()
 	keysToDelete := e.Expressions()
@@ -565,7 +569,6 @@ func duckdbMapdeleteSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbMappickSQL mirrors mappick_sql.
 func duckdbMappickSQL(g *Generator, e *Expr) string {
 	mapArg := e.This()
 	keysToPick := e.Expressions()
@@ -594,7 +597,6 @@ func duckdbMappickSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbMapinsertSQL mirrors mapinsert_sql.
 func duckdbMapinsertSQL(g *Generator, e *Expr) string {
 	duckdbUnsupportedArgs(g, e, "update_flag")
 	mapArg := e.This()
@@ -613,18 +615,15 @@ func duckdbMapinsertSQL(g *Generator, e *Expr) string {
 		// else: polymorphic MAP case - no type parameters available, use value as-is
 	}
 
-	// Create a single-entry map for the new key-value pair
 	newEntryStruct := New(KStruct, "expressions", []*Expr{New(KPropertyEQ, "this", key, "expression", value)})
 	newEntry := New(KToMap, "this", newEntryStruct)
 
-	// Use MAP_CONCAT to merge the original map with the new entry
-	// This automatically handles both insert and update cases
+	// MAP_CONCAT handles both insert and update.
 	result := duckdbFunc("MAP_CONCAT", mapArg, newEntry)
 
 	return g.sql(result)
 }
 
-// duckdbSpaceSQL mirrors space_sql.
 func duckdbSpaceSQL(g *Generator, e *Expr) string {
 	// DuckDB's REPEAT requires BIGINT for the count parameter
 	return g.sql(New(
@@ -634,11 +633,9 @@ func duckdbSpaceSQL(g *Generator, e *Expr) string {
 	))
 }
 
-// duckdbTablefromrowsSQL mirrors tablefromrows_sql.
 func duckdbTablefromrowsSQL(g *Generator, e *Expr) string {
 	// For GENERATOR, unwrap TABLE() - just emit the Generator (becomes RANGE)
 	if e.This().IsA(KGenerator) {
-		// Preserve alias, joins, and other table-level args
 		table := New(
 			KTable,
 			"this", e.This(),
@@ -651,7 +648,6 @@ func duckdbTablefromrowsSQL(g *Generator, e *Expr) string {
 	return g.baseTablefromrowsSQL(e)
 }
 
-// duckdbUnnestSQL mirrors unnest_sql.
 func duckdbUnnestSQL(g *Generator, e *Expr) string {
 	if e.ArgB("explode_array") {
 		// In BigQuery, UNNESTing a nested array leads to explosion of the top-level array & struct
@@ -675,7 +671,6 @@ func duckdbUnnestSQL(g *Generator, e *Expr) string {
 	return g.baseUnnestSQL(e)
 }
 
-// duckdbIgnorenullsSQL mirrors ignorenulls_sql.
 func duckdbIgnorenullsSQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -696,7 +691,6 @@ func duckdbIgnorenullsSQL(g *Generator, e *Expr) string {
 	return g.sql(this)
 }
 
-// duckdbSplitSQL mirrors split_sql.
 func duckdbSplitSQL(g *Generator, e *Expr) string {
 	baseFunc := duckdbFunc("STR_SPLIT", e.This(), e.Expression())
 
@@ -709,7 +703,6 @@ func duckdbSplitSQL(g *Generator, e *Expr) string {
 	}
 
 	if e.ArgB("empty_delimiter_returns_whole") {
-		// When delimiter is empty string, return input string as single array element
 		arrayWithInput := ArrayExpr([]*Expr{e.This()}, true)
 		caseExpr = duckdbWhen(caseExpr, duckdbEQ(e.Expression(), LiteralString("")), arrayWithInput, true)
 		needsCase = true
@@ -721,7 +714,6 @@ func duckdbSplitSQL(g *Generator, e *Expr) string {
 	return g.sql(baseFunc)
 }
 
-// duckdbSplitpartSQL mirrors splitpart_sql.
 func duckdbSplitpartSQL(g *Generator, e *Expr) string {
 	stringArg := e.This()
 	delimiterArg := e.ArgE("delimiter")
@@ -730,7 +722,6 @@ func duckdbSplitpartSQL(g *Generator, e *Expr) string {
 	if delimiterArg != nil && partIndexArg != nil {
 		// Handle Snowflake's "index 0 and 1 both return first element" behavior
 		if e.ArgB("part_index_zero_as_one") {
-			// Convert 0 to 1 for compatibility
 			c := duckdbWhen(duckdbCase(), duckdbEQ(partIndexArg, LiteralNumber("0")), LiteralNumber("1"), true)
 			partIndexArg = New(KParen, "this", duckdbElse(c, partIndexArg, true))
 		}
@@ -741,9 +732,6 @@ func duckdbSplitpartSQL(g *Generator, e *Expr) string {
 		caseExpr := duckdbElse(duckdbCase(), baseFuncExpr, true)
 
 		if e.ArgB("empty_delimiter_returns_whole") {
-			// When delimiter is empty string:
-			// - Return whole string if part_index is 1 or -1
-			// - Return empty string otherwise
 			c := duckdbWhen(duckdbCase(),
 				OrExpr(
 					duckdbEQ(partIndexArg, LiteralNumber("1")),
@@ -765,7 +753,6 @@ func duckdbSplitpartSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// duckdbRespectnullsSQL mirrors respectnulls_sql.
 func duckdbRespectnullsSQL(g *Generator, e *Expr) string {
 	if e.This().IsA(g.s.IGNORE_RESPECT_NULLS_WINDOW_FUNCTIONS...) {
 		// DuckDB should render RESPECT NULLS only for the general-purpose
@@ -777,7 +764,6 @@ func duckdbRespectnullsSQL(g *Generator, e *Expr) string {
 	return g.sqlKey(e, "this")
 }
 
-// duckdbArraytostringSQL mirrors arraytostring_sql.
 func duckdbArraytostringSQL(g *Generator, e *Expr) string {
 	null := e.ArgE("null")
 
@@ -825,9 +811,7 @@ func duckdbArraytostringSQL(g *Generator, e *Expr) string {
 	return g.fn("ARRAY_TO_STRING", e.Arg("this"), e.Arg("expression"))
 }
 
-// duckdbConcatwsSQL mirrors concatws_sql.
 func duckdbConcatwsSQL(g *Generator, e *Expr) string {
-	// DuckDB-specific: handle binary types using DPipe (||) operator
 	exprs := e.Expressions()
 	separator := seqGet(exprs, 0)
 	var args []*Expr
@@ -856,7 +840,6 @@ func duckdbConcatwsSQL(g *Generator, e *Expr) string {
 	return g.baseConcatwsSQL(e)
 }
 
-// duckdbRegexpExtractSQL mirrors _regexp_extract_sql (regexpextract_sql / regexpextractall_sql).
 func duckdbRegexpExtractSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	group := e.ArgE("group")
@@ -883,7 +866,6 @@ func duckdbRegexpExtractSQL(g *Generator, e *Expr) string {
 		flagsExpr = LiteralString(validatedFlags)
 	}
 
-	// use substring to handle position argument
 	if position != nil {
 		if pos, ok := duckdbToPyInt(position); !position.IsInt() || (ok && pos > 1) {
 			this = New(KSubstring, "this", this, "start", position)
@@ -908,18 +890,15 @@ func duckdbRegexpExtractSQL(g *Generator, e *Expr) string {
 
 	result := New(KAnonymous, "this", name, "expressions", duckdbNonNil(this, e.Expression(), group, flagsExpr))
 
-	// Array slicing for REGEXP_EXTRACT_ALL with occurrence
 	if isExtractAll && nonSingleOccurrence {
 		result = New(KBracket, "this", result, "expressions", []*Expr{New(KSlice, "this", occurrence)})
 	} else if nonSingleOccurrence {
-		// ARRAY_EXTRACT for REGEXP_EXTRACT with occurrence > 1
 		result = New(KAnonymous, "this", "ARRAY_EXTRACT", "expressions", []*Expr{result, occurrence})
 	}
 
 	return g.sql(result)
 }
 
-// duckdbRegexpinstrSQL mirrors regexpinstr_sql.
 func duckdbRegexpinstrSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	pattern := e.Expression()
@@ -937,7 +916,6 @@ func duckdbRegexpinstrSQL(g *Generator, e *Expr) string {
 		pattern = New(KConcat, "expressions", []*Expr{LiteralString("(?" + validatedFlags + ")"), pattern})
 	}
 
-	// Handle starting position offset
 	posOffset := LiteralInt(0)
 	if position != nil {
 		if pos, ok := duckdbToPyInt(position); !position.IsInt() || (ok && pos > 1) {
@@ -946,7 +924,7 @@ func duckdbRegexpinstrSQL(g *Generator, e *Expr) string {
 		}
 	}
 
-	// Helper: LIST_SUM(LIST_TRANSFORM(list[1:end], x -> LENGTH(x)))
+	// LIST_SUM(LIST_TRANSFORM(list[1:end], x -> LENGTH(x))), or 0
 	sumLengths := func(funcName string, end *Expr) *Expr {
 		lst := New(
 			KBracket,
@@ -999,8 +977,7 @@ func duckdbRegexpinstrSQL(g *Generator, e *Expr) string {
 		}
 	}
 
-	// NULL checks for all provided arguments
-	// .copy() is used strictly because .is_() alters the node's parent pointer, mutating the parsed AST
+	// Copy is needed because duckdbIs re-parents its operand, which would mutate the parsed AST
 	nullArgs := []*Expr{e.This(), e.Expression(), position, origOcc, option, parameters}
 	var nullChecks []*Expr
 	for _, arg := range nullArgs {
@@ -1018,7 +995,6 @@ func duckdbRegexpinstrSQL(g *Generator, e *Expr) string {
 	return g.sql(c)
 }
 
-// duckdbNumbertostrSQL mirrors numbertostr_sql.
 func duckdbNumbertostrSQL(g *Generator, e *Expr) string {
 	duckdbUnsupportedArgs(g, e, "culture")
 	format := e.ArgE("format")
@@ -1030,7 +1006,6 @@ func duckdbNumbertostrSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// duckdbAliasesSQL mirrors aliases_sql.
 func duckdbAliasesSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KPosexplode) {
@@ -1040,7 +1015,7 @@ func duckdbAliasesSQL(g *Generator, e *Expr) string {
 	return g.baseAliasesSQL(e)
 }
 
-// duckdbPosexplodeSQL mirrors posexplode_sql.
+// duckdbPosexplodeSQL keeps the historical wording of the panic messages for a wrong alias count.
 func duckdbPosexplodeSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	parent := e.Parent()
@@ -1069,7 +1044,6 @@ func duckdbPosexplodeSQL(g *Generator, e *Expr) string {
 		}
 	}
 
-	// Translate POSEXPLODE to UNNEST + GENERATE_SUBSCRIPTS
 	// Note: In Spark pos is 0-indexed, but in DuckDB it's 1-indexed, so we subtract 1 from GENERATE_SUBSCRIPTS
 	unnestSQL := g.sql(New(KUnnest, "expressions", []*Expr{this}, "alias", col))
 	genSubscripts := g.sql(New(
@@ -1091,12 +1065,6 @@ func duckdbPosexplodeSQL(g *Generator, e *Expr) string {
 	return posexplodeSQL
 }
 
-// duckdbAddmonthsSQL mirrors addmonths_sql.
-//
-// Handles three key issues:
-// 1. Float/decimal months: e.g., Snowflake rounds, whereas DuckDB INTERVAL requires integers
-// 2. End-of-month preservation: If input is last day of month, result is last day of result month
-// 3. Type preservation: Maintains DATE/TIMESTAMPTZ types (DuckDB defaults to TIMESTAMP).
 func duckdbAddmonthsSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.Type() == nil {
@@ -1114,19 +1082,15 @@ func duckdbAddmonthsSQL(g *Generator, e *Expr) string {
 		monthsExpr = annotateTypes(monthsExpr, g.d)
 	}
 
-	// Build interval or to_months expression based on type
 	var intervalOrToMonths *Expr
 	if duckdbIsType(monthsExpr, DT_FLOAT, DT_DOUBLE, DT_DECIMAL) {
-		// Float/decimal case: Round and use TO_MONTHS(CAST(ROUND(value) AS INT))
 		intervalOrToMonths = duckdbFunc("TO_MONTHS", CastExpr(duckdbFunc("ROUND", monthsExpr), "INT", true, nil))
 	} else {
-		// Integer case: standard INTERVAL N MONTH syntax
 		intervalOrToMonths = New(KInterval, "this", monthsExpr, "unit", VarExpr("MONTH"))
 	}
 
 	dateAddExpr := New(KAdd, "this", this, "expression", intervalOrToMonths)
 
-	// Apply end-of-month preservation if Snowflake flag is set
 	// CASE WHEN LAST_DAY(date) = date THEN LAST_DAY(result) ELSE result END
 	resultExpr := dateAddExpr
 	if e.ArgB("preserve_end_of_month") {
@@ -1136,17 +1100,14 @@ func duckdbAddmonthsSQL(g *Generator, e *Expr) string {
 		resultExpr = duckdbElse(c, dateAddExpr, true)
 	}
 
-	// DuckDB's DATE_ADD function returns TIMESTAMP/DATETIME by default, even when the input is DATE
-	// To match for example Snowflake's ADD_MONTHS behavior (which preserves the input type)
-	// We need to cast the result back to the original type when the input is DATE or TIMESTAMPTZ
-	// Example: ADD_MONTHS('2023-01-31'::date, 1) should return DATE, not TIMESTAMP
+	// DuckDB's DATE_ADD returns TIMESTAMP even for a DATE input. Snowflake's ADD_MONTHS preserves the
+	// input type, so cast back for DATE and TIMESTAMPTZ: ADD_MONTHS('2023-01-31'::date, 1) is a DATE.
 	if duckdbIsType(this, DT_DATE, DT_TIMESTAMPTZ) {
 		return g.sql(New(KCast, "this", resultExpr, "to", this.Type()))
 	}
 	return g.sql(resultExpr)
 }
 
-// duckdbIsDateUnit mirrors helper.is_date_unit.
 func duckdbIsDateUnit(e *Expr) bool {
 	if e == nil {
 		return false
@@ -1158,7 +1119,6 @@ func duckdbIsDateUnit(e *Expr) bool {
 	return false
 }
 
-// duckdbDatetruncSQL mirrors datetrunc_sql.
 func duckdbDatetruncSQL(g *Generator, e *Expr) string {
 	unitArg := e.ArgE("unit")
 	date := e.This()
@@ -1182,7 +1142,6 @@ func duckdbDatetruncSQL(g *Generator, e *Expr) string {
 	return result
 }
 
-// duckdbTimestamptruncSQL mirrors timestamptrunc_sql.
 func duckdbTimestamptruncSQL(g *Generator, e *Expr) string {
 	unit := unitToStr(e, "DAY")
 	zone := e.ArgE("zone")
@@ -1190,10 +1149,9 @@ func duckdbTimestamptruncSQL(g *Generator, e *Expr) string {
 	dateUnit := duckdbIsDateUnit(unit)
 
 	if dateUnit && zone != nil {
-		// BigQuery's TIMESTAMP_TRUNC with timezone truncates in the target timezone and returns as UTC.
-		// Double AT TIME ZONE needed for BigQuery compatibility:
-		// 1. First AT TIME ZONE: ensures truncation happens in the target timezone
-		// 2. Second AT TIME ZONE: converts the DATE result back to TIMESTAMPTZ (preserving time component)
+		// BigQuery's TIMESTAMP_TRUNC with a zone truncates in that zone and returns UTC: the first
+		// AT TIME ZONE truncates in the target zone, the second turns the DATE result back into
+		// TIMESTAMPTZ.
 		timestamp = New(KAtTimeZone, "this", timestamp, "zone", zone)
 		resultSQL := g.fn("DATE_TRUNC", unit, timestamp)
 		return g.sql(New(KAtTimeZone, "this", resultSQL, "zone", zone))
@@ -1220,7 +1178,6 @@ func duckdbTimestamptruncSQL(g *Generator, e *Expr) string {
 	return result
 }
 
-// duckdbTrimSQL mirrors trim_sql.
 func duckdbTrimSQL(g *Generator, e *Expr) string {
 	e.This().Replace(duckdbCastToVarchar(e.This()))
 	if e.Expression() != nil {
@@ -1231,7 +1188,6 @@ func duckdbTrimSQL(g *Generator, e *Expr) string {
 	return duckdbGenWithCastToBlob(g, e, resultSQL)
 }
 
-// duckdbRoundSQL mirrors round_sql.
 func duckdbRoundSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	decimals := e.ArgE("decimals")
@@ -1261,7 +1217,6 @@ func duckdbRoundSQL(g *Generator, e *Expr) string {
 	return g.fn(fn, this, decimals, truncate)
 }
 
-// duckdbTrycastSQL mirrors trycast_sql.
 func duckdbTrycastSQL(g *Generator, e *Expr) string {
 	to := e.ArgE("to")
 	toType := to.Arg("this")
@@ -1304,7 +1259,6 @@ func duckdbTrycastSQL(g *Generator, e *Expr) string {
 	return g.baseTrycastSQL(e)
 }
 
-// duckdbStrtokSQL mirrors strtok_sql.
 func duckdbStrtokSQL(g *Generator, e *Expr) string {
 	stringArg := e.This()
 	delimiterArg := e.ArgE("delimiter")
@@ -1317,9 +1271,9 @@ func duckdbStrtokSQL(g *Generator, e *Expr) string {
 			"this", "REGEXP_REPLACE",
 			"expressions", []*Expr{
 				delimiterArg,
-				LiteralString(`([\[\]^.\-*+?(){}|$\\])`), // Escape problematic regex chars
-				LiteralString(`\\\1`),                    // Replace with escaped version using $1 backreference
-				LiteralString("g"),                       // Global flag
+				LiteralString(`([\[\]^.\-*+?(){}|$\\])`),
+				LiteralString(`\\\1`),
+				LiteralString("g"),
 			},
 		)
 		// CASE WHEN delimiter = '' THEN '' ELSE CONCAT('[', escaped_delimiter, ']') END
@@ -1345,7 +1299,6 @@ func duckdbStrtokSQL(g *Generator, e *Expr) string {
 			"offset", 1,
 		)
 
-		// Use template with the built regex pattern
 		result := duckdbReplacePlaceholders(duckdbStrtokTemplate.get().Copy(), map[string]*Expr{
 			"string":     stringArg,
 			"delimiter":  delimiterArg,
@@ -1359,7 +1312,6 @@ func duckdbStrtokSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// duckdbStrtoktoarraySQL mirrors strtoktoarray_sql.
 func duckdbStrtoktoarraySQL(g *Generator, e *Expr) string {
 	stringArg := e.This()
 	delimiterArg := e.ArgE("expression")
@@ -1381,7 +1333,6 @@ func duckdbStrtoktoarraySQL(g *Generator, e *Expr) string {
 	}))
 }
 
-// duckdbApproxquantileSQL mirrors approxquantile_sql.
 func duckdbApproxquantileSQL(g *Generator, e *Expr) string {
 	result := g.fn("APPROX_QUANTILE", e.Arg("this"), e.ArgE("quantile"))
 
@@ -1393,10 +1344,8 @@ func duckdbApproxquantileSQL(g *Generator, e *Expr) string {
 	return result
 }
 
-// duckdbApproxquantilesSQL mirrors approxquantiles_sql.
-//
-// BigQuery's APPROX_QUANTILES(expr, n) returns an array of n+1 approximate quantile values
-// dividing the input distribution into n equal-sized buckets.
+// duckdbApproxquantilesSQL renders BigQuery's APPROX_QUANTILES(expr, n), the n+1 boundaries of n
+// equal-sized buckets, as APPROX_QUANTILE over the list of fractions i/n.
 func duckdbApproxquantilesSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	var numQuantilesExpr *Expr
@@ -1430,7 +1379,6 @@ func duckdbApproxquantilesSQL(g *Generator, e *Expr) string {
 	return g.sql(New(KApproxQuantile, "this", this, "quantile", New(KArray, "expressions", quantiles)))
 }
 
-// duckdbJsonextractscalarSQL mirrors jsonextractscalar_sql.
 func duckdbJsonextractscalarSQL(g *Generator, e *Expr) string {
 	if e.ArgB("scalar_only") {
 		e = New(
@@ -1442,7 +1390,6 @@ func duckdbJsonextractscalarSQL(g *Generator, e *Expr) string {
 	return duckdbArrowJSONExtractSQL(g, e)
 }
 
-// duckdbBitwisenotSQL mirrors bitwisenot_sql.
 func duckdbBitwisenotSQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -1463,7 +1410,6 @@ func duckdbBitwisenotSQL(g *Generator, e *Expr) string {
 	return duckdbGenWithCastToBlob(g, e, resultSQL)
 }
 
-// duckdbWindowSQL mirrors window_sql.
 func duckdbWindowSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KCorr) || (this.IsA(KFilter) && this.This().IsA(KCorr)) {
@@ -1473,7 +1419,6 @@ func duckdbWindowSQL(g *Generator, e *Expr) string {
 	return g.baseWindowSQL(e)
 }
 
-// duckdbFilterSQL mirrors filter_sql.
 func duckdbFilterSQL(g *Generator, e *Expr) string {
 	if e.This().IsA(KCorr) {
 		return duckdbCorrSQL(g, e)
@@ -1482,7 +1427,8 @@ func duckdbFilterSQL(g *Generator, e *Expr) string {
 	return g.baseFilterSQL(e)
 }
 
-// duckdbCorrSQL mirrors DuckDBGenerator._corr_sql.
+// duckdbCorrSQL renders CORR. With null_on_zero_variance (possibly under a window or FILTER), the
+// result is wrapped so that NaN, produced for zero variance, becomes NULL.
 func duckdbCorrSQL(g *Generator, e *Expr) string {
 	if e.IsA(KCorr) && !e.ArgB("null_on_zero_variance") {
 		return g.fn("CORR", e.Arg("this"), e.Arg("expression"))
@@ -1496,7 +1442,7 @@ func duckdbCorrSQL(g *Generator, e *Expr) string {
 		if e.IsA(KFilter) {
 			return g.baseFilterSQL(e)
 		}
-		corrExpr = e // make mypy happy
+		corrExpr = e // fallback; not reached from the dispatch table
 	}
 
 	c := duckdbWhen(duckdbCase(), New(KIsNan, "this", corrExpr), Null(), true)
@@ -1504,7 +1450,6 @@ func duckdbCorrSQL(g *Generator, e *Expr) string {
 	return g.sql(c)
 }
 
-// duckdbUuidSQL mirrors uuid_sql.
 func duckdbUuidSQL(g *Generator, e *Expr) string {
 	namespace := e.This()
 	name := e.ArgE("name")

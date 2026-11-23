@@ -107,7 +107,8 @@ func TestHoistDeclaresListContractInputsAndErrors(t *testing.T) {
 	require.Equal(t, []string{"DECLARE a INT, b STRING", "SELECT 1", "DECLARE c INT; SELECT 2"}, got)
 }
 
-// The expected values below were recorded from the Python reference (codegen/pythonsrc).
+// TestHoistDeclaresContractScripts pins hoisting results for whole scripts; the expected values
+// are recorded outputs, not computed by the code under test.
 func TestHoistDeclaresContractScripts(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

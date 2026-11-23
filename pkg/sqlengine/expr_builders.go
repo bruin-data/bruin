@@ -4,76 +4,16 @@ import (
 	"fmt"
 )
 
-// Expression builders: a port of the builder helpers of sqlglot/expressions/core.py and
-// sqlglot/expressions/builders.py, plus the builder methods of Query, Select, SetOperation,
-// Subquery, Join and Expr in sqlglot/expressions/query.py / core.py.
-//
-// Conventions:
-//   - Inputs must be *Expr. Strings that sqlglot would run through maybe_parse are NOT accepted
-//     by the builders; parse them first (MaybeParse does exactly what maybe_parse does for strings).
-//     The Python `dialect` / `**opts` parse options are therefore dropped.
-//   - `copy` keeps its Python meaning; `appendMode` is Python's `append`.
-//   - Python `bool | None` arguments are typed `any` and take nil, true or false.
-//   - Builders panic like sqlglot raises: ParseError via parsePanic, other errors as *ValueError.
-//
-// API (Python -> Go):
-//
-//	maybe_parse(sql: str, into, prefix)  MaybeParse(sql, into, prefix, d)        d == nil: default dialect
-//	maybe_parse(expr, copy)              maybeParseExpr(e, copy)
-//	maybe_copy                           maybeCopy(e, copy)
-//	_is_wrong_expression                 isWrongExpression(e, into)
-//	_apply_builder                       applyBuilder(expression, instance, arg, copy, into, intoArg)
-//	_apply_child_list_builder            applyChildListBuilder(exprs, instance, arg, appendMode, copy, into, properties...)
-//	_apply_list_builder                  applyListBuilder(exprs, instance, arg, appendMode, copy)
-//	_apply_conjunction_builder           applyConjunctionBuilder(exprs, instance, arg, into, appendMode, copy)
-//	_apply_set_operation                 applySetOperation(exprs, setOp, distinct, copy, opts...)
-//	_apply_cte_builder                   applyCTEBuilder(instance, alias, as, recursive, materialized, appendMode, copy, scalar)
-//	_combine                             combineConditions(exprs, operator, copy, wrap)
-//	_wrap                                wrapIfKind(e, kind)
-//	condition                            ConditionExpr(e, copy)
-//	and_ / or_ / xor                     AndExpr(exprs...) / OrExpr(exprs...) / XorExpr(exprs...)   (copy=True, wrap=True)
-//	                                     AndExprOpts(exprs, copy, wrap) / OrExprOpts / XorExprOpts
-//	not_                                 NotExpr(e, copy)
-//	paren                                ParenExpr(e, copy)
-//	to_identifier                        ToIdentifierAny(name, quoted, copy)              name: nil | string | *Expr
-//	alias_ (table=False)                 AliasExpr(e, alias, quoted, copy)                alias: nil | string | *Expr
-//	alias_ (table=True | [columns])      AliasTableExpr(e, alias, columns, quoted, copy)
-//	column                               ColumnExpr(col, table, db, catalog, fields, quoted, copy)
-//	table_                               TableExpr(table, db, catalog, quoted, alias)
-//	var                                  VarChecked(name) / VarOf(e)
-//	cast                                 CastExpr(e, to, copy, d)                         to: DType | string | DataType
-//	DataType.build                       DataTypeBuild(dtype, d, udt, copy)
-//	DataType.is_type                     DataTypeIsType(dt, dtypes, checkNullable)
-//	select / from_ / subquery            SelectExpr(exprs...) / FromExpr(e) / SubqueryExpr(e, alias, copy)
-//	union / intersect / except_          UnionExpr(exprs, distinct, copy) / IntersectExpr / ExceptExpr
-//	tuple_ / array / case                TupleExpr(exprs, copy) / ArrayExpr(exprs, copy) / CaseExpr(e, copy)
-//	replace_children / replace_tree      ReplaceChildren(e, fn) / ReplaceTree(e, fn, prune)
-//	column_table_names                   ColumnTableNames(e, exclude)
-//	Expr.and_ / or_ / not_ / as_         e.ExprAnd(exprs, copy, wrap) / e.ExprOr(...) / e.ExprNot(copy) / e.ExprAs(alias, quoted, copy)
-//	Query.select                         e.QuerySelect(exprs, appendMode, copy)  (Select / SetOperation / Subquery)
-//	Query.subquery                       e.QuerySubquery(alias, copy)            alias: nil | string | *Expr
-//	Query.limit / offset                 e.QueryLimit(expr, copy) / e.QueryOffset(expr, copy)
-//	Query.order_by                       e.QueryOrderBy(exprs, appendMode, copy)
-//	Query.where                          e.QueryWhere(exprs, appendMode, copy)
-//	Query.with_                          e.QueryWith(alias, as, recursive, materialized, appendMode, copy, scalar)
-//	Query.union / intersect / except_    e.QueryUnion(exprs, distinct, copy) / e.QueryIntersect(...) / e.QueryExcept(...)
-//	Select.from_                         e.SelectFrom(expr, copy)
-//	Select.group_by / sort_by / cluster_by
-//	                                     e.SelectGroupBy(exprs, appendMode, copy) / e.SelectSortBy(...) / e.SelectClusterBy(...)
-//	Select.lateral / window              e.SelectLateral(exprs, appendMode, copy) / e.SelectWindow(...)
-//	Select.join                          e.SelectJoin(expr, on, using, appendMode, joinType, joinAlias, copy)
-//	Select.having / qualify              e.SelectHaving(exprs, appendMode, copy) / e.SelectQualify(...)
-//	Select.distinct                      e.SelectDistinct(ons, distinct, copy)
-//	Select.lock / hint                   e.SelectLock(update, copy) / e.SelectHint(hints, copy)
-//	Join.on / using                      e.JoinOn(exprs, appendMode, copy) / e.JoinUsing(exprs, appendMode, copy)
+// Builder conventions:
+//   - Inputs must be *Expr. The builders do not parse strings; parse them first with MaybeParse.
+//   - copy == true makes a builder work on a copy of the expression it changes; false changes it
+//     in place. appendMode adds to existing children instead of replacing them.
+//   - Tri-state arguments (unset, true, false) are typed any and take nil, true or false.
+//   - Builders panic on bad input: parse errors as parsePanic, other errors as *ValueError.
 
-// ---------------------------------------------------------------------------------------------
-// maybe_parse / maybe_copy
-// ---------------------------------------------------------------------------------------------
-
-// MaybeParse mirrors exp.maybe_parse for string inputs: sqlglot.parse_one(prefix + " " + sql,
-// read=d, into=into). into == KNone parses a statement; d == nil uses the default dialect.
-// Parse failures panic (ParseError via parsePanic), like the Python exception.
+// MaybeParse parses prefix + " " + sql (just sql when prefix is empty) with dialect d; d == nil
+// uses the default dialect. into == KNone parses a statement, any other kind parses sql as that
+// kind. Parse failures panic with a parsePanic wrapping the ParseError.
 func MaybeParse(sql string, into Kind, prefix string, d *Dialect) *Expr {
 	if prefix != "" {
 		sql = prefix + " " + sql
@@ -99,7 +39,8 @@ func MaybeParse(sql string, into Kind, prefix string, d *Dialect) *Expr {
 	return res
 }
 
-// maybeParseExpr mirrors exp.maybe_parse for an expression input.
+// maybeParseExpr returns e, copied when copy is set. A nil e panics with the parse error
+// "SQL cannot be None".
 func maybeParseExpr(e *Expr, copy bool) *Expr {
 	if e == nil {
 		panic(parsePanic{&ParseError{Msg: "SQL cannot be None"}})
@@ -110,7 +51,6 @@ func maybeParseExpr(e *Expr, copy bool) *Expr {
 	return e
 }
 
-// maybeCopy mirrors exp.maybe_copy.
 func maybeCopy(e *Expr, copy bool) *Expr {
 	if copy && e != nil {
 		return e.Copy()
@@ -118,16 +58,12 @@ func maybeCopy(e *Expr, copy bool) *Expr {
 	return e
 }
 
-// isWrongExpression mirrors exp._is_wrong_expression.
 func isWrongExpression(e *Expr, into Kind) bool {
 	return e != nil && into != KNone && !e.IsA(into)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Generic builders (core.py)
-// ---------------------------------------------------------------------------------------------
-
-// builderKwargs is an insertion-ordered mapping with Python dict update semantics.
+// builderKwargs is an insertion-ordered key/value map; setting an existing key updates the value
+// and keeps the key's position.
 type builderKwargs struct {
 	keys []string
 	vals map[string]any
@@ -148,7 +84,8 @@ func (b *builderKwargs) set(k string, v any) {
 	b.vals[k] = v
 }
 
-// applyBuilder mirrors exp._apply_builder for an expression input.
+// applyBuilder sets instance's arg to expression, wrapped in an into node (as intoArg) when it is
+// of another kind. instance is copied first when copy is set.
 func applyBuilder(expression, instance *Expr, arg string, copy bool, into Kind, intoArg string) *Expr {
 	if isWrongExpression(expression, into) {
 		expression = New(into, intoArg, expression)
@@ -159,8 +96,10 @@ func applyBuilder(expression, instance *Expr, arg string, copy bool, into Kind, 
 	return instance
 }
 
-// applyChildListBuilder mirrors exp._apply_child_list_builder. properties holds the optional
-// `properties` mapping as alternating key/value pairs.
+// applyChildListBuilder sets instance's arg to an into node holding the expressions, after the
+// existing ones in appendMode. Inputs of another kind are wrapped in into first. properties holds
+// extra args for the new node as alternating key/value pairs; the inputs' args other than
+// expressions are set on it too, after properties.
 func applyChildListBuilder(expressions []*Expr, instance *Expr, arg string, appendMode bool, copy bool, into Kind, properties ...any) *Expr {
 	instance = maybeCopy(instance, copy)
 	parsed := []*Expr{}
@@ -201,8 +140,8 @@ func applyChildListBuilder(expressions []*Expr, instance *Expr, arg string, appe
 	return instance
 }
 
-// applyListBuilder mirrors exp._apply_list_builder for expression inputs (`into` and `prefix`
-// only matter when parsing strings).
+// applyListBuilder sets instance's arg to the non-nil expressions, after the existing ones in
+// appendMode.
 func applyListBuilder(expressions []*Expr, instance *Expr, arg string, appendMode bool, copy bool) *Expr {
 	inst := maybeCopy(instance, copy)
 
@@ -222,7 +161,9 @@ func applyListBuilder(expressions []*Expr, instance *Expr, arg string, appendMod
 	return inst
 }
 
-// applyConjunctionBuilder mirrors exp._apply_conjunction_builder. into == KNone means None.
+// applyConjunctionBuilder ANDs the non-nil expressions (after the existing condition in
+// appendMode) and sets the result as instance's arg, wrapped in an into node unless into is KNone.
+// Without expressions it returns instance unchanged.
 func applyConjunctionBuilder(expressions []*Expr, instance *Expr, arg string, into Kind, appendMode bool, copy bool) *Expr {
 	filtered := []*Expr{}
 	for _, e := range expressions {
@@ -255,7 +196,9 @@ func applyConjunctionBuilder(expressions []*Expr, instance *Expr, arg string, in
 	return inst
 }
 
-// combineConditions mirrors exp._combine.
+// combineConditions folds the non-nil expressions left to right into operator nodes, putting
+// connector operands in parentheses when wrap is set. It panics when there is no expression;
+// the message keeps its historical wording.
 func combineConditions(expressions []*Expr, operator Kind, copy bool, wrap bool) *Expr {
 	conditions := []*Expr{}
 	for _, expression := range expressions {
@@ -282,7 +225,6 @@ func combineConditions(expressions []*Expr, operator Kind, copy bool, wrap bool)
 	return this
 }
 
-// wrapIfKind mirrors exp._wrap.
 func wrapIfKind(expression *Expr, kind Kind) *Expr {
 	if expression.IsA(kind) {
 		return New(KParen, "this", expression)
@@ -290,8 +232,8 @@ func wrapIfKind(expression *Expr, kind Kind) *Expr {
 	return expression
 }
 
-// applySetOperation mirrors exp._apply_set_operation. opts are extra constructor kwargs
-// (alternating key/value pairs) passed to every set operation node.
+// applySetOperation folds the expressions left to right into setOperation nodes. opts are extra
+// args (alternating key/value pairs) set on every node. It panics on an empty list.
 func applySetOperation(expressions []*Expr, setOperation Kind, distinct any, copy bool, opts ...any) *Expr {
 	var acc *Expr
 	for i, e := range expressions {
@@ -311,12 +253,12 @@ func applySetOperation(expressions []*Expr, setOperation Kind, distinct any, cop
 	return acc
 }
 
-// applyCTEBuilder mirrors query._apply_cte_builder for expression inputs.
+// applyCTEBuilder adds a CTE named alias for the query as to instance's WITH clause. A scalar CTE
+// is wrapped in a subquery; a truthy recursive marks the WITH clause recursive.
 func applyCTEBuilder(instance, alias, as *Expr, recursive, materialized any, appendMode bool, copy bool, scalar any) *Expr {
 	aliasExpression := maybeParseExpr(alias, false)
 	asExpression := maybeParseExpr(as, copy)
 	if truthy(scalar) && !asExpression.IsA(KSubquery) {
-		// scalar CTE must be wrapped in a subquery
 		asExpression = New(KSubquery, "this", asExpression)
 	}
 	cte := New(KCTE, "this", asExpression, "alias", aliasExpression, "materialized", materialized, "scalar", scalar)
@@ -327,52 +269,44 @@ func applyCTEBuilder(instance, alias, as *Expr, recursive, materialized any, app
 	return applyChildListBuilder([]*Expr{cte}, instance, "with_", appendMode, copy, KWith, properties...)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Free builders (core.py / builders.py / query.py)
-// ---------------------------------------------------------------------------------------------
-
-// ConditionExpr mirrors exp.condition for an expression input.
 func ConditionExpr(expression *Expr, copy bool) *Expr {
 	return maybeParseExpr(expression, copy)
 }
 
-// AndExpr mirrors exp.and_(*expressions) (copy=True, wrap=True). nil inputs are skipped.
+// AndExpr combines the expressions with AND, copying them and parenthesizing connector operands.
+// nil inputs are skipped.
 func AndExpr(expressions ...*Expr) *Expr { return combineConditions(expressions, KAnd, true, true) }
 
-// AndExprOpts mirrors exp.and_(*expressions, copy=copy, wrap=wrap).
 func AndExprOpts(expressions []*Expr, copy bool, wrap bool) *Expr {
 	return combineConditions(expressions, KAnd, copy, wrap)
 }
 
-// OrExpr mirrors exp.or_(*expressions) (copy=True, wrap=True).
+// OrExpr combines the expressions with OR, copying them and parenthesizing connector operands.
 func OrExpr(expressions ...*Expr) *Expr { return combineConditions(expressions, KOr, true, true) }
 
-// OrExprOpts mirrors exp.or_(*expressions, copy=copy, wrap=wrap).
 func OrExprOpts(expressions []*Expr, copy bool, wrap bool) *Expr {
 	return combineConditions(expressions, KOr, copy, wrap)
 }
 
-// XorExpr mirrors exp.xor(*expressions) (copy=True, wrap=True).
+// XorExpr combines the expressions with XOR, copying them and parenthesizing connector operands.
 func XorExpr(expressions ...*Expr) *Expr { return combineConditions(expressions, KXor, true, true) }
 
-// XorExprOpts mirrors exp.xor(*expressions, copy=copy, wrap=wrap).
 func XorExprOpts(expressions []*Expr, copy bool, wrap bool) *Expr {
 	return combineConditions(expressions, KXor, copy, wrap)
 }
 
-// NotExpr mirrors exp.not_(expression, copy=copy).
+// NotExpr negates expression, putting a connector (AND, OR, ...) in parentheses.
 func NotExpr(expression *Expr, copy bool) *Expr {
 	this := ConditionExpr(expression, copy)
 	return New(KNot, "this", wrapIfKind(this, KConnector))
 }
 
-// ParenExpr mirrors exp.paren(expression, copy=copy).
 func ParenExpr(expression *Expr, copy bool) *Expr {
 	return New(KParen, "this", maybeParseExpr(expression, copy))
 }
 
-// ToIdentifierAny mirrors exp.to_identifier(name, quoted, copy) for nil, string and
-// Identifier inputs.
+// ToIdentifierAny converts a string or an Identifier to an Identifier; nil stays nil and any other
+// expression panics.
 func ToIdentifierAny(name any, quoted *bool, copy bool) *Expr {
 	switch n := name.(type) {
 	case nil:
@@ -384,14 +318,13 @@ func ToIdentifierAny(name any, quoted *bool, copy bool) *Expr {
 		if n.IsA(KIdentifier) {
 			return maybeCopy(n, copy)
 		}
-		panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + n.classRepr()})
+		panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + n.Kind().Name()})
 	case string:
 		return ToIdentifier(n, quoted)
 	}
 	panic(&ValueError{Msg: fmt.Sprintf("Name needs to be a string or an Identifier, got: %T", name)})
 }
 
-// pyTruthyName mirrors the truthiness of a `str | Identifier | None` argument.
 func pyTruthyName(v any) bool {
 	switch x := v.(type) {
 	case nil:
@@ -404,13 +337,14 @@ func pyTruthyName(v any) bool {
 	return true
 }
 
-// AliasExpr mirrors exp.alias_(expression, alias, table=False, quoted=quoted, copy=copy).
+// AliasExpr aliases expression: it sets the alias arg when the kind has one (except Window) and
+// wraps the expression in an Alias otherwise.
 func AliasExpr(expression *Expr, alias any, quoted *bool, copy bool) *Expr {
 	return aliasImpl(expression, alias, false, nil, quoted, copy)
 }
 
-// AliasTableExpr mirrors exp.alias_(expression, alias, table=True or columns, ...). columns
-// holds the optional column names (string or Identifier).
+// AliasTableExpr sets a TableAlias on expression. columns holds the optional column names
+// (string or Identifier).
 func AliasTableExpr(expression *Expr, alias any, columns []any, quoted *bool, copy bool) *Expr {
 	return aliasImpl(expression, alias, true, columns, quoted, copy)
 }
@@ -440,8 +374,8 @@ func aliasImpl(expression *Expr, alias any, table bool, columns []any, quoted *b
 	return New(KAlias, "this", exp, "alias", aliasID)
 }
 
-// ColumnExpr mirrors exp.column(col, table, db, catalog, fields=fields, quoted=quoted, copy=copy).
-// col is a string, Identifier or Star; table/db/catalog/fields entries are nil, strings or Identifiers.
+// ColumnExpr builds a column reference, extended into a Dot chain by fields. col is a string,
+// Identifier or Star; table/db/catalog/fields entries are nil, strings or Identifiers.
 func ColumnExpr(col any, table, db, catalog any, fields []any, quoted *bool, copy bool) *Expr {
 	var colV any = col
 	if c, ok := col.(*Expr); !ok || !c.IsA(KStar) {
@@ -466,7 +400,8 @@ func ColumnExpr(col any, table, db, catalog any, fields []any, quoted *bool, cop
 	return this
 }
 
-// TableExpr mirrors exp.table_(table, db, catalog, quoted, alias).
+// TableExpr builds a table reference from its name parts and an optional alias; unset parts (nil
+// or empty) are left out.
 func TableExpr(table, db, catalog any, quoted *bool, alias any) *Expr {
 	var this, dbV, catalogV, aliasV *Expr
 	if pyTruthyName(table) {
@@ -484,7 +419,7 @@ func TableExpr(table, db, catalog any, quoted *bool, alias any) *Expr {
 	return New(KTable, "this", this, "db", dbV, "catalog", catalogV, "alias", aliasV)
 }
 
-// VarChecked mirrors exp.var(name) for a string, including its empty-name ValueError.
+// VarChecked builds a Var named name; an empty name panics with a ValueError.
 func VarChecked(name string) *Expr {
 	if name == "" {
 		panic(&ValueError{Msg: "Cannot convert empty name into var."})
@@ -492,7 +427,7 @@ func VarChecked(name string) *Expr {
 	return New(KVar, "this", name)
 }
 
-// VarOf mirrors exp.var(expression): the expression's name becomes the var.
+// VarOf builds a Var from an expression's name; a nil expression panics.
 func VarOf(e *Expr) *Expr {
 	if e == nil {
 		panic(&ValueError{Msg: "Cannot convert empty name into var."})
@@ -500,8 +435,8 @@ func VarOf(e *Expr) *Expr {
 	return New(KVar, "this", e.Name())
 }
 
-// DataTypeBuild mirrors exp.DataType.build(dtype, dialect=d, udt=udt, copy=copy) for DType,
-// string and expression inputs.
+// DataTypeBuild builds a DataType from a DType, a type string (parsed with d) or an expression.
+// With udt, unparsable strings and Identifier or Dot expressions become user-defined types.
 func DataTypeBuild(dtype any, d *Dialect, udt bool, copy bool) *Expr {
 	switch x := dtype.(type) {
 	case string:
@@ -516,13 +451,14 @@ func DataTypeBuild(dtype any, d *Dialect, udt bool, copy bool) *Expr {
 			return maybeCopy(x, copy)
 		}
 		if x != nil {
-			panic(&ValueError{Msg: "Invalid data type: " + x.classRepr() + ". Expected str or DType"})
+			panic(&ValueError{Msg: "Invalid data type: " + x.Kind().Name() + ". Expected str or DType"})
 		}
 	}
 	panic(&ValueError{Msg: fmt.Sprintf("Invalid data type: %T. Expected str or DType", dtype)})
 }
 
-// dataTypeFromStr mirrors exp.DataType.from_str.
+// dataTypeFromStr parses a type string with d (nil: default dialect). With udt, a string that
+// does not parse becomes a user-defined type instead of a parse error.
 func dataTypeFromStr(dtype string, d *Dialect, udt bool) *Expr {
 	if pyUpper(dtype) == "UNKNOWN" {
 		return New(KDataType, "this", DT_UNKNOWN)
@@ -544,7 +480,9 @@ func dataTypeFromStr(dtype string, d *Dialect, udt bool) *Expr {
 	return res
 }
 
-// DataTypeIsType mirrors exp.DataType.is_type(*dtypes, check_nullable=checkNullable).
+// DataTypeIsType reports whether dt matches any of dtypes. Parameterized and user-defined types,
+// and nullable ones when checkNullable is set, must match exactly; otherwise only the base type
+// is compared.
 func DataTypeIsType(dt *Expr, dtypes []any, checkNullable bool) bool {
 	selfIsNullable := dt.Arg("nullable")
 	for _, dtype := range dtypes {
@@ -567,13 +505,12 @@ func DataTypeIsType(dt *Expr, dtypes []any, checkNullable bool) bool {
 	return false
 }
 
-// CastExpr mirrors exp.cast(expression, to, copy=copy, dialect=d). `to` is a DType, a type
-// string or a DataType expression; d == nil uses the default dialect.
+// CastExpr casts expression to `to`, a DType, a type string or a DataType expression; d == nil
+// uses the default dialect. A cast that already targets an equivalent type is returned as is.
 func CastExpr(expression *Expr, to any, copy bool, d *Dialect) *Expr {
 	expr := maybeParseExpr(expression, copy)
 	dataType := DataTypeBuild(to, d, false, copy)
 
-	// dont re-cast if the expression is already a cast to the correct type
 	if expr.IsA(KCast) {
 		targetDialect := d
 		if targetDialect == nil {
@@ -607,23 +544,22 @@ func CastExpr(expression *Expr, to any, copy bool, d *Dialect) *Expr {
 	return expr
 }
 
-// SelectExpr mirrors exp.select(*expressions).
 func SelectExpr(expressions ...*Expr) *Expr {
 	return New(KSelect).QuerySelect(expressions, true, true)
 }
 
-// FromExpr mirrors exp.from_(expression).
 func FromExpr(expression *Expr) *Expr {
 	return New(KSelect).SelectFrom(expression, true)
 }
 
-// SubqueryExpr mirrors exp.subquery(expression, alias, copy=copy).
+// SubqueryExpr builds a Select from the query expression wrapped in a subquery with the given
+// alias; expression must be a query.
 func SubqueryExpr(expression *Expr, alias any, copy bool) *Expr {
 	expr := chunkFAssertIs(maybeParseExpr(expression, false), KQuery).QuerySubquery(alias, copy)
 	return New(KSelect).SelectFrom(expr, true)
 }
 
-// UnionExpr mirrors exp.union(*expressions, distinct=distinct, copy=copy).
+// UnionExpr combines at least two queries with UNION.
 func UnionExpr(expressions []*Expr, distinct bool, copy bool) *Expr {
 	if len(expressions) < 2 {
 		panic(&ValueError{Msg: "At least two expressions are required by `union`."})
@@ -631,7 +567,7 @@ func UnionExpr(expressions []*Expr, distinct bool, copy bool) *Expr {
 	return applySetOperation(expressions, KUnion, distinct, copy)
 }
 
-// IntersectExpr mirrors exp.intersect(*expressions, distinct=distinct, copy=copy).
+// IntersectExpr combines at least two queries with INTERSECT.
 func IntersectExpr(expressions []*Expr, distinct bool, copy bool) *Expr {
 	if len(expressions) < 2 {
 		panic(&ValueError{Msg: "At least two expressions are required by `intersect`."})
@@ -639,7 +575,7 @@ func IntersectExpr(expressions []*Expr, distinct bool, copy bool) *Expr {
 	return applySetOperation(expressions, KIntersect, distinct, copy)
 }
 
-// ExceptExpr mirrors exp.except_(*expressions, distinct=distinct, copy=copy).
+// ExceptExpr combines at least two queries with EXCEPT.
 func ExceptExpr(expressions []*Expr, distinct bool, copy bool) *Expr {
 	if len(expressions) < 2 {
 		panic(&ValueError{Msg: "At least two expressions are required by `except_`."})
@@ -647,7 +583,6 @@ func ExceptExpr(expressions []*Expr, distinct bool, copy bool) *Expr {
 	return applySetOperation(expressions, KExcept, distinct, copy)
 }
 
-// TupleExpr mirrors exp.tuple_(*expressions, copy=copy).
 func TupleExpr(expressions []*Expr, copy bool) *Expr {
 	out := make([]*Expr, 0, len(expressions))
 	for _, e := range expressions {
@@ -656,7 +591,6 @@ func TupleExpr(expressions []*Expr, copy bool) *Expr {
 	return New(KTuple, "expressions", out)
 }
 
-// ArrayExpr mirrors exp.array(*expressions, copy=copy).
 func ArrayExpr(expressions []*Expr, copy bool) *Expr {
 	out := make([]*Expr, 0, len(expressions))
 	for _, e := range expressions {
@@ -665,7 +599,7 @@ func ArrayExpr(expressions []*Expr, copy bool) *Expr {
 	return New(KArray, "expressions", out)
 }
 
-// CaseExpr mirrors exp.case(expression, copy=copy); expression may be nil.
+// CaseExpr builds a CASE without WHEN branches; expression, the CASE operand, may be nil.
 func CaseExpr(expression *Expr, copy bool) *Expr {
 	var this *Expr
 	if expression != nil {
@@ -674,7 +608,8 @@ func CaseExpr(expression *Expr, copy bool) *Expr {
 	return New(KCase, "this", this, "ifs", []*Expr{})
 }
 
-// ReplaceChildren mirrors exp.replace_children: fn returns nil, an *Expr or a []*Expr.
+// ReplaceChildren replaces every child of expression with fn(child); fn returns nil, an *Expr or
+// a []*Expr.
 func ReplaceChildren(expression *Expr, fn func(*Expr) any) {
 	type kv struct {
 		key string
@@ -721,7 +656,8 @@ func ReplaceChildren(expression *Expr, fn func(*Expr) any) {
 	}
 }
 
-// ReplaceTree mirrors exp.replace_tree (reverse DFS, leaves first; new nodes are traversed too).
+// ReplaceTree replaces nodes with fn(node) in reverse DFS order, leaves first; replacement nodes
+// are visited too. It returns the result of the last fn call.
 func ReplaceTree(expression *Expr, fn func(*Expr) *Expr, prune func(*Expr) bool) *Expr {
 	var stack []*Expr
 	for n := range expression.DFS(prune) {
@@ -746,7 +682,7 @@ func ReplaceTree(expression *Expr, fn func(*Expr) *Expr, prune func(*Expr) bool)
 	return newNode
 }
 
-// ColumnTableNames mirrors exp.column_table_names.
+// ColumnTableNames returns the table names that columns in expression refer to, except exclude.
 func ColumnTableNames(expression *Expr, exclude string) StrSet {
 	out := StrSet{}
 	for column := range expression.FindAll(KColumn) {
@@ -758,16 +694,13 @@ func ColumnTableNames(expression *Expr, exclude string) StrSet {
 	return out
 }
 
-// chunkFAssertIs mirrors Expr.assert_is(type_) (AssertionError is reported as a ValueError).
 func chunkFAssertIs(e *Expr, kind Kind) *Expr {
 	if !e.IsA(kind) {
-		panic(&ValueError{Msg: chunkFPyStr(e) + " is not " + kindClassRepr(kind) + "."})
+		panic(&ValueError{Msg: chunkFPyStr(e) + " is not " + kind.Name() + "."})
 	}
 	return e
 }
 
-// unnestMethod mirrors a dynamic `.unnest()` call: Subquery.unnest (first non-subquery) for
-// subqueries, Expr.unnest (strip parentheses) otherwise.
 func unnestMethod(e *Expr) *Expr {
 	if e.IsA(KSubquery) {
 		return e.UnnestSubquery()
@@ -775,33 +708,22 @@ func unnestMethod(e *Expr) *Expr {
 	return e.Unnest()
 }
 
-// ---------------------------------------------------------------------------------------------
-// Expr methods (core.py)
-// ---------------------------------------------------------------------------------------------
-
-// ExprAnd mirrors Expr.and_(*expressions, copy=copy, wrap=wrap).
 func (e *Expr) ExprAnd(expressions []*Expr, copy bool, wrap bool) *Expr {
 	return AndExprOpts(append([]*Expr{e}, expressions...), copy, wrap)
 }
 
-// ExprOr mirrors Expr.or_(*expressions, copy=copy, wrap=wrap).
 func (e *Expr) ExprOr(expressions []*Expr, copy bool, wrap bool) *Expr {
 	return OrExprOpts(append([]*Expr{e}, expressions...), copy, wrap)
 }
 
-// ExprNot mirrors Expr.not_(copy=copy).
 func (e *Expr) ExprNot(copy bool) *Expr { return NotExpr(e, copy) }
 
-// ExprAs mirrors Expr.as_(alias, quoted=quoted, copy=copy) (table=False).
 func (e *Expr) ExprAs(alias any, quoted *bool, copy bool) *Expr {
 	return AliasExpr(e, alias, quoted, copy)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Query methods (query.py)
-// ---------------------------------------------------------------------------------------------
-
-// QuerySelect mirrors Select.select / SetOperation.select / Subquery.select.
+// QuerySelect adds projections to a Select, to both sides of a set operation, or to the query
+// inside a subquery.
 func (e *Expr) QuerySelect(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	switch {
 	case e.IsA(KSelect):
@@ -822,7 +744,7 @@ func (e *Expr) QuerySelect(expressions []*Expr, appendMode bool, copy bool) *Exp
 	panic(&ValueError{Msg: "Query objects must implement `select`"})
 }
 
-// QuerySubquery mirrors Query.subquery(alias, copy=copy). alias: nil, string or *Expr.
+// QuerySubquery wraps e in a subquery. alias: nil, string or *Expr.
 func (e *Expr) QuerySubquery(alias any, copy bool) *Expr {
 	instance := maybeCopy(e, copy)
 	var aliasV *Expr
@@ -838,22 +760,21 @@ func (e *Expr) QuerySubquery(alias any, copy bool) *Expr {
 	return New(KSubquery, "this", instance, "alias", aliasV)
 }
 
-// QueryLimit mirrors Query.limit(expression, copy=copy).
+// QueryLimit sets LIMIT; an expression that is not a Limit is wrapped in one.
 func (e *Expr) QueryLimit(expression *Expr, copy bool) *Expr {
 	return applyBuilder(expression, e, "limit", copy, KLimit, "expression")
 }
 
-// QueryOffset mirrors Query.offset(expression, copy=copy).
+// QueryOffset sets OFFSET; an expression that is not an Offset is wrapped in one.
 func (e *Expr) QueryOffset(expression *Expr, copy bool) *Expr {
 	return applyBuilder(expression, e, "offset", copy, KOffset, "expression")
 }
 
-// QueryOrderBy mirrors Query.order_by(*expressions, append=appendMode, copy=copy).
 func (e *Expr) QueryOrderBy(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyChildListBuilder(expressions, e, "order", appendMode, copy, KOrder)
 }
 
-// QueryWhere mirrors Query.where(*expressions, append=appendMode, copy=copy).
+// QueryWhere ANDs the conditions into WHERE; Where nodes among them are unwrapped first.
 func (e *Expr) QueryWhere(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	unwrapped := make([]*Expr, len(expressions))
 	for i, expr := range expressions {
@@ -866,37 +787,31 @@ func (e *Expr) QueryWhere(expressions []*Expr, appendMode bool, copy bool) *Expr
 	return applyConjunctionBuilder(unwrapped, e, "where", KWhere, appendMode, copy)
 }
 
-// QueryWith mirrors Query.with_(alias, as_, recursive, materialized, append, copy=copy, scalar).
-// recursive, materialized and scalar take nil, true or false.
+// QueryWith adds a CTE named alias for the query as (see applyCTEBuilder). recursive,
+// materialized and scalar take nil, true or false.
 func (e *Expr) QueryWith(alias, as *Expr, recursive, materialized any, appendMode bool, copy bool, scalar any) *Expr {
 	return applyCTEBuilder(e, alias, as, recursive, materialized, appendMode, copy, scalar)
 }
 
-// QueryUnion mirrors Query.union(*expressions, distinct=distinct, copy=copy).
 func (e *Expr) QueryUnion(expressions []*Expr, distinct bool, copy bool) *Expr {
 	return UnionExpr(append([]*Expr{e}, expressions...), distinct, copy)
 }
 
-// QueryIntersect mirrors Query.intersect(*expressions, distinct=distinct, copy=copy).
 func (e *Expr) QueryIntersect(expressions []*Expr, distinct bool, copy bool) *Expr {
 	return IntersectExpr(append([]*Expr{e}, expressions...), distinct, copy)
 }
 
-// QueryExcept mirrors Query.except_(*expressions, distinct=distinct, copy=copy).
 func (e *Expr) QueryExcept(expressions []*Expr, distinct bool, copy bool) *Expr {
 	return ExceptExpr(append([]*Expr{e}, expressions...), distinct, copy)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Select methods (query.py)
-// ---------------------------------------------------------------------------------------------
-
-// SelectFrom mirrors Select.from_(expression, copy=copy).
+// SelectFrom sets FROM; an expression that is not a From is wrapped in one.
 func (e *Expr) SelectFrom(expression *Expr, copy bool) *Expr {
 	return applyBuilder(expression, e, "from_", copy, KFrom, "this")
 }
 
-// SelectGroupBy mirrors Select.group_by(*expressions, append=appendMode, copy=copy).
+// SelectGroupBy sets or extends GROUP BY. Without expressions it returns e, copied when copy is
+// set.
 func (e *Expr) SelectGroupBy(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	if len(expressions) == 0 {
 		if !copy {
@@ -908,30 +823,32 @@ func (e *Expr) SelectGroupBy(expressions []*Expr, appendMode bool, copy bool) *E
 	return applyChildListBuilder(expressions, e, "group", appendMode, copy, KGroup)
 }
 
-// SelectSortBy mirrors Select.sort_by(*expressions, append=appendMode, copy=copy).
 func (e *Expr) SelectSortBy(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyChildListBuilder(expressions, e, "sort", appendMode, copy, KSort)
 }
 
-// SelectClusterBy mirrors Select.cluster_by(*expressions, append=appendMode, copy=copy).
 func (e *Expr) SelectClusterBy(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyChildListBuilder(expressions, e, "cluster", appendMode, copy, KCluster)
 }
 
-// SelectLateral mirrors Select.lateral(*expressions, append=appendMode, copy=copy).
 func (e *Expr) SelectLateral(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyListBuilder(expressions, e, "laterals", appendMode, copy)
 }
 
-// SelectJoin mirrors Select.join(expression, on=on, using=using, append=appendMode,
-// join_type=joinType, join_alias=joinAlias, copy=copy). joinType "" means None (when set it is
-// parsed with the default dialect, like sqlglot does); joinAlias is nil, a string or an Identifier.
+// SelectJoin adds a join with expression, wrapping a SELECT in a subquery. joinType, such as
+// "LEFT OUTER", sets the join's method, side and kind ("" for none; it is parsed with the default
+// dialect); joinAlias is nil, a string or an Identifier.
 func (e *Expr) SelectJoin(expression *Expr, on []*Expr, using []*Expr, appendMode bool, joinType string, joinAlias any, copy bool) *Expr {
 	expression = maybeParseExpr(expression, false)
 
+	// A bare table is cross joined unless a condition or join type says otherwise
 	join := expression
 	if !expression.IsA(KJoin) {
-		join = New(KJoin, "this", expression)
+		join = New(KJoin, "this", expression, "kind", "CROSS")
+	}
+
+	if join.KindText() == "CROSS" && (len(on) > 0 || len(using) > 0 || joinType != "") {
+		join.Set("kind", nil)
 	}
 
 	if join.This().IsA(KSelect) {
@@ -970,22 +887,22 @@ func (e *Expr) SelectJoin(expression *Expr, on []*Expr, using []*Expr, appendMod
 	return applyListBuilder([]*Expr{join}, e, "joins", appendMode, copy)
 }
 
-// SelectHaving mirrors Select.having(*expressions, append=appendMode, copy=copy).
+// SelectHaving ANDs the conditions into HAVING.
 func (e *Expr) SelectHaving(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyConjunctionBuilder(expressions, e, "having", KHaving, appendMode, copy)
 }
 
-// SelectWindow mirrors Select.window(*expressions, append=appendMode, copy=copy).
 func (e *Expr) SelectWindow(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyListBuilder(expressions, e, "windows", appendMode, copy)
 }
 
-// SelectQualify mirrors Select.qualify(*expressions, append=appendMode, copy=copy).
+// SelectQualify ANDs the conditions into QUALIFY.
 func (e *Expr) SelectQualify(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return applyConjunctionBuilder(expressions, e, "qualify", KQualify, appendMode, copy)
 }
 
-// SelectDistinct mirrors Select.distinct(*ons, distinct=distinct, copy=copy).
+// SelectDistinct sets DISTINCT, as DISTINCT ON (ons) when ons are given, or removes it when
+// distinct is false.
 func (e *Expr) SelectDistinct(ons []*Expr, distinct bool, copy bool) *Expr {
 	instance := maybeCopy(e, copy)
 	var on *Expr
@@ -1006,7 +923,7 @@ func (e *Expr) SelectDistinct(ons []*Expr, distinct bool, copy bool) *Expr {
 	return instance
 }
 
-// SelectLock mirrors Select.lock(update=update, copy=copy).
+// SelectLock sets a single row lock: FOR UPDATE when update is set, FOR SHARE otherwise.
 func (e *Expr) SelectLock(update bool, copy bool) *Expr {
 	inst := maybeCopy(e, copy)
 	inst.Set("locks", []*Expr{New(KLock, "update", update)})
@@ -1014,7 +931,6 @@ func (e *Expr) SelectLock(update bool, copy bool) *Expr {
 	return inst
 }
 
-// SelectHint mirrors Select.hint(*hints, copy=copy).
 func (e *Expr) SelectHint(hints []*Expr, copy bool) *Expr {
 	inst := maybeCopy(e, copy)
 	exprs := make([]*Expr, 0, len(hints))
@@ -1026,11 +942,7 @@ func (e *Expr) SelectHint(hints []*Expr, copy bool) *Expr {
 	return inst
 }
 
-// ---------------------------------------------------------------------------------------------
-// Join methods (query.py)
-// ---------------------------------------------------------------------------------------------
-
-// JoinOn mirrors Join.on(*expressions, append=appendMode, copy=copy).
+// JoinOn ANDs the conditions into ON; a CROSS join loses its CROSS kind.
 func (e *Expr) JoinOn(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	join := applyConjunctionBuilder(expressions, e, "on", KNone, appendMode, copy)
 
@@ -1041,7 +953,7 @@ func (e *Expr) JoinOn(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	return join
 }
 
-// JoinUsing mirrors Join.using(*expressions, append=appendMode, copy=copy).
+// JoinUsing sets or extends USING; a CROSS join loses its CROSS kind.
 func (e *Expr) JoinUsing(expressions []*Expr, appendMode bool, copy bool) *Expr {
 	join := applyListBuilder(expressions, e, "using", appendMode, copy)
 

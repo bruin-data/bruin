@@ -3,17 +3,11 @@ package sqlengine
 import (
 	"fmt"
 	"iter"
-	"math"
 )
 
-// Port of sqlglot/optimizer/normalize.py.
-
-// normalizationDistanceInf stands for Python's float("inf") as a maxDistance.
-const normalizationDistanceInf = math.MaxInt
-
-// NormalizeCNF mirrors optimizer.normalize.normalize: rewrites a sqlglot AST into conjunctive
-// normal form (or disjunctive normal form when dnf is true). Python defaults: dnf=False,
-// max_distance=128.
+// NormalizeCNF rewrites an expression into conjunctive normal form (or disjunctive normal form
+// when dnf is true). It stops, leaving the rest unchanged, at the first connector whose
+// normalization distance exceeds maxDistance. Usual arguments: dnf false, maxDistance 128.
 //
 // Example: "(x AND y) OR z" -> "(x OR z) AND (y OR z)".
 func NormalizeCNF(expression *Expr, dnf bool, maxDistance int) *Expr {
@@ -38,7 +32,6 @@ func NormalizeCNF(expression *Expr, dnf bool, maxDistance int) *Expr {
 		distance := normalizationDistance(node, dnf, maxDistance)
 
 		if distance > maxDistance {
-			// Skipping normalization because distance exceeds max (logged in Python)
 			return expression
 		}
 
@@ -72,14 +65,14 @@ func NormalizeCNF(expression *Expr, dnf bool, maxDistance int) *Expr {
 	return expression
 }
 
-// normalizedCNF mirrors optimizer.normalize.normalized: checks whether a given expression is in
-// conjunctive normal form (or disjunctive normal form when dnf is true).
+// normalizedCNF reports whether an expression is in conjunctive normal form (or disjunctive
+// normal form when dnf is true).
 //
 // Examples:
 //
-//	normalized("(a AND b) OR c OR (d AND e)", dnf=True) -> True
-//	normalized("(a OR b) AND c") -> True
-//	normalized("a AND (b OR c)", dnf=True) -> False
+//	"(a AND b) OR c OR (d AND e)", dnf true  -> true
+//	"(a OR b) AND c", dnf false              -> true
+//	"a AND (b OR c)", dnf true               -> false
 func normalizedCNF(expression *Expr, dnf bool) bool {
 	ancestor, root := KOr, KAnd
 	if dnf {
@@ -93,14 +86,12 @@ func normalizedCNF(expression *Expr, dnf bool) bool {
 	return true
 }
 
-// Normalized is the exported form of normalizedCNF (optimizer.normalize.normalized).
 func Normalized(expression *Expr, dnf bool) bool { return normalizedCNF(expression, dnf) }
 
-// normalizationDistance mirrors optimizer.normalize.normalization_distance: the difference in the
-// number of predicates between a given expression and its normalized form. Pass
-// normalizationDistanceInf for Python's default max_=float("inf").
+// normalizationDistance returns the difference in the number of predicates between an expression
+// and its normalized form. Counting stops as soon as the total exceeds maxDistance.
 //
-// Example: normalization_distance("(a AND b) OR (c AND d)") -> 4.
+// Example: "(a AND b) OR (c AND d)" -> 4.
 func normalizationDistance(expression *Expr, dnf bool, maxDistance int) int {
 	count := 0
 	for range expression.FindAll(KConnector) {
@@ -118,13 +109,12 @@ func normalizationDistance(expression *Expr, dnf bool, maxDistance int) int {
 	return total
 }
 
-// NormalizationDistance is the exported form of normalizationDistance.
 func NormalizationDistance(expression *Expr, dnf bool, maxDistance int) int {
 	return normalizationDistance(expression, dnf, maxDistance)
 }
 
-// normalizePredicateLengths mirrors normalize._predicate_lengths: the predicate lengths when
-// expanded to normalized form, e.g. (A AND B) OR C -> [2, 2] because len(A OR C), len(B OR C).
+// normalizePredicateLengths yields the predicate lengths of an expression expanded to normal form,
+// e.g. (A AND B) OR C -> [2, 2], the lengths of (A OR C) and (B OR C).
 func normalizePredicateLengths(expression *Expr, dnf bool, maxDistance int, depth int) iter.Seq[int] {
 	return func(yield func(int) bool) {
 		normalizePredicateLengthsImpl(expression, dnf, maxDistance, depth, yield)
@@ -166,12 +156,12 @@ func normalizePredicateLengthsImpl(expression *Expr, dnf bool, maxDistance int, 
 	return normalizePredicateLengthsImpl(right, dnf, maxDistance, depth, yield)
 }
 
-// normalizeDistributiveLaw mirrors normalize.distributive_law:
+// normalizeDistributiveLaw applies the distributive law:
 //
 //	x OR (y AND z) -> (x OR y) AND (x OR z)
 //	(x AND y) OR (y AND z) -> (x OR y) AND (x OR z) AND (y OR y) AND (y OR z)
 //
-// simplifier may be nil (a new Simplifier(annotate_new_expressions=False) is then created).
+// simplifier may be nil; a new Simplifier that does not annotate new expressions is then created.
 func normalizeDistributiveLaw(expression *Expr, dnf bool, maxDistance int, simplifier *Simplifier) *Expr {
 	if normalizedCNF(expression, dnf) {
 		return expression
@@ -226,7 +216,8 @@ func normalizeDistributiveLaw(expression *Expr, dnf bool, maxDistance int, simpl
 	return expression
 }
 
-// normalizeDistribute mirrors normalize._distribute.
+// normalizeDistribute distributes b over a, combining with fromFunc (the operator being
+// distributed) and toFunc (the operator of the result), and simplifies the new operands.
 func normalizeDistribute(a, b *Expr, fromFunc, toFunc func(x, y *Expr, copy bool) *Expr, simplifier *Simplifier) *Expr {
 	// When `a` and `b` are connectors of the SAME polarity (e.g. both AND in
 	// CNF mode), `b` is distributed across `a`'s children so the existing
@@ -243,7 +234,7 @@ func normalizeDistribute(a, b *Expr, fromFunc, toFunc func(x, y *Expr, copy bool
 	}
 
 	// Otherwise apply the textbook rule
-	// ``a OR (b.left AND b.right) -> (a OR b.left) AND (a OR b.right)`` (or
+	// a OR (b.left AND b.right) -> (a OR b.left) AND (a OR b.right) (or
 	// the AND/OR dual).
 	return toFunc(
 		simplifier.UniqSort(simplifyFlatten(fromFunc(a, b.Left(), true)), true),
@@ -252,17 +243,12 @@ func normalizeDistribute(a, b *Expr, fromFunc, toFunc func(x, y *Expr, copy bool
 	)
 }
 
-// normalizeNewSimplifier mirrors Simplifier(annotate_new_expressions=False) (default dialect).
+// normalizeNewSimplifier returns a default-dialect Simplifier that does not annotate the
+// expressions it creates.
 func normalizeNewSimplifier() *Simplifier {
 	return NewSimplifier(nil, false)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Shared helpers for the optimizer rules ported in the opt_* files of this chunk.
-// ---------------------------------------------------------------------------------------------
-
-// optxWhileChanging mirrors sqlglot.helper.while_changing: applies fn until the expression's
-// hash stops changing.
 func optxWhileChanging(expression *Expr, fn func(*Expr) *Expr) *Expr {
 	for {
 		startHash := expression.Hash()
@@ -276,8 +262,9 @@ func optxWhileChanging(expression *Expr, fn func(*Expr) *Expr) *Expr {
 	return expression
 }
 
-// optxFlattenSeq mirrors Expr.flatten(unnest) as a lazy generator: like Python, the DFS prune
-// check runs after the consumer handles each node, so mutations made while iterating are seen.
+// optxFlattenSeq lazily yields the operands of a chain of same-kind nodes (such as nested ANDs),
+// unnested when unnest is set. The DFS prune check runs after the consumer handles each node, so
+// mutations made while iterating are seen.
 func optxFlattenSeq(e *Expr, unnest bool) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		kind := e.kind
@@ -296,8 +283,8 @@ func optxFlattenSeq(e *Expr, unnest bool) iter.Seq[*Expr] {
 	}
 }
 
-// optxUnnestOperands mirrors Expr.unnest_operands with Python's dynamic dispatch of `unnest`
-// (Subquery.unnest for subqueries, Paren stripping otherwise).
+// optxUnnestOperands returns the child expressions of e, each unwrapped by unnestMethod (nested
+// subqueries for a Subquery, parentheses otherwise).
 func optxUnnestOperands(e *Expr) []*Expr {
 	children := e.IterExpressions(false)
 	out := make([]*Expr, len(children))

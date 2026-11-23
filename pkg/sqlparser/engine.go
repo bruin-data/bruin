@@ -1,8 +1,8 @@
 package sqlparser
 
-// In-process implementation of the former Python parser server (pythonsrc/parser/main.py and
-// rename.py) on top of pkg/sqlengine.
-// Each handler mirrors the Python function it replaces and returns the same JSON-shaped payload.
+// SQL analysis commands (lineage, table extraction, query rewrites, DECLARE hoisting, ...) built
+// on pkg/sqlengine. Each handler returns a JSON-shaped payload: its result fields, or an "error"
+// field when it fails.
 
 import (
 	"encoding/json"
@@ -14,14 +14,16 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlengine"
 )
 
-// pyError is an error whose message mirrors str(exception) in the Python implementation.
+// pyError is a command error with a fixed message. The messages keep their historical wording
+// (e.g. "'NoneType' object is not iterable"); tests pin them.
 type pyError struct{ msg string }
 
 func (e *pyError) Error() string { return e.msg }
 
 const dialectSnowflake = "snowflake"
 
-// normalizeDialect mirrors normalize_sqlglot_dialect.
+// normalizeDialect maps a dialect name to the engine dialect that parses it (Vertica as
+// Postgres).
 func normalizeDialect(dialect string) string {
 	if dialect == "vertica" {
 		return "postgres"
@@ -33,8 +35,8 @@ func getDialect(name string) (*sqlengine.Dialect, error) {
 	return sqlengine.GetDialect(name)
 }
 
-// dispatch mirrors the command loop of pythonsrc/main.py. It returns the JSON response line.
-// It is safe for concurrent use.
+// dispatch runs the command in pc and returns the JSON response line. It is safe for concurrent
+// use.
 func dispatch(pc *parserCommand) string {
 	return string(encodeResponse(runCommand(pc.Command, pc.Contents)))
 }
@@ -93,7 +95,8 @@ func runCommandUnguarded(command string, c map[string]any) (result any, err erro
 	return result, err
 }
 
-// encodeResponse serializes a response object like the Python command loop's json.dumps.
+// encodeResponse serializes a response object to JSON, falling back to an {"error": ...} object
+// when it can't be encoded.
 func encodeResponse(resp any) []byte {
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -138,8 +141,8 @@ func toStrings(v any) []string {
 // DECLARE hoisting
 // ---------------------------------------------------------------------------
 
-// topLevelSemicolons mirrors _top_level_semicolons: rune offsets of statement separators
-// outside procedural blocks.
+// topLevelSemicolons returns the rune offsets of statement separators outside parentheses and
+// procedural BEGIN ... END blocks.
 func topLevelSemicolons(query string, d *sqlengine.Dialect) ([]int, error) {
 	tokens, err := d.TokenizeScript(query)
 	if err != nil {
@@ -182,13 +185,14 @@ func topLevelSemicolons(query string, d *sqlengine.Dialect) ([]int, error) {
 func firstWord(s string) string {
 	f := strings.Fields(strings.ToUpper(s))
 	if len(f) == 0 {
-		// Python: "".split()[0] raises IndexError; tokens always have text here.
+		// Tokens always have text here; an empty one has no first word.
 		return ""
 	}
 	return f[0]
 }
 
-// isDeclareStatement mirrors _is_declare_statement.
+// isDeclareStatement reports whether query parses as a DECLARE statement in dialect or, failing
+// that, in BigQuery.
 func isDeclareStatement(query, dialect string) bool {
 	tried := map[string]bool{}
 	for _, rd := range []string{dialect, "bigquery"} {
@@ -219,7 +223,8 @@ func isPySpace(r rune) bool {
 	return r >= ' ' && r <= ' '
 }
 
-// hoistDeclares mirrors hoist_declares.
+// hoistDeclares moves the DECLARE statements of a script ahead of the other statements, rejoined
+// with ";\n", when one follows a non-DECLARE statement; otherwise the query is returned unchanged.
 func hoistDeclares(query, dialect string) map[string]any {
 	if pyStrip(query) == "" {
 		return map[string]any{"query": query, "error": ""}
@@ -264,7 +269,7 @@ func hoistDeclares(query, dialect string) map[string]any {
 	return map[string]any{"query": strings.Join(append(declares, rest...), ";\n") + ";", "error": ""}
 }
 
-// hoistDeclaresList mirrors hoist_declares_list.
+// hoistDeclaresList is hoistDeclares for a script that is already split into statements.
 func hoistDeclaresList(queries []string, dialect string) map[string]any {
 	dialect = normalizeDialect(dialect)
 	var declares, rest []string
@@ -288,7 +293,8 @@ func hoistDeclaresList(queries []string, dialect string) map[string]any {
 // Tables
 // ---------------------------------------------------------------------------
 
-// extractTables mirrors extract_tables.
+// extractTables returns the table references in parsed, skipping unqualified references to its
+// CTEs (for CREATE, the CTEs of its query) and the names of its inline functions.
 func extractTables(parsed *sqlengine.Expr) []*sqlengine.Expr {
 	if parsed == nil {
 		return nil
@@ -310,12 +316,32 @@ func extractTables(parsed *sqlengine.Expr) []*sqlengine.Expr {
 		if cteNames[table.Name()] && table.DbName() == "" && table.CatalogName() == "" {
 			continue
 		}
+		if isInlineFunctionName(table) {
+			continue
+		}
 		refs = append(refs, table)
 	}
 	return refs
 }
 
-// tableNamePart mirrors the Anonymous-aware table name logic of get_table_name.
+// isInlineFunctionName reports whether table is the name of a function defined by a WITH clause
+// (Trino's WITH FUNCTION). Like a CTE, such a function is local to its statement, unlike the
+// function a CREATE FUNCTION statement creates.
+func isInlineFunctionName(table *sqlengine.Expr) bool {
+	udf := table.Parent()
+	if !udf.IsA(sqlengine.KUserDefinedFunction) || table.ArgKey() != "this" {
+		return false
+	}
+	for node := udf; node != nil && !node.IsA(sqlengine.KWith); node = node.Parent() {
+		if node.ArgKey() == "udfs" {
+			return node.Parent().IsA(sqlengine.KWith)
+		}
+	}
+	return false
+}
+
+// tableNamePart returns the name part of a table reference, including tables named by an
+// anonymous function call.
 func tableNamePart(table *sqlengine.Expr) string {
 	name := table.Name()
 	if name == "" {
@@ -336,7 +362,7 @@ func tableNamePart(table *sqlengine.Expr) string {
 	return name
 }
 
-// getTableName mirrors get_table_name.
+// getTableName returns catalog.db.name for a table reference, omitting empty parts.
 func getTableName(table *sqlengine.Expr) string {
 	db := ""
 	if c := table.CatalogName(); c != "" {
@@ -349,7 +375,8 @@ func getTableName(table *sqlengine.Expr) string {
 	return db + schema + tableNamePart(table)
 }
 
-// getTableNameWithContext mirrors get_table_name_with_context.
+// getTableNameWithContext returns catalog.db.name for a T-SQL table reference, using
+// currentDatabase for a missing catalog and dbo for a missing schema.
 func getTableNameWithContext(table *sqlengine.Expr, currentDatabase string) string {
 	var db, schema string
 	if c := table.CatalogName(); c != "" {
@@ -417,7 +444,8 @@ func getTablesTSQL(query string) map[string]any {
 	return map[string]any{"tables": sortedUnique(names)}
 }
 
-// getTables mirrors get_tables.
+// getTables returns the sorted, deduplicated names of the tables a query references. For T-SQL,
+// names are resolved against the database selected by USE statements.
 func getTables(query, dialect string) map[string]any {
 	dialect = normalizeDialect(dialect)
 	if dialect == "tsql" {
@@ -443,7 +471,7 @@ func getTables(query, dialect string) map[string]any {
 	return map[string]any{"tables": sortedUnique(names)}
 }
 
-// mergeParts mirrors merge_parts.
+// mergeParts joins the identifier (and anonymous function name) parts of a table with dots.
 func mergeParts(table *sqlengine.Expr) string {
 	var parts []string
 	for _, part := range table.Parts() {

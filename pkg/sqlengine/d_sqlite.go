@@ -1,18 +1,22 @@
 package sqlengine
 
-// Port of sqlglot/dialects/sqlite.py, sqlglot/parsers/sqlite.py and sqlglot/generators/sqlite.py
-// (sqlglot v30.13.0). Data-only class attributes live in the generated zz_*_settings.go files.
+import (
+	"math/big"
+	"strings"
+)
 
 func init() { registerCustomizer("sqlite", customizeSQLite) }
 
 func customizeSQLite(d *Dialect) {
-	// ---- SQLiteParser ----
 	P := d.P
+
+	P.FUNCTION_PARSERS["GROUP_CONCAT"] = func(p *Parser) *Expr { return p.parseStringAgg() }
 
 	P.FUNCTIONS["DATETIME"] = func(args []*Expr, _ *Dialect) *Expr {
 		return New(KAnonymous, "this", "DATETIME", "expressions", args)
 	}
 	P.FUNCTIONS["EDITDIST3"] = fromArgList(KLevenshtein)
+	P.FUNCTIONS["JSON_EXTRACT"] = sqliteBuildJSONExtract
 	P.FUNCTIONS["JSON_GROUP_ARRAY"] = fromArgList(KJSONArrayAgg)
 	P.FUNCTIONS["JSON_GROUP_OBJECT"] = func(args []*Expr, _ *Dialect) *Expr {
 		return New(KJSONObjectAgg, "expressions", args)
@@ -23,12 +27,18 @@ func customizeSQLite(d *Dialect) {
 		return New(KAnonymous, "this", "TIME", "expressions", args)
 	}
 
-	// "USING" is `lambda self, **kwargs: ...` (accepts any kwargs).
+	// USING accepts (and ignores) any property keyword arguments.
 	P.PROPERTY_PARSERS["USING"] = func(p *Parser, _ propKwargs) any {
 		return anyExpr(sqliteParseModuleProperty(p))
 	}
 	P.PROPERTY_PARSERS["VIRTUAL"] = noKwargsE(func(p *Parser) *Expr {
 		return p.expression(New(KVirtualProperty))
+	})
+	P.PROPERTY_PARSERS["WITHOUT"] = noKwargsE(func(p *Parser) *Expr {
+		if p.matchTextSeq("ROWID") {
+			return p.expression(New(KWithoutRowidProperty))
+		}
+		return nil
 	})
 
 	P.STATEMENT_PARSERS[TK_ATTACH] = func(p *Parser) *Expr { return sqliteParseAttachDetach(p, true) }
@@ -37,13 +47,38 @@ func customizeSQLite(d *Dialect) {
 
 	// https://www.sqlite.org/lang_expr.html
 	P.RANGE_PARSERS[TK_MATCH] = binaryRangeParser(KMatch, false)
+	P.RANGE_PARSERS[TK_IS] = sqliteParseIs
+
+	P.PRIMARY_PARSERS[TK_HEX_STRING] = sqliteParseHexString
+
+	// Unary + removes column affinity, so it is kept rather than dropped
+	// https://www.sqlite.org/datatype3.html#affinity_of_expressions
+	P.UNARY_PARSERS[TK_PLUS] = func(p *Parser) *Expr { return p.expression(New(KPos, "this", p.parseUnary())) }
 
 	P.h.parseUnique = sqliteParseUnique
+	P.h.parseGeneratedAsIdentity = sqliteParseGeneratedAsIdentity
+	P.h.parseIsRhs = sqliteParseIsRhs
 
-	// ---- SQLiteGenerator ----
+	// ||, -> and ->> form a single left-associative precedence tier that binds tighter than
+	// multiplication, so they are consumed by parseFactorOperand rather than as column operators
+	// or in parseBitwise: https://sqlite.org/lang_expr.html
+	delete(P.COLUMN_OPERATORS, TK_ARROW)
+	delete(P.COLUMN_OPERATORS, TK_DARROW)
+	arithmetic := map[TokenType]bool{}
+	for _, ops := range []map[TokenType]Kind{P.BITWISE, P.TERM, P.FACTOR} {
+		for tok := range ops {
+			arithmetic[tok] = tok != TK_COLLATE
+		}
+	}
+	P.h.parseFactorOperand = func(p *Parser) *Expr { return sqliteParseFactorOperand(p, arithmetic) }
+
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module level)
+	// table options are separated by commas, e.g. STRICT, WITHOUT ROWID
+	G.h.rootProperties = func(g *Generator, properties *Expr) string {
+		return g.expressions(properties, exprsOpts{noIndent: true, sep: strp2(", ")})
+	}
+
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -58,7 +93,6 @@ func customizeSQLite(d *Dialect) {
 	T := G.TRANSFORMS
 	T[KAnyValue] = anyValueToMaxSQL
 	T[KChr] = renameFunc("CHAR")
-	T[KConcat] = concatToDpipeSQL
 	T[KCountIf] = countIfToSum
 	T[KCreate] = transformPreprocess([]func(*Expr) *Expr{sqliteTransformCreate}, nil)
 	T[KCurrentDate] = func(_ *Generator, _ *Expr) string { return "CURRENT_DATE" }
@@ -74,7 +108,6 @@ func customizeSQLite(d *Dialect) {
 		dhUnsupportedArgs(g, e, "order", "null_handling", "return_type", "strict")
 		return jsonGroupArray(g, e)
 	}
-	T[KJSONExtractScalar] = arrowJSONExtractSQL
 	T[KJSONObjectAgg] = func(g *Generator, e *Expr) string { return g.jsonobjectSQL(e, "JSON_GROUP_OBJECT") }
 	editdist3 := renameFunc("EDITDIST3")
 	T[KLevenshtein] = func(g *Generator, e *Expr) string {
@@ -85,6 +118,7 @@ func customizeSQLite(d *Dialect) {
 	T[KLogicalAnd] = renameFunc("MIN")
 	T[KPivot] = noPivotSQL
 	T[KRand] = renameFunc("RANDOM")
+	T[KRegexpLike] = func(g *Generator, e *Expr) string { return g.binary(e, "REGEXP") }
 	T[KSelect] = transformPreprocess([]func(*Expr) *Expr{
 		sqliteOffsetToLimit,
 		transformEliminateDistinctOn,
@@ -102,22 +136,28 @@ func customizeSQLite(d *Dialect) {
 	T[KTryCast] = noTrycastSQL
 	T[KTsOrDsToTimestamp] = func(g *Generator, e *Expr) string { return g.sqlKey(e, "this") }
 
-	// <key>_sql method overrides of base methods that are not hooks (only reached via dispatch)
+	// Per-kind overrides of base methods that are not hooks (only reached via dispatch)
 	G.methods[KInsert] = sqliteInsertSQL
 	G.methods[KDateAdd] = sqliteDateaddSQL
+	G.methods[KDateSub] = sqliteDatesubSQL
 	G.methods[KWindowSpec] = sqliteWindowspecSQL
+	// IS and IS NOT are SQLite's null-safe comparisons
+	G.methods[KNullSafeEQ] = func(g *Generator, e *Expr) string { return g.binary(e, "IS") }
+	G.methods[KNullSafeNEQ] = func(g *Generator, e *Expr) string { return g.binary(e, "IS NOT") }
 
-	// <key>_sql method overrides (hooks)
+	// Overrides of hooked base methods
 	G.h.castSQL = sqliteCastSQL
 	G.h.transactionSQL = sqliteTransactionSQL
 	G.h.ignorenullsSQL = sqliteIgnorenullsSQL
 	G.h.respectnullsSQL = sqliteRespectnullsSQL
+	G.h.computedcolumnconstraintSQL = sqliteComputedcolumnconstraintSQL
 
-	// dialect-only <key>_sql methods
+	// Per-kind methods that only SQLite defines
 	G.methods[KBitwiseAndAgg] = sqliteBitwiseandaggSQL
 	G.methods[KBitwiseOrAgg] = sqliteBitwiseoraggSQL
 	G.methods[KBitwiseXorAgg] = sqliteBitwisexoraggSQL
 	G.methods[KJSONExtract] = sqliteJsonextractSQL
+	G.methods[KJSONExtractScalar] = sqliteJsonextractscalarSQL
 	G.methods[KTrunc] = sqliteTruncSQL
 	G.methods[KGenerateSeries] = sqliteGenerateseriesSQL
 	G.methods[KDateDiff] = sqliteDatediffSQL
@@ -128,10 +168,8 @@ func customizeSQLite(d *Dialect) {
 	G.methods[KCurrentSchema] = sqliteCurrentschemaSQL
 }
 
-// ---------------------------------------------------------------------------------------------
-// Parser
-
-// sqliteBuildStrftime mirrors parsers/sqlite.py:_build_strftime (which appends to args in place).
+// sqliteBuildStrftime builds STRFTIME(format[, value]) as TimeToStr, defaulting the value to the
+// current timestamp (arity is then validated against the extended argument list).
 func sqliteBuildStrftime(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 1 {
 		args = append(append(make([]*Expr, 0, 2), args...), New(KCurrentTimestamp))
@@ -143,7 +181,160 @@ func sqliteBuildStrftime(args []*Expr, _ *Dialect) *Expr {
 	return New(KAnonymous, "this", "STRFTIME", "expressions", args)
 }
 
-// sqliteParseUnique mirrors SQLiteParser._parse_unique.
+// sqliteBuildJSONExtract builds JSON_EXTRACT: with a single path it returns an SQL value like
+// ->> (a JSONExtractScalar marked json_subtype, since object/array results keep the JSON
+// subtype), with several paths a JSON array (a JSONExtract).
+// https://www.sqlite.org/json1.html#jex
+func sqliteBuildJSONExtract(args []*Expr, d *Dialect) *Expr {
+	if len(args) == 2 {
+		extract := buildExtractJSONWithPath(KJSONExtractScalar)(args, d)
+		extract.Set("json_subtype", true)
+		return extract
+	}
+	return buildExtractJSONWithPath(KJSONExtract)(args, d)
+}
+
+// sqliteParseHexString parses a hex token: 0x<digits> is an integer, read as a signed 64-bit
+// two's-complement value like SQLite does, and x'<digits>' stays a blob literal.
+func sqliteParseHexString(p *Parser, token *Token) *Expr {
+	runes := p.runes()
+	if start := int(token.Start); start+1 < len(runes) && runes[start] == '0' && (runes[start+1] == 'x' || runes[start+1] == 'X') {
+		value, ok := new(big.Int).SetString(strings.ReplaceAll(token.Text, "_", ""), 16)
+		if !ok || !sqliteValidHexDigits(token.Text) {
+			panic(&ValueError{Msg: "invalid literal for int() with base 16: " + pyRepr(token.Text)})
+		}
+		if value.Cmp(new(big.Int).Lsh(big.NewInt(1), 63)) >= 0 {
+			value.Sub(value, new(big.Int).Lsh(big.NewInt(1), 64))
+		}
+		return p.expressionTok(LiteralNumber(value.String()), token)
+	}
+
+	return p.expressionTok(New(KHexString, "this", token.Text), token)
+}
+
+// sqliteValidHexDigits reports whether s is hex digits with single underscores only between
+// digits.
+func sqliteValidHexDigits(s string) bool {
+	if s == "" || s[0] == '_' || s[len(s)-1] == '_' {
+		return false
+	}
+	return !strings.Contains(s, "__")
+}
+
+// sqliteParseGeneratedAsIdentity parses GENERATED ... AS; the GENERATED ALWAYS AS (expr)
+// [STORED | VIRTUAL] form becomes a computed column.
+func sqliteParseGeneratedAsIdentity(p *Parser) *Expr {
+	this := p.baseParseGeneratedAsIdentity()
+
+	// Only an expression-bearing form is a computed column, so a true identity (AS IDENTITY) does
+	// not consume a following storage keyword
+	if this.IsA(KGeneratedAsIdentityColumnConstraint) && this.ArgE("expression") != nil {
+		persisted := p.matchTexts("STORED", "VIRTUAL") && upperText(p.prev) == "STORED"
+		return p.expression(New(KComputedColumnConstraint, "this", this.ArgE("expression"), "persisted", persisted))
+	}
+
+	return this
+}
+
+// sqliteParseIs parses IS / IS NOT. They compare any two values, treating NULLs as equal, so with
+// a right side other than NULL, TRUE or FALSE they are the null-safe comparisons IS [NOT]
+// DISTINCT FROM. A parenthesized NULL, TRUE or FALSE right side is unwrapped.
+func sqliteParseIs(p *Parser, this *Expr) *Expr {
+	this = p.parseIs(this)
+
+	isNode, wrappedInNot := this, false
+	if this.IsA(KNot) && this.This().IsA(KIs) {
+		isNode, wrappedInNot = this.This(), true
+	}
+
+	if isNode.IsA(KIs) {
+		if rhs := isNode.Expression().Unnest(); rhs.IsA(KNull, KBoolean) {
+			isNode.Set("expression", rhs)
+		} else {
+			kind := KNullSafeEQ
+			if wrappedInNot {
+				kind = KNullSafeNEQ
+			}
+			this = New(kind, "this", isNode.This(), "expression", isNode.Expression())
+		}
+	}
+
+	return this
+}
+
+// sqliteParseIsRhs parses the right operand of IS and IS [NOT] DISTINCT FROM: ordering
+// comparisons bind above IS, but range predicates bind below it.
+func sqliteParseIsRhs(p *Parser, distinct bool) *Expr {
+	this := p.parseBitwise()
+	for chunkDMatchKey(p, p.s.COMPARISON) {
+		comments := p.prevComments
+		kind := p.s.COMPARISON[p.prev.Type]
+		this = p.expressionC(New(kind, "this", this, "expression", p.parseBitwise()), comments)
+	}
+	return this
+}
+
+// sqliteParseFactorOperand parses an operand of a FACTOR operator: COLLATE-bound unary operands
+// joined by ||, -> and ->>, left to right. A || chain followed by an arrow is parenthesized so
+// dialects where the arrows bind tighter keep the grouping, and so is the whole tier when it is
+// an operand of an arithmetic operator (in arithmetic), which binds looser elsewhere.
+func sqliteParseFactorOperand(p *Parser, arithmetic map[TokenType]bool) *Expr {
+	inArithmeticOperand := p.prev != nil && arithmetic[p.prev.Type]
+	this := sqliteParseConcatOperand(p)
+	parsedOp := false
+
+	for p.curr.ok() {
+		tok := p.curr.Type
+		if tok != TK_DPIPE && tok != TK_ARROW && tok != TK_DARROW {
+			break
+		}
+		if tok != TK_DPIPE && this.IsA(KDPipe) {
+			this = p.expression(New(KParen, "this", this))
+		}
+
+		p.advance(1)
+		expression := sqliteParseConcatOperand(p)
+		switch tok {
+		case TK_DPIPE:
+			this = p.expression(New(KDPipe, "this", this, "expression", expression, "safe", !p.d.S.STRICT_STRING_CONCAT))
+		case TK_ARROW:
+			this = p.expression(New(
+				KJSONExtract,
+				"this", this,
+				"expression", p.d.toJSONPath(expression),
+				"only_json_types", p.s.JSON_ARROWS_REQUIRE_JSON_TYPE,
+			))
+		default:
+			this = p.expression(New(
+				KJSONExtractScalar,
+				"this", this,
+				"expression", p.d.toJSONPath(expression),
+				"only_json_types", p.s.JSON_ARROWS_REQUIRE_JSON_TYPE,
+				"scalar_only", p.d.S.JSON_EXTRACT_SCALAR_SCALAR_ONLY,
+			))
+		}
+		parsedOp = true
+	}
+
+	if parsedOp && (inArithmeticOperand || (p.curr.ok() && arithmetic[p.curr.Type])) {
+		this = p.expression(New(KParen, "this", this))
+	}
+
+	return this
+}
+
+// sqliteParseConcatOperand parses a unary expression and the COLLATE clauses after it, since
+// COLLATE binds tighter than any binary operator.
+func sqliteParseConcatOperand(p *Parser) *Expr {
+	this := p.parseUnary()
+	for p.match(TK_COLLATE) {
+		collate := p.expression(New(KCollate, "this", this, "expression", p.parseUnary()))
+		normalizeCollate(collate)
+		this = collate
+	}
+	return this
+}
+
 func sqliteParseUnique(p *Parser) *Expr {
 	// Do not consume more tokens if UNIQUE is used as a standalone constraint, e.g:
 	// CREATE TABLE foo (bar TEXT UNIQUE REFERENCES baz ...)
@@ -154,7 +345,6 @@ func sqliteParseUnique(p *Parser) *Expr {
 	return p.baseParseUnique()
 }
 
-// sqliteParseModuleProperty mirrors SQLiteParser._parse_module_property.
 func sqliteParseModuleProperty(p *Parser) *Expr {
 	name := p.parseIdVar(true, nil)
 	var expressions any
@@ -164,12 +354,11 @@ func sqliteParseModuleProperty(p *Parser) *Expr {
 	return p.expression(New(KModuleProperty, "this", name, "expressions", expressions))
 }
 
-// sqliteParsePragma mirrors SQLiteParser._parse_pragma.
 func sqliteParsePragma(p *Parser) *Expr {
-	name := p.parseVar(true, nil, false)
+	name := p.parseIdVar(true, nil)
 
 	if p.match(TK_DOT) {
-		name = New(KDot, "this", name, "expression", p.parseVar(true, nil, false))
+		name = New(KDot, "this", name, "expression", p.parseIdVar(true, nil))
 	}
 
 	p.match(TK_EQ)
@@ -188,8 +377,7 @@ func sqliteParsePragma(p *Parser) *Expr {
 	return p.expression(New(KPragma, "this", name))
 }
 
-// sqliteParseAttachDetach mirrors SQLiteParser._parse_attach_detach.
-func sqliteParseAttachDetach(p *Parser, isAttach bool /*=True*/) *Expr {
+func sqliteParseAttachDetach(p *Parser, isAttach bool /* true for ATTACH */) *Expr {
 	p.match(TK_DATABASE)
 	this := p.parseExpression()
 
@@ -199,10 +387,8 @@ func sqliteParseAttachDetach(p *Parser, isAttach bool /*=True*/) *Expr {
 	return p.expression(New(KDetach, "this", this))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Generator: module-level transforms
-
-// sqliteListRemove mirrors Python list.remove(x) (first structurally equal element) on a copy.
+// sqliteListRemove returns a copy of list without its first element structurally equal to x. It
+// panics with a ValueError when there is none; the message keeps its historical wording.
 func sqliteListRemove(list []*Expr, x *Expr) []*Expr {
 	for i, y := range list {
 		if y.Equal(x) {
@@ -214,8 +400,8 @@ func sqliteListRemove(list []*Expr, x *Expr) []*Expr {
 	panic(&ValueError{Msg: "list.remove(x): x not in list"})
 }
 
-// sqliteTransformCreate mirrors generators/sqlite.py:_transform_create.
-// Move primary key to a column and enforce auto_increment on primary keys.
+// sqliteTransformCreate moves a single-column primary key to its column and enforces
+// auto_increment on primary keys.
 func sqliteTransformCreate(expression *Expr) *Expr {
 	schema := expression.This()
 
@@ -243,7 +429,7 @@ func sqliteTransformCreate(expression *Expr) *Expr {
 				panic(&ValueError{Msg: "'" + key + "'"})
 			}
 			column.Append("constraints", New(KColumnConstraint, "kind", New(KPrimaryKeyColumnConstraint)))
-			// schema.expressions.remove(primary_key): in-place list mutation (no parent bookkeeping)
+			// Drop the table-level primary key without parent bookkeeping
 			schema.SetArgRaw("expressions", sqliteListRemove(schema.Expressions(), primaryKey))
 		}
 
@@ -267,7 +453,7 @@ func sqliteTransformCreate(expression *Expr) *Expr {
 			if autoIncrement != nil && (primaryKeyIndex == -1 || autoIncrementIndex < primaryKeyIndex) {
 				constraints = sqliteListRemove(constraints, autoIncrement)
 				if primaryKeyIndex != -1 {
-					// list.insert(i, x) appends when i is past the end
+					// Insert before the primary key constraint (append when past the end)
 					idx := min(primaryKeyIndex, len(constraints))
 					out := make([]*Expr, 0, len(constraints)+1)
 					out = append(out, constraints[:idx]...)
@@ -282,7 +468,8 @@ func sqliteTransformCreate(expression *Expr) *Expr {
 	return expression
 }
 
-// sqliteGeneratedToAutoIncrement mirrors generators/sqlite.py:_generated_to_auto_increment.
+// sqliteGeneratedToAutoIncrement replaces a column's GENERATED ... AS IDENTITY constraint (and
+// its NOT NULL) with AUTOINCREMENT. Expression-bearing forms are computed columns and are kept.
 func sqliteGeneratedToAutoIncrement(expression *Expr) *Expr {
 	if !expression.IsA(KColumnDef) {
 		return expression
@@ -290,7 +477,7 @@ func sqliteGeneratedToAutoIncrement(expression *Expr) *Expr {
 
 	generated := expression.Find(KGeneratedAsIdentityColumnConstraint)
 
-	if generated != nil {
+	if generated != nil && generated.ArgE("expression") == nil {
 		generated.Parent().Pop()
 
 		notNull := expression.Find(KNotNullColumnConstraint)
@@ -304,7 +491,8 @@ func sqliteGeneratedToAutoIncrement(expression *Expr) *Expr {
 	return expression
 }
 
-// sqliteOffsetToLimit mirrors generators/sqlite.py:_offset_to_limit.
+// sqliteOffsetToLimit adds LIMIT -1 to a SELECT that has an OFFSET but no LIMIT, since SQLite
+// only accepts OFFSET after LIMIT.
 func sqliteOffsetToLimit(expression *Expr) *Expr {
 	if !expression.IsA(KSelect) {
 		return expression
@@ -312,18 +500,14 @@ func sqliteOffsetToLimit(expression *Expr) *Expr {
 
 	offset := expression.Arg("offset")
 
-	if truthy(offset) && !expression.ArgB("limit") {
-		// expression.limit(-1, copy=False): maybe_parse("LIMIT -1", into=exp.Limit)
+	if limit := expression.ArgE("limit"); truthy(offset) && (limit == nil || limit.isLimitAll()) {
 		expression.QueryLimit(MaybeParse("-1", KLimit, "LIMIT", nil), false)
 	}
 
 	return expression
 }
 
-// ---------------------------------------------------------------------------------------------
-// Generator: methods
-
-// sqliteInsertSQL mirrors SQLiteGenerator.insert_sql.
+// sqliteInsertSQL renders INSERT, turning INSERT IGNORE into INSERT OR IGNORE.
 func sqliteInsertSQL(g *Generator, expression *Expr) string {
 	if expression.ArgB("ignore") {
 		expression.Set("ignore", false)
@@ -333,25 +517,32 @@ func sqliteInsertSQL(g *Generator, expression *Expr) string {
 	return g.insertSQL(expression)
 }
 
-// sqliteBitwiseandaggSQL mirrors SQLiteGenerator.bitwiseandagg_sql.
 func sqliteBitwiseandaggSQL(g *Generator, expression *Expr) string {
 	g.unsupported("BITWISE_AND aggregation is not supported in SQLite")
 	return g.functionFallbackSQL(expression)
 }
 
-// sqliteBitwiseoraggSQL mirrors SQLiteGenerator.bitwiseoragg_sql.
 func sqliteBitwiseoraggSQL(g *Generator, expression *Expr) string {
 	g.unsupported("BITWISE_OR aggregation is not supported in SQLite")
 	return g.functionFallbackSQL(expression)
 }
 
-// sqliteBitwisexoraggSQL mirrors SQLiteGenerator.bitwisexoragg_sql.
 func sqliteBitwisexoraggSQL(g *Generator, expression *Expr) string {
 	g.unsupported("BITWISE_XOR aggregation is not supported in SQLite")
 	return g.functionFallbackSQL(expression)
 }
 
-// sqliteJsonextractSQL mirrors SQLiteGenerator.jsonextract_sql.
+// sqliteJsonextractscalarSQL renders JSONExtractScalar with the ->> operator, or as
+// JSON_EXTRACT(x, path) when it came from a single-path JSON_EXTRACT: unlike ->>, JSON_EXTRACT
+// keeps the JSON subtype of object/array results, observable when they feed another JSON
+// function.
+func sqliteJsonextractscalarSQL(g *Generator, expression *Expr) string {
+	if expression.ArgB("json_subtype") {
+		return g.fn("JSON_EXTRACT", expression.This(), expression.Expression())
+	}
+	return arrowJSONExtractSQL(g, expression)
+}
+
 func sqliteJsonextractSQL(g *Generator, expression *Expr) string {
 	if len(expression.Expressions()) > 0 {
 		return g.functionFallbackSQL(expression)
@@ -359,7 +550,9 @@ func sqliteJsonextractSQL(g *Generator, expression *Expr) string {
 	return arrowJSONExtractSQL(g, expression)
 }
 
-// sqliteDateaddSQL mirrors SQLiteGenerator.dateadd_sql.
+// sqliteDateaddSQL renders DATE_ADD as DATE(x, '<amount> <unit>'), or DATETIME for units below a
+// day, which DATE would drop. Weeks become days, and an amount that is not a literal is
+// concatenated with its unit: DATE(x, (amount) || ' <unit>').
 func sqliteDateaddSQL(g *Generator, expression *Expr) string {
 	modifier := expression.Expression()
 	unit := expression.ArgE("unit")
@@ -371,6 +564,29 @@ func sqliteDateaddSQL(g *Generator, expression *Expr) string {
 		}
 		modifier = modifier.This()
 	}
+
+	if unit != nil && pyUpper(unit.Name()) == "WEEK" {
+		modifier = dhBinop(KMul, modifier, 7)
+		unit = VarExpr("DAY")
+	}
+
+	fn := "DATE"
+	if unit != nil {
+		switch pyUpper(unit.Name()) {
+		case "HOUR", "MINUTE", "SECOND":
+			fn = "DATETIME"
+		}
+	}
+
+	modifier = modifier.Unnest()
+	if unit != nil && !modifier.IsA(KLiteral) && !(modifier.IsA(KNeg) && modifier.This().IsNumber()) {
+		return g.fn(fn, expression.Arg("this"), New(
+			KDPipe,
+			"this", ParenExpr(modifier, true),
+			"expression", LiteralString(" "+unit.Name()),
+		))
+	}
+
 	var modifierSQL string
 	if modifier.IsString() {
 		modifierSQL = modifier.Name()
@@ -378,23 +594,62 @@ func sqliteDateaddSQL(g *Generator, expression *Expr) string {
 		modifierSQL = g.sql(modifier)
 	}
 	if unit != nil {
-		modifierSQL = "'" + modifierSQL + " " + unit.Name() + "'"
-	} else {
-		modifierSQL = "'" + modifierSQL + "'"
+		modifierSQL = modifierSQL + " " + unit.Name()
 	}
-	return g.fn("DATE", expression.Arg("this"), modifierSQL)
+	return g.fn(fn, expression.Arg("this"), LiteralString(modifierSQL))
 }
 
-// sqliteCastSQL mirrors SQLiteGenerator.cast_sql.
+// sqliteDatesubSQL renders DATE_SUB, which SQLite lacks, as DATE_ADD of the negated amount.
+func sqliteDatesubSQL(g *Generator, expression *Expr) string {
+	amount := expression.Expression()
+	unit := expression.ArgE("unit")
+	if amount.IsA(KInterval) {
+		if unit == nil {
+			unit = amount.ArgE("unit")
+		}
+		amount = amount.This()
+	}
+
+	amount = amount.Unnest()
+	var negated *Expr
+	switch {
+	case amount.IsA(KNeg):
+		negated = amount.This()
+	case amount.IsA(KLiteral):
+		text := strings.TrimPrefix(amount.Name(), "+")
+		if rest, ok := strings.CutPrefix(text, "-"); ok {
+			text = rest
+		} else {
+			text = "-" + text
+		}
+		negated = LiteralString(text)
+	case amount.IsA(KColumn, KFunc):
+		negated = New(KNeg, "this", amount)
+	default:
+		negated = New(KNeg, "this", ParenExpr(amount, false))
+	}
+
+	return sqliteDateaddSQL(g, New(KDateAdd, "this", expression.This(), "expression", negated, "unit", unit))
+}
+
+// sqliteCastSQL renders CAST, using the DATE, DATETIME, TIME and JSON functions for those
+// targets.
 func sqliteCastSQL(g *Generator, expression *Expr, safePrefix string) string {
-	if expression.IsTypeOf(DT_DATE) {
+	switch {
+	case expression.IsTypeOf(DT_DATE):
 		return g.fn("DATE", expression.Arg("this"))
+	case expression.IsTypeOf(DT_DATETIME, DT_TIMESTAMP, DT_TIMESTAMPNTZ):
+		return g.fn("DATETIME", expression.Arg("this"))
+	case expression.IsTypeOf(DT_TIME):
+		return g.fn("TIME", expression.Arg("this"))
+	case expression.IsTypeOf(DT_JSON, DT_JSONB):
+		return g.fn("JSON", expression.Arg("this"))
 	}
 
 	return g.baseCastSQL(expression, "")
 }
 
-// sqliteTruncSQL mirrors SQLiteGenerator.trunc_sql.
+// sqliteTruncSQL renders TRUNC; a decimals argument is reported as unsupported.
 //
 // Note: SQLite's TRUNC always returns REAL (e.g., trunc(10.99) -> 10.0), not INTEGER.
 // This creates a transpilation gap affecting division semantics, similar to Presto.
@@ -403,7 +658,8 @@ func sqliteTruncSQL(g *Generator, expression *Expr) string {
 	return g.fn("TRUNC", expression.Arg("this"))
 }
 
-// sqliteGenerateseriesSQL mirrors SQLiteGenerator.generateseries_sql.
+// sqliteGenerateseriesSQL renders GENERATE_SERIES; a column alias moves into a subquery that
+// selects value under that alias.
 func sqliteGenerateseriesSQL(g *Generator, expression *Expr) string {
 	parent := expression.Parent()
 	var alias *Expr
@@ -424,7 +680,8 @@ func sqliteGenerateseriesSQL(g *Generator, expression *Expr) string {
 	return sql
 }
 
-// sqliteDatediffSQL mirrors SQLiteGenerator.datediff_sql.
+// sqliteDatediffSQL renders DATE_DIFF as the JULIANDAY difference scaled to the unit and cast to
+// INTEGER.
 func sqliteDatediffSQL(g *Generator, expression *Expr) string {
 	unitE := expression.ArgE("unit")
 	unit := "DAY"
@@ -450,7 +707,9 @@ func sqliteDatediffSQL(g *Generator, expression *Expr) string {
 	case "MICROSECOND":
 		sql = sql + " * 86400000000.0"
 	case "NANOSECOND":
-		sql = sql + " * 8640000000000.0"
+		sql = sql + " * 86400000000000.0"
+	case "DAY":
+		// JULIANDAY already counts days
 	default:
 		g.unsupported("DATEDIFF unsupported for '" + unit + "'.")
 	}
@@ -458,34 +717,34 @@ func sqliteDatediffSQL(g *Generator, expression *Expr) string {
 	return "CAST(" + sql + " AS INTEGER)"
 }
 
-// sqliteGroupconcatSQL mirrors SQLiteGenerator.groupconcat_sql.
+// sqliteGroupconcatSQL renders GROUP_CONCAT([DISTINCT] x[, separator] [ORDER BY ...]). A window
+// function cannot order its argument, so that ORDER BY is reported as unsupported and dropped, and
+// a DISTINCT aggregate takes a single argument, so a comma separator (the default) is dropped.
 // https://www.sqlite.org/lang_aggfunc.html#group_concat
 func sqliteGroupconcatSQL(g *Generator, expression *Expr) string {
-	this := expression.Arg("this")
-	distinct := expression.Find(KDistinct)
+	node := expression
+	if expression.Parent().IsA(KFilter) {
+		node = expression.Parent()
+	}
+	window := node.Parent()
 
-	var distinctSQL string
-	if distinct != nil {
-		exprs := distinct.Expressions()
-		if len(exprs) == 0 {
-			panic(&ValueError{Msg: "IndexError: list index out of range"})
-		}
-		this = exprs[0]
-		distinctSQL = "DISTINCT "
+	if expression.This().IsA(KOrder) && window.IsA(KWindow) && window.This() == node {
+		g.unsupported("SQLite GROUP_CONCAT window functions do not support argument ORDER BY")
+		expression.Set("this", expression.This().This())
 	}
 
-	if expression.This().IsA(KOrder) {
-		g.unsupported("SQLite GROUP_CONCAT doesn't support ORDER BY.")
-		if truthy(expression.This().Arg("this")) && distinct == nil {
-			this = expression.This().Arg("this")
-		}
+	this := expression.This()
+	if this.IsA(KOrder) {
+		this = this.This()
+	}
+	if separator := expression.ArgE("separator"); this.IsA(KDistinct) && separator != nil && separator.Equal(LiteralString(",")) {
+		expression.Set("separator", nil)
 	}
 
-	separator := expression.ArgE("separator")
-	return "GROUP_CONCAT(" + distinctSQL + g.formatArgs(", ", this, separator) + ")"
+	return groupconcatSQL(g, expression, "GROUP_CONCAT", "", false, false)
 }
 
-// sqliteLeastSQL mirrors SQLiteGenerator.least_sql.
+// sqliteLeastSQL renders LEAST as the multi-argument MIN(...), or as its only argument.
 func sqliteLeastSQL(g *Generator, expression *Expr) string {
 	if len(expression.Expressions()) > 0 {
 		return renameFunc("MIN")(g, expression)
@@ -494,7 +753,7 @@ func sqliteLeastSQL(g *Generator, expression *Expr) string {
 	return g.sqlKey(expression, "this")
 }
 
-// sqliteGreatestSQL mirrors SQLiteGenerator.greatest_sql.
+// sqliteGreatestSQL renders GREATEST as the multi-argument MAX(...), or as its only argument.
 func sqliteGreatestSQL(g *Generator, expression *Expr) string {
 	if len(expression.Expressions()) > 0 {
 		return renameFunc("MAX")(g, expression)
@@ -503,7 +762,6 @@ func sqliteGreatestSQL(g *Generator, expression *Expr) string {
 	return g.sqlKey(expression, "this")
 }
 
-// sqliteTransactionSQL mirrors SQLiteGenerator.transaction_sql.
 func sqliteTransactionSQL(g *Generator, expression *Expr) string {
 	this := ""
 	if v := expression.Arg("this"); truthy(v) {
@@ -512,33 +770,53 @@ func sqliteTransactionSQL(g *Generator, expression *Expr) string {
 	return "BEGIN" + this + " TRANSACTION"
 }
 
-// sqliteIsasciiSQL mirrors SQLiteGenerator.isascii_sql.
+// sqliteIsasciiSQL renders IS_ASCII as a GLOB test for characters outside 0x01-0x7F.
 func sqliteIsasciiSQL(g *Generator, expression *Expr) string {
 	return "(NOT " + g.sql(expression.Arg("this")) + " GLOB CAST(x'2a5b5e012d7f5d2a' AS TEXT))"
 }
 
-// sqliteCurrentschemaSQL mirrors SQLiteGenerator.currentschema_sql.
 func sqliteCurrentschemaSQL(g *Generator, expression *Expr) string {
 	dhUnsupportedArgs(g, expression, "this")
 	return "'main'"
 }
 
-// sqliteIgnorenullsSQL mirrors SQLiteGenerator.ignorenulls_sql.
 func sqliteIgnorenullsSQL(g *Generator, expression *Expr) string {
 	g.unsupported("SQLite does not support IGNORE NULLS.")
 	return g.sql(expression.Arg("this"))
 }
 
-// sqliteRespectnullsSQL mirrors SQLiteGenerator.respectnulls_sql.
 func sqliteRespectnullsSQL(g *Generator, expression *Expr) string {
 	return g.sql(expression.Arg("this"))
 }
 
-// sqliteWindowspecSQL mirrors SQLiteGenerator.windowspec_sql.
+// sqliteWindowspecSQL renders a window frame; a RANGE frame starting at CURRENT ROW without an
+// end bound is rendered as RANGE CURRENT ROW.
 func sqliteWindowspecSQL(g *Generator, expression *Expr) string {
-	if pyUpper(expression.Text("kind")) == "RANGE" && pyUpper(expression.Text("start")) == "CURRENT ROW" {
+	if pyUpper(expression.Text("kind")) == "RANGE" && pyUpper(expression.Text("start")) == "CURRENT ROW" &&
+		expression.Arg("end") == nil {
 		return "RANGE CURRENT ROW"
 	}
 
 	return g.windowspecSQL(expression)
+}
+
+func sqliteComputedcolumnconstraintSQL(g *Generator, e *Expr) string {
+	if e.ArgB("data_type") {
+		g.unsupported("SQLite generated columns do not support a data type")
+	}
+
+	this := e.This()
+	thisSQL := g.sql(this)
+	if !this.IsA(KParen) {
+		thisSQL = "(" + thisSQL + ")"
+	}
+	storage := ""
+	if e.ArgB("persisted") {
+		storage = " STORED"
+	}
+	notNull := ""
+	if e.ArgB("not_null") {
+		notNull = " NOT NULL"
+	}
+	return "AS " + thisSQL + storage + notNull
 }

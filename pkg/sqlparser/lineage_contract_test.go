@@ -1,4 +1,4 @@
-//nolint:paralleltest // all cases intentionally share TestMain's subprocess.
+//nolint:paralleltest // all cases intentionally share TestMain's parser.
 package sqlparser
 
 import (
@@ -75,14 +75,14 @@ func TestSQLParserColumnLineageContractPlatformFeatures(t *testing.T) {
 		{"duckdb struct list star exclude", "duckdb", `SELECT * EXCLUDE(secret), profile.name AS profile_name, list_transform(scores, x -> x + 1) AS bumped FROM users`, Schema{"users": {"id": "INTEGER", "secret": "VARCHAR", "profile": "STRUCT(name VARCHAR, age INTEGER)", "scores": "INTEGER[]"}}, []ColumnLineage{{"bumped", uc("scores", "users"), "UNKNOWN"}, {"id", uc("id", "users"), "INT"}, {"profile", uc("profile", "users"), "STRUCT<name TEXT, age INT>"}, {"profile_name", uc("profile", "users"), "TEXT"}, {"scores", uc("scores", "users"), "ARRAY<INT>"}}, nil},
 		{"spark explode lambda", "spark", `SELECT id, x, transform(nums, n -> n + 1) AS bumped FROM src LATERAL VIEW explode(items) e AS x`, Schema{"src": {"id": "bigint", "items": "array<string>", "nums": "array<int>"}}, []ColumnLineage{{"bumped", uc("nums", "src"), "UNKNOWN"}, {"id", uc("id", "src"), "BIGINT"}, {"x", uc("items", "src"), "ARRAY<TEXT>"}}, nil},
 		{"databricks explode lambda", "databricks", `SELECT id, x, transform(nums, n -> n + 1) AS bumped FROM src LATERAL VIEW explode(items) e AS x`, Schema{"src": {"id": "bigint", "items": "array<string>", "nums": "array<int>"}}, []ColumnLineage{{"bumped", uc("nums", "src"), "UNKNOWN"}, {"id", uc("id", "src"), "BIGINT"}, {"x", uc("items", "src"), "ARRAY<TEXT>"}}, nil},
-		// SQLGlot currently cannot resolve the ARRAY JOIN alias; freeze the omission rather than claiming support.
+		// The engine currently cannot resolve the ARRAY JOIN alias; freeze the omission rather than
+		// claiming support.
 		{"clickhouse array join sumIf unsupported", "clickhouse", `SELECT id, x, sumIf(amount, active) AS total FROM src ARRAY JOIN items AS x GROUP BY id, x`, Schema{"src": {"id": "UInt64", "items": "Array(String)", "amount": "Float64", "active": "Bool"}}, []ColumnLineage{}, []string{"Schema Error: Column 'x' could not be resolved. Line: 1, Col: 12"}},
 		{"oracle hierarchy level", "oracle", `SELECT id, parent_id, LEVEL AS depth FROM nodes START WITH parent_id IS NULL CONNECT BY PRIOR id = parent_id`, Schema{"nodes": {"id": "NUMBER", "parent_id": "NUMBER"}}, []ColumnLineage{{"DEPTH", []UpstreamColumn{}, "UNKNOWN"}, {"ID", uc("ID", "NODES"), "DECIMAL"}, {"PARENT_ID", uc("PARENT_ID", "NODES"), "DECIMAL"}}, nil},
 		{"mysql json", "mysql", `SELECT id, JSON_UNQUOTE(JSON_EXTRACT(payload, '$.name')) AS name FROM users`, Schema{"users": {"id": "int", "payload": "json"}}, []ColumnLineage{{"id", uc("id", "users"), "INT"}, {"name", uc("payload", "users"), "UNKNOWN"}}, nil},
 		{"doris arrays bitmap", "doris", `SELECT id, ARRAY_SIZE(tags) AS n, BITMAP_COUNT(users) AS users FROM metrics`, Schema{"metrics": {"id": "BIGINT", "tags": "ARRAY<STRING>", "users": "BITMAP"}}, []ColumnLineage{{"id", uc("id", "metrics"), "BIGINT"}, {"n", uc("tags", "metrics"), "BIGINT"}, {"users", uc("users", "metrics"), "UNKNOWN"}}, nil},
 		{"starrocks arrays bitmap", "starrocks", `SELECT id, ARRAY_LENGTH(tags) AS n, BITMAP_COUNT(users) AS users FROM metrics`, Schema{"metrics": {"id": "BIGINT", "tags": "ARRAY<STRING>", "users": "BITMAP"}}, []ColumnLineage{{"id", uc("id", "metrics"), "BIGINT"}, {"n", uc("tags", "metrics"), "BIGINT"}, {"users", uc("users", "metrics"), "UNKNOWN"}}, nil},
-		// Ordinality currently inherits the array element type, not an integer type.
-		{"trino unnest ordinality", "trino", `SELECT e.id, u.item, u.n FROM events e CROSS JOIN UNNEST(e.items) WITH ORDINALITY AS u(item,n)`, Schema{"events": {"id": "bigint", "items": "array(varchar)"}}, []ColumnLineage{{"id", uc("id", "events"), "BIGINT"}, {"item", uc("items", "events"), "VARCHAR"}, {"n", uc("items", "events"), "VARCHAR"}}, nil},
+		{"trino unnest ordinality", "trino", `SELECT e.id, u.item, u.n FROM events e CROSS JOIN UNNEST(e.items) WITH ORDINALITY AS u(item,n)`, Schema{"events": {"id": "bigint", "items": "array(varchar)"}}, []ColumnLineage{{"id", uc("id", "events"), "BIGINT"}, {"item", uc("items", "events"), "VARCHAR"}, {"n", uc("items", "events"), "BIGINT"}}, nil},
 		{"athena row cast", "athena", `SELECT id, CAST(ROW(id, name) AS ROW(k BIGINT, label VARCHAR)) AS record FROM users`, Schema{"users": {"id": "bigint", "name": "varchar"}}, []ColumnLineage{{"id", uc("id", "users"), "BIGINT"}, {"record", []UpstreamColumn{{"id", "users"}, {"name", "users"}}, "STRUCT<k BIGINT, label VARCHAR>"}}, nil},
 		// The correlated aggregate loses the payment amount dependency today.
 		{"tsql cross apply", "tsql", `SELECT o.id, x.total FROM orders o CROSS APPLY (SELECT SUM(amount) AS total FROM payments p WHERE p.order_id=o.id) x`, Schema{"orders": {"id": "int"}, "payments": {"order_id": "int", "amount": "decimal(10,2)"}}, []ColumnLineage{{"id", uc("id", "orders"), "INT"}, {"total", uc("id", "orders"), "UNKNOWN"}}, nil},
@@ -111,6 +111,60 @@ func TestSQLParserColumnLineageContractPlatformFeatures(t *testing.T) {
 				tt.wantErrors = []string{}
 			}
 			require.Equal(t, &Lineage{Columns: tt.want, NonSelectedColumns: wantNonSelected, Errors: tt.wantErrors}, got)
+		})
+	}
+}
+
+// A function's output referenced by its alias, or a projection alias over a table function whose
+// columns are unknown, does not make the whole query unresolvable.
+func TestSQLParserColumnLineageContractTableFunctions(t *testing.T) {
+	tests := []struct {
+		name, dialect, query string
+		schema               Schema
+		want                 *Lineage
+	}{
+		{
+			"unnest alias as a column", "postgres", `SELECT x.id, elem FROM x CROSS JOIN LATERAL UNNEST(x.a) AS elem`,
+			Schema{"x": {"id": "int", "a": "int[]"}},
+			&Lineage{
+				Columns:            []ColumnLineage{{"elem", []UpstreamColumn{}, "UNKNOWN"}, {"id", uc("id", "x"), "INT"}},
+				NonSelectedColumns: []ColumnLineage{{"a", uc("a", "x"), ""}},
+			},
+		},
+		{
+			"lateral function alias in where", "postgres", `SELECT m.name FROM manufacturers AS m LEFT JOIN LATERAL GET_PRODUCT_NAMES(m.id) pname ON TRUE WHERE pname IS NULL`,
+			Schema{"manufacturers": {"id": "int", "name": "text"}},
+			&Lineage{
+				Columns:            []ColumnLineage{{"name", uc("name", "manufacturers"), "TEXT"}},
+				NonSelectedColumns: []ColumnLineage{{"id", uc("id", "manufacturers"), ""}},
+			},
+		},
+		{
+			"group by alias over read_parquet", "duckdb", `SELECT date_trunc('day', ts) AS day, count(*) AS n FROM read_parquet('s3://b/x.parquet') GROUP BY day`,
+			Schema{"t": {"a": "int"}},
+			&Lineage{
+				Columns:            []ColumnLineage{{"day", uc("ts", ""), "UNKNOWN"}, {"n", []UpstreamColumn{}, "BIGINT"}},
+				NonSelectedColumns: []ColumnLineage{{"ts", uc("ts", ""), ""}},
+			},
+		},
+		{
+			"group by alias over external query", "bigquery", `SELECT t.id, DATE(e.ts) AS day FROM t JOIN EXTERNAL_QUERY('conn', 'select 1') e ON e.id = t.id GROUP BY t.id, day`,
+			Schema{"t": {"id": "INT64"}},
+			&Lineage{
+				Columns: []ColumnLineage{{"day", []UpstreamColumn{}, "DATE"}, {"id", uc("id", "t"), "BIGINT"}},
+				NonSelectedColumns: []ColumnLineage{
+					{"id", []UpstreamColumn{{"id", "EXTERNAL_QUERY"}, {"id", "t"}}, ""},
+					{"ts", uc("ts", "EXTERNAL_QUERY"), ""},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.dialect+"/"+tt.name, func(t *testing.T) {
+			got, err := sharedSQLParser.ColumnLineage(tt.query, tt.dialect, tt.schema)
+			require.NoError(t, err)
+			tt.want.Errors = []string{}
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -223,15 +277,15 @@ func TestSQLParserColumnLineageContractBoundaryAndInvalidInputs(t *testing.T) {
 
 	atBoundary, err := parser.ColumnLineage("SELECT 1", "postgres", Schema{})
 	require.NoError(t, err)
-	// The exact boundary is sent to the subprocess (rather than rejected by Go).
+	// A query exactly at the boundary is analyzed rather than rejected.
 	require.Equal(t, &Lineage{Columns: []ColumnLineage{{"1", []UpstreamColumn{}, "INT"}}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{}}, atBoundary)
 
 	overBoundary, err := parser.ColumnLineage(strings.Repeat("x", 9), "postgres", Schema{})
 	require.NoError(t, err)
 	require.Equal(t, &Lineage{Columns: []ColumnLineage{}, NonSelectedColumns: []ColumnLineage{}, Errors: []string{"query is too long skipping column lineage analysis"}}, overBoundary)
 
-	// nil serializes to null. Python fails before producing a lineage response;
-	// Go ignores the singular "error" field and returns the zero value, not a Go error.
+	// nil serializes to null. The lineage command fails before producing a lineage response;
+	// its singular "error" field is ignored, so the result is the zero value, not a Go error.
 	nilSchema, err := sharedSQLParser.ColumnLineage("SELECT 1 AS one", "postgres", nil)
 	require.NoError(t, err)
 	require.Equal(t, &Lineage{}, nilSchema)

@@ -1,21 +1,15 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/merge_subqueries.py.
-
-// MergeSubqueries mirrors sqlglot.optimizer.merge_subqueries.merge_subqueries.
-//
-// Rewrite sqlglot AST to merge derived tables into the outer query.
-// This also merges CTEs if they are selected from only once.
-//
-// If leaveTablesIsolated is true, this will not merge inner queries into outer
-// queries if it would result in multiple table selects in a single query.
+// MergeSubqueries merges derived tables, and CTEs selected from only once, into the outer query.
+// With leaveTablesIsolated it skips merges that would put several table selects in one query.
 func MergeSubqueries(expression *Expr, leaveTablesIsolated bool) *Expr {
 	expression = MergeCTEs(expression, leaveTablesIsolated)
 	expression = MergeDerivedTables(expression, leaveTablesIsolated)
 	return expression
 }
 
-// msUnmergableArgs mirrors UNMERGABLE_ARGS: if a derived table has these Select args, it can't be merged.
+// msUnmergableArgs lists the Select args that keep a derived table from being merged: every arg
+// except expressions, from_, joins, where, order and hint.
 var msUnmergableArgs = func() []string {
 	keep := newStrSet("expressions", "from_", "joins", "where", "order", "hint")
 	var out []string
@@ -27,9 +21,8 @@ var msUnmergableArgs = func() []string {
 	return out
 }()
 
-// msSafeToReplaceUnwrapped mirrors SAFE_TO_REPLACE_UNWRAPPED: projections in the outer query that are
-// instances of these types can be replaced without getting wrapped in parentheses, because the
-// precedence won't be altered.
+// msSafeToReplaceUnwrapped lists the kinds of inner projections that can replace an outer column
+// without getting wrapped in parentheses, because the precedence won't be altered.
 var msSafeToReplaceUnwrapped = []Kind{KColumn, KEQ, KFunc, KNEQ, KParen}
 
 type msCTESelection struct {
@@ -38,9 +31,9 @@ type msCTESelection struct {
 	table      *Expr
 }
 
-// MergeCTEs mirrors merge_subqueries.merge_ctes.
 func MergeCTEs(expression *Expr, leaveTablesIsolated bool) *Expr {
 	scopes := TraverseScope(expression)
+	scopeLookup := msScopeLookup(scopes)
 
 	// All places where we select from CTEs.
 	// We key on the CTE scope so we can detect CTES that are selected from multiple times.
@@ -70,9 +63,9 @@ func MergeCTEs(expression *Expr, leaveTablesIsolated bool) *Expr {
 		if !fromOrJoin.IsA(KFrom, KJoin) {
 			continue
 		}
-		if msMergeable(outerScope, innerScope, leaveTablesIsolated, fromOrJoin) {
+		if msMergeable(outerScope, innerScope, leaveTablesIsolated, fromOrJoin, scopeLookup) {
 			alias := table.AliasOrName()
-			msRenameInnerSources(outerScope, innerScope, alias)
+			msRenameInnerSources(outerScope, innerScope, alias, scopeLookup)
 			msMergeFrom(outerScope, innerScope, table, alias)
 			msMergeExpressions(outerScope, innerScope, alias)
 			msMergeOrder(outerScope, innerScope)
@@ -86,9 +79,10 @@ func MergeCTEs(expression *Expr, leaveTablesIsolated bool) *Expr {
 	return expression
 }
 
-// MergeDerivedTables mirrors merge_subqueries.merge_derived_tables.
 func MergeDerivedTables(expression *Expr, leaveTablesIsolated bool) *Expr {
-	for _, outerScope := range TraverseScope(expression) {
+	scopes := TraverseScope(expression)
+	scopeLookup := msScopeLookup(scopes)
+	for _, outerScope := range scopes {
 		for _, subquery := range outerScope.DerivedTables() {
 			fromOrJoin := subquery.FindAncestor(KFrom, KJoin)
 			if !fromOrJoin.IsA(KFrom, KJoin) {
@@ -103,8 +97,8 @@ func MergeDerivedTables(expression *Expr, leaveTablesIsolated bool) *Expr {
 			if innerScope == nil {
 				continue
 			}
-			if msMergeable(outerScope, innerScope, leaveTablesIsolated, fromOrJoin) {
-				msRenameInnerSources(outerScope, innerScope, alias)
+			if msMergeable(outerScope, innerScope, leaveTablesIsolated, fromOrJoin, scopeLookup) {
+				msRenameInnerSources(outerScope, innerScope, alias, scopeLookup)
 				msMergeFrom(outerScope, innerScope, subquery, alias)
 				msMergeExpressions(outerScope, innerScope, alias)
 				msMergeOrder(outerScope, innerScope)
@@ -119,9 +113,7 @@ func MergeDerivedTables(expression *Expr, leaveTablesIsolated bool) *Expr {
 	return expression
 }
 
-// msMergeable mirrors merge_subqueries._mergeable: return true if `inner_select` can be merged into
-// the outer query.
-func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOrJoin *Expr) bool {
+func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOrJoin *Expr, scopeLookup map[*Expr]*Scope) bool {
 	innerSelect := innerScope.Expression.UnnestSubqueryOrParen()
 
 	// A window function's result depends on the full row set it sees, so merging the
@@ -205,7 +197,7 @@ func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOr
 			}
 		}
 
-		// not grouped <= projected
+		// every grouped name must also be projected
 		for name := range grouped {
 			if !projected.Has(name) {
 				return true
@@ -234,7 +226,7 @@ func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOr
 			return false
 		}
 		var selections []string
-		for c := range on.FindAll(KColumn) {
+		for c := range FindAllInScope(on, KColumn) {
 			if c.TableName() == alias {
 				selections = append(selections, c.Name())
 			}
@@ -316,6 +308,15 @@ func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOr
 	if innerSelect.Arg("from_") == nil || len(outerScope.Pivots()) > 0 {
 		return false
 	}
+	// Merging can move filters and projections across row pairing and padding.
+	for _, scope := range []*Scope{outerScope, innerScope} {
+		for join := range scope.FindAll(KJoin) {
+			method, kind := join.MethodText(), join.KindText()
+			if method == "ASOF" || method == "POSITIONAL" || kind == "ASOF" || kind == "ANY" || kind == "PASTE" || join.ArgB("nearest") {
+				return false
+			}
+		}
+	}
 	for _, e := range innerSelect.Expressions() {
 		if e.Find(KAggFunc, KSelect, KExplode) != nil {
 			return false
@@ -339,6 +340,46 @@ func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOr
 			}
 		}
 	}
+
+	if externalSources := msExternalSources(innerScope); len(externalSources) > 0 {
+		innerName := fromOrJoin.AliasOrName()
+		// Ancestor sources can't be renamed here, so merges that would capture them are skipped
+		for _, ref := range outerScope.References() {
+			if ref.Name != innerName && externalSources.Has(ref.Name) {
+				return false
+			}
+		}
+
+		outerColumns := outerScope.SourceColumns(innerName)
+		projections := newOMap[*Expr]()
+		for _, s := range innerSelect.Selects() {
+			projections.Set(s.AliasOrName(), s)
+		}
+		for _, name := range projections.Keys() {
+			projection, _ := projections.Get(name)
+			sources := newStrSet()
+			for column := range projection.FindAll(KColumn) {
+				if externalSources.Has(column.TableName()) {
+					sources.Add(column.TableName())
+				}
+			}
+			if len(sources) == 0 {
+				continue
+			}
+			var references []*Expr
+			for _, column := range outerColumns {
+				if column.Name() == name {
+					references = append(references, column)
+				}
+			}
+			for nested := range msNestedSourceNames(outerScope, references, scopeLookup) {
+				if sources.Has(nested) {
+					return false
+				}
+			}
+		}
+	}
+
 	return !outerSelectJoinsOnInnerSelectJoin() &&
 		!windowProjectionBlocksMerge() &&
 		!literalGroupUnmergeable() &&
@@ -348,49 +389,139 @@ func msMergeable(outerScope, innerScope *Scope, leaveTablesIsolated bool, fromOr
 		!seqGet(innerSelect.Expressions(), 0).IsA(KQueryTransform)
 }
 
-// msRenameInnerSources mirrors merge_subqueries._rename_inner_sources: renames any sources in the
-// inner query that conflict with names in the outer query.
-func msRenameInnerSources(outerScope, innerScope *Scope, alias string) {
-	innerKeys := innerScope.SelectedSources().Keys()
-	outerKeys := outerScope.SelectedSources().Keys()
-	innerTaken := newStrSet(innerKeys...)
-	outerTaken := newStrSet(outerKeys...)
+func msScopeLookup(scopes []*Scope) map[*Expr]*Scope {
+	lookup := make(map[*Expr]*Scope, len(scopes))
+	for _, scope := range scopes {
+		lookup[scope.Expression] = scope
+	}
+	return lookup
+}
 
-	// conflicts = outer_taken & inner_taken - {alias}. Python iterates this set in an arbitrary
-	// order; the result does not depend on it (new names are never conflicts), so use outer order.
+func msExternalSources(scope *Scope) StrSet {
+	names := newStrSet()
+	for _, column := range scope.ExternalColumns() {
+		names.Add(column.TableName())
+	}
+	return names
+}
+
+// msNestedSourceNames returns the names of the sources of the scopes nested in scope that lie on
+// the path of the given (correlated) column references, which could capture them.
+func msNestedSourceNames(scope *Scope, columns []*Expr, scopeLookup map[*Expr]*Scope) StrSet {
+	names := newStrSet()
+	seen := map[*Expr]bool{scope.Expression: true}
+	for _, column := range columns {
+		if _, ok := scope.ColumnIndex()[column]; ok {
+			continue
+		}
+
+		// Only scopes on a reference's path can capture it. Shared paths are visited once.
+		for node := column.Parent(); node != nil && !seen[node]; node = node.Parent() {
+			seen[node] = true
+			if nested := scopeLookup[node]; nested != nil {
+				for _, ref := range nested.References() {
+					names.Add(ref.Name)
+				}
+			}
+		}
+	}
+	return names
+}
+
+// msRenameInnerSources renames any sources in the inner query that conflict with names in the
+// outer query: its sources, the outer sources it references and those of the nested scopes that
+// would capture the merged references.
+func msRenameInnerSources(outerScope, innerScope *Scope, alias string, scopeLookup map[*Expr]*Scope) {
+	var outerNames []string
+	for _, ref := range outerScope.References() {
+		if ref.Name != alias {
+			outerNames = append(outerNames, ref.Name)
+		}
+	}
+	for _, column := range outerScope.ExternalColumns() {
+		outerNames = append(outerNames, column.TableName())
+	}
+	outerTaken := newStrSet(outerNames...)
+	for name := range msNestedSourceNames(outerScope, outerScope.SourceColumns(alias), scopeLookup) {
+		outerTaken.Add(name)
+	}
+
+	// The result does not depend on the order the conflicts are renamed in (new names are never
+	// conflicts); they follow the inner order.
 	var conflicts []string
-	for _, name := range outerKeys {
-		if innerTaken.Has(name) && name != alias {
+	for _, name := range innerScope.SelectedSources().Keys() {
+		if outerTaken.Has(name) {
 			conflicts = append(conflicts, name)
 		}
 	}
+	if len(conflicts) == 0 {
+		return
+	}
+	conflictSet := newStrSet(conflicts...)
 
-	taken := outerTaken.Clone().Add(innerKeys...)
+	taken := outerTaken.Clone()
+	for _, ref := range innerScope.References() {
+		taken.Add(ref.Name)
+	}
+	for _, column := range innerScope.ExternalColumns() {
+		taken.Add(column.TableName())
+	}
+	var tableColumns []*Expr
+	for _, scope := range innerScope.Traverse() {
+		for _, column := range scope.TableColumns() {
+			if conflictSet.Has(column.Name()) && !msNestedSourceNames(innerScope, []*Expr{column}, scopeLookup).Has(column.Name()) {
+				tableColumns = append(tableColumns, column)
+			}
+		}
+	}
+	var references []*Expr
+	for _, column := range innerScope.Columns() {
+		if conflictSet.Has(column.TableName()) {
+			references = append(references, column)
+		}
+	}
+	for name := range msNestedSourceNames(innerScope, append(references, tableColumns...), scopeLookup) {
+		taken.Add(name)
+	}
 
 	for _, conflict := range conflicts {
 		newName := findNewNameOMap(taken.Has, conflict)
+		taken.Add(newName)
 
 		selected, _ := innerScope.SelectedSources().Get(conflict)
-		source := selected.Node
-		newAlias := ToIdentifier(newName, nil)
+		aliasHolder := selected.Node
+		if aliasHolder.Parent().IsA(KSubquery) {
+			aliasHolder = aliasHolder.Parent()
+		}
+		tableAlias := aliasHolder.ArgE("alias")
+		if tableAlias == nil {
+			tableAlias = New(KTableAlias)
+		}
+		tableAlias.Set("this", ToIdentifier(newName, nil))
+		aliasHolder.Set("alias", tableAlias)
 
-		if source.IsA(KTable) && source.Alias() != "" {
-			source.Set("alias", New(KTableAlias, "this", newAlias))
-		} else if source.IsA(KTable) {
-			source.Replace(AliasExpr(source, newAlias, nil, true))
-		} else if source.Parent().IsA(KSubquery) {
-			source.Parent().Set("alias", New(KTableAlias, "this", newAlias))
+		for _, joinHint := range innerScope.JoinHints() {
+			for table := range joinHint.FindAll(KTable) {
+				if table.AliasOrName() == conflict {
+					table.Set("this", ToIdentifier(newName, nil))
+				}
+			}
 		}
 
 		for _, column := range innerScope.SourceColumns(conflict) {
 			column.Set("table", ToIdentifier(newName, nil))
 		}
 
+		for _, tableColumn := range tableColumns {
+			if tableColumn.Name() == conflict {
+				tableColumn.Set("this", ToIdentifier(newName, nil))
+			}
+		}
+
 		innerScope.RenameSource(conflict, newName)
 	}
 }
 
-// msMergeFrom mirrors merge_subqueries._merge_from: merge FROM clause of inner query into outer query.
 func msMergeFrom(outerScope, innerScope *Scope, nodeToReplace *Expr, alias string) {
 	newSubquery := innerScope.Expression.ArgE("from_").This()
 	newSubquery.Set("joins", nodeToReplace.Arg("joins"))
@@ -411,7 +542,6 @@ func msMergeFrom(outerScope, innerScope *Scope, nodeToReplace *Expr, alias strin
 	outerScope.AddSource(name, src)
 }
 
-// msMergeJoins mirrors merge_subqueries._merge_joins: merge JOIN clauses of inner query into outer query.
 func msMergeJoins(outerScope, innerScope *Scope, fromOrJoin *Expr) {
 	var newJoins []*Expr
 
@@ -430,10 +560,9 @@ func msMergeJoins(outerScope, innerScope *Scope, fromOrJoin *Expr) {
 	if len(newJoins) > 0 {
 		outerJoins := outerScope.Expression.ArgL("joins")
 
-		// Maintain the join order
 		position := 0
 		if !fromOrJoin.IsA(KFrom) {
-			// list.index: first element that is (or equals) from_or_join
+			// position of the first outer join that is (or equals) fromOrJoin
 			idx := -1
 			for i, j := range outerJoins {
 				if j == fromOrJoin || j.Equal(fromOrJoin) {
@@ -455,10 +584,7 @@ func msMergeJoins(outerScope, innerScope *Scope, fromOrJoin *Expr) {
 	}
 }
 
-// msMergeExpressions mirrors merge_subqueries._merge_expressions: merge projections of inner query
-// into outer query.
 func msMergeExpressions(outerScope, innerScope *Scope, alias string) {
-	// Collect all columns that reference the alias of the inner query
 	outerColumns := map[string][]*Expr{}
 	for _, column := range outerScope.Columns() {
 		if column.TableName() == alias {
@@ -468,7 +594,6 @@ func msMergeExpressions(outerScope, innerScope *Scope, alias string) {
 
 	group := outerScope.Expression.ArgE("group")
 
-	// Replace columns with the projection expression in the inner query
 	for _, expression := range innerScope.Expression.Expressions() {
 		projectionName := expression.AliasOrName()
 		if projectionName == "" {
@@ -485,9 +610,8 @@ func msMergeExpressions(outerScope, innerScope *Scope, alias string) {
 		isNumber := expression.IsNumber()
 		last := len(columnsToReplace) - 1
 
-		groupOrdinal := -1 // None
+		groupOrdinal := -1 // no ordinal
 		if isNumber && outerScope.Expression.IsA(KSelect) {
-			// Find the ordinal of the outer SELECT that references this inner projection.
 			for j, s := range outerScope.Expression.Selects() {
 				unaliased := s.Unalias()
 				if unaliased.IsA(KColumn) &&
@@ -504,7 +628,7 @@ func msMergeExpressions(outerScope, innerScope *Scope, alias string) {
 
 			// A numeric-literal projection can't be inlined into a top-level GROUP BY item
 			// (positional context), canonicalize to the projection's ordinal to match
-			// qualify. _mergeable guarantees the ordinal exists.
+			// qualify. msMergeable guarantees the ordinal exists.
 			if isNumber && group != nil {
 				var item *Expr
 				for _, e := range group.Expressions() {
@@ -543,9 +667,19 @@ func msMergeExpressions(outerScope, innerScope *Scope, alias string) {
 			}
 		}
 	}
+
+	// The replaced columns may also be cached by the outer scope's descendants, e.g. as the
+	// external columns of a correlated subquery
+	if len(outerColumns) > 0 {
+		for _, scope := range outerScope.Traverse() {
+			scope.ClearCache()
+		}
+	}
 }
 
-// msMergeWhere mirrors merge_subqueries._merge_where: merge WHERE clause of inner query into outer query.
+// msMergeWhere merges the WHERE clause of the inner query into the outer query. For a joined
+// inner query whose condition only references sources joined so far, it goes into the join's ON
+// clause instead.
 func msMergeWhere(outerScope, innerScope *Scope, fromOrJoin *Expr) {
 	where := innerScope.Expression.ArgE("where")
 	if where == nil || where.This() == nil {
@@ -555,8 +689,6 @@ func msMergeWhere(outerScope, innerScope *Scope, fromOrJoin *Expr) {
 	expression := outerScope.Expression
 
 	if fromOrJoin.IsA(KJoin) {
-		// Merge predicates from an outer join to the ON clause
-		// if it only has columns that are already joined
 		from := expression.ArgE("from_")
 		sources := newStrSet()
 		if from != nil {
@@ -588,7 +720,6 @@ func msMergeWhere(outerScope, innerScope *Scope, fromOrJoin *Expr) {
 	expression.QueryWhere([]*Expr{where.This()}, true, false)
 }
 
-// msMergeOrder mirrors merge_subqueries._merge_order: merge ORDER clause of inner query into outer query.
 func msMergeOrder(outerScope, innerScope *Scope) {
 	innerOrder := innerScope.Expression.ArgE("order")
 	if innerOrder == nil {
@@ -612,7 +743,6 @@ func msMergeOrder(outerScope, innerScope *Scope) {
 	outerScope.Expression.Set("order", innerOrder)
 }
 
-// msMergeHints mirrors merge_subqueries._merge_hints.
 func msMergeHints(outerScope, innerScope *Scope) {
 	innerScopeHint := innerScope.Expression.ArgE("hint")
 	if innerScopeHint == nil {
@@ -628,7 +758,6 @@ func msMergeHints(outerScope, innerScope *Scope) {
 	}
 }
 
-// msPopCTE mirrors merge_subqueries._pop_cte: remove CTE from the AST.
 func msPopCTE(innerScope *Scope) {
 	cte := innerScope.Expression.Parent()
 	if cte == nil {
@@ -645,5 +774,6 @@ func msPopCTE(innerScope *Scope) {
 	}
 }
 
-// msKeyError renders a Python KeyError message for a missing string key.
+// msKeyError formats the error message for a missing source or projection name: the name in
+// single quotes, the message's historical wording.
 func msKeyError(key string) string { return "'" + key + "'" }

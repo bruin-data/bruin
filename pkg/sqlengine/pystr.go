@@ -6,11 +6,8 @@ import (
 	"unicode"
 )
 
-// Helpers that reproduce Python str semantics used by sqlglot.
-
 func itoa(i int) string { return strconv.Itoa(i) }
 
-// pyUpper mirrors str.upper().
 // pyUpperEq reports whether pyUpper(s) == upper, without allocating for ASCII s.
 func pyUpperEq(s, upper string) bool {
 	if len(s) != len(upper) {
@@ -58,6 +55,7 @@ func upperASCII(buf []byte, s string) ([]byte, bool) {
 	return buf[:len(s)], true
 }
 
+// pyUpper uppercases s with full Unicode case mapping (ß becomes SS), unlike strings.ToUpper.
 func pyUpper(s string) string {
 	ascii := true
 	for i := range len(s) {
@@ -80,7 +78,8 @@ func pyUpper(s string) string {
 	return b.String()
 }
 
-// pyLower mirrors str.lower().
+// pyLower lowercases s with full Unicode case mapping (İ becomes i plus a combining dot), unlike
+// strings.ToLower.
 func pyLower(s string) string {
 	ascii := true
 	for i := range len(s) {
@@ -103,7 +102,8 @@ func pyLower(s string) string {
 	return b.String()
 }
 
-// pyIsSpaceRune mirrors str.isspace() for a single character.
+// pyIsSpaceRune reports whether r is whitespace: ASCII whitespace, the information separators
+// U+001C..U+001F, NEL, and the Unicode space, line and paragraph separators (including NBSP).
 func pyIsSpaceRune(r rune) bool {
 	switch r {
 	case '\t', '\n', '\x0b', '\x0c', '\r', '\x1c', '\x1d', '\x1e', '\x1f', ' ', '\x85', '\xa0',
@@ -113,7 +113,6 @@ func pyIsSpaceRune(r rune) bool {
 	return r >= ' ' && r <= ' '
 }
 
-// pyStrip mirrors str.strip() with no arguments.
 func pyStrip(s string) string {
 	return strings.TrimFunc(s, pyIsSpaceRune)
 }
@@ -132,7 +131,8 @@ func pyIsAlphaRune(r rune) bool {
 	return unicode.IsLetter(r)
 }
 
-// pyIsIdentifierRune mirrors str.isidentifier() for a single character.
+// pyIsIdentifierRune reports whether r can start an identifier: an underscore, a letter, a letter
+// number (Nl) or an Other_ID_Start character.
 func pyIsIdentifierRune(r rune) bool {
 	if r < 0x80 {
 		return r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
@@ -140,7 +140,8 @@ func pyIsIdentifierRune(r rune) bool {
 	return unicode.IsLetter(r) || unicode.Is(unicode.Nl, r) || unicode.Is(unicode.Other_ID_Start, r)
 }
 
-// pyIsDigit mirrors str.isdigit() (false for the empty string).
+// pyIsDigit reports whether s is non-empty and every rune is a decimal digit or another
+// numeric digit (category No, e.g. superscripts).
 func pyIsDigit(s string) bool {
 	if s == "" {
 		return false
@@ -153,7 +154,8 @@ func pyIsDigit(s string) bool {
 	return true
 }
 
-// pyRepr mirrors repr() of a Python str.
+// pyRepr quotes s for error messages: single quotes, or double quotes when s contains a single
+// quote but no double quote; backslashes, the active quote and control characters are escaped.
 func pyRepr(s string) string {
 	quote := byte('\'')
 	if strings.Contains(s, "'") && !strings.Contains(s, "\"") {

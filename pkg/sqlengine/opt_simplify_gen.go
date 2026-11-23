@@ -1,15 +1,12 @@
 package sqlengine
 
-// Port of simplify.gen / simplify.Gen (sqlglot/optimizer/simplify.py): a simple pseudo sql
-// generator for quickly generating sortable and uniq strings.
-
 import (
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-// smpGen mirrors simplify.gen(expression, comments).
+// smpGen renders expression as pseudo-SQL, including comments when comments is set.
 //
 // Sorting and deduping sql is a necessary step for optimization. Calling the actual
 // generator is expensive so we have a bare minimum sql generator here.
@@ -97,7 +94,7 @@ func (g *smpGenState) gen(expression *Expr, comments bool) string {
 	return g.sqls.String()
 }
 
-// smpPyStr mirrors str(value) for scalar argument values.
+// smpPyStr formats a scalar argument value: booleans as True/False, DTypes as DType.<NAME>.
 func smpPyStr(v any) string {
 	switch x := v.(type) {
 	case string:
@@ -115,7 +112,8 @@ func smpPyStr(v any) string {
 	return fmt.Sprint(v)
 }
 
-// dispatch mirrors GEN_DISPATCH (handlers are looked up by the exact expression key).
+// dispatch pushes the rendering of e when its exact kind has a dedicated handler and reports
+// whether it did.
 func (g *smpGenState) dispatch(e *Expr) bool {
 	switch e.kind {
 	case KAdd:
@@ -176,7 +174,11 @@ func (g *smpGenState) dispatch(e *Expr) bool {
 	case KIntDiv:
 		g.binary(e, " DIV ")
 	case KIs:
-		g.binary(e, " IS ")
+		if e.ArgB("negate") {
+			g.binary(e, " IS NOT ")
+		} else {
+			g.binary(e, " IS ")
+		}
 	case KLike:
 		if e.ArgB("negate") {
 			g.binary(e, " NOT Like ")
@@ -199,6 +201,8 @@ func (g *smpGenState) dispatch(e *Expr) bool {
 		g.binary(e, " * ")
 	case KNeg:
 		g.push(e.Arg("this"), "-")
+	case KPos:
+		g.push(e.Arg("this"), "+")
 	case KNEQ:
 		g.binary(e, " <> ")
 	case KNot:

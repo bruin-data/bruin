@@ -1,11 +1,14 @@
 package sqlengine
 
 import (
+	"compress/gzip"
+	"encoding/json"
+	"os"
 	"sync"
 	"testing"
 )
 
-// Benchmarks over the conformance corpus (sqlglot's own test-suite SQL, 21 dialects) and the
+// Benchmarks over the golden corpus (testdata/golden/statements.jsonl, 21 dialects) and the
 // TPC-H / TPC-DS queries. Each op is one pass over the whole input set.
 
 type benchStmt struct {
@@ -13,19 +16,33 @@ type benchStmt struct {
 	sql string
 }
 
+// benchCorpus holds the golden statements that parse and regenerate without error.
 var benchCorpus = sync.OnceValues(func() ([]benchStmt, error) {
-	var cases []parseCase
-	loadGz(&testing.T{}, "testdata/parse.json.gz", &cases)
+	stmts, err := goldenStatements()
+	if err != nil {
+		return nil, err
+	}
 	var out []benchStmt
-	for _, c := range cases {
-		if c.Error != "" || c.GenError != "" {
-			continue
-		}
-		d, err := GetDialect(c.Dialect)
+	for _, s := range stmts {
+		d, err := GetDialect(s.Dialect)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, benchStmt{d, c.SQL})
+		trees, err := safeParse(d, s.SQL)
+		if err != nil {
+			continue
+		}
+		ok := true
+		for _, tr := range trees {
+			if tr != nil {
+				if _, err := safeGenerate(d, tr); err != nil {
+					ok = false
+				}
+			}
+		}
+		if ok {
+			out = append(out, benchStmt{d, s.SQL})
+		}
 	}
 	return out, nil
 })
@@ -36,8 +53,20 @@ type tpcSet struct {
 }
 
 func loadTPC(b *testing.B) map[string]tpcSet {
+	b.Helper()
+	f, err := os.Open("testdata/tpc.json.gz")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		b.Fatal(err)
+	}
 	var sets map[string]tpcSet
-	loadGz(b, "testdata/tpc.json.gz", &sets)
+	if err := json.NewDecoder(gz).Decode(&sets); err != nil {
+		b.Fatal(err)
+	}
 	return sets
 }
 
@@ -146,7 +175,7 @@ func BenchmarkOptimizeLineageRules(b *testing.B) {
 	benchOptimize(b, []OptimizerRule{RuleQualify, RuleUnnestSubqueries, RuleMergeSubqueries, RuleAnnotateTypes})
 }
 
-// BenchmarkOptimizeDefaultRules uses sqlglot's full default rule list (Bruin's fallback path).
+// BenchmarkOptimizeDefaultRules uses the full default optimizer rule list (Bruin's fallback path).
 func BenchmarkOptimizeDefaultRules(b *testing.B) {
 	benchOptimize(b, nil)
 }

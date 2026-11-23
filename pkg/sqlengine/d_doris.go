@@ -1,8 +1,6 @@
 package sqlengine
 
-// Port of sqlglot/dialects/doris.py (class Doris), sqlglot/parsers/doris.py (DorisParser) and
-// sqlglot/generators/doris.py (DorisGenerator). Doris inherits from MySQL: only the differences
-// from the MySQL classes are ported here.
+// Doris builds on MySQL; this file holds only the behavior that differs from it.
 
 import (
 	"strings"
@@ -15,12 +13,8 @@ func init() {
 	mysqlPartitionRangeValueImpls["doris"] = dorisParsePartitionRangeValue
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers of sqlglot/parsers/doris.py and sqlglot/generators/doris.py
-// ---------------------------------------------------------------------------------------------
-
-// dorisBuildDateTrunc mirrors _build_date_trunc.
-// Accept both DATE_TRUNC(datetime, unit) and DATE_TRUNC(unit, datetime).
+// dorisBuildDateTrunc builds TimestampTrunc from DATE_TRUNC(datetime, unit) or
+// DATE_TRUNC(unit, datetime): a string literal without digits is taken as the unit.
 func dorisBuildDateTrunc(args []*Expr, d *Dialect) *Expr {
 	a0, a1 := seqGet(args, 0), seqGet(args, 1)
 
@@ -37,7 +31,6 @@ func dorisBuildDateTrunc(args []*Expr, d *Dialect) *Expr {
 		return true
 	}
 
-	// Determine which argument is the unit
 	unit, this := a1, a0
 	if isUnitLike(a0) {
 		unit, this = a0, a1
@@ -46,7 +39,8 @@ func dorisBuildDateTrunc(args []*Expr, d *Dialect) *Expr {
 	return New(KTimestampTrunc, "this", this, "unit", unit)
 }
 
-// dorisLagLeadSQL mirrors _lag_lead_sql.
+// dorisLagLeadSQL renders LAG and LEAD with an explicit offset (default 1) and default value
+// (default NULL).
 func dorisLagLeadSQL(g *Generator, e *Expr) string {
 	name := "LEAD"
 	if e.IsA(KLag) {
@@ -63,14 +57,9 @@ func dorisLagLeadSQL(g *Generator, e *Expr) string {
 	return g.fn(name, e.Arg("this"), offset, def)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Customizer
-// ---------------------------------------------------------------------------------------------
-
 func customizeDoris(d *Dialect) {
 	P := d.P
 
-	// FUNCTIONS
 	P.FUNCTIONS["ADDDATE"] = buildDateDeltaWithInterval(KDateAdd, "DAY")
 	P.FUNCTIONS["COLLECT_SET"] = fromArgList(KArrayUniqueAgg)
 	P.FUNCTIONS["DATE_ADD"] = buildDateDeltaWithInterval(KDateAdd, "DAY")
@@ -82,35 +71,90 @@ func customizeDoris(d *Dialect) {
 	P.FUNCTIONS["SUBDATE"] = buildDateDeltaWithInterval(KDateSub, "DAY")
 	P.FUNCTIONS["TO_DATE"] = fromArgList(KTsOrDsToDate)
 
-	// FUNCTION_PARSERS
 	delete(P.FUNCTION_PARSERS, "GROUP_CONCAT")
 
-	// PROPERTY_PARSERS
-	P.PROPERTY_PARSERS["PROPERTIES"] = mysqlNoKwargs("DorisParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["PROPERTIES"] = noKwargs(func(p *Parser) any {
 		return p.parseWrappedProperties()
 	})
-	P.PROPERTY_PARSERS["UNIQUE"] = mysqlNoKwargs("DorisParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["UNIQUE"] = noKwargs(func(p *Parser) any {
 		return anyExpr(p.parseCompositeKeyProperty(KUniqueKeyProperty))
 	})
-	// Plain KEY without UNIQUE/DUPLICATE/AGGREGATE prefixes should be treated as UniqueKeyProperty with unique=False
-	P.PROPERTY_PARSERS["KEY"] = mysqlNoKwargs("DorisParser.<lambda>", func(p *Parser) any {
+	// Plain KEY without UNIQUE/DUPLICATE/AGGREGATE prefixes is parsed as a UniqueKeyProperty too
+	P.PROPERTY_PARSERS["KEY"] = noKwargs(func(p *Parser) any {
 		return anyExpr(p.parseCompositeKeyProperty(KUniqueKeyProperty))
 	})
-	P.PROPERTY_PARSERS["BUILD"] = mysqlNoKwargs("DorisParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["BUILD"] = noKwargs(func(p *Parser) any {
 		return anyExpr(dorisParseBuildProperty(p))
 	})
-	P.PROPERTY_PARSERS["REFRESH"] = mysqlNoKwargs("DorisParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["REFRESH"] = noKwargs(func(p *Parser) any {
 		return anyExpr(dorisParseRefreshProperty(p))
 	})
+
+	P.h.parseRange = dorisParseRange
 
 	customizeDorisGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// DorisParser methods
-// ---------------------------------------------------------------------------------------------
+// dorisMatchOperators are the full-text search operators.
+// https://doris.apache.org/docs/sql-manual/basic-element/operators/conditional-operators/full-text-search-operators
+var dorisMatchOperators = newStrSet(
+	"MATCH",
+	"MATCH_ALL",
+	"MATCH_ANY",
+	"MATCH_PHRASE",
+	"MATCH_PHRASE_EDGE",
+	"MATCH_PHRASE_PREFIX",
+	"MATCH_REGEXP",
+)
 
-// dorisParsePartitionProperty mirrors DorisParser._parse_partition_property.
+// dorisParseRange parses a full-text search predicate, x [NOT] MATCH[_<kind>] y [USING ANALYZER
+// name], before the usual range predicates. The operators are recognized by their text, so one
+// that has no operand after it (an implicit alias spelled like it) parses as before. The MySQL
+// range parser handles the rest.
+func dorisParseRange(p *Parser, this *Expr, parseIs bool) *Expr {
+	if this == nil {
+		this = p.parseBitwise()
+	}
+	index := p.index
+	negate := p.match(TK_NOT)
+
+	if p.curr.ok() && p.curr.Type == TK_VAR && dorisMatchOperators.Has(upperText(p.curr)) {
+		p.advance(1)
+		var kind any
+		if _, k, _ := strings.Cut(upperText(p.prev), "_"); k != "" {
+			kind = k
+		}
+		expression := p.parseBitwise()
+		if expression == nil {
+			p.retreat(index)
+			return mysqlParseRange(p, this, parseIs)
+		}
+
+		var analyzer *Expr
+		if p.matchTextSeq("USING", "ANALYZER") {
+			analyzer = p.parseString()
+			if analyzer == nil {
+				analyzer = p.parseIdVar(false, nil)
+			}
+			if analyzer == nil {
+				p.raiseError("Expected an analyzer name after USING ANALYZER", nil)
+			}
+		}
+
+		this = p.expression(New(KMatch, "this", this, "expression", expression, "kind", kind, "analyzer", analyzer))
+		if negate {
+			this = p.expression(New(KNot, "this", this))
+		}
+	} else if negate {
+		p.retreat(index)
+	}
+
+	return mysqlParseRange(p, this, parseIs)
+}
+
+// dorisParsePartitionProperty parses PARTITION BY: the MySQL forms, followed by an optional list
+// of dynamic FROM ... TO ... INTERVAL partitions, or a plain PARTITION BY expression when the
+// MySQL forms do not match.
 func dorisParsePartitionProperty(p *Parser) any {
 	expr := mysqlParsePartitionProperty(p)
 
@@ -138,7 +182,6 @@ func dorisParsePartitionProperty(p *Parser) any {
 	))
 }
 
-// dorisParsePartitioningGranularityDynamic mirrors DorisParser._parse_partitioning_granularity_dynamic.
 func dorisParsePartitioningGranularityDynamic(p *Parser) *Expr {
 	p.matchTextSeq("FROM")
 	start := p.parseWrapped(func() *Expr { return p.parseString() }, false)
@@ -151,7 +194,8 @@ func dorisParsePartitioningGranularityDynamic(p *Parser) *Expr {
 	return p.expression(New(KPartitionByRangePropertyDynamic, "start", start, "end", end, "every", every))
 }
 
-// dorisParsePartitionRangeValue mirrors DorisParser._parse_partition_range_value.
+// dorisParsePartitionRangeValue parses a range partition: the MySQL forms plus Doris's
+// VALUES [(...), (...)).
 func dorisParsePartitionRangeValue(p *Parser) *Expr {
 	expr := mysqlParsePartitionRangeValue(p)
 
@@ -162,7 +206,6 @@ func dorisParsePartitionRangeValue(p *Parser) *Expr {
 	p.matchTextSeq("VALUES")
 	name := expr
 
-	// Doris-specific bracket syntax: VALUES [(...), (...))
 	p.match(TK_L_BRACKET)
 	values := parseCSVAny(p, func() []*Expr {
 		return p.parseWrappedCSV(func() *Expr { return p.parseExpression() }, TK_COMMA, false)
@@ -171,7 +214,7 @@ func dorisParsePartitionRangeValue(p *Parser) *Expr {
 	p.match(TK_R_BRACKET)
 	p.match(TK_R_PAREN)
 
-	// A list of lists, like in Python
+	// expressions holds a list of value lists
 	valuesAny := make([]any, len(values))
 	for i, v := range values {
 		valuesAny[i] = v
@@ -180,12 +223,12 @@ func dorisParsePartitionRangeValue(p *Parser) *Expr {
 	return p.expression(New(KPartition, "expressions", []*Expr{partRange}))
 }
 
-// dorisParseBuildProperty mirrors DorisParser._parse_build_property.
 func dorisParseBuildProperty(p *Parser) *Expr {
 	return p.expression(New(KBuildProperty, "this", p.parseVar(false, nil, true)))
 }
 
-// dorisParseRefreshProperty mirrors DorisParser._parse_refresh_property.
+// dorisParseRefreshProperty parses REFRESH <method> [ON MANUAL|COMMIT|SCHEDULE] [EVERY n unit]
+// [STARTS 'timestamp']. Absent parts are stored as false, except unit, which is nil.
 func dorisParseRefreshProperty(p *Parser) *Expr {
 	method := p.parseVar(false, nil, true)
 
@@ -217,10 +260,6 @@ func dorisParseRefreshProperty(p *Parser) *Expr {
 		"starts", starts,
 	))
 }
-
-// ---------------------------------------------------------------------------------------------
-// DorisGenerator
-// ---------------------------------------------------------------------------------------------
 
 func customizeDorisGenerator(d *Dialect) {
 	G := d.G
@@ -273,16 +312,30 @@ func customizeDorisGenerator(d *Dialect) {
 	G.h.partitionrangeSQL = dorisPartitionrangeSQL
 	G.h.partitionbyrangepropertydynamicSQL = dorisPartitionbyrangepropertydynamicSQL
 	G.h.tableSQL = dorisTableSQL
+	G.methods[KMatch] = dorisMatchSQL
 	G.methods[KPartitionedByProperty] = dorisPartitionedbypropertySQL
 }
 
-// dorisUniquekeypropertySQL mirrors DorisGenerator.uniquekeyproperty_sql.
+func dorisMatchSQL(g *Generator, e *Expr) string {
+	op := "MATCH"
+	if kind := e.Text("kind"); kind != "" {
+		op += "_" + kind
+	}
+	sql := g.binary(e, op)
+	if analyzer := g.sqlKey(e, "analyzer"); analyzer != "" {
+		return sql + " USING ANALYZER " + analyzer
+	}
+	return sql
+}
+
+// dorisUniquekeypropertySQL renders KEY (...) in materialized view definitions and UNIQUE KEY (...)
+// elsewhere.
 func dorisUniquekeypropertySQL(g *Generator, e *Expr, prefix string) string {
 	createStmt := e.FindAncestor(KCreate)
 	if createStmt != nil {
 		props := createStmt.ArgE("properties")
 		if props == nil {
-			// create_stmt.args["properties"].find(...) on None raises AttributeError
+			// a CREATE without properties is rejected; the message keeps its historical wording
 			panic(&ValueError{Msg: "'NoneType' object has no attribute 'find'"})
 		}
 		if props.Find(KMaterializedProperty) != nil {
@@ -293,10 +346,11 @@ func dorisUniquekeypropertySQL(g *Generator, e *Expr, prefix string) string {
 	return g.baseUniquekeypropertySQL(e, "UNIQUE KEY")
 }
 
-// dorisPartitionrangeSQL mirrors DorisGenerator.partitionrange_sql.
+// dorisPartitionrangeSQL renders a range partition: VALUES LESS THAN (v) for a single value and
+// VALUES [(...), (...)) otherwise.
 func dorisPartitionrangeSQL(g *Generator, e *Expr) string {
 	name := g.sqlKey(e, "this")
-	// values = expression.expressions (may be a list of lists)
+	// expressions holds expressions or lists of expressions
 	var values []any
 	switch v := e.Arg("expressions").(type) {
 	case []*Expr:
@@ -308,7 +362,6 @@ func dorisPartitionrangeSQL(g *Generator, e *Expr) string {
 	}
 
 	if len(values) != 1 {
-		// Multiple values: use VALUES [ ... )
 		var parts []string
 		if len(values) > 0 {
 			if _, isList := values[0].([]*Expr); isList {
@@ -332,9 +385,7 @@ func dorisPartitionrangeSQL(g *Generator, e *Expr) string {
 	return "PARTITION " + name + " VALUES LESS THAN (" + g.sql(values[0]) + ")"
 }
 
-// dorisPartitionbyrangepropertydynamicSQL mirrors DorisGenerator.partitionbyrangepropertydynamic_sql.
 func dorisPartitionbyrangepropertydynamicSQL(g *Generator, e *Expr) string {
-	// Generates: FROM ("start") TO ("end") INTERVAL N UNIT
 	start := g.sqlKey(e, "start")
 	end := g.sqlKey(e, "end")
 	every := e.ArgE("every")
@@ -348,7 +399,6 @@ func dorisPartitionbyrangepropertydynamicSQL(g *Generator, e *Expr) string {
 	return "FROM (" + start + ") TO (" + end + ") " + interval
 }
 
-// dorisPartitionedbypropertySQL mirrors DorisGenerator.partitionedbyproperty_sql.
 func dorisPartitionedbypropertySQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KSchema) {
@@ -357,8 +407,8 @@ func dorisPartitionedbypropertySQL(g *Generator, e *Expr) string {
 	return "PARTITION BY (" + g.sql(this) + ")"
 }
 
-// dorisTableSQL mirrors DorisGenerator.table_sql.
-// Override table_sql to avoid AS keyword in UPDATE and DELETE statements.
+// dorisTableSQL renders a table reference without AS before its alias, except when the nearest
+// UPDATE, DELETE or SELECT ancestor is a SELECT.
 func dorisTableSQL(g *Generator, e *Expr, sep string) string {
 	ancestor := e.FindAncestor(KUpdate, KDelete, KSelect)
 	if !ancestor.IsA(KSelect) {

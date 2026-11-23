@@ -1,7 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/parsers/tsql.py (TSQLParser and its module-level builders).
-
 import (
 	"math/big"
 	"regexp"
@@ -10,7 +8,6 @@ import (
 	"time"
 )
 
-// tsqlFULL_FORMAT_TIME_MAPPING mirrors parsers/tsql.py FULL_FORMAT_TIME_MAPPING.
 var tsqlFULL_FORMAT_TIME_MAPPING = map[string]string{
 	"weekday": "%A",
 	"dw":      "%A",
@@ -20,7 +17,6 @@ var tsqlFULL_FORMAT_TIME_MAPPING = map[string]string{
 	"m":       "%B",
 }
 
-// tsqlDATE_DELTA_INTERVAL mirrors parsers/tsql.py DATE_DELTA_INTERVAL.
 var tsqlDATE_DELTA_INTERVAL = map[string]string{
 	"year":    "year",
 	"yyyy":    "year",
@@ -39,16 +35,14 @@ var tsqlDATE_DELTA_INTERVAL = map[string]string{
 	"d":       "day",
 }
 
-// tsqlDATE_FMT_RE mirrors parsers/tsql.py DATE_FMT_RE.
 var tsqlDATE_FMT_RE = regexp.MustCompile("([dD]{1,2})|([mM]{1,2})|([yY]{1,4})|([hH]{1,2})|([sS]{1,2})")
 
-// tsqlTRANSPILE_SAFE_NUMBER_FMT mirrors parsers/tsql.py TRANSPILE_SAFE_NUMBER_FMT (N = Numeric, C = Currency).
+// tsqlTRANSPILE_SAFE_NUMBER_FMT lists the FORMAT number patterns that transpile safely
+// (N = Numeric, C = Currency).
 var tsqlTRANSPILE_SAFE_NUMBER_FMT = newStrSet("N", "C")
 
-// tsqlOPTIONS mirrors parsers/tsql.py OPTIONS.
-// Unsupported options:
-// - OPTIMIZE FOR ( @variable_name { UNKNOWN | = <literal_constant> } [ , ...n ] )
-// - TABLE HINT.
+// tsqlOPTIONS lists the query hints of an OPTION (...) clause. Not supported:
+// OPTIMIZE FOR ( @variable_name { UNKNOWN | = <literal_constant> } [ , ...n ] ) and TABLE HINT.
 var tsqlOPTIONS = OptionsType{
 	"DISABLE_OPTIMIZED_PLAN_FORCING":        {},
 	"FAST":                                  {},
@@ -77,7 +71,6 @@ var tsqlOPTIONS = OptionsType{
 	"USE":                                   {{"PLAN"}},
 }
 
-// tsqlFOR_XML_OPTIONS mirrors parsers/tsql.py FOR_XML_OPTIONS.
 var tsqlFOR_XML_OPTIONS = OptionsType{
 	"AUTO":     {},
 	"EXPLICIT": {},
@@ -86,7 +79,7 @@ var tsqlFOR_XML_OPTIONS = OptionsType{
 	"BINARY":   {{"BASE64"}},
 }
 
-// tsqlFOR_JSON_OPTIONS mirrors parsers/tsql.py FOR_JSON_OPTIONS.
+// tsqlFOR_JSON_OPTIONS lists the keyword options of a FOR JSON clause:
 // FOR JSON { AUTO | PATH } [, ROOT [ ( 'name' ) ] ] [, INCLUDE_NULL_VALUES ] [, WITHOUT_ARRAY_WRAPPER ].
 var tsqlFOR_JSON_OPTIONS = OptionsType{
 	"AUTO":                  {},
@@ -95,13 +88,30 @@ var tsqlFOR_JSON_OPTIONS = OptionsType{
 	"WITHOUT_ARRAY_WRAPPER": {},
 }
 
-// tsqlOPTIONS_THAT_REQUIRE_EQUAL mirrors parsers/tsql.py OPTIONS_THAT_REQUIRE_EQUAL.
 var tsqlOPTIONS_THAT_REQUIRE_EQUAL = newStrSet("MAX_GRANT_PERCENT", "MIN_GRANT_PERCENT", "LABEL")
 
-// tsqlDialect returns the TSQL dialect (Python `from sqlglot.dialects.tsql import TSQL`).
+// tsqlBARE_TABLE_HINTS lists the table hints that may be written in parentheses without WITH,
+// as in FROM t (NOLOCK).
+var tsqlBARE_TABLE_HINTS = newStrSet(
+	"NOLOCK",
+	"READUNCOMMITTED",
+	"UPDLOCK",
+	"REPEATABLEREAD",
+	"SERIALIZABLE",
+	"READCOMMITTED",
+	"TABLOCK",
+	"TABLOCKX",
+	"PAGLOCK",
+	"ROWLOCK",
+	"NOWAIT",
+	"READPAST",
+	"XLOCK",
+	"SNAPSHOT",
+	"NOEXPAND",
+)
+
 func tsqlDialect() *Dialect { return MustDialect("tsql") }
 
-// tsqlLiteralStringOpt mirrors exp.Literal.string(value) where value may be None (str(None) == "None").
 func tsqlLiteralStringOpt(s string, ok bool) *Expr {
 	if !ok {
 		return LiteralString("None")
@@ -109,7 +119,6 @@ func tsqlLiteralStringOpt(s string, ok bool) *Expr {
 	return LiteralString(s)
 }
 
-// tsqlMergeMappings mirrors {**a, **b}.
 func tsqlMergeMappings(a, b map[string]string) map[string]string {
 	out := make(map[string]string, len(a)+len(b))
 	for k, v := range a {
@@ -121,7 +130,6 @@ func tsqlMergeMappings(a, b map[string]string) map[string]string {
 	return out
 }
 
-// tsqlBuildFormattedTime mirrors parsers/tsql.py _build_formatted_time.
 func tsqlBuildFormattedTime(kind Kind, fullFormatMapping bool) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		var fmtV *Expr = seqGet(args, 0)
@@ -142,7 +150,8 @@ func tsqlBuildFormattedTime(kind Kind, fullFormatMapping bool) FuncBuilder {
 	}
 }
 
-// tsqlBuildFormat mirrors parsers/tsql.py _build_format.
+// tsqlBuildFormat builds FORMAT(value, format[, culture]) as a NumberToStr for number patterns and
+// as a TimeToStr with a converted format otherwise.
 func tsqlBuildFormat(args []*Expr, _ *Dialect) *Expr {
 	this := seqGet(args, 0)
 	fmtV := seqGet(args, 1)
@@ -166,7 +175,6 @@ func tsqlBuildFormat(args []*Expr, _ *Dialect) *Expr {
 	return New(KTimeToStr, "this", this, "format", fmtV, "culture", culture)
 }
 
-// tsqlBuildEomonth mirrors parsers/tsql.py _build_eomonth.
 func tsqlBuildEomonth(args []*Expr, _ *Dialect) *Expr {
 	date := New(KTsOrDsToDate, "this", seqGet(args, 0))
 	monthLag := seqGet(args, 1)
@@ -186,7 +194,6 @@ func tsqlBuildEomonth(args []*Expr, _ *Dialect) *Expr {
 	return New(KLastDay, "this", this)
 }
 
-// tsqlBuildHashbytes mirrors parsers/tsql.py _build_hashbytes.
 func tsqlBuildHashbytes(args []*Expr, _ *Dialect) *Expr {
 	if len(args) < 2 {
 		panic(&ValueError{Msg: "not enough values to unpack (expected 2, got " + strconv.Itoa(len(args)) + ")"})
@@ -200,7 +207,7 @@ func tsqlBuildHashbytes(args []*Expr, _ *Dialect) *Expr {
 		kind = pyUpper(kindE.Name())
 	}
 
-	// args.pop(0): the caller validates the built expression against the shortened list.
+	// MD5 and SHA drop the algorithm argument: validate the built expression against the rest.
 	if kind == "MD5" {
 		return WithValidateArgs(New(KMD5, "this", data), args[1:])
 	}
@@ -221,10 +228,9 @@ func tsqlBuildHashbytes(args []*Expr, _ *Dialect) *Expr {
 	return dhFunc("HASHBYTES", anyArgs...)
 }
 
-// tsqlDEFAULT_START_DATE mirrors parsers/tsql.py DEFAULT_START_DATE.
+// tsqlDEFAULT_START_DATE is the date a numeric DATETIME value counts days from.
 var tsqlDEFAULT_START_DATE = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
 
-// tsqlIntToPy mirrors expression.to_py() for an integer literal (or a negated one).
 func tsqlIntToPy(e *Expr) int {
 	if e.IsA(KNeg) {
 		return -tsqlIntToPy(e.This())
@@ -232,7 +238,6 @@ func tsqlIntToPy(e *Expr) int {
 	return dhPyIntValue(e.ThisS())
 }
 
-// tsqlBuildDateDelta mirrors parsers/tsql.py _build_date_delta.
 func tsqlBuildDateDelta(kind Kind, unitMapping map[string]string, bigInt bool) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		unit := seqGet(args, 0)
@@ -267,7 +272,7 @@ func tsqlBuildDateDelta(kind Kind, unitMapping map[string]string, bigInt bool) F
 	}
 }
 
-// tsqlBuildDatetimefromparts mirrors parsers/tsql.py _build_datetimefromparts.
+// tsqlBuildDatetimefromparts builds DATETIMEFROMPARTS as a TimestampFromParts.
 // https://learn.microsoft.com/en-us/sql/t-sql/functions/datetimefromparts-transact-sql?view=sql-server-ver16#syntax
 func tsqlBuildDatetimefromparts(args []*Expr, _ *Dialect) *Expr {
 	return New(
@@ -282,7 +287,7 @@ func tsqlBuildDatetimefromparts(args []*Expr, _ *Dialect) *Expr {
 	)
 }
 
-// tsqlBuildTimefromparts mirrors parsers/tsql.py _build_timefromparts.
+// tsqlBuildTimefromparts builds TIMEFROMPARTS as a TimeFromParts.
 // https://learn.microsoft.com/en-us/sql/t-sql/functions/timefromparts-transact-sql?view=sql-server-ver16#syntax
 func tsqlBuildTimefromparts(args []*Expr, _ *Dialect) *Expr {
 	return New(
@@ -295,7 +300,6 @@ func tsqlBuildTimefromparts(args []*Expr, _ *Dialect) *Expr {
 	)
 }
 
-// tsqlBuildWithArgAsText mirrors parsers/tsql.py _build_with_arg_as_text.
 func tsqlBuildWithArgAsText(kind Kind) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		this := seqGet(args, 0)
@@ -315,10 +319,11 @@ func tsqlBuildWithArgAsText(kind Kind) FuncBuilder {
 	}
 }
 
-// tsqlBuildParsename mirrors parsers/tsql.py _build_parsename.
+// tsqlBuildParsename builds PARSENAME as a SplitPart when possible and keeps it as an anonymous
+// call otherwise.
 // https://learn.microsoft.com/en-us/sql/t-sql/functions/parsename-transact-sql?view=sql-server-ver16
 func tsqlBuildParsename(args []*Expr, _ *Dialect) *Expr {
-	// PARSENAME(...) will be stored into exp.SplitPart if:
+	// PARSENAME(...) will be stored into a SplitPart if:
 	// - All args are literals
 	// - The part index (2nd arg) is <= 4 (max valid value, otherwise TSQL returns NULL)
 	allLiterals := true
@@ -345,7 +350,8 @@ func tsqlBuildParsename(args []*Expr, _ *Dialect) *Expr {
 	return New(KAnonymous, "this", "PARSENAME", "expressions", args)
 }
 
-// tsqlPyNumSub mirrors str(n - literal.to_py()) for an int n and a literal.
+// tsqlPyNumSub returns n minus the value of a numeric literal, as text; a string literal panics
+// with a type error.
 func tsqlPyNumSub(n int, lit *Expr) string {
 	if lit.IsNumber() && lit.IsInt() {
 		return strconv.Itoa(n - tsqlIntToPy(lit))
@@ -353,16 +359,14 @@ func tsqlPyNumSub(n int, lit *Expr) string {
 	if lit.IsString() {
 		panic(&ValueError{Msg: "unsupported operand type(s) for -: 'int' and 'str'"})
 	}
-	// Decimal arithmetic: n - Decimal(text)
 	v := chunkDToPyNumber(lit)
 	nv, _ := chunkDParseDecimal(strconv.Itoa(n))
 	return tsqlDecimalSub(nv, v).String()
 }
 
-// tsqlDecimalSub computes a - b for Python Decimal values (exact, no rounding needed for literals).
+// tsqlDecimalSub computes a - b exactly on decimal values (no rounding needed for literals).
 func tsqlDecimalSub(a, b chunkDPyNum) chunkDPyNum {
 	b.neg = !b.neg
-	// align exponents
 	exp := a.exp
 	if b.exp < exp {
 		exp = b.exp
@@ -385,20 +389,23 @@ func tsqlDecimalSub(a, b chunkDPyNum) chunkDPyNum {
 	return out
 }
 
-// tsqlBuildJSONQuery mirrors parsers/tsql.py _build_json_query.
 func tsqlBuildJSONQuery(args []*Expr, d *Dialect) *Expr {
-	if len(args) == 1 {
+	defaultPath := len(args) == 1
+	if defaultPath {
 		// The default value for path is '$'. As a result, if you don't provide a
 		// value for path, JSON_QUERY returns the input expression.
 		args = append(args, LiteralString("$"))
-		// args.append(...) is visible to the caller's validation.
-		return WithValidateArgs(buildExtractJSONWithPath(KJSONExtract)(args, d), args)
 	}
 
-	return buildExtractJSONWithPath(KJSONExtract)(args, d)
+	jsonExtract := buildExtractJSONWithPath(KJSONExtract)(args, d)
+	jsonExtract.Set("json_query", true)
+	if defaultPath {
+		// The default path counts as a passed argument: record it for arity validation.
+		WithValidateArgs(jsonExtract, args)
+	}
+	return jsonExtract
 }
 
-// tsqlBuildDatetrunc mirrors parsers/tsql.py _build_datetrunc.
 func tsqlBuildDatetrunc(args []*Expr, _ *Dialect) *Expr {
 	unit := seqGet(args, 0)
 	this := seqGet(args, 1)
@@ -410,7 +417,6 @@ func tsqlBuildDatetrunc(args []*Expr, _ *Dialect) *Expr {
 	return New(KTimestampTrunc, "this", this, "unit", unit)
 }
 
-// customizeTSQLParser applies the TSQLParser class body on top of the base Parser.
 func customizeTSQLParser(d *Dialect) {
 	P := d.P
 
@@ -493,7 +499,7 @@ func customizeTSQLParser(d *Dialect) {
 	}
 	P.FUNCTION_PARSERS["DATEPART"] = tsqlParseDatepart
 
-	// The DCOLON (::) operator serves as a scope resolution (exp.ScopeResolution) operator in T-SQL
+	// The DCOLON (::) operator serves as a scope resolution (ScopeResolution) operator in T-SQL
 	P.COLUMN_OPERATORS[TK_DCOLON] = func(p *Parser, this, to *Expr) *Expr {
 		if to.IsA(KDataType) && to.Arg("this") != DT_USERDEFINED {
 			return p.expression(New(KCast, "this", this, "to", to))
@@ -514,6 +520,8 @@ func customizeTSQLParser(d *Dialect) {
 	P.h.parseInto = tsqlParseInto
 	P.h.parseIdVar = tsqlParseIdVar
 	P.h.parseTableParts = tsqlParseTableParts
+	P.h.parseTablePart = tsqlParseTablePart
+	P.h.parseTable = tsqlParseTable
 	P.h.parseCreate = tsqlParseCreate
 	P.h.parseIf = tsqlParseIf
 	P.h.parseUnique = tsqlParseUnique
@@ -523,7 +531,8 @@ func customizeTSQLParser(d *Dialect) {
 	P.h.parsePrimaryKeyPart = tsqlParsePrimaryKeyPart
 }
 
-// tsqlParseExecute mirrors TSQLParser._parse_execute.
+// tsqlParseExecute parses EXEC[UTE] [@status =] proc args, producing an ExecuteSql for
+// sp_executesql.
 func tsqlParseExecute(p *Parser) *Expr {
 	var returnStatus *Expr
 	index := p.index
@@ -556,10 +565,9 @@ func tsqlParseExecute(p *Parser) *Expr {
 	return execute
 }
 
-// tsqlParseDatepart mirrors TSQLParser._parse_datepart.
 func tsqlParseDatepart(p *Parser) *Expr {
 	this := p.parseVar(false, tsPtr(newTokenSet(TK_IDENTIFIER)), false)
-	// self._match(TokenType.COMMA) and self._parse_bitwise() -> False when unmatched
+	// false (not nil) when there is no comma.
 	var expression any = false
 	if p.match(TK_COMMA) {
 		expression = p.parseBitwise()
@@ -569,12 +577,11 @@ func tsqlParseDatepart(p *Parser) *Expr {
 	return p.expression(New(KExtract, "this", name, "expression", expression))
 }
 
-// tsqlParseAlterTableSet mirrors TSQLParser._parse_alter_table_set.
 func tsqlParseAlterTableSet(p *Parser) *Expr {
 	return p.parseWrapped(p.baseParseAlterTableSet, false)
 }
 
-// tsqlParseWrappedSelect mirrors TSQLParser._parse_wrapped_select.
+// tsqlParseWrappedSelect also accepts a MERGE statement where a wrapped select may appear.
 func tsqlParseWrappedSelect(p *Parser, table bool) *Expr {
 	if p.match(TK_MERGE) {
 		comments := p.prevComments
@@ -586,9 +593,8 @@ func tsqlParseWrappedSelect(p *Parser, table bool) *Expr {
 	return p.baseParseWrappedSelect(table)
 }
 
-// tsqlParseDcolon mirrors TSQLParser._parse_dcolon.
 func tsqlParseDcolon(p *Parser) *Expr {
-	// We want to use _parse_types() if the first token after :: is a known type,
+	// We want to use parseTypes if the first token after :: is a known type,
 	// otherwise we could parse something like x::varchar(max) into a function
 	if p.matchSetNoAdvance(p.s.TYPE_TOKENS) {
 		return p.parseTypes(false, false, true, false)
@@ -600,7 +606,8 @@ func tsqlParseDcolon(p *Parser) *Expr {
 	return p.parseTypes(false, false, true, false)
 }
 
-// tsqlParseOptions mirrors TSQLParser._parse_options. Returns nil (None) or a []*Expr.
+// tsqlParseOptions parses an OPTION (hint, ...) clause. It returns nil when there is no OPTION
+// keyword and a []*Expr otherwise.
 func tsqlParseOptions(p *Parser) any {
 	if !p.match(TK_OPTION) {
 		return nil
@@ -619,7 +626,6 @@ func tsqlParseOptions(p *Parser) any {
 	return p.parseWrappedCSV(parseOption, TK_COMMA, false)
 }
 
-// tsqlParseKeyValueOption mirrors TSQLParser._parse_key_value_option.
 func tsqlParseKeyValueOption(p *Parser) *Expr {
 	this := p.parsePrimaryOrVar()
 	var expression *Expr
@@ -630,7 +636,6 @@ func tsqlParseKeyValueOption(p *Parser) *Expr {
 	return New(KXMLKeyValueOption, "this", this, "expression", expression)
 }
 
-// tsqlParseForClauseOption mirrors TSQLParser._parse_for_clause_option.
 func tsqlParseForClauseOption(p *Parser, options OptionsType) *Expr {
 	this := p.parseVarFromOptions(options, false)
 	if this == nil {
@@ -639,7 +644,6 @@ func tsqlParseForClauseOption(p *Parser, options OptionsType) *Expr {
 	return p.expression(New(KQueryOption, "this", this))
 }
 
-// tsqlParseFor mirrors TSQLParser._parse_for.
 func tsqlParseFor(p *Parser) *Expr {
 	if p.matchPair(TK_FOR, TK_XML) {
 		return p.expression(New(
@@ -657,7 +661,7 @@ func tsqlParseFor(p *Parser) *Expr {
 		))
 	}
 
-	// FOR BROWSE — bare keyword, no options. BROWSE has no dedicated TokenType.
+	// FOR BROWSE — bare keyword, no options. BROWSE has no dedicated token type.
 	if p.matchTextSeq("FOR", "BROWSE") {
 		return p.expression(New(KForClause, "kind", "BROWSE"))
 	}
@@ -665,12 +669,8 @@ func tsqlParseFor(p *Parser) *Expr {
 	return nil
 }
 
-// tsqlParseProjections mirrors TSQLParser._parse_projections.
-//
-// T-SQL supports the syntax alias = expression in the SELECT's projection list,
-// so we transform all parsed Selects to convert their EQ projections into Aliases.
-//
-// See: https://learn.microsoft.com/en-us/sql/t-sql/queries/select-clause-transact-sql?view=sql-server-ver16#syntax
+// tsqlParseProjections turns alias = expression projections into aliases:
+// https://learn.microsoft.com/en-us/sql/t-sql/queries/select-clause-transact-sql?view=sql-server-ver16#syntax
 func tsqlParseProjections(p *Parser) ([]*Expr, []*Expr) {
 	projections, _ := p.baseParseProjections()
 	out := make([]*Expr, len(projections))
@@ -684,18 +684,6 @@ func tsqlParseProjections(p *Parser) ([]*Expr, []*Expr) {
 	return out, nil
 }
 
-// tsqlParseCommitOrRollback mirrors TSQLParser._parse_commit_or_rollback.
-//
-// Applies to SQL Server and Azure SQL Database
-// COMMIT [ { TRAN | TRANSACTION }
-//
-//	[ transaction_name | @tran_name_variable ] ]
-//	[ WITH ( DELAYED_DURABILITY = { OFF | ON } ) ]
-//
-// ROLLBACK { TRAN | TRANSACTION }
-//
-//	[ transaction_name | @tran_name_variable
-//	| savepoint_name | @savepoint_variable ]
 func tsqlParseCommitOrRollback(p *Parser) *Expr {
 	rollback := p.prev.Type == TK_ROLLBACK
 
@@ -724,13 +712,7 @@ func tsqlParseCommitOrRollback(p *Parser) *Expr {
 	return p.expression(New(KCommit, "this", this, "durability", durability))
 }
 
-// tsqlParseTransaction mirrors TSQLParser._parse_transaction.
-//
-// Applies to SQL Server and Azure SQL Database
-// BEGIN { TRAN | TRANSACTION }
-// [ { transaction_name | @tran_name_variable }
-// [ WITH MARK [ 'description' ] ]
-// ].
+// tsqlParseTransaction parses BEGIN TRAN[SACTION]; any other BEGIN is kept as a Command.
 func tsqlParseTransaction(p *Parser) *Expr {
 	if p.matchTexts("TRAN", "TRANSACTION") {
 		transaction := p.expression(New(KTransaction, "this", p.parseIdVar(true, nil)))
@@ -744,7 +726,7 @@ func tsqlParseTransaction(p *Parser) *Expr {
 	return p.parseAsCommand(p.prev)
 }
 
-// tsqlParseReturns mirrors TSQLParser._parse_returns.
+// tsqlParseReturns parses RETURNS, including the @table variable of table-valued functions.
 func tsqlParseReturns(p *Parser) *Expr {
 	table := p.parseIdVar(false, &p.s.RETURNS_TABLE_TOKENS)
 	returns := p.baseParseReturns()
@@ -752,7 +734,7 @@ func tsqlParseReturns(p *Parser) *Expr {
 	return returns
 }
 
-// tsqlParseConvert mirrors TSQLParser._parse_convert.
+// tsqlParseConvert parses CONVERT(type, value[, style]); safe marks TRY_CONVERT.
 func tsqlParseConvert(p *Parser, strict bool, safe bool) *Expr {
 	this := p.parseTypes(false, false, true, false)
 	p.match(TK_COMMA)
@@ -766,7 +748,6 @@ func tsqlParseConvert(p *Parser, strict bool, safe bool) *Expr {
 	return convert
 }
 
-// tsqlParseColumnDef mirrors TSQLParser._parse_column_def.
 func tsqlParseColumnDef(p *Parser, this *Expr, computedColumn bool) *Expr {
 	this = p.baseParseColumnDef(this, computedColumn)
 	if this == nil {
@@ -781,7 +762,8 @@ func tsqlParseColumnDef(p *Parser, this *Expr, computedColumn bool) *Expr {
 	return this
 }
 
-// tsqlParseUserDefinedFunction mirrors TSQLParser._parse_user_defined_function.
+// tsqlParseUserDefinedFunction parses a function or procedure signature; procedure parameters may
+// appear without parentheses.
 func tsqlParseUserDefinedFunction(p *Parser, kind TokenType) *Expr {
 	this := p.baseParseUserDefinedFunction(kind)
 
@@ -812,7 +794,6 @@ func tsqlParseUserDefinedFunction(p *Parser, kind TokenType) *Expr {
 	return p.expression(New(KUserDefinedFunction, "this", this))
 }
 
-// tsqlParseInto mirrors TSQLParser._parse_into.
 func tsqlParseInto(p *Parser) *Expr {
 	into := p.baseParseInto()
 
@@ -823,7 +804,6 @@ func tsqlParseInto(p *Parser) *Expr {
 	if table.IsA(KTable) {
 		tableIdentifier := table.This()
 		if tableIdentifier.ArgB("temporary") {
-			// Promote the temporary property from the Identifier to the Into expression
 			into.Set("temporary", true)
 		}
 	}
@@ -831,7 +811,6 @@ func tsqlParseInto(p *Parser) *Expr {
 	return into
 }
 
-// tsqlParseIdVar mirrors TSQLParser._parse_id_var.
 func tsqlParseIdVar(p *Parser, anyToken bool, tokens *TokenSet) *Expr {
 	isTemporary := p.match(TK_HASH)
 	isGlobal := isTemporary && p.match(TK_HASH)
@@ -848,7 +827,6 @@ func tsqlParseIdVar(p *Parser, anyToken bool, tokens *TokenSet) *Expr {
 	return this
 }
 
-// tsqlParseTableParts mirrors TSQLParser._parse_table_parts.
 func tsqlParseTableParts(p *Parser, schema bool, isDbReference bool, wildcard bool, fast bool) *Expr {
 	table := p.baseParseTableParts(schema, isDbReference, wildcard, fast)
 	if table.IsA(KTable) && table.This().IsA(KIdentifier) {
@@ -867,7 +845,63 @@ func tsqlParseTableParts(p *Parser, schema bool, isDbReference bool, wildcard bo
 	return table
 }
 
-// tsqlParseCreate mirrors TSQLParser._parse_create.
+// tsqlParseTablePart parses one part of a table name, reading name (HINT) as the name followed by
+// a bare table hint rather than as a function call.
+func tsqlParseTablePart(p *Parser, schema bool) *Expr {
+	if !schema && p.next.Type == TK_L_PAREN {
+		index := p.index
+		p.advance(2)
+		isHint := p.matchTextSet(tsqlBARE_TABLE_HINTS) && p.match(TK_R_PAREN)
+		p.retreat(index)
+
+		if isHint {
+			if this := p.parseIdVar(false, nil); this != nil {
+				return this
+			}
+		}
+	}
+
+	return p.baseParseTablePart(schema)
+}
+
+// tsqlParseTable parses a table reference, turning a single unquoted alias column that names a
+// bare table hint, as in FROM t (NOLOCK) or FROM t AS s (NOLOCK), into a WITH (hint) table hint.
+func tsqlParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
+	table := p.baseParseTable(schema, joins, aliasTokens, parseBracket, isDbReference, parsePartition, consumePipe)
+	if !table.IsA(KTable) || table.ArgB("hints") {
+		return table
+	}
+
+	alias := table.ArgE("alias")
+	if alias == nil {
+		return table
+	}
+	columns := alias.ArgL("columns")
+	if len(columns) != 1 {
+		return table
+	}
+	hint := columns[0]
+	if !hint.IsA(KIdentifier) || hint.ArgB("quoted") || !tsqlBARE_TABLE_HINTS.Has(pyUpper(hint.Name())) {
+		return table
+	}
+	for _, part := range table.Parts() {
+		if !part.IsA(KIdentifier) {
+			return table
+		}
+	}
+
+	v := VarExpr(hint.Name())
+	v.AddComments(hint.PopComments(), false)
+	alias.Set("columns", nil)
+	if alias.This() == nil {
+		table.AddComments(alias.PopComments(), false)
+		table.Set("alias", p.parseTableAlias(aliasTokens))
+	}
+	table.Set("hints", []*Expr{New(KWithTableHint, "expressions", []*Expr{v})})
+
+	return table
+}
+
 func tsqlParseCreate(p *Parser) *Expr {
 	create := p.baseParseCreate()
 
@@ -890,12 +924,11 @@ func tsqlParseCreate(p *Parser) *Expr {
 	return create
 }
 
-// tsqlParseIf mirrors TSQLParser._parse_if.
 func tsqlParseIf(p *Parser) *Expr {
 	this := p.parseCondition()
 	trueE := p.parseBlock()
 
-	// self._match(TokenType.ELSE) and self._parse_block() -> False when unmatched
+	// false (not nil) when ELSE is absent.
 	var falseE any = false
 	if p.match(TK_ELSE) {
 		falseE = p.parseBlock()
@@ -904,7 +937,6 @@ func tsqlParseIf(p *Parser) *Expr {
 	return p.expression(New(KIfBlock, "this", this, "true", trueE, "false", falseE))
 }
 
-// tsqlParseUnique mirrors TSQLParser._parse_unique.
 func tsqlParseUnique(p *Parser) *Expr {
 	var this *Expr
 	if p.matchTexts("CLUSTERED", "NONCLUSTERED") {
@@ -916,14 +948,12 @@ func tsqlParseUnique(p *Parser) *Expr {
 	return p.expression(New(KUniqueColumnConstraint, "this", this))
 }
 
-// tsqlParseUpdate mirrors TSQLParser._parse_update.
 func tsqlParseUpdate(p *Parser) *Expr {
 	expression := p.baseParseUpdate()
 	expression.Set("options", tsqlParseOptions(p))
 	return expression
 }
 
-// tsqlParsePartition mirrors TSQLParser._parse_partition.
 func tsqlParsePartition(p *Parser) *Expr {
 	if !p.matchTextSeq("WITH", "(", "PARTITIONS") {
 		return nil
@@ -949,7 +979,6 @@ func tsqlParsePartition(p *Parser) *Expr {
 	return partition
 }
 
-// tsqlParseAlterTableAlter mirrors TSQLParser._parse_alter_table_alter.
 func tsqlParseAlterTableAlter(p *Parser) *Expr {
 	expression := p.baseParseAlterTableAlter()
 
@@ -964,7 +993,6 @@ func tsqlParseAlterTableAlter(p *Parser) *Expr {
 	return expression
 }
 
-// tsqlParsePrimaryKeyPart mirrors TSQLParser._parse_primary_key_part.
 func tsqlParsePrimaryKeyPart(p *Parser) *Expr {
 	return p.parseOrdered(nil)
 }

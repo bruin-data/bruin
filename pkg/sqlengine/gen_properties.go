@@ -1,22 +1,21 @@
 package sqlengine
 
-// Port of sqlglot/generator.py (generator chunk A, part 2): L2012-L2253
-// properties / property locations and the *property_sql methods up to withsystemversioningproperty_sql.
-
 import (
 	"strings"
 )
 
-// chunkAPropertiesLocation mirrors self.PROPERTIES_LOCATION[p.__class__] (KeyError if missing).
+// chunkAPropertiesLocation returns the PROPERTIES_LOCATION entry for p's kind. A kind without an
+// entry panics with the kind name as the message.
 func (g *Generator) chunkAPropertiesLocation(p *Expr) string {
 	loc, ok := g.s.PROPERTIES_LOCATION[p.Kind()]
 	if !ok {
-		panic(&ValueError{Msg: kindClassRepr(p.Kind())})
+		panic(&ValueError{Msg: p.Kind().Name()})
 	}
 	return loc
 }
 
-// properties_sql (generator.py L2012).
+// propertiesSQL renders a Properties node: the POST_SCHEMA properties bare, then the POST_WITH
+// properties in a WITH (...) list. Properties in other locations are skipped.
 func (g *Generator) propertiesSQL(expression *Expr) string {
 	rootProperties := []*Expr{}
 	withProperties := []*Expr{}
@@ -46,15 +45,13 @@ func (g *Generator) propertiesSQL(expression *Expr) string {
 	return rootProps + withProps
 }
 
-// root_properties (generator.py L2037).
-func (g *Generator) rootProperties(properties *Expr) string {
+func (g *Generator) baseRootProperties(properties *Expr) string {
 	if len(properties.Expressions()) > 0 {
 		return g.expressions(properties, exprsOpts{noIndent: true, sep: strp2(" ")})
 	}
 	return ""
 }
 
-// properties (generator.py L2042).
 func (g *Generator) properties(properties *Expr, prefix string, sep string, suffix string, wrapped bool) string {
 	if len(properties.Expressions()) > 0 {
 		expressions := g.expressions(properties, exprsOpts{sep: strp2(sep), noIndent: true})
@@ -72,12 +69,10 @@ func (g *Generator) properties(properties *Expr, prefix string, sep string, suff
 	return ""
 }
 
-// with_properties (generator.py L2057).
 func (g *Generator) baseWithProperties(properties *Expr) string {
 	return g.properties(properties, g.segSep(g.s.WITH_PROPERTIES_PREFIX, ""), ", ", "", true)
 }
 
-// locate_properties (generator.py L2060).
 func (g *Generator) baseLocateProperties(properties *Expr) propLocations {
 	propertiesLocs := propLocations{}
 	for _, p := range properties.Expressions() {
@@ -92,18 +87,18 @@ func (g *Generator) baseLocateProperties(properties *Expr) propLocations {
 	return propertiesLocs
 }
 
-// property_name (generator.py L2071).
 func (g *Generator) propertyName(expression *Expr, stringKey bool) string {
 	if expression.This().IsA(KDot) {
 		return g.sqlKey(expression, "this")
 	}
 	if stringKey {
-		return "'" + expression.Name() + "'"
+		return g.sql(LiteralString(expression.Name()))
 	}
 	return expression.Name()
 }
 
-// property_sql (generator.py L2076).
+// propertySQL renders name=value. A property kind without a name in PROPERTY_TO_NAME is reported
+// as unsupported, and one missing from the map is rendered with the name None.
 func (g *Generator) propertySQL(expression *Expr) string {
 	if expression.Is(KProperty) {
 		return g.propertyName(expression, false) + "=" + g.sqlKey(expression, "value")
@@ -120,12 +115,12 @@ func (g *Generator) propertySQL(expression *Expr) string {
 	return propertyName + "=" + g.sqlKey(expression, "this")
 }
 
-// uuidproperty_sql (generator.py L2087).
 func (g *Generator) uuidpropertySQL(expression *Expr) string {
 	return "UUID " + g.sqlKey(expression, "this")
 }
 
-// likeproperty_sql (generator.py L2090).
+// baseLikepropertySQL renders LIKE <table> [options] when SUPPORTS_CREATE_TABLE_LIKE is set, and
+// AS SELECT * FROM <table> LIMIT 0 otherwise.
 func (g *Generator) baseLikepropertySQL(expression *Expr) string {
 	if g.s.SUPPORTS_CREATE_TABLE_LIKE {
 		var opts []string
@@ -153,11 +148,10 @@ func (g *Generator) baseLikepropertySQL(expression *Expr) string {
 	return "AS " + g.sql(sel)
 }
 
-// chunkASelectStarFromLimit0 mirrors exp.select("*").from_(from_).limit(0).
 func chunkASelectStarFromLimit0(from_ *Expr) *Expr {
 	sel := New(KSelect, "expressions", []*Expr{Star()})
 
-	// .from_(from_): wraps non-From expressions into From (re-parenting them), copies the instance.
+	// FROM: a non-From expression is wrapped in a From (which re-parents it); the Select is copied.
 	if from_ == nil {
 		panic(genPanic{&ParseError{Msg: "SQL cannot be None"}})
 	}
@@ -167,7 +161,7 @@ func chunkASelectStarFromLimit0(from_ *Expr) *Expr {
 	sel = sel.Copy()
 	sel.Set("from_", from_)
 
-	// .limit(0): parse_one("LIMIT 0", into=Limit), copies the instance.
+	// LIMIT 0, with the same args a parsed LIMIT 0 has; the Select is copied again.
 	sel = sel.Copy()
 	sel.Set("limit", New(
 		KLimit,
@@ -180,7 +174,6 @@ func chunkASelectStarFromLimit0(from_ *Expr) *Expr {
 	return sel
 }
 
-// fallbackproperty_sql (generator.py L2107).
 func (g *Generator) fallbackpropertySQL(expression *Expr) string {
 	no := ""
 	if expression.ArgB("no") {
@@ -193,7 +186,6 @@ func (g *Generator) fallbackpropertySQL(expression *Expr) string {
 	return no + "FALLBACK" + protection
 }
 
-// journalproperty_sql (generator.py L2112).
 func (g *Generator) journalpropertySQL(expression *Expr) string {
 	no := ""
 	if expression.ArgB("no") {
@@ -218,7 +210,6 @@ func (g *Generator) journalpropertySQL(expression *Expr) string {
 	return no + local + dual + before + after + "JOURNAL"
 }
 
-// freespaceproperty_sql (generator.py L2121).
 func (g *Generator) freespacepropertySQL(expression *Expr) string {
 	freespace := g.sqlKey(expression, "this")
 	percent := ""
@@ -228,7 +219,6 @@ func (g *Generator) freespacepropertySQL(expression *Expr) string {
 	return "FREESPACE=" + freespace + percent
 }
 
-// checksumproperty_sql (generator.py L2126).
 func (g *Generator) checksumpropertySQL(expression *Expr) string {
 	var property string
 	if expression.ArgB("default") {
@@ -241,7 +231,6 @@ func (g *Generator) checksumpropertySQL(expression *Expr) string {
 	return "CHECKSUM=" + property
 }
 
-// mergeblockratioproperty_sql (generator.py L2135).
 func (g *Generator) mergeblockratiopropertySQL(expression *Expr) string {
 	if expression.ArgB("no") {
 		return "NO MERGEBLOCKRATIO"
@@ -257,7 +246,6 @@ func (g *Generator) mergeblockratiopropertySQL(expression *Expr) string {
 	return "MERGEBLOCKRATIO=" + g.sqlKey(expression, "this") + percent
 }
 
-// moduleproperty_sql (generator.py L2144).
 func (g *Generator) modulepropertySQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{flat: true})
 	if expressions != "" {
@@ -266,7 +254,6 @@ func (g *Generator) modulepropertySQL(expression *Expr) string {
 	return "USING " + g.sqlKey(expression, "this") + expressions
 }
 
-// datablocksizeproperty_sql (generator.py L2149).
 func (g *Generator) datablocksizepropertySQL(expression *Expr) string {
 	def := expression.ArgB("default")
 	minimum := expression.ArgB("minimum")
@@ -289,7 +276,6 @@ func (g *Generator) datablocksizepropertySQL(expression *Expr) string {
 	return "DATABLOCKSIZE=" + g.sqlKey(expression, "size") + units
 }
 
-// blockcompressionproperty_sql (generator.py L2165).
 func (g *Generator) blockcompressionpropertySQL(expression *Expr) string {
 	autotemp := expression.Arg("autotemp")
 	always := expression.ArgB("always")
@@ -310,13 +296,12 @@ func (g *Generator) blockcompressionpropertySQL(expression *Expr) string {
 	} else if never {
 		prop = "NEVER"
 	} else {
-		// Python raises UnboundLocalError here.
+		// no option is set: an error whose message keeps its historical wording
 		panic(&ValueError{Msg: "cannot access local variable 'prop' where it is not associated with a value"})
 	}
 	return "BLOCKCOMPRESSION=" + prop
 }
 
-// isolatedloadingproperty_sql (generator.py L2184).
 func (g *Generator) isolatedloadingpropertySQL(expression *Expr) string {
 	no := ""
 	if expression.ArgB("no") {
@@ -333,7 +318,6 @@ func (g *Generator) isolatedloadingpropertySQL(expression *Expr) string {
 	return "WITH" + no + concurrent + " ISOLATED LOADING" + target
 }
 
-// partitionboundspec_sql (generator.py L2193).
 func (g *Generator) partitionboundspecSQL(expression *Expr) string {
 	if _, ok := expression.Arg("this").([]*Expr); ok {
 		return "IN (" + g.expressions(expression, exprsOpts{key: "this", flat: true}) + ")"
@@ -349,7 +333,6 @@ func (g *Generator) partitionboundspecSQL(expression *Expr) string {
 	return "FROM (" + fromExpressions + ") TO (" + toExpressions + ")"
 }
 
-// partitionedofproperty_sql (generator.py L2205).
 func (g *Generator) partitionedofpropertySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 
@@ -364,7 +347,6 @@ func (g *Generator) partitionedofpropertySQL(expression *Expr) string {
 	return "PARTITION OF " + this + forValuesOrDefaultSQL
 }
 
-// lockingproperty_sql (generator.py L2216).
 func (g *Generator) lockingpropertySQL(expression *Expr) string {
 	kind := expression.Arg("kind")
 	this := ""
@@ -383,7 +365,6 @@ func (g *Generator) lockingpropertySQL(expression *Expr) string {
 	return "LOCKING " + chunkAPyStr(kind) + this + forOrIn + " " + chunkAPyStr(lockType) + override
 }
 
-// withdataproperty_sql (generator.py L2225).
 func (g *Generator) withdatapropertySQL(expression *Expr) string {
 	no := ""
 	if expression.ArgB("no") {
@@ -402,13 +383,12 @@ func (g *Generator) withdatapropertySQL(expression *Expr) string {
 	return dataSQL + statisticsSQL
 }
 
-// withsystemversioningproperty_sql (generator.py L2233).
 func (g *Generator) withsystemversioningpropertySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
 		this = "HISTORY_TABLE=" + this
 	}
-	// None when empty: func() skips None arguments.
+	// nil when empty: g.fn skips nil arguments.
 	var dataConsistency any
 	if s := g.sqlKey(expression, "data_consistency"); s != "" {
 		dataConsistency = "DATA_CONSISTENCY_CHECK=" + s

@@ -1,29 +1,27 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/qualify.py.
-
-// QualifyOptions mirrors the keyword arguments of sqlglot.optimizer.qualify.qualify.
+// QualifyOptions configures Qualify.
 //
 // Go booleans cannot express "not passed", so:
-//   - DefaultQualifyOptions() returns the Python defaults for every option.
-//   - Defaults: true forces the options whose Python default is True and that callers normally
-//     leave alone (ExpandAliasRefs, ExpandStars, QualifyColumns, QuoteIdentifiers) to true.
+//   - DefaultQualifyOptions() returns the default for every option.
+//   - Defaults: true forces the options that default to true and that callers normally leave
+//     alone (ExpandAliasRefs, ExpandStars, QualifyColumns, QuoteIdentifiers) to true.
 //     ValidateQualifyColumns and Identify are always taken as given (pass true to get the
-//     Python default), and options whose Python default is False/None are taken as given.
+//     default), and options that default to false or unset are taken as given.
 //
 // lineage.go relies on the latter: Qualify(e, QualifyOptions{..., ValidateQualifyColumns: false,
-// Identify: false, Defaults: true}) mirrors qualify(e, dialect=..., schema=...,
-// validate_qualify_columns=False, identify=False).
+// Identify: false, Defaults: true}) qualifies with the defaults except that columns are not
+// validated and only identifiers that need quoting are quoted.
 type QualifyOptions struct {
 	Dialect *Dialect
-	// Db and Catalog are the default database/catalog names ("" means None).
+	// Db and Catalog are the default database/catalog names ("" means unset).
 	Db      string
 	Catalog string
 	Schema  *MappingSchema
 
 	ExpandAliasRefs bool
 	ExpandStars     bool
-	// InferSchema mirrors `infer_schema: bool | None` (TriNone = None).
+	// InferSchema controls schema inference; TriNone infers it only when the schema is empty.
 	InferSchema               Tri
 	IsolateTables             bool
 	QualifyColumns            bool
@@ -34,14 +32,12 @@ type QualifyOptions struct {
 	CanonicalizeTableAliases  bool
 	// OnQualify is called after a table has been qualified (may be nil).
 	OnQualify func(table *Expr)
-	// SQL is the original SQL string for error highlighting ("" means None).
+	// SQL is the original SQL string for error highlighting ("" means unavailable).
 	SQL string
 
-	// Defaults applies the Python defaults described above.
 	Defaults bool
 }
 
-// DefaultQualifyOptions returns the Python default values of qualify's keyword arguments.
 func DefaultQualifyOptions() QualifyOptions {
 	return QualifyOptions{
 		ExpandAliasRefs:           true,
@@ -57,10 +53,10 @@ func DefaultQualifyOptions() QualifyOptions {
 	}
 }
 
-// Qualify mirrors sqlglot.optimizer.qualify.qualify: rewrite the AST to have normalized and
-// qualified tables and columns. This step is necessary for all further SQLGlot optimizations.
+// Qualify rewrites the AST to have normalized and qualified tables and columns. The other
+// optimizer rules depend on this step.
 //
-// Errors are raised as panics (*OptimizeError, *SchemaError, *ValueError ...), like the Python exceptions.
+// Errors are raised as panics (*OptimizeError, *SchemaError, *ValueError ...).
 func Qualify(expression *Expr, o QualifyOptions) *Expr {
 	if o.Defaults {
 		o.ExpandAliasRefs = true

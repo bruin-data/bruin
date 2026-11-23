@@ -1,22 +1,20 @@
 package sqlengine
 
-// Port of sqlglot/generators/tsql.py (TSQLGenerator and its module-level helpers).
-
 import (
+	"slices"
 	"strings"
 )
 
-// tsqlDATE_PART_UNMAPPING mirrors generators/tsql.py DATE_PART_UNMAPPING.
 var tsqlDATE_PART_UNMAPPING = map[string]string{
 	"WEEKISO":         "ISO_WEEK",
 	"DAYOFWEEK":       "WEEKDAY",
 	"TIMEZONE_MINUTE": "TZOFFSET",
 }
 
-// tsqlBIT_TYPES mirrors generators/tsql.py BIT_TYPES (exact classes).
+// tsqlBIT_TYPES lists the parent kinds (exact matches, not subkinds) under which booleans render
+// as the BIT values 1 and 0.
 var tsqlBIT_TYPES = map[Kind]bool{KEQ: true, KNEQ: true, KIs: true, KIn: true, KSelect: true, KAlias: true}
 
-// tsqlFormatSQL mirrors generators/tsql.py _format_sql.
 func tsqlFormatSQL(g *Generator, e *Expr) string {
 	fmtE := e.ArgE("format")
 
@@ -38,12 +36,11 @@ func tsqlFormatSQL(g *Generator, e *Expr) string {
 	return g.fn("FORMAT", e.Arg("this"), fmtSQL, e.Arg("culture"))
 }
 
-// tsqlStringAggSQL mirrors generators/tsql.py _string_agg_sql.
 func tsqlStringAggSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	distinct := e.Find(KDistinct)
 	if distinct != nil {
-		// exp.Distinct can appear below an exp.Order or an exp.GroupConcat expression
+		// A Distinct can appear below an Order or a GroupConcat expression
 		g.unsupported("T-SQL STRING_AGG doesn't support DISTINCT.")
 		this = distinct.Pop().Expressions()[0]
 	}
@@ -64,8 +61,8 @@ func tsqlStringAggSQL(g *Generator, e *Expr) string {
 	return "STRING_AGG(" + g.formatArgs(", ", this, separator) + ")" + order
 }
 
-// QualifyDerivedTableOutputsTSQL mirrors generators/tsql.py qualify_derived_table_outputs:
-// ensures all (unnamed) output columns are aliased for CTEs and Subqueries.
+// QualifyDerivedTableOutputsTSQL ensures all (unnamed) output columns are aliased for CTEs and
+// Subqueries.
 func QualifyDerivedTableOutputsTSQL(expression *Expr) *Expr {
 	alias := expression.ArgE("alias")
 
@@ -74,7 +71,12 @@ func QualifyDerivedTableOutputsTSQL(expression *Expr) *Expr {
 		// themselves, because the latter are going to be replaced by new nodes when the aliases
 		// are added and hence we won't be able to reach these newly added Alias parents
 		query := expression.This()
-		tsqlCheckSelectsAttr(query)
+		if !query.IsA(KQuery) {
+			// A CTE body is not necessarily a query in a lenient parse, e.g.
+			// "WITH c AS (SELEC1) SELECT * FROM c" parses with a non-query
+			// expression as the CTE's body, so there are no outputs to qualify
+			return expression
+		}
 		var unaliasedColumnIndexes []int
 		for i, c := range query.Selects() {
 			if c.IsA(KColumn) && c.Alias() == "" {
@@ -98,28 +100,150 @@ func QualifyDerivedTableOutputsTSQL(expression *Expr) *Expr {
 	return expression
 }
 
-// tsqlCheckSelectsAttr mirrors the Python errors raised by `query.selects` when the node has no
-// (implemented) `selects` property (e.g. a ClickHouse `WITH <expr> AS x` CTE or a DuckDB PIVOT).
-func tsqlCheckSelectsAttr(query *Expr) {
-	if query == nil {
-		panic(&ValueError{Msg: "'NoneType' object has no attribute 'selects'"})
-	}
-	switch propOwner_selects[query.Kind()] {
-	case KNone:
-		panic(&ValueError{Msg: "'" + query.Kind().Name() + "' object has no attribute 'selects'"})
-	case KSelectable:
-		panic(&ValueError{Msg: "Subclasses must implement selects"})
-	}
-}
-
-// tsqlJSONExtractSQL mirrors generators/tsql.py _json_extract_sql.
+// tsqlJSONExtractSQL renders JSON extraction. JSON_VALUE returns scalars and JSON_QUERY objects
+// and arrays: a scalar-only extraction is JSON_VALUE, one read from JSON_QUERY stays JSON_QUERY,
+// and any other is ISNULL(JSON_QUERY(...), JSON_VALUE(...)), which covers both results.
 func tsqlJSONExtractSQL(g *Generator, e *Expr) string {
+	if e.IsA(KJSONExtractScalar) && e.ArgB("scalar_only") {
+		return g.fn("JSON_VALUE", e.Arg("this"), e.Arg("expression"))
+	}
+
 	jsonQuery := g.fn("JSON_QUERY", e.Arg("this"), e.Arg("expression"))
+	if e.ArgB("json_query") {
+		return jsonQuery
+	}
+
 	jsonValue := g.fn("JSON_VALUE", e.Arg("this"), e.Arg("expression"))
 	return g.fn("ISNULL", jsonQuery, jsonValue)
 }
 
-// tsqlTimestrtotimeSQL mirrors generators/tsql.py _timestrtotime_sql.
+// tsqlCountifSQL renders COUNT_IF(cond) as COUNT(IIF(cond, 1, NULL)), as T-SQL has no COUNT_IF.
+func tsqlCountifSQL(g *Generator, e *Expr) string {
+	return g.fn("COUNT", New(KIf, "this", e.This(), "true", LiteralNumber("1"), "false", Null()))
+}
+
+// tsqlFilterSQL renders AGG(x) FILTER (WHERE cond), which T-SQL doesn't support, as an equivalent
+// conditional aggregation: the aggregate's input values are wrapped in IIF(cond, x, NULL), which
+// works because aggregate functions skip NULLs.
+func tsqlFilterSQL(g *Generator, e *Expr) string {
+	agg := e.This()
+	// IGNORE NULLS can wrap the aggregate, but the condition still belongs to its arguments
+	if agg.IsA(KIgnoreNulls) {
+		agg = agg.This()
+	}
+
+	var aggArg *Expr
+	if agg.IsA(KAnonymous) {
+		aggArg = seqGet(agg.Expressions(), 0)
+	} else {
+		aggArg = agg.This()
+	}
+	cond := e.Expression().This()
+
+	if agg.IsA(KWithinGroup) {
+		// Ordered-set aggregates take their input from the ORDER BY key, so the
+		// condition has to wrap that instead of the aggregate's own argument
+		if aggArg.IsA(KMode, KPercentileCont, KPercentileDisc) {
+			for _, ordered := range agg.Expression().Expressions() {
+				key := ordered.This()
+				key.Replace(New(KIf, "this", cond.Copy(), "true", key.Copy(), "false", Null()))
+			}
+
+			return g.sql(e.This())
+		}
+
+		// Besides the ordered-set aggregates, these are the only functions that take WITHIN GROUP
+		// and the input values as arguments, so anything else can't be rewritten correctly
+		if aggArg.IsA(KArrayAgg, KGroupConcat) {
+			aggArg = aggArg.This()
+		} else {
+			g.unsupported("Unable to rewrite FILTER into the aggregate's arguments")
+			return g.sql(e.This())
+		}
+	}
+
+	// Folding the condition into COUNT_IF's predicate avoids an IIF that returns a predicate,
+	// which T-SQL rejects
+	if agg.IsA(KCountIf) && !aggArg.IsA(KDistinct) {
+		return g.sql(New(KCountIf, "this", AndExpr(cond, aggArg)))
+	}
+
+	// `COUNT(*/t.*) FILTER (WHERE cond)` counts qualifying rows, but a star can't be an IIF
+	// argument: `IIF(cond, *, NULL)` expands to multiple columns once the table has 2+ of them.
+	if agg.IsA(KCount) && (aggArg == nil || aggArg.IsStar()) {
+		return g.sql(New(KCountIf, "this", cond))
+	}
+
+	// `DISTINCT` and `ORDER BY` are part of the aggregate's own argument list, so the
+	// condition has to wrap the values underneath them rather than the whole clause --
+	// `IIF(cond, DISTINCT x, NULL)` is not a call any dialect accepts.
+	if aggArg.IsA(KOrder) {
+		aggArg = aggArg.This()
+	}
+
+	var targets []*Expr
+	if aggArg.IsA(KDistinct) {
+		targets = aggArg.Expressions()
+	} else {
+		targets = []*Expr{aggArg}
+	}
+
+	for _, target := range targets {
+		// A missing target or condition panics with a ValueError, as a call on a missing value.
+		if target == nil {
+			panic(&ValueError{Msg: "'NoneType' object has no attribute 'replace'"})
+		}
+		if cond == nil {
+			panic(&ValueError{Msg: "'NoneType' object has no attribute 'copy'"})
+		}
+		target.Replace(New(KIf, "this", cond.Copy(), "true", target.Copy(), "false", Null()))
+	}
+
+	// Where ARRAY_AGG keeps NULLs, the rows that don't satisfy the condition have to be dropped
+	// explicitly
+	if agg.IsA(KArrayAgg) && g.d.S.ARRAY_AGG_INCLUDES_NULLS == TriTrue {
+		// IGNORE NULLS already drops them, so no extra FILTER (WHERE x IS NOT NULL) is needed
+		agg.Set("nulls_excluded", nil)
+		if agg == e.This() {
+			return g.sql(New(KIgnoreNulls, "this", agg))
+		}
+	}
+
+	return g.sql(e.This())
+}
+
+func tsqlDatetruncSQL(g *Generator, e *Expr) string {
+	dhUnsupportedArgs(g, e, "zone")
+	unitExpr := e.ArgE("unit")
+	var unit *Expr
+	if unitExpr.IsA(KWeekStart) {
+		if pyUpper(unitExpr.Name()) == "MONDAY" {
+			unit = VarExpr("ISO_WEEK")
+		} else {
+			unit = VarExpr(tsqlWeekstartName(g, unitExpr))
+		}
+	} else {
+		if name := pyUpper(unitExpr.Name()); unitExpr.IsString() && (name == "W" || name == "WW") {
+			g.unsupported("Unexpected interval unit: " + unitExpr.Name())
+		}
+		unit = unitToVar(e, "DAY")
+		if unit.IsA(KVar) && pyUpper(unit.Name()) == "ISOWEEK" {
+			unit = VarExpr("ISO_WEEK")
+		}
+	}
+	return g.fn("DATETRUNC", unit, e.This())
+}
+
+func tsqlWeekstartName(g *Generator, e *Expr) string {
+	this := pyUpper(e.This().Name())
+	// The ISO day number of the dialect's week start, WEEK_OFFSET being days after Monday.
+	weekStart := ((g.d.S.WEEK_OFFSET%7)+7)%7 + 1
+	if dow, ok := WEEK_START_DAY_TO_DOW[this]; !ok || dow != weekStart {
+		g.unsupported("WEEK(" + this + ") is not supported; falling back to the default week start day")
+	}
+	return "WEEK"
+}
+
 func tsqlTimestrtotimeSQL(g *Generator, e *Expr) string {
 	sql := timestrtotimeSQL(g, e, false)
 	if e.ArgB("zone") {
@@ -131,7 +255,6 @@ func tsqlTimestrtotimeSQL(g *Generator, e *Expr) string {
 	return sql
 }
 
-// tsqlTableName mirrors exp.table_name(table) (default dialect, identify=False).
 func tsqlTableName(table *Expr) string {
 	parts := table.Parts()
 	if len(parts) == 0 {
@@ -152,11 +275,10 @@ func tsqlTableName(table *Expr) string {
 	return strings.Join(out, ".")
 }
 
-// customizeTSQLGenerator applies the TSQLGenerator class body on top of the base Generator.
 func customizeTSQLGenerator(d *Dialect) {
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (no cluster/distribute/sort)
+	// T-SQL has no CLUSTER BY, DISTRIBUTE BY or SORT BY modifiers.
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -235,6 +357,7 @@ func customizeTSQLGenerator(d *Dialect) {
 
 	G.h.scopeResolution = tsqlScopeResolution
 	G.h.selectSQL = tsqlSelectSQL
+	G.h.setOperations = tsqlSetOperations
 	G.h.convertSQL = tsqlConvertSQL
 	G.h.queryoptionSQL = tsqlQueryoptionSQL
 	G.h.lateralOp = tsqlLateralOp
@@ -264,12 +387,15 @@ func customizeTSQLGenerator(d *Dialect) {
 	G.h.whileblockSQL = tsqlWhileblockSQL
 	G.h.executeSQL = tsqlExecuteSQL
 	G.h.executesqlSQL = tsqlExecutesqlSQL
+	G.h.filterSQL = tsqlFilterSQL
 
 	M := G.methods
 	M[KSplitPart] = tsqlSplitpartSQL
 	M[KTimeFromParts] = tsqlTimefrompartsSQL
 	M[KTimestampFromParts] = tsqlTimestampfrompartsSQL
 	M[KCount] = tsqlCountSQL
+	M[KDateTrunc] = tsqlDatetruncSQL
+	M[KCountIf] = tsqlCountifSQL
 	M[KDateDiff] = tsqlDatediffSQL
 	M[KReturnsProperty] = tsqlReturnspropertySQL
 	M[KLength] = tsqlLengthSQL
@@ -279,13 +405,74 @@ func customizeTSQLGenerator(d *Dialect) {
 	M[KCoalesce] = tsqlCoalesceSQL
 }
 
-// tsqlScopeResolution mirrors TSQLGenerator.scope_resolution.
 func tsqlScopeResolution(g *Generator, rhs string, scopeName string) string {
 	return scopeName + "::" + rhs
 }
 
-// tsqlSelectSQL mirrors TSQLGenerator.select_sql.
+// tsqlSelectSQL renders SELECT, rewriting LIMIT/FETCH with OFFSET into the ORDER BY ... OFFSET ...
+// FETCH form T-SQL requires. A set operation operand with FETCH is wrapped in
+// SELECT * FROM (...) AS _l_0, since the operand cannot carry ORDER BY ... FETCH itself.
 func tsqlSelectSQL(g *Generator, e *Expr) string {
+	tsqlPrepareLimitOffset(e)
+
+	if e.Parent().IsA(KSetOperation) && e.ArgE("limit").IsA(KFetch) {
+		return g.sql(SelectExpr(Star()).SelectFrom(e.QuerySubquery("_l_0", false), false))
+	}
+
+	return g.baseSelectSQL(e)
+}
+
+// tsqlSetOperationModifiers are the modifiers that move to the outer query when a set operation
+// is wrapped in SELECT * FROM (...).
+var tsqlSetOperationModifiers = []string{"limit", "offset", "order", "for_", "options"}
+
+// tsqlSetOperations renders a set operation. T-SQL paginates a set operation only with
+// ORDER BY ... OFFSET ... [FETCH ...], so a TOP, an OFFSET or FETCH without ORDER BY, or an
+// ORDER BY that needs NULL ordering emulation or names an expression missing from the select
+// list moves to an outer SELECT * FROM (...) AS _l_0.
+func tsqlSetOperations(g *Generator, e *Expr) string {
+	limit := e.ArgE("limit")
+	offset := e.ArgE("offset")
+	order := e.ArgE("order")
+
+	wrapOrder := false
+	if order != nil {
+		var selects []*Expr
+		for _, sel := range e.Selects() {
+			selects = append(selects, sel.Unalias().Unnest())
+		}
+		for _, ordered := range order.Expressions() {
+			this := ordered.This().Unnest()
+			if this.IsInt() {
+				continue
+			}
+
+			desc := ordered.ArgB("desc")
+			nullsFirst := ordered.ArgB("nulls_first")
+			emulateNullOrdering := (desc && nullsFirst) || (!desc && !nullsFirst)
+			if emulateNullOrdering || (!this.IsA(KColumn) && !slices.ContainsFunc(selects, this.Equal)) {
+				wrapOrder = true
+				break
+			}
+		}
+	}
+
+	if wrapOrder || (limit.IsA(KLimit) && offset == nil) || (order == nil && (offset != nil || limit.IsA(KFetch))) {
+		sel := g.wrapSetOperation(e)
+		for _, arg := range tsqlSetOperationModifiers {
+			if value := e.Arg(arg); truthy(value) {
+				e.Set(arg, nil)
+				sel.Set(arg, value)
+			}
+		}
+		return g.sql(sel)
+	}
+
+	tsqlPrepareLimitOffset(e)
+	return g.baseSetOperations(e)
+}
+
+func tsqlPrepareLimitOffset(e *Expr) {
 	limit := e.ArgE("limit")
 	offset := e.ArgE("offset")
 
@@ -304,17 +491,14 @@ func tsqlSelectSQL(g *Generator, e *Expr) string {
 			e.QueryOrderBy([]*Expr{SelectExpr(Null()).QuerySubquery(nil, true)}, true, false)
 		}
 
-		if limit.IsA(KLimit) {
+		if limit.IsA(KLimit) && !limit.isLimitAll() {
 			// TOP and OFFSET can't be combined, we need use FETCH instead of TOP
-			// we replace here because otherwise TOP would be generated in select_sql
+			// we replace here because otherwise TOP would be generated by baseSelectSQL
 			limit.Replace(New(KFetch, "direction", "FIRST", "count", limit.Expression()))
 		}
 	}
-
-	return g.baseSelectSQL(e)
 }
 
-// tsqlConvertSQL mirrors TSQLGenerator.convert_sql.
 func tsqlConvertSQL(g *Generator, e *Expr) string {
 	name := "CONVERT"
 	if e.ArgB("safe") {
@@ -323,7 +507,6 @@ func tsqlConvertSQL(g *Generator, e *Expr) string {
 	return g.fn(name, e.Arg("this"), e.Arg("expression"), e.Arg("style"))
 }
 
-// tsqlQueryoptionSQL mirrors TSQLGenerator.queryoption_sql.
 func tsqlQueryoptionSQL(g *Generator, e *Expr) string {
 	option := g.sqlKey(e, "this")
 	value := g.sqlKey(e, "expression")
@@ -337,7 +520,6 @@ func tsqlQueryoptionSQL(g *Generator, e *Expr) string {
 	return option
 }
 
-// tsqlLateralOp mirrors TSQLGenerator.lateral_op.
 func tsqlLateralOp(g *Generator, e *Expr) string {
 	crossApply := e.Arg("cross_apply")
 	if b, ok := crossApply.(bool); ok {
@@ -352,7 +534,6 @@ func tsqlLateralOp(g *Generator, e *Expr) string {
 	return "LATERAL"
 }
 
-// tsqlSplitpartSQL mirrors TSQLGenerator.splitpart_sql.
 func tsqlSplitpartSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	splitCount := len(strings.Split(this.Name(), "."))
@@ -370,7 +551,6 @@ func tsqlSplitpartSQL(g *Generator, e *Expr) string {
 	return g.fn("PARSENAME", this, LiteralNumber(tsqlPyNumSub(splitCount+1, partIndex)))
 }
 
-// tsqlExtractSQL mirrors TSQLGenerator.extract_sql.
 func tsqlExtractSQL(g *Generator, e *Expr) string {
 	part := e.This()
 	var name any = part
@@ -381,7 +561,6 @@ func tsqlExtractSQL(g *Generator, e *Expr) string {
 	return g.fn("DATEPART", name, e.Arg("expression"))
 }
 
-// tsqlTimefrompartsSQL mirrors TSQLGenerator.timefromparts_sql.
 func tsqlTimefrompartsSQL(g *Generator, e *Expr) string {
 	if nano := e.ArgE("nano"); nano != nil {
 		nano.Pop()
@@ -398,7 +577,6 @@ func tsqlTimefrompartsSQL(g *Generator, e *Expr) string {
 	return renameFunc("TIMEFROMPARTS")(g, e)
 }
 
-// tsqlTimestampfrompartsSQL mirrors TSQLGenerator.timestampfromparts_sql.
 func tsqlTimestampfrompartsSQL(g *Generator, e *Expr) string {
 	if zone := e.ArgE("zone"); zone != nil {
 		zone.Pop()
@@ -417,7 +595,6 @@ func tsqlTimestampfrompartsSQL(g *Generator, e *Expr) string {
 	return renameFunc("DATETIMEFROMPARTS")(g, e)
 }
 
-// tsqlSetitemSQL mirrors TSQLGenerator.setitem_sql.
 func tsqlSetitemSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KEQ) && !this.Left().IsA(KParameter) {
@@ -428,7 +605,6 @@ func tsqlSetitemSQL(g *Generator, e *Expr) string {
 	return g.baseSetitemSQL(e)
 }
 
-// tsqlBooleanSQL mirrors TSQLGenerator.boolean_sql.
 func tsqlBooleanSQL(g *Generator, e *Expr) string {
 	parent := e.Parent()
 	if (parent != nil && tsqlBIT_TYPES[parent.Kind()]) || e.FindAncestor(KValues, KSelect).IsA(KValues) {
@@ -444,15 +620,20 @@ func tsqlBooleanSQL(g *Generator, e *Expr) string {
 	return "(1 = 0)"
 }
 
-// tsqlIsSQL mirrors TSQLGenerator.is_sql.
 func tsqlIsSQL(g *Generator, e *Expr) string {
+	negate := e.ArgB("negate")
 	if e.Expression().IsA(KBoolean) {
+		if negate {
+			return g.binary(e, "<>")
+		}
 		return g.binary(e, "=")
+	}
+	if negate {
+		return g.binary(e, "IS NOT")
 	}
 	return g.binary(e, "IS")
 }
 
-// tsqlCreateableSQL mirrors TSQLGenerator.createable_sql.
 func tsqlCreateableSQL(g *Generator, e *Expr, locations propLocations) string {
 	sql := g.sqlKey(e, "this")
 	properties := e.ArgE("properties")
@@ -478,7 +659,8 @@ func tsqlCreateableSQL(g *Generator, e *Expr, locations propLocations) string {
 	return sql
 }
 
-// tsqlCreateSQL mirrors TSQLGenerator.create_sql.
+// tsqlCreateSQL renders CREATE: CTAS becomes SELECT ... INTO, IF NOT EXISTS becomes an existence
+// check (INFORMATION_SCHEMA or sys.indexes) around EXEC(...), and OR REPLACE becomes OR ALTER.
 func tsqlCreateSQL(g *Generator, e *Expr) string {
 	kind := e.KindText()
 	exists := e.ArgB("exists")
@@ -514,7 +696,6 @@ func tsqlCreateSQL(g *Generator, e *Expr) string {
 	table := e.Find(KTable)
 
 	var sql string
-	// Convert CTAS statement to SELECT .. INTO ..
 	if kind == "TABLE" && ctasExpression != nil {
 		if ctasExpression.IsA(KSelect, KSetOperation) {
 			ctasExpression = ctasExpression.QuerySubquery(nil, true)
@@ -579,7 +760,6 @@ func tsqlCreateSQL(g *Generator, e *Expr) string {
 	return g.prependCtes(e, sql)
 }
 
-// tsqlIntoSQL mirrors TSQLGenerator.into_sql.
 func tsqlIntoSQL(g *Generator, e *Expr) string {
 	dhUnsupportedArgs(g, e, "unlogged", "expressions")
 	if e.ArgB("temporary") {
@@ -593,7 +773,6 @@ func tsqlIntoSQL(g *Generator, e *Expr) string {
 	return g.seg("INTO") + " " + g.sqlKey(e, "this")
 }
 
-// tsqlCountSQL mirrors TSQLGenerator.count_sql.
 func tsqlCountSQL(g *Generator, e *Expr) string {
 	funcName := "COUNT"
 	if e.ArgB("big_int") {
@@ -602,7 +781,6 @@ func tsqlCountSQL(g *Generator, e *Expr) string {
 	return renameFunc(funcName)(g, e)
 }
 
-// tsqlDatediffSQL mirrors TSQLGenerator.datediff_sql.
 func tsqlDatediffSQL(g *Generator, e *Expr) string {
 	funcName := "DATEDIFF"
 	if e.ArgB("big_int") {
@@ -611,12 +789,10 @@ func tsqlDatediffSQL(g *Generator, e *Expr) string {
 	return dateDeltaSQL(funcName, false)(g, e)
 }
 
-// tsqlOffsetSQL mirrors TSQLGenerator.offset_sql.
 func tsqlOffsetSQL(g *Generator, e *Expr) string {
 	return g.baseOffsetSQL(e) + " ROWS"
 }
 
-// tsqlVersionSQL mirrors TSQLGenerator.version_sql.
 func tsqlVersionSQL(g *Generator, e *Expr) string {
 	name := e.Name()
 	if name == "TIMESTAMP" {
@@ -643,7 +819,6 @@ func tsqlVersionSQL(g *Generator, e *Expr) string {
 	return this + " " + kind + exprSQLs
 }
 
-// tsqlReturnspropertySQL mirrors TSQLGenerator.returnsproperty_sql.
 func tsqlReturnspropertySQL(g *Generator, e *Expr) string {
 	table := ""
 	if t := e.Arg("table"); truthy(t) {
@@ -652,7 +827,6 @@ func tsqlReturnspropertySQL(g *Generator, e *Expr) string {
 	return "RETURNS " + table + g.sqlKey(e, "this")
 }
 
-// tsqlReturningSQL mirrors TSQLGenerator.returning_sql.
 func tsqlReturningSQL(g *Generator, e *Expr) string {
 	into := g.sqlKey(e, "into")
 	if into != "" {
@@ -661,7 +835,6 @@ func tsqlReturningSQL(g *Generator, e *Expr) string {
 	return g.seg("OUTPUT") + " " + g.expressions(e, exprsOpts{flat: true}) + into
 }
 
-// tsqlTransactionSQL mirrors TSQLGenerator.transaction_sql.
 func tsqlTransactionSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	if this != "" {
@@ -674,7 +847,6 @@ func tsqlTransactionSQL(g *Generator, e *Expr) string {
 	return "BEGIN TRANSACTION" + this + mark
 }
 
-// tsqlCommitSQL mirrors TSQLGenerator.commit_sql.
 func tsqlCommitSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	if this != "" {
@@ -692,7 +864,6 @@ func tsqlCommitSQL(g *Generator, e *Expr) string {
 	return "COMMIT TRANSACTION" + this + durability
 }
 
-// tsqlRollbackSQL mirrors TSQLGenerator.rollback_sql.
 func tsqlRollbackSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	if this != "" {
@@ -701,7 +872,6 @@ func tsqlRollbackSQL(g *Generator, e *Expr) string {
 	return "ROLLBACK TRANSACTION" + this
 }
 
-// tsqlIdentifierSQL mirrors TSQLGenerator.identifier_sql.
 func tsqlIdentifierSQL(g *Generator, e *Expr) string {
 	identifier := g.baseIdentifierSQL(e)
 
@@ -722,23 +892,18 @@ func tsqlIdentifierSQL(g *Generator, e *Expr) string {
 	return prefix + identifier
 }
 
-// tsqlConstraintSQL mirrors TSQLGenerator.constraint_sql.
 func tsqlConstraintSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	expressions := g.expressions(e, exprsOpts{flat: true, sep: strp2(" ")})
 	return "CONSTRAINT " + this + " " + expressions
 }
 
-// tsqlLengthSQL mirrors TSQLGenerator.length_sql.
 func tsqlLengthSQL(g *Generator, e *Expr) string { return tsqlUncastText(g, e, "LEN") }
 
-// tsqlRightSQL mirrors TSQLGenerator.right_sql.
 func tsqlRightSQL(g *Generator, e *Expr) string { return tsqlUncastText(g, e, "RIGHT") }
 
-// tsqlLeftSQL mirrors TSQLGenerator.left_sql.
 func tsqlLeftSQL(g *Generator, e *Expr) string { return tsqlUncastText(g, e, "LEFT") }
 
-// tsqlUncastText mirrors TSQLGenerator._uncast_text.
 func tsqlUncastText(g *Generator, e *Expr, name string) string {
 	this := e.This()
 	var thisSQL string
@@ -755,29 +920,30 @@ func tsqlUncastText(g *Generator, e *Expr, name string) string {
 	return g.fn(name, thisSQL, expressionArg)
 }
 
-// tsqlPartitionSQL mirrors TSQLGenerator.partition_sql.
 func tsqlPartitionSQL(g *Generator, e *Expr) string {
 	return "WITH (PARTITIONS(" + g.expressions(e, exprsOpts{flat: true}) + "))"
 }
 
-// tsqlAlterSQL mirrors TSQLGenerator.alter_sql.
 func tsqlAlterSQL(g *Generator, e *Expr) string {
 	action := seqGet(e.ArgL("actions"), 0)
 	if action.IsA(KAlterRename) {
-		return "EXEC sp_rename '" + g.sql(e.Arg("this")) + "', '" + action.This().Name() + "'"
+		oldName := g.sql(LiteralString(g.sql(e.Arg("this"))))
+		newName := g.sql(LiteralString(action.This().Name()))
+		return "EXEC sp_rename " + oldName + ", " + newName
 	}
 	return g.baseAlterSQL(e)
 }
 
-// tsqlDropSQL mirrors TSQLGenerator.drop_sql.
 func tsqlDropSQL(g *Generator, e *Expr) string {
 	if s, ok := e.Arg("kind").(string); ok && s == "VIEW" {
 		e.This().Set("catalog", nil)
+		for _, table := range e.ArgL("tables") {
+			table.Set("catalog", nil)
+		}
 	}
 	return g.baseDropSQL(e)
 }
 
-// tsqlOptionsModifier mirrors TSQLGenerator.options_modifier.
 func tsqlOptionsModifier(g *Generator, e *Expr) string {
 	options := g.expressions(e, exprsOpts{key: "options"})
 	if options != "" {
@@ -786,7 +952,6 @@ func tsqlOptionsModifier(g *Generator, e *Expr) string {
 	return ""
 }
 
-// tsqlDpipeSQL mirrors TSQLGenerator.dpipe_sql.
 func tsqlDpipeSQL(g *Generator, e *Expr) string {
 	flat := e.Flatten(true)
 	var acc *Expr
@@ -800,12 +965,10 @@ func tsqlDpipeSQL(g *Generator, e *Expr) string {
 	return g.sql(acc)
 }
 
-// tsqlIsasciiSQL mirrors TSQLGenerator.isascii_sql.
 func tsqlIsasciiSQL(g *Generator, e *Expr) string {
 	return "(PATINDEX(CONVERT(VARCHAR(MAX), 0x255b5e002d7f5d25) COLLATE Latin1_General_BIN, " + g.sql(e.Arg("this")) + ") = 0)"
 }
 
-// tsqlColumndefSQL mirrors TSQLGenerator.columndef_sql.
 func tsqlColumndefSQL(g *Generator, e *Expr, sep string) string {
 	this := g.baseColumndefSQL(e, sep)
 	def := g.sqlKey(e, "default")
@@ -819,7 +982,6 @@ func tsqlColumndefSQL(g *Generator, e *Expr, sep string) string {
 	return this + def + output
 }
 
-// tsqlCoalesceSQL mirrors TSQLGenerator.coalesce_sql.
 func tsqlCoalesceSQL(g *Generator, e *Expr) string {
 	funcName := "COALESCE"
 	if e.ArgB("is_null") {
@@ -828,7 +990,6 @@ func tsqlCoalesceSQL(g *Generator, e *Expr) string {
 	return renameFunc(funcName)(g, e)
 }
 
-// tsqlStoredprocedureSQL mirrors TSQLGenerator.storedprocedure_sql.
 func tsqlStoredprocedureSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	expressions := g.expressions(e, exprsOpts{})
@@ -843,7 +1004,6 @@ func tsqlStoredprocedureSQL(g *Generator, e *Expr) string {
 	return this
 }
 
-// tsqlIfblockSQL mirrors TSQLGenerator.ifblock_sql.
 func tsqlIfblockSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	trueS := g.sqlKey(e, "true")
@@ -859,7 +1019,6 @@ func tsqlIfblockSQL(g *Generator, e *Expr) string {
 	return "IF " + this + " BEGIN" + trueS + falseS
 }
 
-// tsqlWhileblockSQL mirrors TSQLGenerator.whileblock_sql.
 func tsqlWhileblockSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	body := g.sqlKey(e, "body")
@@ -871,7 +1030,6 @@ func tsqlWhileblockSQL(g *Generator, e *Expr) string {
 	return "WHILE " + this + " BEGIN" + body
 }
 
-// tsqlExecuteSQL mirrors TSQLGenerator.execute_sql.
 func tsqlExecuteSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	expressions := g.expressions(e, exprsOpts{})
@@ -885,7 +1043,6 @@ func tsqlExecuteSQL(g *Generator, e *Expr) string {
 	return "EXECUTE " + returnStatus + this + expressions
 }
 
-// tsqlExecutesqlSQL mirrors TSQLGenerator.executesql_sql.
 func tsqlExecutesqlSQL(g *Generator, e *Expr) string {
 	return g.executeSQL(e)
 }

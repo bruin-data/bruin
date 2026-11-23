@@ -1,11 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/typing/bigquery.py.
-
-// DATE_ADD / DATE_SUB / *_TRUNC return the type of their first argument. BigQuery
-// implicitly casts a string literal first arg to the function's own temporal type,
-// so map each to that type (e.g. DATE_ADD('2020-01-01', ...) -> DATE,
-// TIMESTAMP_TRUNC('...') -> TIMESTAMP).
 var typingBigQueryDateFuncKinds = []Kind{KDateAdd, KDateSub, KDateTrunc, KDatetimeTrunc, KTimestampTrunc}
 
 var typingBigQueryDateFuncLiteralType = map[Kind]DType{
@@ -29,7 +23,7 @@ func typingBigQueryAnnotateDateFunc(a *TypeAnnotator, expression *Expr) *Expr {
 	if this.IsA(KLiteral) && this.IsString() {
 		dtype, ok := typingBigQueryDateFuncLiteralType[expression.Kind()]
 		if !ok {
-			panic(&ValueError{Msg: expression.classRepr()})
+			panic(&ValueError{Msg: expression.Kind().Name()})
 		}
 		return a.setType(expression, dtype)
 	}
@@ -37,8 +31,26 @@ func typingBigQueryAnnotateDateFunc(a *TypeAnnotator, expression *Expr) *Expr {
 	return a.annotateByArgs(expression, "this")
 }
 
-// typingBigQueryAnnotateMathFunctions: many BigQuery math functions such as CEIL, FLOOR etc
-// follow this return type convention:
+// typingBigQueryAnnotateDatetimeOrTimestampAdd annotates DATETIME_ADD / DATETIME_SUB /
+// TIMESTAMP_ADD / TIMESTAMP_SUB. Whichever of them is called, BigQuery returns a TIMESTAMP for a
+// TIMESTAMP and a DATETIME for a DATE or DATETIME. Any other argument, e.g. a string literal,
+// gets the function's own type.
+func typingBigQueryAnnotateDatetimeOrTimestampAdd(a *TypeAnnotator, expression *Expr) *Expr {
+	this := expression.This()
+	if this.IsTypeOf(DT_TIMESTAMPTZ) {
+		return a.setType(expression, DT_TIMESTAMPTZ)
+	}
+	if this.IsTypeOf(DT_DATE, DT_DATETIME, DT_TIMESTAMP) {
+		return a.setType(expression, DT_DATETIME)
+	}
+	if expression.IsA(KTimestampAdd, KTimestampSub) {
+		return a.setType(expression, DT_TIMESTAMPTZ)
+	}
+	return a.setType(expression, DT_DATETIME)
+}
+
+// typingBigQueryAnnotateMathFunctions annotates math functions such as CEIL and FLOOR, which
+// return FLOAT64 for integers and strings and the input type otherwise:
 //
 //	+---------+---------+---------+------------+---------+
 //	|  INPUT  | INT64   | NUMERIC | BIGNUMERIC | FLOAT64 |
@@ -48,7 +60,7 @@ func typingBigQueryAnnotateDateFunc(a *TypeAnnotator, expression *Expr) *Expr {
 func typingBigQueryAnnotateMathFunctions(a *TypeAnnotator, expression *Expr) *Expr {
 	this := expression.This()
 
-	if annIsTypeSet(this, DataType_INTEGER_TYPES) {
+	if annIsTypeSet(this, DataType_INTEGER_TYPES) || annIsTypeSet(this, DataType_TEXT_TYPES) {
 		a.setType(expression, DT_DOUBLE)
 	} else {
 		a.setType(expression, annT(this.Type()))
@@ -56,7 +68,10 @@ func typingBigQueryAnnotateMathFunctions(a *TypeAnnotator, expression *Expr) *Ex
 	return expression
 }
 
-// typingBigQueryAnnotateSafeDivide:
+// typingBigQueryAnnotateIntPairAsDouble annotates SAFE_DIVIDE and POW / POWER: both promote
+// INT64 / INT64 to FLOAT64, and otherwise follow the numeric coercion. NULL operands coerce the
+// way INT64 does, since BigQuery treats a bare NULL argument as an unresolved integer-family
+// type for this promotion.
 //
 //	+------------+------------+------------+-------------+---------+
 //	| INPUT      | INT64      | NUMERIC    | BIGNUMERIC  | FLOAT64 |
@@ -66,15 +81,17 @@ func typingBigQueryAnnotateMathFunctions(a *TypeAnnotator, expression *Expr) *Ex
 //	| BIGNUMERIC | BIGNUMERIC | BIGNUMERIC | BIGNUMERIC  | FLOAT64 |
 //	| FLOAT64    | FLOAT64    | FLOAT64    | FLOAT64     | FLOAT64 |
 //	+------------+------------+------------+-------------+---------+
-func typingBigQueryAnnotateSafeDivide(a *TypeAnnotator, expression *Expr) *Expr {
-	if annIsTypeSet(expression.This(), DataType_INTEGER_TYPES) && annIsTypeSet(expression.Expression(), DataType_INTEGER_TYPES) {
-		return a.setType(expression, DT_DOUBLE)
+func typingBigQueryAnnotateIntPairAsDouble(a *TypeAnnotator, expression *Expr) *Expr {
+	typingBigQueryAnnotateByArgsWithCoerce(a, expression)
+
+	if expression.IsTypeOf(DT_NULL) || annIsTypeSet(expression, DataType_INTEGER_TYPES) {
+		a.setType(expression, DT_DOUBLE)
 	}
 
-	return typingBigQueryAnnotateByArgsWithCoerce(a, expression)
+	return expression
 }
 
-// typingBigQueryAnnotateByArgsWithCoerce:
+// typingBigQueryAnnotateByArgsWithCoerce types a binary expression by coercing its operand types:
 //
 //	+------------+------------+------------+-------------+---------+
 //	| INPUT      | INT64      | NUMERIC    | BIGNUMERIC  | FLOAT64 |
@@ -90,6 +107,11 @@ func typingBigQueryAnnotateByArgsWithCoerce(a *TypeAnnotator, expression *Expr) 
 }
 
 func typingBigQueryAnnotateByArgsApproxTop(a *TypeAnnotator, expression *Expr) *Expr {
+	if expression.This().Type() == nil || expression.This().IsTypeOf(DT_UNKNOWN) {
+		a.setType(expression, DT_UNKNOWN)
+		return expression
+	}
+
 	structType := New(
 		KDataType,
 		"this", DT_STRUCT,
@@ -111,6 +133,24 @@ func typingBigQueryAnnotateConcat(a *TypeAnnotator, expression *Expr) *Expr {
 	}
 
 	return annotated
+}
+
+// typingBigQueryAllStructKind reports whether every leaf SELECT of a (possibly nested) set
+// operation is a SELECT AS STRUCT. It walks the operands iteratively, so long UNION chains do not
+// deepen the stack.
+func typingBigQueryAllStructKind(node *Expr) bool {
+	stack := []*Expr{node}
+	for len(stack) > 0 {
+		n := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if n.IsA(KSetOperation) {
+			stack = append(stack, n.This().Unnest(), n.Expression().Unnest())
+		} else if kind, _ := n.Arg("kind").(string); !n.IsA(KSelect) || kind != "STRUCT" {
+			return false
+		}
+	}
+
+	return true
 }
 
 func typingBigQueryAnnotateArray(a *TypeAnnotator, expression *Expr) *Expr {
@@ -153,17 +193,31 @@ func typingBigQueryAnnotateArray(a *TypeAnnotator, expression *Expr) *Expr {
 		} else if unnested.IsA(KSetOperation) {
 			// Handle ARRAY(SELECT ... UNION ALL SELECT ...) - set operations
 
-			// Get all column types for the SetOperation
 			colTypes := a.getSetopColumnTypes(unnested)
-			// For ARRAY constructor, there should only be one projection
-			// https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array
-			if colTypes.Len() > 0 && len(unnested.Left().Selects()) > 0 {
-				firstColName := unnested.Left().Selects()[0].AliasOrName()
-				projectionType, _ = colTypes.Get(firstColName)
+
+			if len(colTypes) > 0 && typingBigQueryAllStructKind(unnested) {
+				// Each branch's row is itself the struct value, not N separate columns
+				fields := make([]*Expr, 0, len(colTypes))
+				known := true
+				for _, ct := range colTypes {
+					kind := DataTypeBuild(ct.typ, nil, false, true)
+					if kind.IsTypeOf(DT_UNKNOWN) {
+						known = false
+						break
+					}
+					fields = append(fields, New(KColumnDef, "this", ToIdentifier(ct.name, nil), "kind", kind))
+				}
+
+				if known {
+					projectionType = New(KDataType, "this", DT_STRUCT, "expressions", fields, "nested", true)
+				}
+			} else if len(colTypes) == 1 {
+				// For ARRAY constructor, there should only be one projection
+				// https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array
+				projectionType = colTypes[0].typ
 			}
 		}
 
-		// If we successfully determine a projection type and it's not UNKNOWN, wrap it in ARRAY
 		if projectionType != nil {
 			dt, isDataType := projectionType.(*Expr)
 			if !((isDataType && dt.IsTypeOf(DT_UNKNOWN)) || projectionType == DT_UNKNOWN) {
@@ -180,6 +234,14 @@ func typingBigQueryAnnotateArray(a *TypeAnnotator, expression *Expr) *Expr {
 		}
 	}
 
+	// BigQuery inherits field names from the first STRUCT in a literal array
+	if len(arrayArgs) > 0 {
+		if firstType := arrayArgs[0].Type(); firstType.IsTypeOf(DT_STRUCT) && len(firstType.Expressions()) > 0 {
+			a.setType(expression, New(KDataType, "this", DT_ARRAY, "expressions", []*Expr{firstType.Copy()}, "nested", true))
+			return expression
+		}
+	}
+
 	return a.annotateByArgsFull(expression, false, true, "expressions")
 }
 
@@ -187,7 +249,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 	m := typingMetadata("").copy()
 
 	m.annotators(
-		"typing/bigquery.py:199", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateMathFunctions(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateMathFunctions(a, e) },
 		KAvg,
 		KCeil,
 		KExp,
@@ -198,7 +260,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KSqrt,
 	)
 	m.annotators(
-		"typing/bigquery.py:212", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KArgMax,
 		KArgMin,
 		KGroupConcat,
@@ -224,7 +286,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KTrim,
 		KUpper,
 	)
-	m.annotators("typing/bigquery.py:241", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateDateFunc(a, e) },
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateDateFunc(a, e) },
 		typingBigQueryDateFuncKinds...)
 	m.returns(
 		DT_BIGINT,
@@ -268,8 +330,6 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KCorr,
 		KCosineDistance,
 		KCoth,
-		KCovarPop,
-		KCovarSamp,
 		KCsc,
 		KCsch,
 		KEuclideanDistance,
@@ -311,7 +371,7 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KUuid,
 	)
 	m.annotators(
-		"typing/bigquery.py:345", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsWithCoerce(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsWithCoerce(a, e) },
 		KPercentileCont,
 		KSafeAdd,
 		KSafeDivide,
@@ -319,38 +379,40 @@ func typingBigQueryMetadata() ExprMetadataType {
 		KSafeSubtract,
 	)
 	m.annotators(
-		"typing/bigquery.py:355", func(a *TypeAnnotator, e *Expr) { a.annotateByArgsFull(e, false, true, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgsFull(e, false, true, "this") },
 		KApproxQuantiles,
 		KJSONExtractArray,
 		KRegexpExtractAll,
 		KSplit,
 	)
 	m.returns(DT_TIMESTAMPTZ, typingTIMESTAMP_EXPRESSIONS...)
-	m.annotators("typing/bigquery.py:364", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopK)
-	m.annotators("typing/bigquery.py:365", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopSum)
-	m.annotators("typing/bigquery.py:127", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateArray(a, e) }, KArray)
-	m.annotators("typing/bigquery.py:116", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateConcat(a, e) }, KConcat)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateDatetimeOrTimestampAdd(a, e) },
+		KDatetimeAdd, KDatetimeSub, KTimestampAdd, KTimestampSub)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopK)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateByArgsApproxTop(a, e) }, KApproxTopSum)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateArray(a, e) }, KArray)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateConcat(a, e) }, KConcat)
 	m.returns(DT_DATE, KDateFromUnixDate)
-	m.annotators("typing/bigquery.py:370", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<TIMESTAMP>", MustDialect("bigquery"), false, true))
 	}, KGenerateTimestampArray)
-	m.annotators("typing/bigquery.py:375", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("to_json") {
 			a.setType(e, DT_JSON)
 		} else {
 			a.setType(e, DT_VARCHAR)
 		}
 	}, KJSONFormat)
-	m.annotators("typing/bigquery.py:380", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<VARCHAR>", MustDialect("bigquery"), false, true))
 	}, KJSONKeysAtDepth)
-	m.annotators("typing/bigquery.py:385", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<VARCHAR>", MustDialect("bigquery"), false, true))
 	}, KJSONValueArray)
 	m.returns(DT_BIGDECIMAL, KParseBignumeric)
 	m.returns(DT_DECIMAL, KParseNumeric)
-	m.annotators("typing/bigquery.py:391", func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateSafeDivide(a, e) }, KSafeDivide)
-	m.annotators("typing/bigquery.py:393", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingBigQueryAnnotateIntPairAsDouble(a, e) }, KPow, KSafeDivide)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("ARRAY<BIGINT>", MustDialect("bigquery"), false, true))
 	}, KToCodePoints)
 

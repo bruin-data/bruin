@@ -1,9 +1,7 @@
 package sqlparser
 
 import (
-	"compress/gzip"
 	"encoding/json"
-	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -12,21 +10,10 @@ import (
 )
 
 // TestFastPathMatchesJSONRoundTrip checks that the in-process fast path is indistinguishable from
-// the JSON round trip it replaces, over the engine's conformance corpus.
+// the JSON round trip it replaces, over the golden corpus.
 func TestFastPathMatchesJSONRoundTrip(t *testing.T) {
 	t.Parallel()
-	f, err := os.Open("../sqlengine/testdata/parse.json.gz")
-	if err != nil {
-		t.Skip("missing corpus")
-	}
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	require.NoError(t, err)
-	var cases []struct {
-		Dialect string `json:"dialect"`
-		SQL     string `json:"sql"`
-	}
-	require.NoError(t, json.NewDecoder(gz).Decode(&cases))
+	cases := mustGoldenCorpus(t)
 
 	type command struct {
 		name     string
@@ -38,8 +25,8 @@ func TestFastPathMatchesJSONRoundTrip(t *testing.T) {
 		if i%3 != 0 {
 			continue
 		}
-		q := c.SQL
-		d := c.Dialect
+		q := c.sql
+		d := c.dialect
 		commands := []command{
 			{"lineage", map[string]any{"query": q, "dialect": d, "schema": Schema{}}, func() any { return &Lineage{} }},
 			{"lineage", map[string]any{"query": q, "dialect": d, "schema": Schema{"t": {"a": "int", "b": "varchar"}, "x": nil}}, func() any { return &Lineage{} }},
@@ -113,18 +100,7 @@ func expandSchemas(m map[string]any) map[string]any {
 // JSON round trip they replace.
 func TestDirectPathsMatchJSONRoundTrip(t *testing.T) {
 	t.Parallel()
-	f, err := os.Open("../sqlengine/testdata/parse.json.gz")
-	if err != nil {
-		t.Skip("missing corpus")
-	}
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	require.NoError(t, err)
-	var cases []struct {
-		Dialect string `json:"dialect"`
-		SQL     string `json:"sql"`
-	}
-	require.NoError(t, json.NewDecoder(gz).Decode(&cases))
+	cases := mustGoldenCorpus(t)
 
 	p, err := NewSQLParser(false)
 	require.NoError(t, err)
@@ -145,7 +121,7 @@ func TestDirectPathsMatchJSONRoundTrip(t *testing.T) {
 		if i%3 != 1 {
 			continue
 		}
-		q, d := c.SQL, c.Dialect
+		q, d := c.sql, c.dialect
 
 		var tables tablesResponse
 		viaJSON("get-tables", map[string]any{"query": q, "dialect": d}, &tables)

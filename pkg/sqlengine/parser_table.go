@@ -5,15 +5,11 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/parser.py (chunk C, part 1): MATCH_RECOGNIZE, LATERAL, joins, indexes,
-// table hints, table parts, _parse_table, versions / historical data, UNNEST, VALUES,
-// TABLESAMPLE and PIVOT / UNPIVOT.
-
-// chunkCRowTokens mirrors the ad-hoc `(TokenType.ROW,)` tuple used by _parse_table_sample.
+// chunkCRowTokens lets baseParseTableSample accept ROW as a sampling method name.
 var chunkCRowTokens = newTokenSet(TK_ROW)
 
-// chunkCOptList converts a "list or None" result into an argument value: a nil slice means
-// Python None (untyped nil, so that Set removes the key / New keeps None), otherwise the list.
+// chunkCOptList converts an optional list into an argument value: a nil slice becomes an untyped
+// nil (so that Set removes the key and New leaves it unset), anything else stays the list.
 func chunkCOptList(l []*Expr) any {
 	if l == nil {
 		return nil
@@ -21,7 +17,8 @@ func chunkCOptList(l []*Expr) any {
 	return l
 }
 
-// chunkCAnyExpr converts a possibly-nil expression into an untyped value (nil means None).
+// chunkCAnyExpr converts a possibly-nil expression into an untyped value (a nil *Expr becomes an
+// untyped nil).
 func chunkCAnyExpr(e *Expr) any {
 	if e == nil {
 		return nil
@@ -29,7 +26,8 @@ func chunkCAnyExpr(e *Expr) any {
 	return e
 }
 
-// chunkCKwargs mirrors an insertion-ordered Python kwargs dict (also used for defaultdict(list)).
+// chunkCKwargs is an insertion-ordered set of key / value arguments for New, with helpers for
+// keys that collect lists of expressions.
 type chunkCKwargs struct {
 	keys []string
 	vals []any
@@ -46,6 +44,18 @@ func (k *chunkCKwargs) set(key string, v any) {
 	k.vals = append(k.vals, v)
 }
 
+// joinQualifiers are the join arguments that qualify a join beyond its table.
+var joinQualifiers = []string{"on", "using", "side", "kind", "method"}
+
+func hasJoinQualifier(kwargs *chunkCKwargs) bool {
+	for _, k := range joinQualifiers {
+		if truthy(kwargs.get(k)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (k *chunkCKwargs) get(key string) any {
 	for i, kk := range k.keys {
 		if kk == key {
@@ -55,7 +65,6 @@ func (k *chunkCKwargs) get(key string) any {
 	return nil
 }
 
-// list mirrors defaultdict(list)[key]: returns the list, creating an empty one if absent.
 func (k *chunkCKwargs) list(key string) []*Expr {
 	for i, kk := range k.keys {
 		if kk == key {
@@ -86,7 +95,6 @@ func (k *chunkCKwargs) kv() []any {
 	return out
 }
 
-// chunkCAliasTokensOr mirrors `alias_tokens or self.TABLE_ALIAS_TOKENS`.
 func (p *Parser) chunkCAliasTokensOr(aliasTokens *TokenSet) *TokenSet {
 	if aliasTokens != nil && *aliasTokens != (TokenSet{}) {
 		return aliasTokens
@@ -94,7 +102,6 @@ func (p *Parser) chunkCAliasTokensOr(aliasTokens *TokenSet) *TokenSet {
 	return &p.s.TABLE_ALIAS_TOKENS
 }
 
-// chunkCToIdentifier mirrors exp.to_identifier(name, copy=copy) for expression (or None) inputs.
 func chunkCToIdentifier(name *Expr, copy bool) *Expr {
 	if name == nil {
 		return nil
@@ -105,10 +112,11 @@ func chunkCToIdentifier(name *Expr, copy bool) *Expr {
 		}
 		return name
 	}
-	panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + name.classRepr()})
+	panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + name.Kind().Name()})
 }
 
-// chunkCColumn mirrors exp.column(col, table, db, catalog, fields=fields, copy=copy) for expression inputs.
+// chunkCColumn builds a Column from identifier parts (col may also be a Star), wrapped in Dots
+// for any extra fields.
 func chunkCColumn(col, table, db, catalog *Expr, fields []*Expr, copy bool) *Expr {
 	if !col.IsA(KStar) {
 		col = chunkCToIdentifier(col, copy)
@@ -130,13 +138,13 @@ func chunkCColumn(col, table, db, catalog *Expr, fields []*Expr, copy bool) *Exp
 	return this
 }
 
-// chunkCAlias mirrors exp.alias_(expression, alias, copy=copy) for an expression and an
-// Identifier (or None) alias.
+// chunkCAlias aliases e with an Identifier (or nil): it sets e's own alias arg when its kind has
+// one (except Window), and wraps e in an Alias otherwise.
 func chunkCAlias(e *Expr, alias *Expr, copy bool) *Expr {
 	if copy {
 		e = e.Copy()
 	}
-	// to_identifier's own copy flag defaults to True
+	// the alias is always copied, whatever copy says
 	alias = chunkCToIdentifier(alias, true)
 	if e.Kind().hasArgType("alias") && !e.Is(KWindow) {
 		e.Set("alias", alias)
@@ -145,7 +153,8 @@ func chunkCAlias(e *Expr, alias *Expr, copy bool) *Expr {
 	return New(KAlias, "this", e, "alias", alias)
 }
 
-// chunkCTableToColumn mirrors Table.to_column(copy).
+// chunkCTableToColumn converts a Table to a Column (catalog.db.table.name plus any further
+// fields), keeping its alias. A Table wrapping a function or array yields that expression.
 func chunkCTableToColumn(t *Expr, copy bool) *Expr {
 	parts := t.Parts()
 	lastPart := parts[len(parts)-1]
@@ -176,7 +185,6 @@ func chunkCTableToColumn(t *Expr, copy bool) *Expr {
 	return col
 }
 
-// chunkCUnpivotTarget mirrors parser._unpivot_target.
 func chunkCUnpivotTarget(e *Expr) *Expr {
 	// UNPIVOT's pre-FOR values and FOR field are new output names, not column references.
 	if e.IsA(KColumn) && e.TableName() == "" {
@@ -193,7 +201,8 @@ func chunkCUnpivotTarget(e *Expr) *Expr {
 	return e
 }
 
-// chunkCProduct mirrors itertools.product(*lists) for lists of strings.
+// chunkCProduct returns the Cartesian product of lists, in order (the last list varies
+// fastest).
 func chunkCProduct(lists [][]string) [][]string {
 	result := [][]string{{}}
 	for _, l := range lists {
@@ -211,7 +220,8 @@ func chunkCProduct(lists [][]string) [][]string {
 	return result
 }
 
-// _parse_match_recognize_measure (parser.py L4315).
+// parseMatchRecognizeMeasure parses one MEASURES item of MATCH_RECOGNIZE: [FINAL | RUNNING] <expr>.
+// window_frame is false (not nil) when neither keyword is present.
 func (p *Parser) parseMatchRecognizeMeasure() *Expr {
 	var windowFrame any = false
 	if p.matchTexts("FINAL", "RUNNING") {
@@ -224,8 +234,9 @@ func (p *Parser) parseMatchRecognizeMeasure() *Expr {
 	))
 }
 
-// chunkCAdvanceAnyText mirrors `self._advance_any().text`, which raises AttributeError when no
-// token can be consumed.
+// chunkCAdvanceAnyText consumes any token and returns its text. When no token is left it panics
+// with a ValueError; the message keeps its historical wording ("'NoneType' object has no
+// attribute 'text'").
 func chunkCAdvanceAnyText(p *Parser) string {
 	tok := p.advanceAny(false)
 	if tok == nil {
@@ -234,7 +245,9 @@ func chunkCAdvanceAnyText(p *Parser) string {
 	return tok.Text
 }
 
-// _parse_match_recognize (parser.py L4323).
+// parseMatchRecognize parses MATCH_RECOGNIZE (...) with its PARTITION BY, ORDER BY, MEASURES,
+// rows-per-match, AFTER MATCH SKIP, PATTERN and DEFINE clauses, and an optional alias. The
+// PATTERN is kept as raw SQL text.
 func (p *Parser) parseMatchRecognize() *Expr {
 	if !p.match(TK_MATCH_RECOGNIZE) {
 		return nil
@@ -331,9 +344,11 @@ func (p *Parser) parseMatchRecognize() *Expr {
 	))
 }
 
-// _parse_lateral (parser.py L4412).
+// baseParseLateral parses LATERAL [VIEW] [OUTER] ... and CROSS / OUTER APPLY ..., whose target is a
+// subquery, UNNEST, function call or (dotted) name. cross_apply is true for CROSS APPLY, false
+// for OUTER APPLY and nil otherwise.
 func (p *Parser) baseParseLateral() *Expr {
-	var crossApply any // bool | None
+	var crossApply any // nil, true or false
 	if p.matchPair(TK_CROSS, TK_APPLY) {
 		crossApply = true
 	} else if p.matchPair(TK_OUTER, TK_APPLY) {
@@ -372,7 +387,7 @@ func (p *Parser) baseParseLateral() *Expr {
 		}
 	}
 
-	var ordinality any // bool | None
+	var ordinality any // nil, true or false
 	var tableAlias *Expr
 
 	if truthy(view) {
@@ -401,7 +416,6 @@ func (p *Parser) baseParseLateral() *Expr {
 	))
 }
 
-// _parse_stream (parser.py L4469).
 func (p *Parser) parseStream() *Expr {
 	index := p.index
 	if p.match(TK_STREAM) {
@@ -415,7 +429,7 @@ func (p *Parser) parseStream() *Expr {
 	return nil
 }
 
-// _parse_join_parts (parser.py L4477).
+// baseParseJoinParts consumes the optional join method, side and kind tokens, in that order.
 func (p *Parser) baseParseJoinParts() (*Token, *Token, *Token) {
 	var method, side, kind *Token
 	if p.matchSet(p.s.JOIN_METHODS) {
@@ -430,7 +444,6 @@ func (p *Parser) baseParseJoinParts() (*Token, *Token, *Token) {
 	return method, side, kind
 }
 
-// _parse_using_identifiers (parser.py L4486).
 func (p *Parser) parseUsingIdentifiers() []*Expr {
 	parseColumnAsIdentifier := func() *Expr {
 		this := p.parseColumn()
@@ -443,7 +456,9 @@ func (p *Parser) parseUsingIdentifiers() []*Expr {
 	return p.parseWrappedCSV(parseColumnAsIdentifier, TK_COMMA, true)
 }
 
-// _parse_join (parser.py L4495).
+// baseParseJoin parses one join: a comma join, or [method] [side] [kind] [DIRECTED] [hint]
+// JOIN / APPLY <table> with MATCH_CONDITION, ON or USING, and pivots. It returns nil when no
+// join follows. Joins nested after the joined table attach to it when an ON / USING follows them.
 func (p *Parser) baseParseJoin(skipJoinToken bool, parseBracket bool, aliasTokens *TokenSet) *Expr {
 	if p.match(TK_COMMA) {
 		table := p.tryParseExpr(func() *Expr {
@@ -463,7 +478,7 @@ func (p *Parser) baseParseJoin(skipJoinToken bool, parseBracket bool, aliasToken
 
 	index := p.index
 	method, side, kind := p.parseJoinParts()
-	directed := p.matchTextSeq("DIRECTED")
+	directed := p.s.SUPPORTS_DIRECTED_JOIN && p.matchTextSeq("DIRECTED")
 	hint := ""
 	if p.matchTextSet(p.s.JOIN_HINTS) {
 		hint = p.prev.Text
@@ -507,7 +522,7 @@ func (p *Parser) baseParseJoin(skipJoinToken bool, parseBracket bool, aliasToken
 	}
 
 	if p.match(TK_MATCH_CONDITION) {
-		kwargs.set("match_condition", p.parseWrapped(p.parseComparison, false))
+		kwargs.set("match_condition", p.parseWrapped(func() *Expr { return p.parseComparison(nil) }, false))
 	}
 
 	thisExpr, _ := kwargs.get("this").(*Expr)
@@ -565,10 +580,14 @@ func (p *Parser) baseParseJoin(skipJoinToken bool, parseBracket bool, aliasToken
 		kwargs.set("directed", directed)
 	}
 
+	// A JOIN without any qualifier is a cross join, unlike a comma join
+	if join && !hasJoinQualifier(kwargs) {
+		kwargs.set("kind", "CROSS")
+	}
+
 	return p.expressionC(New(KJoin, kwargs.kv()...), comments)
 }
 
-// _parse_opclass (parser.py L4591).
 func (p *Parser) parseOpclass() *Expr {
 	this := p.parseDisjunction()
 
@@ -583,10 +602,11 @@ func (p *Parser) parseOpclass() *Expr {
 	return this
 }
 
-// _parse_index_params (parser.py L4602).
+// parseIndexParams parses index parameters: USING, columns, INCLUDE, PARTITION BY, WITH (...),
+// [USING INDEX] TABLESPACE, WHERE and ON. with_storage is false (not nil) when WITH is absent.
 func (p *Parser) parseIndexParams() *Expr {
 	var using *Expr
-	if p.match(TK_USING) {
+	if !p.matchTextSeqNoAdvance("USING", "INDEX", "TABLESPACE") && p.match(TK_USING) {
 		using = p.parseVar(true, nil, false)
 	}
 
@@ -605,8 +625,8 @@ func (p *Parser) parseIndexParams() *Expr {
 		withStorage = p.parseWrappedProperties()
 	}
 	var tablespace *Expr
-	if p.matchTextSeq("USING", "INDEX", "TABLESPACE") {
-		tablespace = p.parseVar(true, nil, false)
+	if p.matchTextSeq("USING", "INDEX", "TABLESPACE") || p.matchTextSeq("TABLESPACE") {
+		tablespace = p.parseIdVar(true, nil)
 	}
 	where := p.parseWhere(false)
 
@@ -628,7 +648,9 @@ func (p *Parser) parseIndexParams() *Expr {
 	))
 }
 
-// _parse_index (parser.py L4635).
+// parseIndex parses an index definition. Given a name (or anonymous), it parses
+// [ON] [TABLE] <table> and the parameters; otherwise [UNIQUE] [PRIMARY] [AMP] INDEX <name> and
+// the parameters, returning nil when INDEX is missing.
 func (p *Parser) parseIndex(index *Expr, anonymous bool) *Expr {
 	var unique, primary, amp any
 	var table *Expr
@@ -667,7 +689,8 @@ func (p *Parser) parseIndex(index *Expr, anonymous bool) *Expr {
 	))
 }
 
-// _parse_table_hints (parser.py L4665).
+// parseTableHints parses T-SQL WITH (...) table hints or MySQL index hints, returning nil when
+// there are none.
 func (p *Parser) parseTableHints() []*Expr {
 	hints := []*Expr{}
 	if p.matchPair(TK_WITH, TK_L_PAREN) {
@@ -707,7 +730,6 @@ func (p *Parser) parseTableHints() []*Expr {
 	return hints
 }
 
-// _parse_table_part (parser.py L4693).
 func (p *Parser) baseParseTablePart(schema bool) *Expr {
 	if !schema {
 		if f := p.parseFunction(nil, false, false, false); f != nil {
@@ -723,10 +745,12 @@ func (p *Parser) baseParseTablePart(schema bool) *Expr {
 	return p.parsePlaceholder()
 }
 
-// _parse_table_parts_fast (parser.py L4701).
+// parseTablePartsFast parses a table name made only of dot-separated identifier tokens, the
+// common case. It retreats and returns nil when a postfix token follows the name or a dot is not
+// followed by an identifier, leaving those cases to the full parser.
 func (p *Parser) parseTablePartsFast() *Expr {
 	index := p.index
-	var parts []*Expr // None until the first part
+	var parts []*Expr // nil until the first part
 	var allComments []string
 
 	for p.matchSet(p.s.IDENTIFIER_TOKENS) {
@@ -796,13 +820,16 @@ func (p *Parser) parseTablePartsFast() *Expr {
 	return table
 }
 
-// _parse_table_parts (parser.py L4764).
+// baseParseTableParts parses a dotted table name into a Table with catalog, db and this; parts
+// beyond the third nest in Dot expressions. A trailing `*` makes a wildcard name when wildcard is
+// set, and isDbReference shifts the parts so the last one is the db. Comments on the parts,
+// CHANGES, AT / BEFORE and pivots attach to the Table.
 func (p *Parser) baseParseTableParts(schema bool, isDbReference bool, wildcard bool, fast bool) *Expr {
 	if fast {
 		return p.parseTablePartsFast()
 	}
 
-	// catalog, db and table hold an *Expr, a string ("") or nil (None)
+	// catalog, db and table hold an *Expr, a string ("") or nil
 	var catalog, db any
 	var table any = chunkCAnyExpr(p.parseTablePart(schema))
 
@@ -875,7 +902,10 @@ func (p *Parser) baseParseTableParts(schema bool, isDbReference bool, wildcard b
 	return result
 }
 
-// _parse_table (parser.py L4835).
+// baseParseTable parses a table reference: a plain table name (fast path), STREAM, LATERAL,
+// UNNEST, VALUES, a subquery, a bracket, ROWS FROM (...) or a table name with its partition,
+// version, sample, alias, index hints, pivots and joins. With schema set, a column list follows
+// the name instead.
 func (p *Parser) baseParseTable(schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
 	if !schema && !isDbReference && !consumePipe && !joins {
 		index := p.index
@@ -921,7 +951,8 @@ func (p *Parser) baseParseTable(schema bool, joins bool, aliasTokens *TokenSet, 
 		return unnest
 	}
 
-	if values := p.parseDerivedTableValues(); values != nil {
+	if values := p.parseDerivedTableValues(false); values != nil {
+		values.Set("pivots", chunkCOptList(p.parsePivots()))
 		return values
 	}
 
@@ -990,6 +1021,9 @@ func (p *Parser) baseParseTable(schema bool, joins bool, aliasTokens *TokenSet, 
 
 	if p.d.S.ALIAS_POST_TABLESAMPLE {
 		this.Set("sample", p.parseTableSample(false))
+		if this.ArgB("sample") && p.d.S.ALIAS_POST_VERSION && !this.ArgB("version") {
+			this.Set("version", p.parseVersion())
+		}
 	}
 
 	alias := p.parseTableAlias(p.chunkCAliasTokensOr(aliasTokens))
@@ -1045,14 +1079,24 @@ func (p *Parser) baseParseTable(schema bool, joins bool, aliasTokens *TokenSet, 
 	return this
 }
 
-// _parse_version (parser.py L4975).
+// VersionPhrase is a time travel clause prefix, such as FOR SYSTEM_TIME, and what it pins (a
+// timestamp or a version).
+type VersionPhrase struct {
+	Words []string
+	Kind  string
+}
+
+// parseVersion parses a time travel clause (a VERSION_PHRASES prefix such as FOR SYSTEM_TIME)
+// with FROM / BETWEEN, CONTAINED IN, ALL or AS OF.
 func (p *Parser) parseVersion() *Expr {
 	var this string
-	if p.match(TK_TIMESTAMP_SNAPSHOT) {
-		this = "TIMESTAMP"
-	} else if p.match(TK_VERSION_SNAPSHOT) {
-		this = "VERSION"
-	} else {
+	for _, phrase := range p.s.VERSION_PHRASES {
+		if p.matchTextSeq(phrase.Words...) {
+			this = phrase.Kind
+			break
+		}
+	}
+	if this == "" {
 		return nil
 	}
 
@@ -1073,13 +1117,14 @@ func (p *Parser) parseVersion() *Expr {
 	} else {
 		p.matchTextSeq("AS", "OF")
 		kind = "AS OF"
-		expression = p.parseType(true, false)
+		expression = p.parseBitwise()
 	}
 
 	return p.expression(New(KVersion, "this", this, "expression", expression, "kind", kind))
 }
 
-// _parse_historical_data (parser.py L5004).
+// parseHistoricalData parses Snowflake's AT | BEFORE (<kind> => <expr>), backtracking when no
+// expression follows.
 func (p *Parser) parseHistoricalData() *Expr {
 	// https://docs.snowflake.com/en/sql-reference/constructs/at-before
 	index := p.index
@@ -1106,7 +1151,6 @@ func (p *Parser) parseHistoricalData() *Expr {
 	return historicalData
 }
 
-// _parse_changes (parser.py L5027).
 func (p *Parser) parseChanges() *Expr {
 	if !p.matchTextSeq("CHANGES", "(", "INFORMATION", "=>") {
 		return nil
@@ -1125,7 +1169,8 @@ func (p *Parser) parseChanges() *Expr {
 	))
 }
 
-// _parse_unnest (parser.py L5042).
+// baseParseUnnest parses UNNEST(...) [WITH ORDINALITY] [alias] [WITH OFFSET [AS] <alias>]. With
+// ordinality, an extra trailing column alias becomes the offset.
 func (p *Parser) baseParseUnnest(withAlias bool) *Expr {
 	if !p.matchPairNoAdvance(TK_UNNEST, TK_L_PAREN) {
 		return nil
@@ -1134,7 +1179,7 @@ func (p *Parser) baseParseUnnest(withAlias bool) *Expr {
 	p.advance(1)
 
 	expressions := p.parseWrappedCSV(p.parseEquality, TK_COMMA, false)
-	var offset any = p.matchPair(TK_WITH, TK_ORDINALITY) // bool | Expr
+	var offset any = p.matchPair(TK_WITH, TK_ORDINALITY) // bool or *Expr
 
 	var alias *Expr
 	if withAlias {
@@ -1153,7 +1198,7 @@ func (p *Parser) baseParseUnnest(withAlias bool) *Expr {
 
 		columns := alias.ArgL("columns")
 		if truthy(offset) && len(expressions) < len(columns) {
-			// columns.pop(): mutates the alias' column list in place
+			// the last column alias names the offset: take it off the alias
 			offset = columns[len(columns)-1]
 			alias.SetArgRaw("columns", append([]*Expr{}, columns[:len(columns)-1]...))
 		}
@@ -1171,11 +1216,15 @@ func (p *Parser) baseParseUnnest(withAlias bool) *Expr {
 	return p.expression(New(KUnnest, "expressions", expressions, "alias", alias, "offset", offset))
 }
 
-// _parse_derived_table_values (parser.py L5073).
-func (p *Parser) parseDerivedTableValues() *Expr {
+// parseDerivedTableValues parses a VALUES list, parenthesized or bare (also ClickHouse's FORMAT
+// Values, and VALUE when allowValueSynonym is set), with an optional alias inside or after the
+// parentheses.
+func (p *Parser) parseDerivedTableValues(allowValueSynonym bool) *Expr {
 	isDerived := p.matchPair(TK_L_PAREN, TK_VALUES)
-	// ClickHouse's `FORMAT Values` is equivalent to `VALUES`
-	if !isDerived && !(p.matchTextSeq("VALUES") || p.matchTextSeq("FORMAT", "VALUES")) {
+	// ClickHouse's `FORMAT Values` is equivalent to `VALUES`; MySQL accepts VALUE as a synonym
+	// for VALUES in INSERT statements
+	if !isDerived && !(p.matchTextSeq("VALUES") || p.matchTextSeq("FORMAT", "VALUES") ||
+		(allowValueSynonym && p.matchTextSeq("VALUE"))) {
 		return nil
 	}
 
@@ -1192,14 +1241,16 @@ func (p *Parser) parseDerivedTableValues() *Expr {
 	return p.expression(New(KValues, "expressions", expressions, "alias", alias))
 }
 
-// _parse_table_sample (parser.py L5091).
+// baseParseTableSample parses TABLESAMPLE (or USING SAMPLE, when asModifier) with its method,
+// size or percent, BUCKET ... OUT OF ... ON ..., and seed. seed is false (not nil) when the
+// method is called without a seed argument.
 func (p *Parser) baseParseTableSample(asModifier bool) *Expr {
 	if !p.match(TK_TABLE_SAMPLE) && !(asModifier && p.matchTextSeq("USING", "SAMPLE")) {
 		return nil
 	}
 
 	var bucketNumerator, bucketDenominator, bucketField, percent, size *Expr
-	var seed any // None | False | Expr
+	var seed any // nil, false or *Expr
 
 	method := p.parseVar(false, &chunkCRowTokens, true)
 	matchedLParen := p.match(TK_L_PAREN)
@@ -1268,7 +1319,6 @@ func (p *Parser) baseParseTableSample(asModifier bool) *Expr {
 	))
 }
 
-// _parse_pivots (parser.py L5157).
 func (p *Parser) parsePivots() []*Expr {
 	if !p.matchAnyNoAdvance(TK_PIVOT, TK_UNPIVOT) {
 		return nil
@@ -1287,7 +1337,6 @@ func (p *Parser) parsePivots() []*Expr {
 	return pivots
 }
 
-// _parse_joins (parser.py L5162).
 func (p *Parser) parseJoins(aliasTokens *TokenSet) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		for {
@@ -1302,7 +1351,8 @@ func (p *Parser) parseJoins(aliasTokens *TokenSet) iter.Seq[*Expr] {
 	}
 }
 
-// _parse_unpivot_columns (parser.py L5167).
+// parseUnpivotColumns parses INTO NAME <column> VALUE <columns> of an UNPIVOT statement; missing
+// parts are false (not nil).
 func (p *Parser) parseUnpivotColumns() *Expr {
 	if !p.match(TK_INTO) {
 		return nil
@@ -1319,9 +1369,9 @@ func (p *Parser) parseUnpivotColumns() *Expr {
 	return p.expression(New(KUnpivotColumns, "this", this, "expressions", expressions))
 }
 
-// _parse_simplified_pivot (parser.py L5179)
+// parseSimplifiedPivot parses DuckDB's simplified PIVOT / UNPIVOT statement:
 // https://duckdb.org/docs/sql/statements/pivot
-// isUnpivot is `bool | None` (None for the PIVOT statement parser).
+// isUnpivot is a bool, or nil for the PIVOT statement parser.
 func (p *Parser) parseSimplifiedPivot(isUnpivot any) *Expr {
 	parseOn := func() *Expr {
 		this := p.parseBitwise()
@@ -1361,7 +1411,8 @@ func (p *Parser) parseSimplifiedPivot(isUnpivot any) *Expr {
 	))
 }
 
-// _parse_pivot_in (parser.py L5211).
+// parsePivotIn parses the <column> IN (...) part of a PIVOT, whose values may be aliased or
+// be ANY [ORDER BY ...], or <column> IN <name>.
 func (p *Parser) parsePivotIn() *Expr {
 	parseAliasedExpression := func() *Expr {
 		this := p.parseSelectOrExpression(false)
@@ -1398,7 +1449,8 @@ func (p *Parser) parsePivotIn() *Expr {
 	return p.expression(New(KIn, "this", value, "field", p.parseIdVar(true, nil)))
 }
 
-// _parse_pivot_aggregation (parser.py L5239).
+// baseParsePivotAggregation parses one aliased aggregation of a PIVOT, returning nil after a
+// trailing comma.
 func (p *Parser) baseParsePivotAggregation() *Expr {
 	fn := p.parseFunction(nil, false, true, false)
 	if fn == nil {
@@ -1411,10 +1463,11 @@ func (p *Parser) baseParsePivotAggregation() *Expr {
 	return p.parseAlias(fn, false)
 }
 
-// _parse_pivot (parser.py L5248).
+// parsePivot parses one PIVOT or UNPIVOT clause. For PIVOT it also computes the output column
+// names from the IN values and the aggregation aliases.
 func (p *Parser) parsePivot() *Expr {
 	index := p.index
-	var includeNulls any // bool | None
+	var includeNulls any // nil, true or false
 	var unpivot bool
 
 	if p.match(TK_PIVOT) {
@@ -1514,7 +1567,9 @@ func (p *Parser) parsePivot() *Expr {
 
 			fieldNames := []string{}
 			for _, fld := range pivotFieldExpressions {
-				if p.s.IDENTIFY_PIVOT_STRINGS {
+				// An explicit `<field> AS <alias>` names the output column directly, so it wins
+				// over the dialect's string-identifying convention
+				if p.s.IDENTIFY_PIVOT_STRINGS && !fld.IsA(KPivotAlias) {
 					fieldNames = append(fieldNames, exprSQL(fld))
 				} else {
 					fieldNames = append(fieldNames, fld.AliasOrName())
@@ -1533,7 +1588,6 @@ func (p *Parser) parsePivot() *Expr {
 			// generates the product between [[2000, 2010], ['NL', 'US'], ['total']]
 			for _, fldParts := range chunkCProduct(allFields) {
 				if len(names) > 0 && p.s.PREFIXED_PIVOT_COLUMNS {
-					// Move the "name" to the front of the list
 					last := fldParts[len(fldParts)-1]
 					fldParts = append([]string{last}, fldParts[:len(fldParts)-1]...)
 				}
@@ -1551,7 +1605,6 @@ func (p *Parser) parsePivot() *Expr {
 	return pivot
 }
 
-// _pivot_column_names (parser.py L5359).
 func (p *Parser) basePivotColumnNames(aggregations []*Expr) []string {
 	out := []string{}
 	for _, agg := range aggregations {

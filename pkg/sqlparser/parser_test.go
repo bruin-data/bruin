@@ -16,8 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// sharedSQLParser is initialized once in TestMain and reused across all tests
-// to avoid the ~3.5s startup cost of spawning a Python subprocess per test.
+// sharedSQLParser is initialized once in TestMain and reused across all tests.
 var sharedSQLParser *SQLParser
 
 func TestMain(m *testing.M) {
@@ -859,7 +858,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "SELECT * FROM raw_dev.items",
 		},
 		{
-			name:  "python parity simple single table select",
+			name:  "simple single table select",
 			query: `SELECT * FROM items`,
 			tableMappings: map[string]string{
 				"items": "t1",
@@ -867,7 +866,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "SELECT * FROM t1 AS items",
 		},
 		{
-			name:  "python parity multi table with schemas",
+			name:  "multi table with schemas",
 			query: `SELECT * FROM raw.items join raw.orders on items.item_id = orders.item_id`,
 			tableMappings: map[string]string{
 				"raw.items": "t1",
@@ -876,7 +875,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
 		},
 		{
-			name:  "python parity multiple queries",
+			name:  "multiple queries",
 			query: `DELETE FROM raw.items WHERE item_id = 1; SELECT * FROM raw.items join raw.orders on items.item_id = orders.item_id`,
 			tableMappings: map[string]string{
 				"raw.items": "t1",
@@ -885,7 +884,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "DELETE FROM t1 AS items WHERE item_id = 1; SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
 		},
 		{
-			name: "python parity table name in select",
+			name: "table name in select",
 			query: `
              SELECT
                  items.item_id as item_id,
@@ -905,7 +904,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "SELECT items.item_id AS item_id, CASE WHEN price > 1000 AND t2.somecol < 250 THEN 'high' WHEN price > 100 THEN 'medium' ELSE 'low' END AS price_category FROM t1 AS items JOIN raw_dev.orders AS t2 ON items.item_id = t2.item_id WHERE in_stock = TRUE",
 		},
 		{
-			name: "python parity subquery",
+			name: "subquery",
 			query: `
              SELECT
                  emp_id,
@@ -919,7 +918,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "SELECT emp_id, (SELECT AVG(salary) FROM raw_dev.salaries WHERE salaries.emp_id = employees.emp_id) AS avg_salary FROM raw_dev.employees",
 		},
 		{
-			name: "python parity complex ctes",
+			name: "complex ctes",
 			query: `
 WITH ufd AS (
     SELECT
@@ -955,7 +954,7 @@ GROUP BY 1`,
 			want: "WITH ufd AS (SELECT user_id, MIN(date_utc) AS my_date_col FROM fact_dev.some_other_table GROUP BY 1), user_retention AS (SELECT d.user_id, MAX(CASE WHEN DATE_DIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) AS some_day1_metric FROM fact_dev.some_daily_metrics AS d INNER JOIN ufd AS f ON d.user_id = f.user_id GROUP BY 1) SELECT d.user_id, DATE_DIFF(day, MAX(d.date_utc)) AS recency, COUNT(DISTINCT d.date_utc) AS active_days, MIN_BY(d.first_device_type, d.first_activity_timestamp) AS first_device_type, AVG(NULLIF(d.estimated_session_duration, 0)) AS avg_session_duration, SUM(d.event_start) AS total_event_start, MAX(r.some_day1_metric) AS some_day1_metric, CASE WHEN sum(d.event_start) > 0 THEN 'Player' ELSE 'Visitor' END AS user_type FROM fact_dev.some_daily_metrics AS d LEFT JOIN user_retention AS r ON d.user_id = r.user_id GROUP BY 1",
 		},
 		{
-			name: "python parity cte with similar names",
+			name: "cte with similar names",
 			query: `
 with
 t1 as
@@ -989,7 +988,7 @@ join t2
 			tableMappings: map[string]string{
 				"raw.mytable": "raw_dev.mytable",
 			},
-			want: "SELECT d FROM `mytable`, UNNEST(JSON_EXTRACT_ARRAY(values.domains, '$')) AS d",
+			want: "SELECT d FROM `mytable` CROSS JOIN UNNEST(JSON_EXTRACT_ARRAY(values.domains, '$')) AS d",
 		},
 	}
 
@@ -1815,7 +1814,7 @@ func TestSqlParser_IsSingleSelectQuery(t *testing.T) {
 	}
 }
 
-type pythonMainLineageCase struct {
+type fixtureLineageCase struct {
 	Name                string                 `json:"name"`
 	Dialect             string                 `json:"dialect"`
 	Query               string                 `json:"query"`
@@ -1825,7 +1824,7 @@ type pythonMainLineageCase struct {
 	ExpectedErrors      []string               `json:"expected_errors"`
 }
 
-type pythonMainNonSelectedCase struct {
+type fixtureNonSelectedCase struct {
 	Name             string                 `json:"name"`
 	Dialect          string                 `json:"dialect"`
 	Query            string                 `json:"query"`
@@ -1863,7 +1862,7 @@ func loadFixture[T any](t *testing.T, filename string) []T {
 func startParsersForParity(t *testing.T) []startedParser {
 	t.Helper()
 
-	return []startedParser{{name: "sqlglot", parser: sharedSQLParser}}
+	return []startedParser{{name: "sqlparser", parser: sharedSQLParser}}
 }
 
 func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]any) *Lineage {
@@ -1885,8 +1884,8 @@ func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string,
 	return &result
 }
 
-func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
-	cases := loadFixture[pythonMainLineageCase](t, "python_main_lineage_cases.json")
+func TestGetLineageForRunner_FixtureCases(t *testing.T) {
+	cases := loadFixture[fixtureLineageCase](t, "lineage_cases.json")
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
 		t.Run(parser.name, func(t *testing.T) {
@@ -1902,8 +1901,8 @@ func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
 	}
 }
 
-func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
-	cases := loadFixture[pythonMainNonSelectedCase](t, "python_main_non_selected_cases.json")
+func TestExtractNonSelectColumn_FixtureCases(t *testing.T) {
+	cases := loadFixture[fixtureNonSelectedCase](t, "non_selected_cases.json")
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
 		t.Run(parser.name, func(t *testing.T) {
@@ -1920,7 +1919,7 @@ func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
 	}
 }
 
-func TestSqlParser_GetTables_PythonMainParity(t *testing.T) {
+func TestSqlParser_GetTables_Cases(t *testing.T) {
 	tests := []struct {
 		name    string
 		dialect string
@@ -2089,7 +2088,7 @@ SELECT * FROM
 	}
 }
 
-func TestSqlParser_AddLimit_PythonMainParity(t *testing.T) {
+func TestSqlParser_AddLimit_Cases(t *testing.T) {
 	tests := []struct {
 		name          string
 		dialect       string

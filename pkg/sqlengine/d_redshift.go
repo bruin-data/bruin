@@ -2,12 +2,12 @@ package sqlengine
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
-// Port of sqlglot/dialects/redshift.py (Redshift dialect), sqlglot/parsers/redshift.py
-// (RedshiftParser) and sqlglot/generators/redshift.py (RedshiftGenerator). Settings are cloned
-// from Postgres's resolved settings, so only Redshift's own differences are applied here.
+// Redshift settings are cloned from Postgres's resolved settings, so only Redshift's own
+// differences are applied here.
 
 func init() { registerCustomizer("redshift", customizeRedshift) }
 
@@ -16,11 +16,6 @@ func customizeRedshift(d *Dialect) {
 	customizeRedshiftGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// RedshiftParser
-// ---------------------------------------------------------------------------------------------
-
-// redshiftBuildDateDelta mirrors parsers.redshift._build_date_delta(expr_type).
 func redshiftBuildDateDelta(exprType Kind) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		expr := New(
@@ -35,6 +30,30 @@ func redshiftBuildDateDelta(exprType Kind) FuncBuilder {
 
 		return expr
 	}
+}
+
+// redshiftDateDeltaSQL switches to the underscored function (DATE_ADD, DATE_DIFF) when the unit
+// is an expression rather than a date-part keyword, since only that form accepts one.
+func redshiftDateDeltaSQL(name string) GenFunc {
+	underscored := strings.Replace(name, "DATE", "DATE_", 1)
+	return func(g *Generator, e *Expr) string {
+		unit := e.ArgE("unit")
+		if unit == nil || unit.IsA(KLiteral) {
+			unit = unitToVar(e, "DAY")
+		}
+		fn := name
+		if unit != nil && !unit.IsA(KVar) {
+			fn = underscored
+		}
+		return g.fn(fn, unit, e.Arg("expression"), e.Arg("this"))
+	}
+}
+
+func redshiftBytestringSQL(g *Generator, e *Expr) string {
+	if !e.ArgB("is_bytes") {
+		return g.sql(LiteralString(e.ThisS()))
+	}
+	return g.fn("FROM_HEX", LiteralString(postgresBytesHex(e.ThisS())))
 }
 
 func customizeRedshiftParser(d *Dialect) {
@@ -99,7 +118,6 @@ func customizeRedshiftParser(d *Dialect) {
 	P.h.parseProjections = redshiftParseProjections
 }
 
-// redshiftParseTable mirrors RedshiftParser._parse_table.
 func redshiftParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
 	// Redshift supports UNPIVOTing SUPER objects, e.g. `UNPIVOT foo.obj[0] AS val AT attr`
 	unpivot := p.match(TK_UNPIVOT)
@@ -111,7 +129,6 @@ func redshiftParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSe
 	return table
 }
 
-// redshiftParseConvert mirrors RedshiftParser._parse_convert.
 func redshiftParseConvert(p *Parser, strict bool, safe bool) *Expr {
 	var safeV any
 	if safe {
@@ -123,7 +140,6 @@ func redshiftParseConvert(p *Parser, strict bool, safe bool) *Expr {
 	return p.expression(New(KCast, "this", this, "to", to, "safe", safeV))
 }
 
-// redshiftParseObjectTransform mirrors RedshiftParser._parse_object_transform.
 func redshiftParseObjectTransform(p *Parser) *Expr {
 	this := p.parseColumn()
 	keep := []*Expr{}
@@ -137,7 +153,8 @@ func redshiftParseObjectTransform(p *Parser) *Expr {
 	return p.expression(New(KObjectTransform, "this", this, "keep", keep, "set_", set))
 }
 
-// redshiftParseApproximateCount mirrors RedshiftParser._parse_approximate_count.
+// redshiftParseApproximateCount backs up to APPROXIMATE and returns nil for any function other
+// than COUNT(DISTINCT x) and PERCENTILE_DISC(q) WITHIN GROUP (ORDER BY x).
 func redshiftParseApproximateCount(p *Parser) *Expr {
 	index := p.index - 1
 	fn := p.parseFunction(nil, false, true, false)
@@ -157,7 +174,6 @@ func redshiftParseApproximateCount(p *Parser) *Expr {
 	return nil
 }
 
-// redshiftParseProjections mirrors RedshiftParser._parse_projections.
 func redshiftParseProjections(p *Parser) ([]*Expr, []*Expr) {
 	projections, _ := p.baseParseProjections()
 	if upperText(p.prev) == "EXCLUDE" && p.curr.ok() {
@@ -180,12 +196,10 @@ func redshiftParseProjections(p *Parser) ([]*Expr, []*Expr) {
 	return projections, exclude
 }
 
-// ---------------------------------------------------------------------------------------------
-// RedshiftGenerator
-// ---------------------------------------------------------------------------------------------
-
 func customizeRedshiftGenerator(d *Dialect) {
 	G := d.G
+	G.methods[KByteString] = redshiftBytestringSQL
+
 	T := G.TRANSFORMS
 
 	for _, k := range []Kind{KPivot, KParseJSON, KAnyValue, KLastDay, KSHA2, KGetbit, KRound, KTryCast} {
@@ -205,8 +219,8 @@ func customizeRedshiftGenerator(d *Dialect) {
 		return "GETDATE()"
 	}
 	T[KCurrentUserId] = func(g *Generator, e *Expr) string { return "CURRENT_USER_ID" }
-	T[KDateAdd] = dateDeltaSQL("DATEADD", false)
-	T[KDateDiff] = dateDeltaSQL("DATEDIFF", false)
+	T[KDateAdd] = redshiftDateDeltaSQL("DATEADD")
+	T[KDateDiff] = redshiftDateDeltaSQL("DATEDIFF")
 	T[KDistKeyProperty] = func(g *Generator, e *Expr) string { return g.fn("DISTKEY", e.Arg("this")) }
 	T[KDistStyleProperty] = func(g *Generator, e *Expr) string { return g.nakedProperty(e) }
 	T[KExplode] = func(g *Generator, e *Expr) string { return redshiftExplodeSQL(g, e) }
@@ -243,8 +257,8 @@ func customizeRedshiftGenerator(d *Dialect) {
 	}
 	T[KStringToArray] = renameFunc("SPLIT_TO_ARRAY")
 	T[KTableSample] = noTablesampleSQL
-	T[KTsOrDsAdd] = dateDeltaSQL("DATEADD", false)
-	T[KTsOrDsDiff] = dateDeltaSQL("DATEDIFF", false)
+	T[KTsOrDsAdd] = redshiftDateDeltaSQL("DATEADD")
+	T[KTsOrDsDiff] = redshiftDateDeltaSQL("DATEDIFF")
 	T[KUnixToTime] = func(g *Generator, e *Expr) string { return redshiftUnixToTimeSQL(g, e) }
 	T[KSHA2Digest] = func(g *Generator, e *Expr) string {
 		length := e.ArgE("length")
@@ -254,7 +268,6 @@ func customizeRedshiftGenerator(d *Dialect) {
 		return g.fn("SHA2", e.Arg("this"), length)
 	}
 
-	// <key>_sql method overrides
 	G.h.unnestSQL = redshiftUnnestSQL
 	G.h.castSQL = redshiftCastSQL
 	G.h.datatypeSQL = redshiftDatatypeSQL
@@ -262,7 +275,6 @@ func customizeRedshiftGenerator(d *Dialect) {
 	G.h.ignorenullsSQL = func(g *Generator, e *Expr) string { return g.baseIgnorenullsSQL(e) }
 	G.h.respectnullsSQL = func(g *Generator, e *Expr) string { return g.baseRespectnullsSQL(e) }
 
-	// dialect-only <key>_sql methods
 	G.methods[KStPoint] = redshiftStpointSQL
 	G.methods[KArrayContains] = redshiftArraycontainsSQL
 	G.methods[KObjectTransform] = redshiftObjecttransformSQL
@@ -356,10 +368,8 @@ var (
 	redshiftTextTypeOnce sync.Once
 )
 
-// Redshift converts the `TEXT` data type to `VARCHAR(255)` by default when people more generally mean
-// VARCHAR of max length which is `VARCHAR(max)` in Redshift. Therefore if we get a `TEXT` data type
-// without precision we convert it to `VARCHAR(max)` and if it does have precision then we just convert
-// `TEXT` to `VARCHAR`.
+// redshiftDatatypeSQL maps TEXT without a precision to VARCHAR(max) and TEXT(n) to VARCHAR(n):
+// Redshift turns TEXT into VARCHAR(255), while TEXT generally means VARCHAR of max length.
 func redshiftDatatypeSQL(g *Generator, expression *Expr) string {
 	redshiftTextTypeOnce.Do(func() { redshiftTextType = DataTypeBuild("text", nil, true, true) })
 	if DataTypeIsType(expression, []any{redshiftTextType}, false) {
@@ -404,7 +414,6 @@ func redshiftExplodeSQL(g *Generator, expression *Expr) string {
 	return ""
 }
 
-// redshiftUnixToTimeSQL mirrors RedshiftGenerator._unix_to_time_sql.
 func redshiftUnixToTimeSQL(g *Generator, expression *Expr) string {
 	scale := expression.ArgE("scale")
 	this := g.sql(expression.Arg("this"))

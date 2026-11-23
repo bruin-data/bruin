@@ -5,11 +5,11 @@ import (
 	"unicode/utf8"
 )
 
-// trie mirrors sqlglot.trie: nested maps keyed by a single "character" (rune or word),
-// with end marking the presence of a complete key.
+// trie is a prefix tree of nested maps keyed by a single "character" (rune or word), with end
+// marking the presence of a complete key.
 type trie struct {
 	children map[string]*trie
-	order    []string // insertion order of children (Python dict order)
+	order    []string // insertion order of children
 	end      bool
 	// kidRunes/kids index the single-rune children by rune, sorted (fast path for keyword
 	// scanning; most nodes have a handful of children).
@@ -27,7 +27,6 @@ const (
 
 func newTrie() *trie { return &trie{children: map[string]*trie{}} }
 
-// newTrieFromStrings builds a trie keyed by runes.
 func newTrieFromStrings(keys ...string) *trie {
 	t := newTrie()
 	for _, k := range keys {
@@ -76,7 +75,6 @@ func (t *trie) add(key []string) {
 	cur.end = true
 }
 
-// getRune returns the child for the single-character key r.
 func (t *trie) getRune(r rune) *trie {
 	if t == nil {
 		return nil
@@ -105,7 +103,8 @@ func (t *trie) getRune(r rune) *trie {
 	return nil
 }
 
-// inTrie mirrors sqlglot.trie.in_trie.
+// inTrie looks key up from t. It returns trieFailed (with the deepest node reached) when key is
+// empty or not a path, trieExists for a complete key and triePrefix for a proper prefix of one.
 func inTrie(t *trie, key []string) (trieResult, *trie) {
 	if len(key) == 0 {
 		return trieFailed, t

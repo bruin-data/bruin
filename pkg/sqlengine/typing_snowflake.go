@@ -5,8 +5,6 @@ import (
 	"math/big"
 )
 
-// Port of sqlglot/typing/snowflake.py.
-
 var typingSnowflakeDATE_PARTS = newStrSet("DAY", "WEEK", "MONTH", "QUARTER", "YEAR")
 
 const typingSnowflakeMAX_PRECISION = 38
@@ -23,10 +21,8 @@ func typingSnowflakeAnnotateReverse(a *TypeAnnotator, expression *Expr) *Expr {
 	return expression
 }
 
-// typingSnowflakeAnnotateTimestampFromParts annotates TimestampFromParts with the correct type
-// based on arguments:
-// TIMESTAMP_FROM_PARTS with time_zone -> TIMESTAMPTZ
-// TIMESTAMP_FROM_PARTS without time_zone -> TIMESTAMP (defaults to TIMESTAMP_NTZ).
+// typingSnowflakeAnnotateTimestampFromParts types TIMESTAMP_FROM_PARTS as TIMESTAMPTZ with a time
+// zone and as TIMESTAMP (Snowflake's default TIMESTAMP_NTZ) without one.
 func typingSnowflakeAnnotateTimestampFromParts(a *TypeAnnotator, expression *Expr) *Expr {
 	if expression.ArgB("zone") {
 		a.setType(expression, DT_TIMESTAMPTZ)
@@ -46,17 +42,12 @@ func typingSnowflakeAnnotateDateOrTimeAdd(a *TypeAnnotator, expression *Expr) *E
 	return expression
 }
 
-// typingSnowflakeAnnotateDecodeCase annotates DecodeCase with the type inferred from return
-// values only.
-//
-// DECODE uses the format: DECODE(expr, val1, ret1, val2, ret2, ..., default)
-// We only look at the return values (ret1, ret2, ..., default) to determine the type,
-// not the comparison values (val1, val2, ...) or the expression being compared.
+// typingSnowflakeAnnotateDecodeCase types DECODE(expr, val1, ret1, val2, ret2, ..., default) from
+// its return values (ret1, ret2, ..., default) only, not from expr or the compared values.
 func typingSnowflakeAnnotateDecodeCase(a *TypeAnnotator, expression *Expr) *Expr {
 	expressions := expression.Expressions()
 
 	// Return values are at indices 2, 4, 6, ... and the last element (if even length)
-	// DECODE(expr, val1, ret1, val2, ret2, ..., default)
 	var returnTypes []any
 	for i := 2; i < len(expressions); i += 2 {
 		returnTypes = append(returnTypes, annT(expressions[i].Type()))
@@ -70,7 +61,6 @@ func typingSnowflakeAnnotateDecodeCase(a *TypeAnnotator, expression *Expr) *Expr
 		returnTypes = append(returnTypes, annT(expressions[len(expressions)-1].Type()))
 	}
 
-	// Determine the common type from all return values
 	var lastType any
 	for _, retType := range returnTypes {
 		first := lastType
@@ -93,11 +83,6 @@ func typingSnowflakeAnnotateArgMaxMin(a *TypeAnnotator, expression *Expr) *Expr 
 	return expression
 }
 
-// typingSnowflakeAnnotateWithinGroup annotates WithinGroup with the correct type based on the
-// inner function:
-//  1. Annotate args first
-//  2. Check if this is PercentileDisc/PercentileCont and if so, re-annotate its type to match
-//     the ordered expression's type
 func typingSnowflakeAnnotateWithinGroup(a *TypeAnnotator, expression *Expr) *Expr {
 	orderExpr := expression.Expression()
 	if expression.This().IsA(KPercentileDisc, KPercentileCont) &&
@@ -112,7 +97,8 @@ func typingSnowflakeAnnotateWithinGroup(a *TypeAnnotator, expression *Expr) *Exp
 	return expression
 }
 
-// typingSnowflakeToPyInt mirrors `param.this.to_py()` for the integer parameters of NUMBER(p, s).
+// typingSnowflakeToPyInt returns the integer value of a NUMBER(p, s) type parameter, panicking
+// with a ValueError for anything else.
 func typingSnowflakeToPyInt(param *Expr) int {
 	this := param.This()
 	if this.IsNumber() {
@@ -125,23 +111,16 @@ func typingSnowflakeToPyInt(param *Expr) int {
 	panic(&ValueError{Msg: "Unsupported type parameter for Snowflake type annotation: " + annPyTypeName(this)})
 }
 
-// typingSnowflakeAnnotateMedian annotates the MEDIAN function with the correct return type.
-//
-// Based on Snowflake documentation:
-//   - If the expr is FLOAT/DOUBLE -> annotate as DOUBLE (FLOAT is a synonym for DOUBLE)
-//   - If the expr is NUMBER(p, s) -> annotate as NUMBER(min(p+3, 38), min(s+3, 37))
+// typingSnowflakeAnnotateMedian follows Snowflake's MEDIAN return types: DOUBLE for FLOAT/DOUBLE
+// (synonyms) and NUMBER(min(p+3, 38), min(s+3, 37)) for NUMBER(p, s).
 func typingSnowflakeAnnotateMedian(a *TypeAnnotator, expression *Expr) *Expr {
-	// First annotate the argument to get its type
 	expression = a.annotateByArgs(expression, "this")
 
-	// Get the input type
 	inputType := expression.This().Type()
 
 	if inputType.IsTypeOf(DT_DOUBLE) {
-		// If input is FLOAT/DOUBLE, return DOUBLE (FLOAT is normalized to DOUBLE in Snowflake)
 		a.setType(expression, DT_DOUBLE)
 	} else {
-		// If input is NUMBER(p, s), return NUMBER(min(p+3, 38), min(s+3, 37))
 		exprs := inputType.Expressions()
 
 		precision := typingSnowflakeMAX_PRECISION
@@ -157,7 +136,6 @@ func typingSnowflakeAnnotateMedian(a *TypeAnnotator, expression *Expr) *Expr {
 		newPrecision := min(precision+3, typingSnowflakeMAX_PRECISION)
 		newScale := min(scale+3, typingSnowflakeMAX_SCALE)
 
-		// Build the new NUMBER type
 		newType := DataTypeBuild(fmt.Sprintf("NUMBER(%d, %d)", newPrecision, newScale), MustDialect("snowflake"), false, true)
 		a.setType(expression, newType)
 	}
@@ -174,20 +152,15 @@ func typingSnowflakeAnnotateMedian(a *TypeAnnotator, expression *Expr) *Expr {
 //   - INT, NUMBER(p, 0) -> NUMBER(38, 6)
 //   - NUMBER(p, s) -> NUMBER(38, max(12, s))
 func typingSnowflakeAnnotateVariance(a *TypeAnnotator, expression *Expr) *Expr {
-	// First annotate the argument to get its type
 	expression = a.annotateByArgs(expression, "this")
 
-	// Get the input type
 	inputType := expression.This().Type()
 
 	if inputType.IsTypeOf(DT_DECFLOAT) {
-		// Special case: DECFLOAT -> DECFLOAT(38)
 		a.setType(expression, DataTypeBuild("DECFLOAT", MustDialect("snowflake"), false, true))
 	} else if inputType.IsTypeOf(DT_FLOAT, DT_DOUBLE) {
-		// Special case: FLOAT/DOUBLE -> DOUBLE
 		a.setType(expression, DT_DOUBLE)
 	} else {
-		// For NUMBER types: determine the scale
 		exprs := inputType.Expressions()
 		scale := 0
 		if scaleExpr := seqGet(exprs, 1); scaleExpr != nil {
@@ -201,7 +174,6 @@ func typingSnowflakeAnnotateVariance(a *TypeAnnotator, expression *Expr) *Expr {
 			newScale = max(12, scale)
 		}
 
-		// Build the new NUMBER type
 		newType := DataTypeBuild(fmt.Sprintf("NUMBER(%d, %d)", typingSnowflakeMAX_PRECISION, newScale), MustDialect("snowflake"), false, true)
 		a.setType(expression, newType)
 	}
@@ -230,21 +202,14 @@ func typingSnowflakeAnnotateKurtosis(a *TypeAnnotator, expression *Expr) *Expr {
 	return expression
 }
 
-// typingSnowflakeAnnotateMathWithFloatDecfloat annotates math functions that preserve DECFLOAT
-// but return DOUBLE for others.
-//
-// In Snowflake, trigonometric and exponential math functions:
-//   - If input is DECFLOAT -> return DECFLOAT
-//   - For integer types (INT, BIGINT, etc.) -> return DOUBLE
-//   - For other numeric types (NUMBER, DECIMAL, DOUBLE) -> return DOUBLE
+// typingSnowflakeAnnotateMathWithFloatDecfloat types trigonometric and exponential math functions:
+// DECFLOAT for DECFLOAT input, DOUBLE for any other numeric input.
 func typingSnowflakeAnnotateMathWithFloatDecfloat(a *TypeAnnotator, expression *Expr) *Expr {
 	expression = a.annotateByArgs(expression, "this")
 
-	// If input is DECFLOAT, preserve
 	if expression.This().IsTypeOf(DT_DECFLOAT) {
 		a.setType(expression, annT(expression.This().Type()))
 	} else {
-		// For all other types (integers, decimals, etc.), return DOUBLE
 		a.setType(expression, DT_DOUBLE)
 	}
 
@@ -252,7 +217,6 @@ func typingSnowflakeAnnotateMathWithFloatDecfloat(a *TypeAnnotator, expression *
 }
 
 func typingSnowflakeAnnotateStrToTime(a *TypeAnnotator, expression *Expr) *Expr {
-	// target_type is stored as a DataType instance
 	var targetType any = DT_TIMESTAMP
 	if targetTypeArg, ok := expression.Arg("target_type").(*Expr); ok && targetTypeArg.IsA(KDataType) {
 		targetType = targetTypeArg.Arg("this")
@@ -261,15 +225,41 @@ func typingSnowflakeAnnotateStrToTime(a *TypeAnnotator, expression *Expr) *Expr 
 	return expression
 }
 
+// typingSnowflakeAnnotateFloorCeil annotates FLOOR and CEIL: a string argument is implicitly cast
+// to FLOAT, or to NUMBER when a scale is given, and a VARIANT to FLOAT; any other argument goes
+// through the numeric argument rule.
+func typingSnowflakeAnnotateFloorCeil(a *TypeAnnotator, expression *Expr) *Expr {
+	this := expression.This()
+	if annIsTypeSet(this, DataType_TEXT_TYPES) {
+		if expression.Arg("decimals") == nil {
+			return a.setType(expression, DT_DOUBLE)
+		}
+		return a.setType(expression, DT_UNKNOWN)
+	}
+	if this.IsTypeOf(DT_VARIANT) {
+		return a.setType(expression, DT_DOUBLE)
+	}
+	typingAnnotateByNumericArg(a, expression)
+	return expression
+}
+
 func typingSnowflakeMetadata() ExprMetadataType {
 	m := typingMetadata("").copy()
 
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateFloorCeil(a, e) }, KCeil, KFloor)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
+		if annIsTypeSet(e.This(), DataType_FLOAT_TYPES) {
+			a.setType(e, DT_DOUBLE)
+		} else {
+			a.setType(e, DT_INT)
+		}
+	}, KSign)
 	m.annotators(
-		"typing/snowflake.py:245", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KAddMonths,
-		KCeil,
+		KArrayDistinct,
+		KArrayExcept,
 		KDateTrunc,
-		KFloor,
 		KLeft,
 		KMode,
 		KPad,
@@ -353,7 +343,7 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KPreviousDay,
 	)
 	m.annotators(
-		"typing/snowflake.py:346", func(a *TypeAnnotator, e *Expr) {
+		func(a *TypeAnnotator, e *Expr) {
 			a.setType(e, DataTypeBuild("NUMBER", MustDialect("snowflake"), false, true))
 		},
 		KBitwiseAndAgg,
@@ -376,14 +366,14 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KMonthsBetween,
 		KNormal,
 	)
-	m.annotators("typing/snowflake.py:189", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateKurtosis(a, e) }, KKurtosis)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateKurtosis(a, e) }, KKurtosis)
 	m.returns(
 		DT_DECFLOAT,
 		KToDecfloat,
 		KTryToDecfloat,
 	)
 	m.annotators(
-		"typing/snowflake.py:212", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMathWithFloatDecfloat(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMathWithFloatDecfloat(a, e) },
 		KAcos,
 		KAsin,
 		KAtan,
@@ -500,6 +490,7 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KCurrentOrganizationName,
 		KDecompressString,
 		KHexDecodeString,
+		KJSONFormat,
 		KHex,
 		KRandstr,
 		KRegexpExtract,
@@ -519,31 +510,31 @@ func typingSnowflakeMetadata() ExprMetadataType {
 		KMinhashCombine,
 	)
 	m.annotators(
-		"typing/snowflake.py:149", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateVariance(a, e) },
+		func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateVariance(a, e) },
 		KVariance,
 		KVariancePop,
 	)
-	m.annotators("typing/snowflake.py:83", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMax)
-	m.annotators("typing/snowflake.py:83", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMin)
-	m.annotators("typing/snowflake.py:547", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expressions") }, KConcatWs)
-	m.annotators("typing/snowflake.py:549", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMax)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateArgMaxMin(a, e) }, KArgMin)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "expressions") }, KConcatWs)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		if e.ArgB("source_tz") {
 			a.setType(e, DT_TIMESTAMPNTZ)
 		} else {
 			a.setType(e, DT_TIMESTAMPTZ)
 		}
 	}, KConvertTimezone)
-	m.annotators("typing/snowflake.py:43", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KDateAdd)
-	m.annotators("typing/snowflake.py:54", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDecodeCase(a, e) }, KDecodeCase)
-	m.annotators("typing/snowflake.py:557", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KDateAdd)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDecodeCase(a, e) }, KDecodeCase)
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.setType(e, DataTypeBuild("NUMBER(19, 0)", MustDialect("snowflake"), false, true))
 	}, KHashAgg)
-	m.annotators("typing/snowflake.py:111", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMedian(a, e) }, KMedian)
-	m.annotators("typing/snowflake.py:19", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateReverse(a, e) }, KReverse)
-	m.annotators("typing/snowflake.py:232", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateStrToTime(a, e) }, KStrToTime)
-	m.annotators("typing/snowflake.py:43", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KTimeAdd)
-	m.annotators("typing/snowflake.py:28", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateTimestampFromParts(a, e) }, KTimestampFromParts)
-	m.annotators("typing/snowflake.py:91", func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateWithinGroup(a, e) }, KWithinGroup)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateMedian(a, e) }, KMedian)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateReverse(a, e) }, KReverse)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateStrToTime(a, e) }, KStrToTime)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateDateOrTimeAdd(a, e) }, KTimeAdd)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateTimestampFromParts(a, e) }, KTimestampFromParts)
+	m.annotators(func(a *TypeAnnotator, e *Expr) { typingSnowflakeAnnotateWithinGroup(a, e) }, KWithinGroup)
 
 	return m
 }

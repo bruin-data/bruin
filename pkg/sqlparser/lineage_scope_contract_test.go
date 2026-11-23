@@ -1,4 +1,4 @@
-//nolint:paralleltest // all cases intentionally share TestMain's subprocess.
+//nolint:paralleltest // all cases intentionally share TestMain's parser.
 package sqlparser
 
 import (
@@ -70,9 +70,10 @@ func TestSQLParserColumnLineageContractScopesAndDialectFeatures(t *testing.T) {
 }
 
 func TestSQLParserColumnLineageContractCaseCollision(t *testing.T) {
-	// align_schema_casing iterates a Python set and copies only one spelling.
-	// Seeds 1 and 2 produce opposite type omissions. Permit exactly those two
-	// complete observed results, without weakening assertions for other cases.
+	// alignSchemaCasing copies the schema entry under only one of the query's two
+	// spellings, so one output loses its type. Which spelling wins is not part of the
+	// contract: permit exactly those two complete results, without weakening
+	// assertions for other cases.
 	query := "SELECT a.id AS x, b.id AS y FROM raw.Teams a JOIN raw.TEAMS b ON a.id=b.id"
 	got, err := sharedSQLParser.ColumnLineage(query, "bigquery", Schema{"raw.teams": {"id": "int64"}})
 	require.NoError(t, err)

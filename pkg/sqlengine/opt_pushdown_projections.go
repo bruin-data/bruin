@@ -2,11 +2,9 @@ package sqlengine
 
 import "fmt"
 
-// Port of sqlglot/optimizer/pushdown_projections.py.
-
-// pushdownProjectionsSelection mirrors the Python `set[str | object]` of selected column names,
-// where `all` stands for the SELECT_ALL sentinel (an outer query selecting ALL columns).
-// Pointers are shared like the Python set objects are.
+// pushdownProjectionsSelection is the set of column names an outer query selects from a scope;
+// `all` means the outer query selects ALL columns. Scopes may share one selection through the
+// same pointer, so updating it affects all of them.
 type pushdownProjectionsSelection struct {
 	all   bool
 	names StrSet
@@ -16,12 +14,10 @@ func newPushdownProjectionsSelection() *pushdownProjectionsSelection {
 	return &pushdownProjectionsSelection{names: newStrSet()}
 }
 
-// pushdownProjectionsSelectAll mirrors {SELECT_ALL}.
 func pushdownProjectionsSelectAll() *pushdownProjectionsSelection {
 	return &pushdownProjectionsSelection{all: true, names: newStrSet()}
 }
 
-// update mirrors set.update.
 func (s *pushdownProjectionsSelection) update(other *pushdownProjectionsSelection) {
 	if other.all {
 		s.all = true
@@ -31,15 +27,12 @@ func (s *pushdownProjectionsSelection) update(other *pushdownProjectionsSelectio
 	}
 }
 
-// pushdownProjectionsSetReturningFunctions mirrors SET_RETURNING_FUNCTIONS.
-//
-// Set-returning (table) functions multiply the rows of the entire query, so a projection
-// containing one affects the cardinality of every output column and must never be pruned,
-// even when the projection itself is otherwise unreferenced. Posexplode and the *Outer
-// variants are subclasses of Explode, so matching Explode covers them too.
+// pushdownProjectionsSetReturningFunctions are the set-returning (table) function kinds. They
+// multiply the rows of the whole query, so a projection containing one is never pruned, even
+// when otherwise unreferenced. Posexplode and the *Outer variants are subkinds of Explode, so
+// matching Explode covers them too.
 var pushdownProjectionsSetReturningFunctions = []Kind{KExplode, KInline, KUnnest}
 
-// pushdownProjectionsIsSelfReferencingCTE mirrors pushdown_projections._is_self_referencing_cte.
 func pushdownProjectionsIsSelfReferencingCTE(scope *Scope) bool {
 	cte := scope.Expression.Parent()
 	if !cte.IsA(KCTE) || !cte.Parent().IsA(KWith) || !cte.Parent().ArgB("recursive") {
@@ -53,8 +46,6 @@ func pushdownProjectionsIsSelfReferencingCTE(scope *Scope) bool {
 	return false
 }
 
-// pushdownProjectionsDefaultSelection mirrors pushdown_projections.default_selection: the
-// selection to use if the selection list is empty.
 func pushdownProjectionsDefaultSelection(isAgg bool) *Expr {
 	var e *Expr
 	if isAgg {
@@ -62,18 +53,14 @@ func pushdownProjectionsDefaultSelection(isAgg bool) *Expr {
 	} else {
 		e = LiteralNumber("1")
 	}
-	// .assert_is(exp.Alias) always holds: neither Max nor Literal has an "alias" arg.
+	// The result is always an Alias: neither Max nor Literal has an "alias" arg.
 	return AliasExpr(e, "_", nil, true)
 }
 
-// PushdownProjections mirrors optimizer.pushdown_projections.pushdown_projections: rewrites the
-// AST to remove unused columns projections. schema == nil means an empty schema, d == nil the
-// default dialect. Python defaults: remove_unused_selections=True.
-//
-// Example: "SELECT y.a AS a FROM (SELECT x.a AS a, x.b AS b FROM x) AS y"
+// PushdownProjections removes unused column projections, e.g.
+// "SELECT y.a AS a FROM (SELECT x.a AS a, x.b AS b FROM x) AS y"
 // -> "SELECT y.a AS a FROM (SELECT x.a AS a FROM x) AS y".
 func PushdownProjections(expression *Expr, schema *MappingSchema, removeUnusedSelections bool, d *Dialect) *Expr {
-	// Map of Scope to all columns being selected by outer queries.
 	if schema == nil {
 		schema = NewMappingSchema(nil, nil, d, true, nil)
 	}
@@ -163,7 +150,6 @@ func PushdownProjections(expression *Expr, schema *MappingSchema, removeUnusedSe
 				continue
 			}
 
-			// Group columns by source name
 			selects := map[string]StrSet{}
 			for _, col := range scope.Columns() {
 				tableName := col.TableName()
@@ -174,7 +160,6 @@ func PushdownProjections(expression *Expr, schema *MappingSchema, removeUnusedSe
 				selects[tableName].Add(colName)
 			}
 
-			// Push the selected columns down to the next scope
 			selectedSources := scope.SelectedSources()
 			for _, name := range selectedSources.Keys() {
 				v, _ := selectedSources.Get(name)
@@ -208,7 +193,8 @@ func PushdownProjections(expression *Expr, schema *MappingSchema, removeUnusedSe
 	return expression
 }
 
-// pushdownProjectionsRemoveUnusedSelections mirrors pushdown_projections._remove_unused_selections.
+// pushdownProjectionsRemoveUnusedSelections drops the projections of scope that no outer query,
+// ORDER BY or positional column alias uses, expanding a removed star into the needed columns.
 func pushdownProjectionsRemoveUnusedSelections(scope *Scope, parentSelections *pushdownProjectionsSelection, schema *MappingSchema, aliasCount int) {
 	order := scope.Expression.ArgE("order")
 
@@ -236,10 +222,8 @@ func pushdownProjectionsRemoveUnusedSelections(scope *Scope, parentSelections *p
 			newSelections = append(newSelections, selection)
 			aliasCount--
 		} else if selection.Find(pushdownProjectionsSetReturningFunctions...) != nil {
-			// A set-returning function multiplies the rows of the whole query, so this
-			// projection affects the cardinality of every output column and must be kept
-			// even though it is otherwise unreferenced. It is not a positional alias slot,
-			// so alias_count is left untouched.
+			// A set-returning function changes the cardinality of every output column, so this projection
+			// is kept. It is not a positional alias slot, so aliasCount is left untouched.
 			newSelections = append(newSelections, selection)
 		} else {
 			if selection.IsStar() {
@@ -260,7 +244,7 @@ func pushdownProjectionsRemoveUnusedSelections(scope *Scope, parentSelections *p
 			names.Add(s.AliasOrName())
 		}
 
-		// SELECT_ALL can't be in parent_selections here (nothing is removed in that case)
+		// parentSelections.all can't be set here (nothing is removed in that case)
 		for _, name := range parentSelections.names.Sorted() {
 			if !names.Has(name) {
 				newSelections = append(
@@ -271,7 +255,6 @@ func pushdownProjectionsRemoveUnusedSelections(scope *Scope, parentSelections *p
 		}
 	}
 
-	// If there are no remaining selections, just select a single constant
 	if len(newSelections) == 0 {
 		newSelections = append(newSelections, pushdownProjectionsDefaultSelection(isAgg))
 	}
