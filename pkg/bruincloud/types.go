@@ -14,6 +14,27 @@ type Team struct {
 	CompanyPrefix string `json:"company_prefix"`
 }
 
+// TeamRole is a role that can be given in the team: built-in, or custom when the team has them on.
+type TeamRole struct {
+	Key         string   `json:"key"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Custom      bool     `json:"custom"`
+	Permissions []string `json:"permissions"`
+}
+
+// TeamMember is someone in the team and the role they have.
+type TeamMember struct {
+	ID            int     `json:"id"`
+	Name          string  `json:"name"`
+	Email         string  `json:"email"`
+	Role          *string `json:"role"`
+	RoleName      *string `json:"role_name"`
+	Owner         bool    `json:"owner"`
+	BruinEmployee bool    `json:"bruin_employee"`
+	ExpiresAt     *string `json:"expires_at"`
+}
+
 // Project represents a Bruin Cloud project.
 type Project struct {
 	ID       string          `json:"id"`

@@ -366,6 +366,18 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "config")
 }
 
+func TestCloudTeamsCommand_Subcommands(t *testing.T) {
+	t.Parallel()
+	cmd := CloudTeams()
+	require.NotNil(t, cmd)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Equal(t, []string{"list", "roles", "members"}, subNames)
+}
+
 func TestCloudSkillsCommand_Help(t *testing.T) {
 	t.Parallel()
 	cmd := CloudSkills()

@@ -283,6 +283,8 @@ func CloudTeams() *cli.Command {
 		Usage: "Manage Bruin Cloud teams",
 		Commands: []*cli.Command{
 			cloudTeamsList(),
+			cloudTeamsRoles(),
+			cloudTeamsMembers(),
 		},
 	}
 }
@@ -322,6 +324,90 @@ func cloudTeamsList() *cli.Command {
 			t.AppendHeader(table.Row{"ID", "Name", "Company Prefix"})
 			for _, tm := range teams {
 				t.AppendRow(table.Row{tm.ID, tm.Name, tm.CompanyPrefix})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudTeamsRoles() *cli.Command {
+	return &cli.Command{
+		Name:  "roles",
+		Usage: "List the team's roles and their permissions (read-only; change them in Team Settings)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			roles, err := client.ListTeamRoles(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list roles")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(roles, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Key", "Name", "Custom", "Permissions"})
+			for _, r := range roles {
+				t.AppendRow(table.Row{r.Key, r.Name, r.Custom, len(r.Permissions)})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudTeamsMembers() *cli.Command {
+	return &cli.Command{
+		Name:  "members",
+		Usage: "List the team's members and their roles (read-only; needs a personal API token)",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			members, err := client.ListTeamMembers(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list members")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(members, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"ID", "Name", "Email", "Role", "Bruin", "Expires"})
+			for _, m := range members {
+				t.AppendRow(table.Row{m.ID, m.Name, m.Email, derefString(m.RoleName), m.BruinEmployee, derefString(m.ExpiresAt)})
 			}
 			t.Render()
 			return nil

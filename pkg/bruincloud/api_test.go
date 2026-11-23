@@ -2093,6 +2093,34 @@ func TestListAuditLogs(t *testing.T) {
 	assert.Equal(t, "alice@example.com", logs[0].UserIdentifier)
 }
 
+func TestListTeamRolesAndMembers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		w.WriteHeader(http.StatusOK)
+		switch r.URL.Path {
+		case "/team/roles":
+			_, _ = w.Write([]byte(`{"roles":[{"key":"custom-3","name":"On-call","description":"Copied from Catalog User.","custom":true,"permissions":["pipeline:list","pipeline:run:re-run"]}]}`))
+		case "/team/members":
+			_, _ = w.Write([]byte(`{"members":[{"id":7,"name":"Alex","email":"alex@example.com","role":"custom-3","role_name":"On-call","owner":false,"bruin_employee":false,"expires_at":null}]}`))
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	})
+
+	roles, err := client.ListTeamRoles(t.Context())
+	require.NoError(t, err)
+	require.Len(t, roles, 1)
+	assert.True(t, roles[0].Custom)
+	assert.Equal(t, []string{"pipeline:list", "pipeline:run:re-run"}, roles[0].Permissions)
+
+	members, err := client.ListTeamMembers(t.Context())
+	require.NoError(t, err)
+	require.Len(t, members, 1)
+	assert.Equal(t, "On-call", *members[0].RoleName)
+	assert.Nil(t, members[0].ExpiresAt)
+}
+
 func TestListRunStates(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
