@@ -76,7 +76,7 @@ func TestSetupExecutorsRunsChecksOnSourceAssets(t *testing.T) { //nolint:paralle
 		pipeline.AssetTypeVerticaSource,
 	}
 
-	var assets []*pipeline.Asset
+	assets := make([]*pipeline.Asset, 0, len(sourceTypes))
 	for _, assetType := range sourceTypes {
 		assets = append(assets, &pipeline.Asset{
 			Name: "schema." + strings.ReplaceAll(string(assetType), ".", "_"),
@@ -99,6 +99,7 @@ func TestSetupExecutorsRunsChecksOnSourceAssets(t *testing.T) { //nolint:paralle
 
 	for _, assetType := range sourceTypes {
 		t.Run(string(assetType), func(t *testing.T) {
+			t.Parallel()
 			assert.NotEqual(t, executor.NoOpOperator{}, executors[assetType][scheduler.TaskInstanceTypeColumnCheck])
 			assert.IsType(t, &ansisql.CustomCheckOperator{}, executors[assetType][scheduler.TaskInstanceTypeCustomCheck])
 		})
