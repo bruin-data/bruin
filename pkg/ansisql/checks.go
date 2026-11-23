@@ -22,8 +22,8 @@ type selector interface {
 // for better error reporting when running single checks.
 type CheckError struct {
 	Query    string
-	Result   float64
-	Expected float64
+	Result   string
+	Expected string
 	Message  string
 }
 
@@ -33,15 +33,16 @@ func (e *CheckError) Error() string {
 
 type CountableQueryCheck struct {
 	conn                config.ConnectionGetter
-	expectedQueryResult float64
+	expectedQueryResult int64
 	queryInstance       *query.Query
 	checkName           string
 	customError         func(count int64) error
-	// valueError replaces customError for results that may have decimals, such as custom check values.
-	valueError func(result float64) error
+	// expectedValue and valueError replace the integer fields for custom checks, whose values may have decimals.
+	expectedValue string
+	valueError    func(actual string) error
 }
 
-func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult float64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
+func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult int64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
 	return &CountableQueryCheck{
 		conn:                conn,
 		expectedQueryResult: expectedQueryResult,
@@ -99,28 +100,37 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 		return errors.Wrapf(err, "failed '%s' check", c.checkName)
 	}
 
-	result, err := helpers.CastResultToFloat(res)
+	if c.valueError != nil {
+		actual, equal, err := helpers.CompareCheckResult(res, c.expectedValue)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse '%s' check result", c.checkName)
+		}
+		if equal {
+			return nil
+		}
+		return &CheckError{
+			Query:    c.queryInstance.Query,
+			Result:   actual,
+			Expected: c.expectedValue,
+			Message:  c.valueError(actual).Error(),
+		}
+	}
+
+	count, err := helpers.CastResultToInteger(res, false)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse '%s' check result", c.checkName)
 	}
 
-	if result == c.expectedQueryResult {
-		return nil
+	if count != c.expectedQueryResult {
+		return &CheckError{
+			Query:    c.queryInstance.Query,
+			Result:   strconv.FormatInt(count, 10),
+			Expected: strconv.FormatInt(c.expectedQueryResult, 10),
+			Message:  c.customError(count).Error(),
+		}
 	}
 
-	var message error
-	if c.valueError != nil {
-		message = c.valueError(result)
-	} else {
-		message = c.customError(int64(result))
-	}
-
-	return &CheckError{
-		Query:    c.queryInstance.Query,
-		Result:   result,
-		Expected: c.expectedQueryResult,
-		Message:  message.Error(),
-	}
+	return nil
 }
 
 type NotNullCheck struct {
@@ -477,26 +487,21 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 
 		qq = qry
 	}
-	expected := ti.Check.Value
+	expected := ti.Check.Value.String()
 	if ti.Check.Count != nil {
-		expected = float64(*ti.Check.Count)
+		expected = strconv.FormatInt(*ti.Check.Count, 10)
 		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
 	}
 
 	return (&CountableQueryCheck{
-		conn:                c.conn,
-		expectedQueryResult: expected,
-		queryInstance:       &query.Query{Query: qq},
-		checkName:           ti.Check.Name,
-		valueError: func(result float64) error {
-			return errors.Errorf("custom check '%s' has returned %s instead of the expected %s", ti.Check.Name, FormatCheckNumber(result), FormatCheckNumber(expected))
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     ti.Check.Name,
+		expectedValue: expected,
+		valueError: func(actual string) error {
+			return errors.Errorf("custom check '%s' has returned %s instead of the expected %s", ti.Check.Name, actual, expected)
 		},
 	}).CustomCheck(ctx, ti)
-}
-
-// FormatCheckNumber prints a check value without exponent or trailing zeros: 3014136.99, 3015906, 0.5.
-func FormatCheckNumber(v float64) string {
-	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
 type CheckRunner interface {

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"strings"
+	"maps"
 	"testing"
 	"time"
 
@@ -28,7 +28,7 @@ func TestSetupExecutorsRoutesInferenceChecksToTheWarehouse(t *testing.T) { //nol
 		Columns: []pipeline.Column{
 			{Name: "id", PrimaryKey: true, Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
 		},
-		CustomChecks: []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: 1}},
+		CustomChecks: []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: "1"}},
 	}
 	p := &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{asset}}
 	python.InferIngestrDestinations(p, staticConnectionTypes{"warehouse": "duckdb"})
@@ -76,32 +76,36 @@ func TestSetupExecutorsRunsChecksOnSourceAssets(t *testing.T) { //nolint:paralle
 		pipeline.AssetTypeVerticaSource,
 	}
 
-	assets := make([]*pipeline.Asset, 0, len(sourceTypes))
+	conn, errs := connection.NewManagerFromConfig(&config.Config{SelectedEnvironment: &config.Environment{Connections: &config.Connections{}}})
+	require.Empty(t, errs)
+
+	// SetupExecutors writes into executor.DefaultExecutorsV2, so give each type a fresh copy:
+	// otherwise wiring from another type's run would hide a missing gate for this one.
+	original := executor.DefaultExecutorsV2
+	t.Cleanup(func() { executor.DefaultExecutorsV2 = original })
+
 	for _, assetType := range sourceTypes {
-		assets = append(assets, &pipeline.Asset{
-			Name: "schema." + strings.ReplaceAll(string(assetType), ".", "_"),
+		fresh := make(map[pipeline.AssetType]executor.Config, len(original))
+		for key, cfg := range original {
+			fresh[key] = maps.Clone(cfg)
+		}
+		executor.DefaultExecutorsV2 = fresh
+
+		asset := &pipeline.Asset{
+			Name: "schema.items",
 			Type: assetType,
 			Columns: []pipeline.Column{
 				{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
 			},
-			CustomChecks: []pipeline.CustomCheck{{Name: "always fails", Query: "select 1", Value: 0}},
-		})
-	}
-	p := &pipeline.Pipeline{Name: "test", Assets: assets}
+			CustomChecks: []pipeline.CustomCheck{{Name: "always fails", Query: "select 1", Value: "0"}},
+		}
+		p := &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{asset}}
+		s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+		now := time.Now()
+		executors, err := SetupExecutors(s, conn, now, now, now, p.Name, "run", false, "", nil, nil, nil, "", "default")
+		require.NoError(t, err, assetType)
 
-	conn, errs := connection.NewManagerFromConfig(&config.Config{SelectedEnvironment: &config.Environment{Connections: &config.Connections{}}})
-	require.Empty(t, errs)
-
-	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
-	now := time.Now()
-	executors, err := SetupExecutors(s, conn, now, now, now, p.Name, "run", false, "", nil, nil, nil, "", "default")
-	require.NoError(t, err)
-
-	for _, assetType := range sourceTypes {
-		t.Run(string(assetType), func(t *testing.T) {
-			t.Parallel()
-			assert.NotEqual(t, executor.NoOpOperator{}, executors[assetType][scheduler.TaskInstanceTypeColumnCheck])
-			assert.IsType(t, &ansisql.CustomCheckOperator{}, executors[assetType][scheduler.TaskInstanceTypeCustomCheck])
-		})
+		assert.NotEqual(t, executor.NoOpOperator{}, executors[assetType][scheduler.TaskInstanceTypeColumnCheck], assetType)
+		assert.IsType(t, &ansisql.CustomCheckOperator{}, executors[assetType][scheduler.TaskInstanceTypeCustomCheck], assetType)
 	}
 }
