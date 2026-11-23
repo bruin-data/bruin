@@ -374,7 +374,7 @@ Enabling a required partition filter or a positive partition expiration requires
 
 ## `schema_evolution`
 
-Controls automatic backwards-compatible schema evolution for SQL table assets. When enabled, Bruin compares the existing table schema against the query's output schema before writing and automatically applies backwards-compatible `ALTER TABLE` statements (adding newly introduced columns and widening compatible column types). Existing columns omitted from the query are never dropped, and incompatible type changes fail with an error rather than altering the table.
+Controls automatic backwards-compatible schema evolution for SQL table assets. When enabled, Bruin compares the existing table schema against the incoming schema before writing, applies lossless `ALTER TABLE` additions and type widenings, and targets columns by name so omitted historical columns are preserved. Incompatible type changes fail before modifying the table.
 
 ```yaml
 schema_evolution:
@@ -385,22 +385,9 @@ schema_evolution:
 |-------|------|---------|-------------|
 | `enabled` | Boolean | `false` | Enables automatic backwards-compatible schema evolution for the asset. |
 
-Currently supported for `duckdb.sql` and `bq.sql` assets with `materialization.type: table` using in-place strategies (`append`, `delete+insert`, `truncate+insert`, `time_interval`, `merge`, `scd2_by_column`, `scd2_by_time`, `datavault_*`, and `ddl`). It has no effect on `create+replace` tables (which are recreated on every run) or during `--full-refresh` (except for `ddl`).
+Currently supported for `duckdb.sql` and `bq.sql` assets with `materialization.type: table` using in-place strategies (`append`, `delete+insert`, `truncate+insert`, `time_interval`, `merge`, `scd2_by_column`, `scd2_by_time`, `datavault_*`, and `ddl`). It has no effect on `create+replace` tables or during `--full-refresh` (except for `ddl`).
 
-Notes on DuckDB behavior when `schema_evolution.enabled` is `true`:
-- `append`, `delete+insert`, `truncate+insert`, and `time_interval` use `INSERT INTO ... BY NAME`, so query output column aliases must match the target table's column names. Explicitly alias computed expressions (`AS col_name`) instead of relying on auto-generated expression names or bare `VALUES` queries, and note that omitted `NOT NULL` columns without a `DEFAULT` cannot be inserted as `NULL`.
-- `merge`, `scd2_by_column`, and `scd2_by_time` only evolve columns declared in `columns` (using query-inferred types). `ddl` and `datavault_*` evolve directly from the declared `columns` definitions and types.
-- On `scd2_by_column`, enabling `schema_evolution` switches change detection on all non-primary-key columns to `IS DISTINCT FROM` (NULL-aware). Transitions between `NULL` and non-`NULL` create history rows, and the first run after adding a new column expires and re-inserts existing current rows whose incoming value for the new column is non-`NULL`.
-- Because DuckDB SCD2 strategies (`scd2_by_column` and `scd2_by_time`) rebuild the table via `CREATE OR REPLACE TABLE ... UNION ALL`, removing an existing column from `columns` fails with an error (to prevent silently dropping it), and `VARCHAR` inputs into temporal or `ENUM` columns must be explicitly `CAST`. For existing `VARCHAR` columns, `scd2_by_column` (and primary-key join columns in `scd2_by_time`) require explicit `CAST` for non-`VARCHAR`/non-`ENUM` inputs, while non-primary-key columns in `scd2_by_time` accept incoming types whose `UNION ALL` stays `VARCHAR` (such as numbers, booleans, dates, and timestamps) and reject types that `UNION ALL` would promote away from `VARCHAR` (such as `LIST`, `STRUCT`, `MAP`, `UUID`, `JSON`, `BLOB`, `BIT`, or `BIGNUM`).
-- Allowed DuckDB type promotions:
-  - Signed integers (`TINYINT` → `SMALLINT` → `INTEGER` → `BIGINT` → `HUGEINT`), unsigned integers (`UTINYINT` → `USMALLINT` → `UINTEGER` → `UBIGINT` → `UHUGEINT`), and lossless unsigned/signed reconciliation (e.g. `UINTEGER` → `BIGINT`).
-  - Floating-point widening (`FLOAT` → `DOUBLE`).
-  - Exact `DECIMAL(p, s)` precision/scale widening (up to precision 38) and integer → `DECIMAL(p, s)` widening when all existing integer digits fit.
-  - Temporal widening (`DATE` → `TIMESTAMP_S` / `TIMESTAMP_MS` / `TIMESTAMP`, and `DATE` / `TIMESTAMP_*` → `TIMESTAMP WITH TIME ZONE` interpreted as UTC).
-  - Recursive list element widening (`T[]` → `T'[]`) when `T` → `T'` is an allowed promotion.
-  - Existing wider columns (for example `BIGINT` receiving `INTEGER`, `VARCHAR` receiving any type on insert-based strategies, or `DATE`/`TIMESTAMP`/`UUID`/`JSON`/`ENUM` receiving `VARCHAR` literals on insert-based strategies) stay unchanged without altering the table.
-  - Exact numeric types (integers, `DECIMAL`) are **not** widened to `FLOAT`/`DOUBLE`, temporal types are **not** widened to `TIMESTAMP_NS`, and other incompatible changes (such as `INTEGER` → `VARCHAR`) fail with an error rather than altering the table.
-- DuckLake connections are limited to DuckLake's supported promotions and literal defaults; DuckDB Iceberg lakehouse connections are not yet supported.
+See [Schema Evolution for SQL Assets](../schema-evolution/sql.md) for strategy rules, platform widening matrices (BigQuery, DuckDB, and DuckLake), and design tradeoffs, or [Schema Evolution Overview](../schema-evolution/overview.md) for how SQL schema evolution compares with `ingestr` assets.
 
 - **Type:** `Object`
 

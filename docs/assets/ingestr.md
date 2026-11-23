@@ -144,7 +144,7 @@ parameters:
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
 | `partition_by` | No | `--partition-by` | Comma-separated list of destination columns to partition by. |
 | `cluster_by` | No | `--cluster-by` | Comma-separated list of destination clustering keys. |
-| `schema_contract` | No | `--schema-contract` | Controls how Ingestr handles schema changes (`evolve`, `freeze`, `discard_row`, `discard_value`). |
+| `schema_contract` | No | `--schema-contract` | Controls how Ingestr handles schema changes (`evolve`, `freeze`, `discard_row`, `discard_value`). See [Schema Evolution in Ingestr Assets](../schema-evolution/ingestr.md). |
 | `loader_file_format` | No | `--loader-file-format` | Overrides the loader file format (`jsonl`, `csv`, `parquet`). |
 | `loader_file_size` | No | `--loader-file-size` | Sets the maximum loader file size accepted by Ingestr. |
 | `sql_backend` | No | `--sql-backend` | Selects the SQL backend Ingestr should use (`pyarrow` or `sqlalchemy`). |

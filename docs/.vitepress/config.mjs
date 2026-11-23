@@ -248,6 +248,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 ],
             },
             {
+                text: "Schema Evolution",
+                link: "/schema-evolution/overview",
+                collapsed: false,
+                items: [
+                    {text: "Ingestr Assets", link: "/schema-evolution/ingestr"},
+                    {text: "SQL Assets", link: "/schema-evolution/sql"},
+                ],
+            },
+            {
                 text: "Variables",
                 link: "/variables/overview",
                 collapsed: false,
