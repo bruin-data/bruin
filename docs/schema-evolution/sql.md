@@ -64,13 +64,15 @@ When `bruin run` executes a SQL asset with `schema_evolution.enabled: true`:
    - **Unchanged or implicitly absorbed types** (for example, an existing `BIGINT` column receiving `INT`, or `FLOAT64` receiving `INT64`) require no DDL.
    - **Lossless widenings** (for example, `INT64` to `NUMERIC`, `INT` to `BIGINT`, or `STRING(10)` to `STRING(50)`) are scheduled as `ALTER COLUMN ... SET DATA TYPE` to the narrowest lossless supertype that fits both existing and incoming values.
    - **Incompatible changes** are collected across all columns at once. If any column is incompatible, Bruin aborts before modifying the table and lists every offending column in a single error.
-3. **DDL execution and name-matched writes:** Bruin runs the planned `ALTER TABLE` statement(s) (`ALTER COLUMN` widenings first, then `ADD COLUMN` additions) and aligns `INSERT` statements by column name (`INSERT INTO ... BY NAME` on DuckDB; explicit `INSERT INTO table (col1, col2)` column lists on BigQuery) so omitted historical columns and reordered `SELECT` projections succeed without positional column-count errors.
+3. **DDL execution and name-matched writes:** Bruin runs the planned `ALTER TABLE` statement(s) (on DuckDB, `ALTER COLUMN` widenings first, then `ADD COLUMN` additions; on BigQuery, `ADD COLUMN` additions first, then `ALTER COLUMN` widenings) and aligns `INSERT` statements by column name (`INSERT INTO ... BY NAME` on DuckDB; explicit `INSERT INTO table (col1, col2)` column lists on BigQuery) so omitted historical columns and reordered `SELECT` projections succeed without positional column-count errors.
 
 ### Validation with `bruin validate`
 
-Running `bruin validate` on a schema-evolution-enabled asset dry-runs the `SELECT` query and checks the planned diff against the live destination table without altering it.
+Running `bruin validate` on a schema-evolution-enabled BigQuery asset dry-runs the `SELECT` query and checks the planned diff against the live destination table without altering it.
 
 This solves a common CI failure mode: without schema-evolution-aware validation, dry-running `INSERT INTO table ...` or `MERGE table ...` in a pull request fails because the new or widened columns have not been added to production yet. With `schema_evolution.enabled: true`, `bruin validate` passes when the planned evolution is backwards-compatible and fails early in CI if a query introduces an incompatible type change (such as `STRING` to `INT64`) or an untyped `NULL` new column.
+
+DuckDB assets are not checked by `bruin validate`; their schema evolution plan is checked when `bruin run` executes the asset, before the table is altered.
 
 ## Behavior by Materialization Strategy
 
@@ -101,10 +103,11 @@ BigQuery schema evolution supports native BigQuery tables across `append`, `dele
   - `INT64` -> `NUMERIC` -> `BIGNUMERIC` (preserving existing integer digits; for example, `INT64` widened against `NUMERIC(10,2)` becomes `NUMERIC(21,2)` so 19-digit `INT64` values fit, and `NUMERIC` scale increases beyond 9 upgrade to `BIGNUMERIC`).
   - `NUMERIC(p1, s1)` -> `NUMERIC(p2, s2)` and `BIGNUMERIC(p1, s1)` -> `BIGNUMERIC(p2, s2)`.
   - `STRING(n)` -> larger `STRING(m)` -> unbounded `STRING`, and `BYTES(n)` -> larger `BYTES(m)` -> unbounded `BYTES`.
+  - BigQuery query results never carry type parameters, so on strategies that read the query schema an existing `STRING(10)`, `BYTES(16)`, `NUMERIC(10,2)`, or `BIGNUMERIC(40,2)` column (including inside a `STRUCT` or `ARRAY`) keeps its parameters when the query returns the bare type. Widenings within the same type (`STRING(10)` -> `STRING(20)`, `NUMERIC(10,2)` -> `NUMERIC(12,4)`) therefore only happen on `ddl` assets, whose declared `columns` types carry parameters; widenings across types, such as `INT64` into `NUMERIC(10,2)`, apply to every strategy.
   - `ARRAY<T>` -> `ARRAY<U>` when `T` -> `U` is an allowed widening.
   - Existing `FLOAT64` columns absorb `INT64`, `NUMERIC`, and `BIGNUMERIC` without altering the table; `STRUCT` columns absorb matching `STRUCT` values whose field types normalize or coerce cleanly.
 - **Rejected changes:** `INT64` or `NUMERIC` -> `FLOAT64` (lossy above $2^{53}$), `STRING` <-> `INT64`, conversions between `DATE`, `DATETIME`, and `TIMESTAMP`, altering `PRIMARY KEY` columns, and adding `NOT NULL` (`REQUIRED`) columns via `ALTER TABLE`.
-- **DDL batching and defaults:** Multiple `ALTER COLUMN ... SET DATA TYPE` and `ADD COLUMN` clauses are combined into a single `ALTER TABLE` statement before the main query runs. Because GoogleSQL forbids inline `DEFAULT` on `ADD COLUMN`, column defaults on `ddl` assets are applied in a follow-up `ALTER TABLE ... ALTER COLUMN ... SET DEFAULT (...)` statement.
+- **DDL batching and defaults:** Before the main query runs, all new columns are added in a single `ALTER TABLE ... ADD COLUMN ..., ADD COLUMN ...` statement, and each widened column gets its own `ALTER TABLE ... ALTER COLUMN ... SET DATA TYPE` statement. Because GoogleSQL forbids inline `DEFAULT` on `ADD COLUMN`, column defaults on `ddl` assets are applied in a follow-up `ALTER TABLE ... ALTER COLUMN ... SET DEFAULT (...)` statement.
 - **SCD2 change detection:** On `scd2_by_column`, enabling `schema_evolution` switches non-key comparisons from `!=` to `IS DISTINCT FROM` for groupable types and `FORMAT('%T', ...)` for `ARRAY`, `STRUCT`, `JSON`, and `GEOGRAPHY` columns, so `NULL`-to-value transitions on newly added columns and array updates are versioned accurately.
 
 ### DuckDB (`duckdb.sql`) and DuckLake

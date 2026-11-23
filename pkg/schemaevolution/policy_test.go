@@ -183,3 +183,52 @@ func TestPolicyDialect_Capabilities(t *testing.T) {
 	require.False(t, ok)
 	assert.Contains(t, reason, "NOT NULL")
 }
+
+func TestPolicyDialect_UnreportedTypeParamsKeepExistingParameters(t *testing.T) {
+	t.Parallel()
+
+	d := schemaevolution.PolicyDialect{Policy: schemaevolution.TypePolicy{
+		Format: schemaevolution.TypeFormatConfig{
+			SQLDialect:               "bigquery",
+			TypeNames:                map[sqlengine.DType]string{sqlengine.DT_VARCHAR: "STRING", sqlengine.DT_DECIMAL: "NUMERIC"},
+			GenericArraySyntax:       true,
+			KeepTypeLength:           true,
+			OmitDefaultDecimalParams: true,
+			DefaultDecimalPrecision:  38,
+			DefaultDecimalScale:      9,
+		},
+		AllowDecimalWidening: true,
+		AllowLengthWidening:  true,
+	}}
+
+	tests := []struct {
+		name       string
+		existing   string
+		incoming   string
+		wantRes    schemaevolution.TypeResolution
+		wantTarget string
+	}{
+		{"bare string keeps length", "STRING(10)", "STRING", schemaevolution.TypeChangeNone, ""},
+		{"bare numeric keeps precision", "NUMERIC(10,2)", "NUMERIC", schemaevolution.TypeChangeNone, ""},
+		{"array element keeps length", "ARRAY<STRING(10)>", "ARRAY<STRING>", schemaevolution.TypeChangeNone, ""},
+		{"struct field keeps parameters", "STRUCT<code STRING(10), amount NUMERIC(10,2)>", "STRUCT<code STRING, amount NUMERIC>", schemaevolution.TypeChangeNone, ""},
+		{"renamed struct field stays incompatible", "STRUCT<code STRING(10)>", "STRUCT<other STRING>", schemaevolution.TypeChangeIncompatible, ""},
+		{"parameterized incoming still widens", "STRING(10)", "STRING(20)", schemaevolution.TypeChangeWiden, "STRING(20)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res, target, _ := d.ResolveTypeChange(
+				schemaevolution.Column{Type: tt.existing},
+				schemaevolution.Column{Type: tt.incoming, UnreportedTypeParams: true},
+			)
+			assert.Equal(t, tt.wantRes, res)
+			assert.Equal(t, tt.wantTarget, target)
+		})
+	}
+
+	// Without the flag a bare type is a real widening to the unbounded type.
+	res, target, _ := d.ResolveTypeChange(schemaevolution.Column{Type: "STRING(10)"}, schemaevolution.Column{Type: "STRING"})
+	assert.Equal(t, schemaevolution.TypeChangeWiden, res)
+	assert.Equal(t, "STRING", target)
+}

@@ -119,6 +119,16 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	shouldEvolve := schemaevolution.ShouldEvolve(t, fullRefresh)
 
 	if shouldEvolve {
+		// Render the main statement without hooks so only its INSERT gets the column list. It is
+		// rendered before anything runs so a materialization error leaves the warehouse untouched.
+		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
+		mainAsset := *renderAsset
+		mainAsset.Hooks = pipeline.Hooks{}
+		materialized, err := o.materializer.Render(&mainAsset, rawQuery)
+		if err != nil {
+			return err
+		}
+
 		if t.Materialization.Type != pipeline.MaterializationTypeNone {
 			if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 				return err
@@ -133,20 +143,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 		defer endSession()
 
-		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
 		printer, _ := writer.(io.Writer)
 		plan, err := o.prepareAndApplySchemaEvolution(ctx, p, t, renderAsset, conn, rawQuery, fullRefresh, printer)
 		if err != nil {
 			return err
 		}
 
-		// Render the main statement without hooks so only its INSERT gets the column list.
-		mainAsset := *renderAsset
-		mainAsset.Hooks = pipeline.Hooks{}
-		materialized, err := o.materializer.Render(&mainAsset, rawQuery)
-		if err != nil {
-			return err
-		}
 		if plan.TableExists && len(plan.IncomingColumns) > 0 {
 			materialized = schemaevolution.InjectInsertColumnList(
 				bigQuerySQLDialect,

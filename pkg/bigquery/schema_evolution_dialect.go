@@ -64,48 +64,47 @@ func newBigQueryDialect() BigQueryDialect {
 	return BigQueryDialect{PolicyDialect: bigQueryBasePolicy}
 }
 
-// RenderStatements renders all planned evolution actions into GoogleSQL ALTER TABLE statements.
-// BigQuery allows batching multiple ADD COLUMN and ALTER COLUMN SET DATA TYPE clauses in a single
-// ALTER TABLE statement, while DEFAULT values on new columns require a follow-up ALTER COLUMN SET DEFAULT.
+// RenderStatements renders all planned evolution actions into GoogleSQL ALTER TABLE statements:
+// one statement adding every new column, then one ALTER COLUMN SET DATA TYPE statement per widened
+// column, then an ALTER COLUMN SET DEFAULT statement per new column with a DEFAULT (GoogleSQL
+// does not allow DEFAULT on ADD COLUMN).
 func (d BigQueryDialect) RenderStatements(tableName string, plan *schemaevolution.Plan) []string {
 	if plan.IsEmpty() {
 		return nil
 	}
 
 	quotedTable := schemaevolution.QuoteQualifiedTableName(bigQuerySQLDialect, tableName, schemaevolution.QuoteBacktickIdentifier)
-	clauses := make([]string, 0, len(plan.Actions))
-	var defaultStmts []string
+	var addClauses, alterStmts, defaultStmts []string
 
 	for _, action := range plan.Actions {
-		if action.Type == schemaevolution.ActionAlterColumnType {
-			quotedCol := schemaevolution.QuoteBacktickIdentifier(action.ColumnName)
-			clauses = append(clauses, fmt.Sprintf("ALTER COLUMN %s SET DATA TYPE %s", quotedCol, action.ToType))
-		}
-	}
-
-	for _, action := range plan.Actions {
-		if action.Type != schemaevolution.ActionAddColumn {
-			continue
-		}
-		col := action.Column
-		quotedCol := schemaevolution.QuoteBacktickIdentifier(col.Name)
-		clause := fmt.Sprintf("ADD COLUMN %s %s", quotedCol, col.Type)
-		if col.Collation != "" {
-			clause += fmt.Sprintf(" COLLATE '%s'", strings.ReplaceAll(col.Collation, "'", "''"))
-		}
-		clauses = append(clauses, clause)
-		if col.Default != "" {
-			defaultStmts = append(defaultStmts, fmt.Sprintf(
-				"ALTER TABLE %s ALTER COLUMN %s SET DEFAULT (%s)",
-				quotedTable, quotedCol, col.Default,
+		switch action.Type {
+		case schemaevolution.ActionAddColumn:
+			col := action.Column
+			quotedCol := schemaevolution.QuoteBacktickIdentifier(col.Name)
+			clause := fmt.Sprintf("ADD COLUMN %s %s", quotedCol, col.Type)
+			if col.Collation != "" {
+				clause += fmt.Sprintf(" COLLATE '%s'", strings.ReplaceAll(col.Collation, "'", "''"))
+			}
+			addClauses = append(addClauses, clause)
+			if col.Default != "" {
+				defaultStmts = append(defaultStmts, fmt.Sprintf(
+					"ALTER TABLE %s ALTER COLUMN %s SET DEFAULT (%s)",
+					quotedTable, quotedCol, col.Default,
+				))
+			}
+		case schemaevolution.ActionAlterColumnType:
+			alterStmts = append(alterStmts, fmt.Sprintf(
+				"ALTER TABLE %s ALTER COLUMN %s SET DATA TYPE %s",
+				quotedTable, schemaevolution.QuoteBacktickIdentifier(action.ColumnName), action.ToType,
 			))
 		}
 	}
 
-	stmts := make([]string, 0, 1+len(defaultStmts))
-	if len(clauses) > 0 {
-		stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s %s", quotedTable, strings.Join(clauses, ", ")))
+	stmts := make([]string, 0, 1+len(alterStmts)+len(defaultStmts))
+	if len(addClauses) > 0 {
+		stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s %s", quotedTable, strings.Join(addClauses, ", ")))
 	}
+	stmts = append(stmts, alterStmts...)
 	stmts = append(stmts, defaultStmts...)
 	return stmts
 }

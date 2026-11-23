@@ -183,18 +183,29 @@ func TestBigQueryDialect_ResolveTypeChangeAndDDL(t *testing.T) {
 	require.False(t, ok)
 	assert.Contains(t, reason, "REQUIRED")
 
-	// Verify batched ALTER TABLE + follow-up SET DEFAULT DDL rendering
+	// Verify DDL rendering: one ADD COLUMN statement, one SET DATA TYPE statement per column,
+	// then the follow-up SET DEFAULT statements.
 	plan := &schemaevolution.Plan{
 		Actions: []schemaevolution.Action{
 			{Type: schemaevolution.ActionAddColumn, ColumnName: "status", ToType: "STRING", Column: schemaevolution.Column{Name: "status", Type: "STRING", Default: "'active'", Collation: "und:ci"}},
 			{Type: schemaevolution.ActionAlterColumnType, ColumnName: "amount", FromType: "INT64", ToType: "NUMERIC"},
 			{Type: schemaevolution.ActionAddColumn, ColumnName: "tags", ToType: "ARRAY<STRING>", Column: schemaevolution.Column{Name: "tags", Type: "ARRAY<STRING>"}},
+			{Type: schemaevolution.ActionAlterColumnType, ColumnName: "code", FromType: "STRING(10)", ToType: "STRING(20)"},
 		},
 	}
 	assert.Equal(t, []string{
-		"ALTER TABLE `my-proj`.`analytics`.`orders` ALTER COLUMN `amount` SET DATA TYPE NUMERIC, ADD COLUMN `status` STRING COLLATE 'und:ci', ADD COLUMN `tags` ARRAY<STRING>",
+		"ALTER TABLE `my-proj`.`analytics`.`orders` ADD COLUMN `status` STRING COLLATE 'und:ci', ADD COLUMN `tags` ARRAY<STRING>",
+		"ALTER TABLE `my-proj`.`analytics`.`orders` ALTER COLUMN `amount` SET DATA TYPE NUMERIC",
+		"ALTER TABLE `my-proj`.`analytics`.`orders` ALTER COLUMN `code` SET DATA TYPE STRING(20)",
 		"ALTER TABLE `my-proj`.`analytics`.`orders` ALTER COLUMN `status` SET DEFAULT ('active')",
 	}, d.RenderStatements("my-proj.analytics.orders", plan))
+
+	// Only widenings: no ADD COLUMN statement.
+	assert.Equal(t, []string{
+		"ALTER TABLE `orders` ALTER COLUMN `amount` SET DATA TYPE NUMERIC",
+	}, d.RenderStatements("orders", &schemaevolution.Plan{Actions: []schemaevolution.Action{
+		{Type: schemaevolution.ActionAlterColumnType, ColumnName: "amount", FromType: "INT64", ToType: "NUMERIC"},
+	}}))
 }
 
 func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
@@ -241,7 +252,7 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 		assert.Equal(t, 1, db.datasetsCreated)
 		assert.Equal(t, 1, db.limitCheckCalls)
 
-		assert.Contains(t, db.executedQueries[0], "ALTER TABLE `my-proj`.`analytics`.`events` ALTER COLUMN `amount` SET DATA TYPE NUMERIC, ADD COLUMN `tags` ARRAY<STRING>;")
+		assert.Contains(t, db.executedQueries[0], "ALTER TABLE `my-proj`.`analytics`.`events` ADD COLUMN `tags` ARRAY<STRING>;\nALTER TABLE `my-proj`.`analytics`.`events` ALTER COLUMN `amount` SET DATA TYPE NUMERIC;")
 		assert.Contains(t, db.executedQueries[1], "INSERT INTO my-proj.analytics.events (`amount`, `id`, `tags`) SELECT NUMERIC '12.34' AS amount, 1 AS id, ['a', 'b'] AS tags")
 		assert.Contains(t, logBuf.String(), `widening column "amount" (INT64 -> NUMERIC)`)
 		assert.Contains(t, logBuf.String(), `adding column "tags" (ARRAY<STRING>)`)
@@ -383,7 +394,7 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 
 		require.NoError(t, op.RunTask(context.Background(), p, asset))
 		require.Len(t, db.executedQueries, 2)
-		assert.Contains(t, db.executedQueries[0], "ALTER TABLE `analytics`.`dim_users` ALTER COLUMN `label` SET DATA TYPE STRING(50), ADD COLUMN `email` STRING, ADD COLUMN `tags` ARRAY<STRING>, ADD COLUMN `profile` STRUCT<`tier` STRING>;")
+		assert.Contains(t, db.executedQueries[0], "ALTER TABLE `analytics`.`dim_users` ADD COLUMN `email` STRING, ADD COLUMN `tags` ARRAY<STRING>, ADD COLUMN `profile` STRUCT<`tier` STRING>;\nALTER TABLE `analytics`.`dim_users` ALTER COLUMN `label` SET DATA TYPE STRING(50);")
 		assert.NotContains(t, db.executedQueries[0], "undeclared_extra")
 		assert.Contains(t, db.executedQueries[1], "target.email IS DISTINCT FROM source.email")
 		assert.Contains(t, db.executedQueries[1], "FORMAT('%T', target.tags) != FORMAT('%T', source.tags)")
@@ -487,4 +498,138 @@ func TestBigQueryEvolutionEngine_QueryColumnsBehindPreHooks(t *testing.T) {
 
 	_, err = engine.QueryColumns(t.Context(), "SELECT id FROM stg")
 	require.ErrorIs(t, err, errQuerySchemaUnavailable)
+}
+
+func TestBigQuerySchemaEvolution_QueryTypesWithoutParametersKeepExistingParameters(t *testing.T) {
+	t.Parallel()
+
+	existing := bigquery.Schema{
+		{Name: "code", Type: bigquery.StringFieldType, MaxLength: 10},
+		{Name: "amount", Type: bigquery.NumericFieldType, Precision: 10, Scale: 2},
+		{Name: "big", Type: bigquery.BigNumericFieldType, Precision: 40, Scale: 2},
+		{Name: "raw", Type: bigquery.BytesFieldType, MaxLength: 16},
+		{Name: "codes", Type: bigquery.StringFieldType, MaxLength: 5, Repeated: true},
+		{Name: "info", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{
+			{Name: "code", Type: bigquery.StringFieldType, MaxLength: 10},
+			{Name: "price", Type: bigquery.NumericFieldType, Precision: 10, Scale: 2},
+		}},
+	}
+	// A dry run reports every column above without its type parameters.
+	query := bigquery.Schema{
+		{Name: "code", Type: bigquery.StringFieldType},
+		{Name: "amount", Type: bigquery.NumericFieldType},
+		{Name: "big", Type: bigquery.BigNumericFieldType},
+		{Name: "raw", Type: bigquery.BytesFieldType},
+		{Name: "codes", Type: bigquery.StringFieldType, Repeated: true},
+		{Name: "info", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{
+			{Name: "code", Type: bigquery.StringFieldType},
+			{Name: "price", Type: bigquery.NumericFieldType},
+		}},
+	}
+
+	engine := &bigQueryEvolutionEngine{
+		BigQueryDialect: newBigQueryDialect(),
+		inspector: &fakeBigQueryEvolutionDB{
+			tableExists: true,
+			tableMeta:   &bigquery.TableMetadata{Schema: existing},
+			querySchema: query,
+		},
+	}
+
+	for _, strategy := range []pipeline.MaterializationStrategy{pipeline.MaterializationStrategyAppend, pipeline.MaterializationStrategyMerge} {
+		asset := &pipeline.Asset{
+			Name:            "analytics.params",
+			Type:            pipeline.AssetTypeBigqueryQuery,
+			SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: strategy},
+		}
+		if strategy == pipeline.MaterializationStrategyMerge {
+			for _, f := range query {
+				asset.Columns = append(asset.Columns, pipeline.Column{Name: f.Name})
+			}
+		}
+		plan, err := schemaevolution.BuildPlan(t.Context(), engine, asset, asset.Name, "SELECT 1", false)
+		require.NoError(t, err, strategy)
+		assert.Empty(t, plan.Actions, strategy)
+	}
+
+	// A different base type in the query is still a real widening.
+	engine.inspector = &fakeBigQueryEvolutionDB{
+		tableExists: true,
+		tableMeta:   &bigquery.TableMetadata{Schema: bigquery.Schema{{Name: "amount", Type: bigquery.NumericFieldType, Precision: 10, Scale: 2}}},
+		querySchema: bigquery.Schema{{Name: "amount", Type: bigquery.BigNumericFieldType}},
+	}
+	appendAsset := &pipeline.Asset{
+		Name:            "analytics.params",
+		Type:            pipeline.AssetTypeBigqueryQuery,
+		SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyAppend},
+	}
+	plan, err := schemaevolution.BuildPlan(t.Context(), engine, appendAsset, appendAsset.Name, "SELECT 1", false)
+	require.NoError(t, err)
+	require.Len(t, plan.Actions, 1)
+	assert.Equal(t, "BIGNUMERIC", plan.Actions[0].ToType)
+}
+
+func TestBigQuerySchemaEvolution_DDLDeclaredTypesWidenParameters(t *testing.T) {
+	t.Parallel()
+
+	engine := &bigQueryEvolutionEngine{
+		BigQueryDialect: newBigQueryDialect(),
+		inspector: &fakeBigQueryEvolutionDB{
+			tableExists: true,
+			tableMeta: &bigquery.TableMetadata{Schema: bigquery.Schema{
+				{Name: "code", Type: bigquery.StringFieldType, MaxLength: 10},
+				{Name: "note", Type: bigquery.StringFieldType, MaxLength: 10},
+			}},
+		},
+	}
+	asset := &pipeline.Asset{
+		Name:            "analytics.declared",
+		Type:            pipeline.AssetTypeBigqueryQuery,
+		SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDDL},
+		Columns: []pipeline.Column{
+			{Name: "code", Type: "STRING(20)"},
+			{Name: "note", Type: "STRING"},
+		},
+	}
+	plan, err := schemaevolution.BuildPlan(t.Context(), engine, asset, asset.Name, "", false)
+	require.NoError(t, err)
+	require.Len(t, plan.Actions, 2)
+	assert.Equal(t, "STRING(20)", plan.Actions[0].ToType)
+	assert.Equal(t, "STRING", plan.Actions[1].ToType)
+}
+
+func TestBigQuerySchemaEvolution_RenderErrorStopsBeforePreHooksAndDDL(t *testing.T) {
+	t.Parallel()
+
+	db := &fakeBigQueryEvolutionDB{
+		tableExists: true,
+		tableMeta:   &bigquery.TableMetadata{Schema: bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType}}},
+		querySchema: bigquery.Schema{
+			{Name: "id", Type: bigquery.IntegerFieldType},
+			{Name: "extra", Type: bigquery.StringFieldType},
+		},
+	}
+	op := newTestBigQueryOperator(db)
+
+	asset := &pipeline.Asset{
+		Name:            "analytics.no_key",
+		Type:            pipeline.AssetTypeBigqueryQuery,
+		SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyDeleteInsert,
+		},
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{{Query: "INSERT INTO analytics.audit VALUES ('pre')"}},
+		},
+		ExecutableFile: pipeline.ExecutableFile{Content: "SELECT 1 AS id, 'x' AS extra"},
+	}
+
+	err := op.RunTask(context.Background(), &pipeline.Pipeline{Name: "bq-pipeline"}, asset)
+	require.ErrorContains(t, err, "incremental_key")
+	assert.Empty(t, db.executedQueries)
+	assert.Zero(t, db.datasetsCreated)
 }

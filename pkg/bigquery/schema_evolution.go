@@ -167,9 +167,12 @@ func (e *bigQueryEvolutionEngine) QueryColumns(ctx context.Context, queryStr str
 		if field == nil || field.Name == "" {
 			continue
 		}
+		// BigQuery does not carry type parameters through query results, so a STRING(10) column
+		// read back unchanged is reported as STRING.
 		cols = append(cols, schemaevolution.Column{
-			Name: field.Name,
-			Type: bigQueryFieldSchemaToSQLType(field),
+			Name:                 field.Name,
+			Type:                 bigQueryFieldSchemaToSQLType(field),
+			UnreportedTypeParams: true,
 		})
 	}
 	schemaevolution.ApplyUntypedSelectLiterals(bigQueryTypeFormatConfig, trimmed, cols)

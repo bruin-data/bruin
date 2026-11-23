@@ -156,6 +156,9 @@ func (d PolicyDialect) ResolveTypeChange(existing, incoming Column) (TypeResolut
 
 	cur := d.ParseType(existing.Type)
 	inc := d.ParseType(incoming.Type)
+	if incoming.UnreportedTypeParams {
+		inc = d.inheritTypeParams(cur, inc)
+	}
 
 	res, target, reason := d.resolveParsedTypeChange(cur, inc)
 	if res == TypeChangeWiden {
@@ -165,6 +168,39 @@ func (d PolicyDialect) ResolveTypeChange(existing, incoming Column) (TypeResolut
 		return TypeChangeWiden, d.FormatType(target), ""
 	}
 	return res, "", reason
+}
+
+// inheritTypeParams gives each unparameterized STRING, BYTES, NUMERIC, or BIGNUMERIC in inc the
+// parameters of the same type at the same position in cur, descending into ARRAY elements and
+// STRUCT fields whose names line up.
+func (d PolicyDialect) inheritTypeParams(cur, inc ParsedType) ParsedType {
+	if cur.DType != inc.DType {
+		return inc
+	}
+	switch inc.DType { //nolint:exhaustive
+	case sqlengine.DT_VARCHAR, sqlengine.DT_BINARY, sqlengine.DT_DECIMAL, sqlengine.DT_BIGDECIMAL:
+		if d.FormatType(inc) == d.FormatType(ParsedType{DType: inc.DType}) {
+			inc.Length, inc.Precision, inc.Scale = cur.Length, cur.Precision, cur.Scale
+		}
+	case sqlengine.DT_ARRAY:
+		if cur.Elem != nil && inc.Elem != nil {
+			elem := d.inheritTypeParams(*cur.Elem, *inc.Elem)
+			inc.Elem = &elem
+		}
+	case sqlengine.DT_STRUCT:
+		if len(cur.Fields) != len(inc.Fields) {
+			return inc
+		}
+		fields := make([]StructField, len(inc.Fields))
+		for i, f := range inc.Fields {
+			if d.ColumnKey(f.Name) == d.ColumnKey(cur.Fields[i].Name) {
+				f.Type = d.inheritTypeParams(cur.Fields[i].Type, f.Type)
+			}
+			fields[i] = f
+		}
+		inc.Fields = fields
+	}
+	return inc
 }
 
 func (d PolicyDialect) resolveParsedTypeChange(cur, inc ParsedType) (TypeResolution, ParsedType, string) {

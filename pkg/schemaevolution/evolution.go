@@ -22,6 +22,10 @@ type Column struct {
 	Unique        bool
 	HasForeignKey bool
 	UntypedNull   bool
+	// UnreportedTypeParams marks a type read from query metadata that never reports type
+	// parameters (a BigQuery dry run reports STRING for a STRING(10) value), so a bare STRING,
+	// BYTES, NUMERIC, or BIGNUMERIC keeps the length, precision, and scale of the existing column.
+	UnreportedTypeParams bool
 }
 
 // ActionType identifies a single backwards-compatible schema evolution operation.
@@ -427,9 +431,10 @@ func resolveIncomingColumns(ctx context.Context, engine Engine, asset *pipeline.
 			continue
 		}
 		filtered = append(filtered, Column{
-			Name:        name,
-			Type:        qc.Type,
-			UntypedNull: qc.UntypedNull,
+			Name:                 name,
+			Type:                 qc.Type,
+			UntypedNull:          qc.UntypedNull,
+			UnreportedTypeParams: qc.UnreportedTypeParams,
 		})
 	}
 	if len(missing) > 0 {
