@@ -478,7 +478,8 @@ func TestBuildPlan(t *testing.T) {
 				Strategy: pipeline.MaterializationStrategyAppend,
 			},
 		}
-		require.NoError(t, schemaevolution.Validate(t.Context(), missingTableEngine, asset, "analytics.events", "SELECT 1 AS id"))
+		_, err := schemaevolution.Validate(t.Context(), missingTableEngine, asset, "analytics.events", "SELECT 1 AS id")
+		require.NoError(t, err)
 		assert.Equal(t, 1, missingTableEngine.queryCalls)
 	})
 
@@ -502,7 +503,7 @@ func TestBuildPlan(t *testing.T) {
 				{Name: "email", Type: "VARCHAR"},
 			},
 		}
-		err := schemaevolution.Validate(t.Context(), engine, asset, "analytics.users", "SELECT 1 AS id")
+		_, err := schemaevolution.Validate(t.Context(), engine, asset, "analytics.users", "SELECT 1 AS id")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not return declared column(s) email")
 	})

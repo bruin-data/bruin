@@ -142,7 +142,7 @@ type recordingSchemaEvolutionValidator struct {
 	err      error
 }
 
-func (r *recordingSchemaEvolutionValidator) ValidateSchemaEvolution(_ context.Context, asset *pipeline.Asset, rawQuery string) error {
+func (r *recordingSchemaEvolutionValidator) ValidateSchemaEvolution(_ context.Context, asset *pipeline.Asset, rawQuery string, _ pipeline.DeclareHoister) error {
 	r.asset = asset
 	r.rawQuery = rawQuery
 	return r.err

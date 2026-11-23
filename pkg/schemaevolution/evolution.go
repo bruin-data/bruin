@@ -347,16 +347,18 @@ func BuildPlan(ctx context.Context, engine Engine, asset *pipeline.Asset, tableN
 // Validate checks a schema-evolution-enabled asset during `bruin validate` without mutating the
 // target warehouse: it verifies that any schema diff against an existing table is backwards-compatible,
 // and still inspects userQuery via engine.QueryColumns when the target table does not exist yet.
-func Validate(ctx context.Context, engine Engine, asset *pipeline.Asset, tableName, userQuery string) error {
+// It returns the plan a run would apply.
+func Validate(ctx context.Context, engine Engine, asset *pipeline.Asset, tableName, userQuery string) (*Plan, error) {
 	plan, err := BuildPlan(ctx, engine, asset, tableName, userQuery, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !plan.TableExists && asset != nil && !UsesDeclaredSchemaOnly(asset.Materialization.Strategy) && strings.TrimSpace(userQuery) != "" {
-		_, err = engine.QueryColumns(ctx, userQuery)
-		return err
+		if _, err := engine.QueryColumns(ctx, userQuery); err != nil {
+			return nil, err
+		}
 	}
-	return nil
+	return plan, nil
 }
 
 func canSuggestFullRefresh(asset *pipeline.Asset) bool {

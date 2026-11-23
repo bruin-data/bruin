@@ -19,7 +19,7 @@ type queryValidator interface {
 }
 
 type schemaEvolutionValidator interface {
-	ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string) error
+	ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string, hoister pipeline.DeclareHoister) error
 }
 
 type connectionManager interface {
@@ -103,7 +103,7 @@ func (q *QueryValidatorRule) schemaEvolutionIssue(ctx context.Context, p *pipeli
 	}
 	withHooks := *asset
 	withHooks.Hooks = hooks
-	if err := validator.ValidateSchemaEvolution(query.WithQueryType(ctx, query.QueryTypeDryRun), &withHooks, rawQuery); err != nil {
+	if err := validator.ValidateSchemaEvolution(query.WithQueryType(ctx, query.QueryTypeDryRun), &withHooks, rawQuery, q.HookHoister); err != nil {
 		return failurePrefix + err.Error()
 	}
 	return ""

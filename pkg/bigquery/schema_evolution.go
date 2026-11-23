@@ -62,8 +62,8 @@ var errQuerySchemaUnavailable = errors.New("query schema is not available from a
 // ValidateSchemaEvolution validates a schema-evolution-enabled BigQuery SQL asset during `bruin validate`
 // by dry-running the SELECT query and verifying that any diff against the live table is backwards-compatible,
 // avoiding false-positive DML dry-run errors before `bruin run` applies the planned ALTER TABLE.
-// The asset's hooks are expected to be rendered already.
-func (d *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string) error {
+// The asset's hooks are expected to be rendered already; hoister orders their DECLAREs the way a run does.
+func (d *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string, hoister pipeline.DeclareHoister) error {
 	renderAsset := d.PrepareAssetForRender(asset)
 	if renderAsset.Materialization.IsIceberg() {
 		return errors.New("schema_evolution is not yet supported for BigQuery Iceberg tables")
@@ -78,21 +78,33 @@ func (d *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.As
 		BigQueryDialect: newBigQueryDialect(),
 		inspector:       d,
 	}
-	if !renderAsset.Hooks.IsZero() {
-		// Hooks share script scope with the query (a pre-hook DECLARE, for example), so they are
-		// dry-run together with it, and the query schema is inspected behind the pre-hooks.
-		script := pipeline.WrapHooks(cleaned, renderAsset.Hooks, nil, renderAsset.Type)
-		if _, err := d.QueryDryRun(ctx, &query.Query{Query: script}); err != nil {
-			return err
-		}
-		engine.preHookSQL = pipeline.WrapHooks("", pipeline.Hooks{Pre: renderAsset.Hooks.Pre}, nil, renderAsset.Type)
+	// Pre-hooks share script scope with the query (a DECLARE, for example), so the query schema
+	// is inspected behind them.
+	if len(renderAsset.Hooks.Pre) > 0 {
+		engine.preHookSQL = pipeline.WrapHooks("", pipeline.Hooks{Pre: renderAsset.Hooks.Pre}, hoister, renderAsset.Type)
 	}
 
-	err := schemaevolution.Validate(ctx, engine, renderAsset, asset.Name, cleaned)
-	if errors.Is(err, errQuerySchemaUnavailable) {
+	plan, err := schemaevolution.Validate(ctx, engine, renderAsset, asset.Name, cleaned)
+	schemaKnown := true
+	switch {
+	case errors.Is(err, errQuerySchemaUnavailable):
 		// The schema can only be checked once the pre-hooks have run, which `bruin run` does.
+		schemaKnown = false
+	case err != nil:
+		return err
+	}
+
+	hooks := renderAsset.Hooks
+	if schemaKnown && (!plan.TableExists || !plan.IsEmpty()) {
+		// Post-hooks run after the table is created or altered, so a dry run against the current
+		// table would reject valid references to the new columns. They are checked at run time.
+		hooks.Post = nil
+	}
+	if hooks.IsZero() {
 		return nil
 	}
+	script := pipeline.WrapHooks(cleaned, hooks, hoister, renderAsset.Type)
+	_, err = d.QueryDryRun(ctx, &query.Query{Query: script})
 	return err
 }
 

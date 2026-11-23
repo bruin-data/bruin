@@ -178,8 +178,8 @@ func nonEmptyHookSQLs(hooks []pipeline.Hook) []string {
 }
 
 // ValidateSchemaEvolution validates a schema-evolution-enabled DuckDB SQL asset during `bruin validate`
-// without mutating the target database.
-func (c *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string) error {
+// without mutating the target database. Hooks are validated separately by the hook dry-run rule.
+func (c *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string, _ pipeline.DeclareHoister) error {
 	if q, ok := any(c).(interface{ HasQuack() bool }); ok && q.HasQuack() {
 		return errors.New("connection uses quack: true, which does not support duckdb.sql assets yet")
 	}
@@ -205,7 +205,8 @@ func (c *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.As
 			DuckDBDialect: dialect,
 			session:       session,
 		}
-		return schemaevolution.Validate(ctx, engine, asset, asset.Name, cleaned)
+		_, err := schemaevolution.Validate(ctx, engine, asset, asset.Name, cleaned)
+		return err
 	})
 }
 
