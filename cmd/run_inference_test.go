@@ -26,7 +26,7 @@ func TestSetupExecutorsRoutesInferenceChecksToTheWarehouse(t *testing.T) { //nol
 		Columns: []pipeline.Column{
 			{Name: "id", PrimaryKey: true, Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
 		},
-		CustomChecks: []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: 1}},
+		CustomChecks: []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: "1"}},
 	}
 	p := &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{asset}}
 	python.InferIngestrDestinations(p, staticConnectionTypes{"warehouse": "duckdb"})
@@ -58,7 +58,7 @@ func TestSetupExecutorsRunsChecksOnDuckDBSourceAssets(t *testing.T) { //nolint:p
 		Columns: []pipeline.Column{
 			{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
 		},
-		CustomChecks: []pipeline.CustomCheck{{Name: "always fails", Query: "select 1", Value: 0}},
+		CustomChecks: []pipeline.CustomCheck{{Name: "always fails", Query: "select 1", Value: "0"}},
 	}
 	p := &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{asset}}
 

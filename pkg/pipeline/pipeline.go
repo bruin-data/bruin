@@ -1154,11 +1154,65 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 	}, nil
 }
 
+// CheckNumber is a custom check value kept as written, so decimals and integers above 2^53 compare exactly.
+type CheckNumber string
+
+func (n CheckNumber) String() string {
+	if n == "" {
+		return "0"
+	}
+	return string(n)
+}
+
+func (n CheckNumber) IsZero() bool {
+	f, err := strconv.ParseFloat(n.String(), 64)
+	return err == nil && f == 0
+}
+
+func (n CheckNumber) MarshalJSON() ([]byte, error) {
+	return []byte(n.String()), nil
+}
+
+func (n *CheckNumber) UnmarshalJSON(data []byte) error {
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err != nil {
+		return errors.Wrap(err, "custom check value must be a number")
+	}
+	*n = CheckNumber(num)
+	return nil
+}
+
+func (n CheckNumber) MarshalYAML() (interface{}, error) {
+	tag := "!!float"
+	if _, err := strconv.ParseInt(n.String(), 10, 64); err == nil {
+		tag = "!!int"
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: n.String()}, nil
+}
+
+func (n *CheckNumber) UnmarshalYAML(node *yaml.Node) error {
+	var i int64
+	if node.ShortTag() == "!!int" && node.Decode(&i) == nil {
+		*n = CheckNumber(strconv.FormatInt(i, 10))
+		return nil
+	}
+	if _, err := strconv.ParseFloat(node.Value, 64); err == nil {
+		*n = CheckNumber(node.Value)
+		return nil
+	}
+	var f float64
+	if err := node.Decode(&f); err != nil {
+		return errors.Errorf("custom check value must be a number, got '%s'", node.Value)
+	}
+	*n = CheckNumber(strconv.FormatFloat(f, 'f', -1, 64))
+	return nil
+}
+
 type CustomCheck struct {
 	ID            string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name          string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description   string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value         float64         `json:"value" yaml:"value" mapstructure:"value"`
+	Value         CheckNumber     `json:"value" yaml:"value" mapstructure:"value"`
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
@@ -4003,7 +4057,7 @@ func findCustomCheckIndex(checks []CustomCheck, name string) int {
 func mergeCustomCheckDefault(target *CustomCheck, defaults CustomCheck) {
 	applyStringDefault(&target.Name, defaults.Name)
 	applyStringDefault(&target.Description, defaults.Description)
-	if target.Value == 0 && defaults.Value != 0 {
+	if target.Value.IsZero() && !defaults.Value.IsZero() {
 		target.Value = defaults.Value
 	}
 	if target.Count == nil {

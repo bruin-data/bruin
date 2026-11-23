@@ -318,7 +318,7 @@ func TestCustomCheck(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func(n *mockQuerierWithResult)
-		value   float64 // defaults to 5
+		value   pipeline.CheckNumber // defaults to 5
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
@@ -342,6 +342,12 @@ func TestCustomCheck(t *testing.T) {
 			wantErr: checkError("custom check 'check1' has returned 10 instead of the expected 5"),
 		},
 		{
+			name:    "integers above 2^53 are compared exactly",
+			setup:   setupFunc([][]interface{}{{int64(9007199254740993)}}, nil),
+			value:   "9007199254740992",
+			wantErr: checkError("custom check 'check1' has returned 9007199254740993 instead of the expected 9007199254740992"),
+		},
+		{
 			name:    "decimal result is not rounded to the expected integer",
 			setup:   setupFunc([][]interface{}{{5.5}}, nil),
 			wantErr: checkError("custom check 'check1' has returned 5.5 instead of the expected 5"),
@@ -349,13 +355,13 @@ func TestCustomCheck(t *testing.T) {
 		{
 			name:    "decimal expected value is not rounded to the result",
 			setup:   setupFunc([][]interface{}{{"100.99"}}, nil),
-			value:   100.50,
-			wantErr: checkError("custom check 'check1' has returned 100.99 instead of the expected 100.5"),
+			value:   "100.50",
+			wantErr: checkError("custom check 'check1' has returned 100.99 instead of the expected 100.50"),
 		},
 		{
 			name:    "large decimal result matches the expected value",
 			setup:   setupFunc([][]interface{}{{3014136.99}}, nil),
-			value:   3014136.99,
+			value:   "3014136.99",
 			wantErr: assert.NoError,
 		},
 		{
@@ -377,8 +383,8 @@ func TestCustomCheck(t *testing.T) {
 			tt.setup(q)
 
 			value := tt.value
-			if value == 0 {
-				value = 5
+			if value == "" {
+				value = "5"
 			}
 
 			conn := new(mockConnectionFetcher)
