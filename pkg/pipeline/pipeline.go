@@ -1155,7 +1155,7 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 }
 
 // CheckNumber is a custom check value kept as written, so decimals and integers above 2^53 compare exactly.
-type CheckNumber string
+type CheckNumber string //nolint:recvcheck
 
 func (n CheckNumber) String() string {
 	if n == "" {
