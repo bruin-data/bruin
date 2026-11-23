@@ -115,6 +115,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/paddle"
 	"github.com/bruin-data/bruin/pkg/payrails"
+	"github.com/bruin-data/bruin/pkg/peeringdb"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/phantombuster"
 	"github.com/bruin-data/bruin/pkg/pinterest"
@@ -326,6 +327,7 @@ type Manager struct {
 	Dune                 map[string]*dune.Client
 	Odoo                 map[string]*odoo.Client
 	Privatus             map[string]*privatus.Client
+	PeeringDB            map[string]*peeringdb.Client
 	BreezyHR             map[string]*breezyhr.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
@@ -4346,6 +4348,29 @@ func (m *Manager) AddBreezyHRConnectionFromConfig(connection *config.BreezyHRCon
 	return nil
 }
 
+func (m *Manager) AddPeeringDBConnectionFromConfig(connection *config.PeeringDBConnection) error {
+	m.mutex.Lock()
+	if m.PeeringDB == nil {
+		m.PeeringDB = make(map[string]*peeringdb.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := peeringdb.NewClient(&peeringdb.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.PeeringDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPrivatusConnectionFromConfig(connection *config.PrivatusConnection) error {
 	m.mutex.Lock()
 	if m.Privatus == nil {
@@ -4910,6 +4935,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Odoo, connectionManager.AddOdooConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Privatus, connectionManager.AddPrivatusConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.PeeringDB, connectionManager.AddPeeringDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.BreezyHR, connectionManager.AddBreezyHRConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

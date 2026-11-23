@@ -1230,6 +1230,31 @@ func TestManager_AddBreezyHRConnectionFromConfig(t *testing.T) {
 	assert.Equal(t, "breezyhr://?api_key=breezy_pat_123&company_id=abc123", uri)
 }
 
+func TestManager_AddPeeringDBConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.PeeringDBConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "abc.123",
+	}
+
+	require.NoError(t, m.AddPeeringDBConnectionFromConfig(configuration))
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.PeeringDB["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.PeeringDB["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "peeringdb://?api_key=abc.123", uri)
+}
+
 func TestManager_AddPrivatusConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 

@@ -1083,6 +1083,15 @@ func (c PrivatusConnection) GetName() string {
 	return c.Name
 }
 
+type PeeringDBConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c PeeringDBConnection) GetName() string {
+	return c.Name
+}
+
 type GranolaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
