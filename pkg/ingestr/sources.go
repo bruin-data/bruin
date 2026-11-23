@@ -1101,6 +1101,24 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "breakdown:<dimension>", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
 	},
 
+	// PeeringDB - Public database of networks, exchanges, and facilities. Every table merges on id
+	// by its update time and keeps deleted objects with status "deleted".
+	"peeringdb": {
+		{Name: "organizations", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "campuses", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "carriers", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "carrier_facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchanges", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchange_facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchange_lans", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchange_prefixes", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "networks", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "network_facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "network_exchange_lans", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "network_contacts", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+	},
+
 	// Okta - Identity and access management platform
 	"okta": {
 		{Name: "users", PrimaryKey: "id", IncKey: "lastUpdated", IncStrategy: "merge"},
