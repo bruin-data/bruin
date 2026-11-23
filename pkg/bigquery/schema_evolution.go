@@ -55,9 +55,14 @@ func (d *Client) QuerySchemaForEvolution(ctx context.Context, queryObj *query.Qu
 	return stats.Schema, nil
 }
 
+// errQuerySchemaUnavailable means a dry run of the asset query behind its pre-hooks returned no
+// schema, which happens when the query reads temp tables that only exist once the pre-hooks run.
+var errQuerySchemaUnavailable = errors.New("query schema is not available from a dry run")
+
 // ValidateSchemaEvolution validates a schema-evolution-enabled BigQuery SQL asset during `bruin validate`
 // by dry-running the SELECT query and verifying that any diff against the live table is backwards-compatible,
 // avoiding false-positive DML dry-run errors before `bruin run` applies the planned ALTER TABLE.
+// The asset's hooks are expected to be rendered already.
 func (d *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string) error {
 	renderAsset := d.PrepareAssetForRender(asset)
 	if renderAsset.Materialization.IsIceberg() {
@@ -73,12 +78,30 @@ func (d *Client) ValidateSchemaEvolution(ctx context.Context, asset *pipeline.As
 		BigQueryDialect: newBigQueryDialect(),
 		inspector:       d,
 	}
-	return schemaevolution.Validate(ctx, engine, renderAsset, asset.Name, cleaned)
+	if !renderAsset.Hooks.IsZero() {
+		// Hooks share script scope with the query (a pre-hook DECLARE, for example), so they are
+		// dry-run together with it, and the query schema is inspected behind the pre-hooks.
+		script := pipeline.WrapHooks(cleaned, renderAsset.Hooks, nil, renderAsset.Type)
+		if _, err := d.QueryDryRun(ctx, &query.Query{Query: script}); err != nil {
+			return err
+		}
+		engine.preHookSQL = pipeline.WrapHooks("", pipeline.Hooks{Pre: renderAsset.Hooks.Pre}, nil, renderAsset.Type)
+	}
+
+	err := schemaevolution.Validate(ctx, engine, renderAsset, asset.Name, cleaned)
+	if errors.Is(err, errQuerySchemaUnavailable) {
+		// The schema can only be checked once the pre-hooks have run, which `bruin run` does.
+		return nil
+	}
+	return err
 }
 
 type bigQueryEvolutionEngine struct {
 	BigQueryDialect
 	inspector bigQuerySchemaInspector
+	// preHookSQL, when set, is dry-run ahead of the query so the query can use what the pre-hooks
+	// declare. Only validation sets it; runs execute pre-hooks in a session instead.
+	preHookSQL string
 }
 
 func (e *bigQueryEvolutionEngine) ExistingColumns(ctx context.Context, tableName string) ([]schemaevolution.Column, bool, error) {
@@ -115,9 +138,16 @@ func (e *bigQueryEvolutionEngine) QueryColumns(ctx context.Context, queryStr str
 		return nil, nil
 	}
 
-	schema, err := e.inspector.QuerySchemaForEvolution(ctx, &query.Query{Query: trimmed})
+	inspected := trimmed
+	if e.preHookSQL != "" {
+		inspected = e.preHookSQL + "\n" + trimmed + ";"
+	}
+	schema, err := e.inspector.QuerySchemaForEvolution(ctx, &query.Query{Query: inspected})
 	if err != nil {
 		return nil, err
+	}
+	if e.preHookSQL != "" && len(schema) == 0 {
+		return nil, errQuerySchemaUnavailable
 	}
 
 	cols := make([]schemaevolution.Column, 0, len(schema))
@@ -134,6 +164,61 @@ func (e *bigQueryEvolutionEngine) QueryColumns(ctx context.Context, queryStr str
 	return cols, nil
 }
 
+// bigQuerySessionRunner is implemented by connections that can run jobs in a BigQuery session.
+type bigQuerySessionRunner interface {
+	StartSession(ctx context.Context, q *query.Query) (string, error)
+	AbortSession(ctx context.Context, sessionID string)
+}
+
+// runPreHooksInSession runs the asset's pre-hooks as the first job of a new BigQuery session.
+// It returns a context that keeps later jobs in that session, the asset without its pre-hooks
+// (they must not run a second time with the main query), and a function that ends the session.
+// Without pre-hooks it changes nothing.
+func (o BasicOperator) runPreHooksInSession(
+	ctx context.Context,
+	p *pipeline.Pipeline,
+	asset *pipeline.Asset,
+	renderAsset *pipeline.Asset,
+	conn DB,
+) (context.Context, *pipeline.Asset, func(), error) {
+	noop := func() {}
+	preHooks := pipeline.Hooks{Pre: renderAsset.Hooks.Pre}
+	var preHookSQL string
+	if wrapper, ok := o.materializer.(hookWrapper); ok {
+		preHookSQL = strings.TrimSpace(wrapper.WrapHooks(&pipeline.Asset{Type: renderAsset.Type, Hooks: preHooks}, ""))
+	}
+	if preHookSQL == "" {
+		return ctx, renderAsset, noop, nil
+	}
+
+	runner, ok := conn.(bigQuerySessionRunner)
+	if !ok {
+		return nil, nil, nil, errors.New("schema_evolution with pre-hooks requires a BigQuery connection that supports sessions")
+	}
+
+	hookQuery := &query.Query{Query: preHookSQL}
+	if o.devEnv != nil {
+		var err error
+		hookQuery, err = o.devEnv.Modify(ctx, p, asset, hookQuery)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+	annotatedHook, err := ansisql.AddAnnotationComment(ctx, hookQuery, asset.Name, "pre_hook", p.Name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	sessionID, err := runner.StartSession(query.WithQueryType(ctx, "pre_hook"), annotatedHook)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	withoutPreHooks := *renderAsset
+	withoutPreHooks.Hooks.Pre = nil
+	endSession := func() { runner.AbortSession(ctx, sessionID) }
+	return withSessionID(ctx, sessionID), &withoutPreHooks, endSession, nil
+}
+
 func (o BasicOperator) prepareAndApplySchemaEvolution(
 	ctx context.Context,
 	p *pipeline.Pipeline,
@@ -143,51 +228,21 @@ func (o BasicOperator) prepareAndApplySchemaEvolution(
 	rawQuery string,
 	fullRefresh bool,
 	writer io.Writer,
-) (*pipeline.Asset, *schemaevolution.Plan, error) {
+) (*schemaevolution.Plan, error) {
 	if renderAsset.Materialization.IsIceberg() {
-		return nil, nil, errors.New("schema_evolution is not yet supported for BigQuery Iceberg tables")
+		return nil, errors.New("schema_evolution is not yet supported for BigQuery Iceberg tables")
 	}
 
 	inspector, ok := conn.(bigQuerySchemaInspector)
 	if !ok {
-		return nil, nil, errors.New("bigquery connection does not support schema inspection for schema_evolution")
+		return nil, errors.New("bigquery connection does not support schema inspection for schema_evolution")
 	}
 
-	// Execute any pre-hooks once before inspecting table/query schemas so staging setups are visible,
-	// and strip pre-hooks from renderAsset so they are not executed a second time with the main query.
-	effectiveRenderAsset := renderAsset
-	if len(renderAsset.Hooks.Pre) > 0 {
-		for _, hook := range renderAsset.Hooks.Pre {
-			hq := strings.TrimSpace(hook.Query)
-			if hq == "" {
-				continue
-			}
-			hookQuery := &query.Query{Query: hq}
-			if o.devEnv != nil {
-				var err error
-				hookQuery, err = o.devEnv.Modify(ctx, p, asset, hookQuery)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-			annotatedHook, err := ansisql.AddAnnotationComment(ctx, hookQuery, asset.Name, "pre_hook", p.Name)
-			if err != nil {
-				return nil, nil, err
-			}
-			if err := conn.RunQueryWithoutResult(query.WithQueryType(ctx, "pre_hook"), annotatedHook); err != nil {
-				return nil, nil, err
-			}
-		}
-		copied := *renderAsset
-		copied.Hooks.Pre = nil
-		effectiveRenderAsset = &copied
-	}
-
-	inspectQuery := schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
-	if o.devEnv != nil && !schemaevolution.UsesDeclaredSchemaOnly(effectiveRenderAsset.Materialization.Strategy) {
+	inspectQuery := rawQuery
+	if o.devEnv != nil && !schemaevolution.UsesDeclaredSchemaOnly(renderAsset.Materialization.Strategy) {
 		modified, err := o.devEnv.Modify(ctx, p, asset, &query.Query{Query: inspectQuery})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		inspectQuery = modified.Query
 	}
@@ -198,22 +253,22 @@ func (o BasicOperator) prepareAndApplySchemaEvolution(
 		inspector:       inspector,
 	}
 
-	plan, err := schemaevolution.BuildPlan(ctx, engine, effectiveRenderAsset, asset.Name, inspectQuery, fullRefresh)
+	plan, err := schemaevolution.BuildPlan(ctx, engine, renderAsset, asset.Name, inspectQuery, fullRefresh)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if !plan.IsEmpty() {
 		alterSQL := strings.Join(dialect.RenderStatements(asset.Name, plan), ";\n") + ";"
 		annotatedAlter, err := ansisql.AddAnnotationComment(ctx, &query.Query{Query: alterSQL}, asset.Name, "schema_evolution", p.Name)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if err := conn.RunQueryWithoutResult(query.WithQueryType(ctx, "schema_evolution"), annotatedAlter); err != nil {
-			return nil, nil, fmt.Errorf("schema evolution DDL failed for %q: %w", asset.Name, err)
+			return nil, fmt.Errorf("schema evolution DDL failed for %q: %w", asset.Name, err)
 		}
 		schemaevolution.LogPlan(writer, asset.Name, plan)
 	}
 
-	return effectiveRenderAsset, plan, nil
+	return plan, nil
 }

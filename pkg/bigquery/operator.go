@@ -33,6 +33,11 @@ type devEnv interface {
 	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
 }
 
+// hookWrapper is implemented by materializers that add asset hooks around the rendered query.
+type hookWrapper interface {
+	WrapHooks(asset *pipeline.Asset, materialized string) string
+}
+
 type queryLimitChecker interface {
 	CheckQueryLimits(ctx context.Context, q *query.Query) error
 }
@@ -119,14 +124,26 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 				return err
 			}
 		}
-		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
-		printer, _ := writer.(io.Writer)
-		var plan *schemaevolution.Plan
-		renderAsset, plan, err = o.prepareAndApplySchemaEvolution(ctx, p, t, renderAsset, conn, rawQuery, fullRefresh, printer)
+		// Pre-hooks run first in a BigQuery session, and every later job of this run joins it,
+		// so schema inspection and the main query see the variables and temp tables they create.
+		var endSession func()
+		ctx, renderAsset, endSession, err = o.runPreHooksInSession(ctx, p, t, renderAsset, conn)
 		if err != nil {
 			return err
 		}
-		materialized, err := o.materializer.Render(renderAsset, rawQuery)
+		defer endSession()
+
+		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
+		printer, _ := writer.(io.Writer)
+		plan, err := o.prepareAndApplySchemaEvolution(ctx, p, t, renderAsset, conn, rawQuery, fullRefresh, printer)
+		if err != nil {
+			return err
+		}
+
+		// Render the main statement without hooks so only its INSERT gets the column list.
+		mainAsset := *renderAsset
+		mainAsset.Hooks = pipeline.Hooks{}
+		materialized, err := o.materializer.Render(&mainAsset, rawQuery)
 		if err != nil {
 			return err
 		}
@@ -138,6 +155,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 				schemaevolution.QuoteBacktickIdentifier,
 				plan.IncomingColumns,
 			)
+		}
+		if wrapper, ok := o.materializer.(hookWrapper); ok {
+			materialized = wrapper.WrapHooks(renderAsset, materialized)
 		}
 		q.Query = materialized
 	} else {

@@ -66,22 +66,47 @@ func (q *QueryValidatorRule) GetSeverity() ValidatorSeverity {
 	return ValidatorSeverityCritical
 }
 
-func (q *QueryValidatorRule) wrapRenderedHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset, sql string) (string, error) {
+// renderHooks renders the asset's hook templates with the asset's Jinja context. Without a
+// hook renderer, hooks are not validated and an empty Hooks value is returned.
+func (q *QueryValidatorRule) renderHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) (pipeline.Hooks, error) {
 	if q.HookRenderer == nil || asset.Hooks.IsZero() {
-		return sql, nil
+		return pipeline.Hooks{}, nil
 	}
 
 	assetRenderer, err := q.HookRenderer.CloneForAsset(ctx, p, asset)
 	if err != nil {
-		return "", fmt.Errorf("failed to create hook renderer: %w", err)
+		return pipeline.Hooks{}, fmt.Errorf("failed to create hook renderer: %w", err)
 	}
 
-	renderedHooks, err := pipeline.ResolveHookTemplatesToNew(asset.Hooks, assetRenderer)
+	return pipeline.ResolveHookTemplatesToNew(asset.Hooks, assetRenderer)
+}
+
+func (q *QueryValidatorRule) wrapRenderedHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset, sql string) (string, error) {
+	renderedHooks, err := q.renderHooks(ctx, p, asset)
 	if err != nil {
 		return "", err
 	}
+	if renderedHooks.IsZero() {
+		return sql, nil
+	}
 
 	return pipeline.WrapHooks(sql, renderedHooks, q.HookHoister, asset.Type), nil
+}
+
+// schemaEvolutionIssue validates a schema-evolution-enabled asset with its hooks rendered, so
+// engines that check hooks together with the query (BigQuery) see the same hooks a run would.
+// It returns the issue description, or "" when the asset is valid.
+func (q *QueryValidatorRule) schemaEvolutionIssue(ctx context.Context, p *pipeline.Pipeline, validator schemaEvolutionValidator, asset *pipeline.Asset, rawQuery, failurePrefix string) string {
+	hooks, err := q.renderHooks(ctx, p, asset)
+	if err != nil {
+		return fmt.Sprintf("Failed to render hooks: %s", err)
+	}
+	withHooks := *asset
+	withHooks.Hooks = hooks
+	if err := validator.ValidateSchemaEvolution(query.WithQueryType(ctx, query.QueryTypeDryRun), &withHooks, rawQuery); err != nil {
+		return failurePrefix + err.Error()
+	}
+	return ""
 }
 
 // withRenderedIncrementalPredicate returns a copy of the asset whose
@@ -179,11 +204,8 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 					Description: fmt.Sprintf("Failed to materialize query: %s", predErr),
 				}), nil
 			}
-			if evoErr := evoVal.ValidateSchemaEvolution(query.WithQueryType(ctx, query.QueryTypeDryRun), materializedAsset, rawQuery); evoErr != nil {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: fmt.Sprintf("Failed to validate query: %s", evoErr),
-				})
+			if desc := q.schemaEvolutionIssue(ctx, p, evoVal, materializedAsset, rawQuery, "Failed to validate query: "); desc != "" {
+				issues = append(issues, &Issue{Task: asset, Description: desc})
 			}
 			return issues, nil
 		}
@@ -358,12 +380,9 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 			}
 			if schemaevolution.ShouldEvolve(task, task.FullRefreshEnabled(q.FullRefresh)) {
 				if evoVal, ok := validator.(schemaEvolutionValidator); ok {
-					if evoErr := evoVal.ValidateSchemaEvolution(query.WithQueryType(ctx, query.QueryTypeDryRun), materializedTask, rawQuery); evoErr != nil {
+					if desc := q.schemaEvolutionIssue(ctx, p, evoVal, materializedTask, rawQuery, "Invalid query found: "); desc != "" {
 						mu.Lock()
-						issues = append(issues, &Issue{
-							Task:        task,
-							Description: fmt.Sprintf("Invalid query found: %s", evoErr),
-						})
+						issues = append(issues, &Issue{Task: task, Description: desc})
 						mu.Unlock()
 					}
 					return

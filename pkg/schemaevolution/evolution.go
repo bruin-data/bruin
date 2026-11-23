@@ -409,20 +409,29 @@ func resolveIncomingColumns(ctx context.Context, engine Engine, asset *pipeline.
 		}
 	}
 
+	// The materializations for these strategies reference every declared column on the query
+	// output, so a declared column the query does not return would fail the write.
 	filtered := make([]Column, 0, len(asset.Columns))
+	var missing []string
 	for _, col := range asset.Columns {
 		name := strings.TrimSpace(col.Name)
 		key := engine.ColumnKey(name)
 		if key == "" {
 			continue
 		}
-		if qc, ok := queryByName[key]; ok {
-			filtered = append(filtered, Column{
-				Name:        name,
-				Type:        qc.Type,
-				UntypedNull: qc.UntypedNull,
-			})
+		qc, ok := queryByName[key]
+		if !ok {
+			missing = append(missing, name)
+			continue
 		}
+		filtered = append(filtered, Column{
+			Name:        name,
+			Type:        qc.Type,
+			UntypedNull: qc.UntypedNull,
+		})
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("schema evolution: the query for %q does not return declared column(s) %s, which the %s strategy requires", tableName, strings.Join(missing, ", "), strategy)
 	}
 	return filtered, nil
 }

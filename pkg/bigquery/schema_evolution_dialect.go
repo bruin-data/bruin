@@ -110,23 +110,13 @@ func (d BigQueryDialect) RenderStatements(tableName string, plan *schemaevolutio
 	return stmts
 }
 
-// isBigQueryNonGroupableType reports whether sqlType is or contains a GoogleSQL type
-// (ARRAY, JSON, or GEOGRAPHY) that BigQuery rejects in `=` / `!=` / `IS DISTINCT FROM`.
-func isBigQueryNonGroupableType(sqlType string) bool {
-	return hasNonGroupableBigQueryType(schemaevolution.ParseType(bigQueryTypeFormatConfig, sqlType))
-}
-
-func hasNonGroupableBigQueryType(pt schemaevolution.ParsedType) bool {
-	switch pt.DType { //nolint:exhaustive
-	case sqlengine.DT_ARRAY, sqlengine.DT_JSON, sqlengine.DT_JSONB, sqlengine.DT_GEOGRAPHY:
+// needsBigQueryFormatComparison reports whether sqlType is or contains a GoogleSQL type
+// (ARRAY, JSON, GEOGRAPHY, or STRUCT) that BigQuery rejects in `IS DISTINCT FROM`, so
+// change detection has to compare FORMAT('%T', ...) renderings instead.
+func needsBigQueryFormatComparison(sqlType string) bool {
+	switch schemaevolution.ParseType(bigQueryTypeFormatConfig, sqlType).DType { //nolint:exhaustive
+	case sqlengine.DT_ARRAY, sqlengine.DT_JSON, sqlengine.DT_JSONB, sqlengine.DT_GEOGRAPHY, sqlengine.DT_STRUCT:
 		return true
-	case sqlengine.DT_STRUCT:
-		for _, f := range pt.Fields {
-			if hasNonGroupableBigQueryType(f.Type) {
-				return true
-			}
-		}
-		return false
 	default:
 		return false
 	}

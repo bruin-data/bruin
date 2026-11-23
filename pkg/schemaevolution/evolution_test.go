@@ -482,6 +482,31 @@ func TestBuildPlan(t *testing.T) {
 		assert.Equal(t, 1, missingTableEngine.queryCalls)
 	})
 
+	t.Run("merge fails when the query does not return a declared column", func(t *testing.T) {
+		t.Parallel()
+
+		engine := &fakeEngine{
+			exists:   true,
+			existing: []schemaevolution.Column{{Name: "id", Type: "INTEGER"}, {Name: "email", Type: "VARCHAR"}},
+			incoming: []schemaevolution.Column{{Name: "id", Type: "INTEGER"}},
+		}
+		asset := &pipeline.Asset{
+			Name:            "analytics.users",
+			SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyMerge,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", Type: "INTEGER", PrimaryKey: true},
+				{Name: "email", Type: "VARCHAR"},
+			},
+		}
+		err := schemaevolution.Validate(t.Context(), engine, asset, "analytics.users", "SELECT 1 AS id")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not return declared column(s) email")
+	})
+
 	t.Run("DDL uses default ColumnsFromAsset normalization when engine does not implement DeclaredColumnResolver", func(t *testing.T) {
 		t.Parallel()
 

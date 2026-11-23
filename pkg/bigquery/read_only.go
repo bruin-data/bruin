@@ -36,6 +36,9 @@ func (d *Client) readOnlyDryRun(ctx context.Context, sql string) (*bigquery.Quer
 	if limit := d.config.bytesBilledLimit(); limit != nil {
 		req.MaximumBytesBilled = *limit
 	}
+	if sessionID := sessionIDFromContext(ctx); sessionID != "" {
+		req.ConnectionProperties = []*bigqueryapi.ConnectionProperty{{Key: sessionIDProperty, Value: sessionID}}
+	}
 	resp, err := d.readOnlyService.Jobs.Query(d.config.ProjectID, req).Context(ctx).Do()
 	if err != nil {
 		return nil, formatError(err)

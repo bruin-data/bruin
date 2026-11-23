@@ -32,13 +32,26 @@ type fakeBigQueryEvolutionDB struct {
 	querySchema     bigquery.Schema
 	queryDryRunFunc func(sql string) (bigquery.Schema, error)
 	executedQueries []string
+	querySessions   []string
 	datasetsCreated int
 	limitCheckCalls int
+	abortedSessions []string
 }
 
-func (f *fakeBigQueryEvolutionDB) RunQueryWithoutResult(_ context.Context, q *query.Query) error {
+func (f *fakeBigQueryEvolutionDB) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	f.executedQueries = append(f.executedQueries, q.Query)
+	f.querySessions = append(f.querySessions, sessionIDFromContext(ctx))
 	return nil
+}
+
+func (f *fakeBigQueryEvolutionDB) StartSession(ctx context.Context, q *query.Query) (string, error) {
+	f.executedQueries = append(f.executedQueries, q.Query)
+	f.querySessions = append(f.querySessions, "new:"+sessionIDFromContext(ctx))
+	return "session-1", nil
+}
+
+func (f *fakeBigQueryEvolutionDB) AbortSession(_ context.Context, sessionID string) {
+	f.abortedSessions = append(f.abortedSessions, sessionID)
 }
 
 func (f *fakeBigQueryEvolutionDB) Ping(_ context.Context) error { return nil }
@@ -234,7 +247,7 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 		assert.Contains(t, logBuf.String(), `adding column "tags" (ARRAY<STRING>)`)
 	})
 
-	t.Run("delete+insert: runs pre-hooks once before inspection and rewrites SELECT * FROM temp table to explicit columns", func(t *testing.T) {
+	t.Run("delete+insert: runs pre-hooks once in a session before inspection and rewrites SELECT * FROM temp table to explicit columns", func(t *testing.T) {
 		t.Parallel()
 		db := &fakeBigQueryEvolutionDB{
 			tableExists: true,
@@ -261,8 +274,14 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 				IncrementalKey: "dt",
 			},
 			Hooks: pipeline.Hooks{
-				Pre:  []pipeline.Hook{{Query: "INSERT INTO analytics.audit VALUES ('pre')"}},
-				Post: []pipeline.Hook{{Query: "INSERT INTO analytics.audit VALUES ('post')"}},
+				Pre: []pipeline.Hook{
+					{Query: "DECLARE cutoff DATE DEFAULT CURRENT_DATE()"},
+					{Query: "INSERT INTO analytics.audit VALUES ('pre')"},
+				},
+				Post: []pipeline.Hook{
+					{Query: "INSERT INTO analytics.audit VALUES ('post')"},
+					{Query: "INSERT INTO analytics.daily SELECT DATE '2020-01-01', 'seed', 0.0"},
+				},
 			},
 			ExecutableFile: pipeline.ExecutableFile{
 				Content: "SELECT DATE '2026-01-01' AS dt, 3.5 AS metric",
@@ -270,13 +289,50 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 		}
 
 		require.NoError(t, op.RunTask(context.Background(), p, asset))
-		// 1: pre-hook, 2: ALTER TABLE, 3: main transaction + post-hook (without duplicate pre-hook!)
+		// 1: pre-hooks starting the session, 2: ALTER TABLE, 3: main transaction + post-hooks (without duplicate pre-hooks!)
 		require.Len(t, db.executedQueries, 3)
-		assert.Contains(t, db.executedQueries[0], "INSERT INTO analytics.audit VALUES ('pre')")
+		assert.Equal(t, []string{"new:", "session-1", "session-1"}, db.querySessions)
+		assert.Equal(t, []string{"session-1"}, db.abortedSessions)
+		assert.Contains(t, db.executedQueries[0], "DECLARE cutoff DATE DEFAULT CURRENT_DATE();\nINSERT INTO analytics.audit VALUES ('pre');")
 		assert.Contains(t, db.executedQueries[1], "ALTER TABLE `analytics`.`daily` ADD COLUMN `metric` FLOAT64;")
 		assert.NotContains(t, db.executedQueries[2], "VALUES ('pre')")
+		assert.NotContains(t, db.executedQueries[2], "DECLARE cutoff")
 		assert.Contains(t, db.executedQueries[2], "INSERT INTO analytics.daily (`dt`, `metric`) SELECT `dt`, `metric` FROM __bruin_tmp_")
 		assert.Contains(t, db.executedQueries[2], "INSERT INTO analytics.audit VALUES ('post')")
+		// Post-hooks keep their own column order instead of getting the main query's column list.
+		assert.Contains(t, db.executedQueries[2], "INSERT INTO analytics.daily SELECT DATE '2020-01-01', 'seed', 0.0;")
+	})
+
+	t.Run("no pre-hooks runs without a session", func(t *testing.T) {
+		t.Parallel()
+		db := &fakeBigQueryEvolutionDB{
+			tableExists: true,
+			tableMeta: &bigquery.TableMetadata{
+				Schema: bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType}},
+			},
+			querySchema: bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType}},
+		}
+		op := newTestBigQueryOperator(db)
+
+		asset := &pipeline.Asset{
+			Name:            "analytics.ids",
+			Type:            pipeline.AssetTypeBigqueryQuery,
+			SchemaEvolution: &pipeline.SchemaEvolution{Enabled: boolPtr(true)},
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyAppend,
+			},
+			Hooks: pipeline.Hooks{
+				Post: []pipeline.Hook{{Query: "INSERT INTO analytics.audit VALUES ('post')"}},
+			},
+			ExecutableFile: pipeline.ExecutableFile{Content: "SELECT 1 AS id"},
+		}
+
+		require.NoError(t, op.RunTask(context.Background(), p, asset))
+		require.Len(t, db.executedQueries, 1)
+		assert.Equal(t, []string{""}, db.querySessions)
+		assert.Empty(t, db.abortedSessions)
+		assert.Contains(t, db.executedQueries[0], "INSERT INTO analytics.ids (`id`) SELECT 1 AS id;\nINSERT INTO analytics.audit VALUES ('post');")
 	})
 
 	t.Run("scd2_by_column: evolves declared columns and switches comparison to IS DISTINCT FROM", func(t *testing.T) {
@@ -297,6 +353,9 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 				{Name: "label", Type: bigquery.StringFieldType, MaxLength: 50},
 				{Name: "email", Type: bigquery.StringFieldType},
 				{Name: "tags", Type: bigquery.StringFieldType, Repeated: true},
+				{Name: "profile", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{
+					{Name: "tier", Type: bigquery.StringFieldType},
+				}},
 				{Name: "undeclared_extra", Type: bigquery.StringFieldType},
 			},
 		}
@@ -315,18 +374,21 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 				{Name: "label", Type: "STRING"},
 				{Name: "email", Type: "STRING"},
 				{Name: "tags", Type: "ARRAY<STRING>"},
+				{Name: "profile", Type: "STRUCT<tier STRING>"},
 			},
 			ExecutableFile: pipeline.ExecutableFile{
-				Content: "SELECT 1 AS id, 'longer_label' AS label, 'a@b.com' AS email, ['vip'] AS tags, 'skip' AS undeclared_extra",
+				Content: "SELECT 1 AS id, 'longer_label' AS label, 'a@b.com' AS email, ['vip'] AS tags, STRUCT('gold' AS tier) AS profile, 'skip' AS undeclared_extra",
 			},
 		}
 
 		require.NoError(t, op.RunTask(context.Background(), p, asset))
 		require.Len(t, db.executedQueries, 2)
-		assert.Contains(t, db.executedQueries[0], "ALTER TABLE `analytics`.`dim_users` ALTER COLUMN `label` SET DATA TYPE STRING(50), ADD COLUMN `email` STRING, ADD COLUMN `tags` ARRAY<STRING>;")
+		assert.Contains(t, db.executedQueries[0], "ALTER TABLE `analytics`.`dim_users` ALTER COLUMN `label` SET DATA TYPE STRING(50), ADD COLUMN `email` STRING, ADD COLUMN `tags` ARRAY<STRING>, ADD COLUMN `profile` STRUCT<`tier` STRING>;")
 		assert.NotContains(t, db.executedQueries[0], "undeclared_extra")
 		assert.Contains(t, db.executedQueries[1], "target.email IS DISTINCT FROM source.email")
 		assert.Contains(t, db.executedQueries[1], "FORMAT('%T', target.tags) != FORMAT('%T', source.tags)")
+		// BigQuery rejects IS DISTINCT FROM on STRUCT values.
+		assert.Contains(t, db.executedQueries[1], "FORMAT('%T', target.profile) != FORMAT('%T', source.profile)")
 	})
 
 	t.Run("untyped NULL and empty array rejected on new columns, accepted on compatible existing columns", func(t *testing.T) {
@@ -397,4 +459,32 @@ func TestBigQuerySchemaEvolution_EndToEndOperator(t *testing.T) {
 		require.Len(t, db.executedQueries, 1)
 		assert.True(t, strings.HasSuffix(strings.TrimSpace(db.executedQueries[0]), "INSERT INTO analytics.missing SELECT 1 AS id"))
 	})
+}
+
+func TestBigQueryEvolutionEngine_QueryColumnsBehindPreHooks(t *testing.T) {
+	t.Parallel()
+
+	var inspected []string
+	db := &fakeBigQueryEvolutionDB{
+		queryDryRunFunc: func(sql string) (bigquery.Schema, error) {
+			inspected = append(inspected, sql)
+			if strings.Contains(sql, "FROM stg") {
+				return nil, nil
+			}
+			return bigquery.Schema{{Name: "c", Type: bigquery.DateFieldType}}, nil
+		},
+	}
+	engine := &bigQueryEvolutionEngine{
+		BigQueryDialect: newBigQueryDialect(),
+		inspector:       db,
+		preHookSQL:      "DECLARE cutoff DATE DEFAULT CURRENT_DATE();",
+	}
+
+	cols, err := engine.QueryColumns(t.Context(), "SELECT cutoff AS c")
+	require.NoError(t, err)
+	require.Len(t, cols, 1)
+	assert.Equal(t, "DECLARE cutoff DATE DEFAULT CURRENT_DATE();\nSELECT cutoff AS c;", inspected[0])
+
+	_, err = engine.QueryColumns(t.Context(), "SELECT id FROM stg")
+	require.ErrorIs(t, err, errQuerySchemaUnavailable)
 }

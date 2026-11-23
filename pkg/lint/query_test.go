@@ -136,6 +136,76 @@ func TestQueryValidatorRule_ValidateAssetWithHookScope(t *testing.T) {
 	connections.AssertExpectations(t)
 }
 
+type recordingSchemaEvolutionValidator struct {
+	asset    *pipeline.Asset
+	rawQuery string
+	err      error
+}
+
+func (r *recordingSchemaEvolutionValidator) ValidateSchemaEvolution(_ context.Context, asset *pipeline.Asset, rawQuery string) error {
+	r.asset = asset
+	r.rawQuery = rawQuery
+	return r.err
+}
+
+func TestQueryValidatorRule_SchemaEvolutionValidatesRenderedHooks(t *testing.T) {
+	t.Parallel()
+
+	endDate := time.Date(2024, time.January, 31, 0, 0, 0, 0, time.UTC)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigEndDate, endDate)
+	enabled := true
+
+	asset := &pipeline.Asset{
+		Name:            "dashboard.evolving",
+		Type:            pipeline.AssetTypeBigqueryQuery,
+		SchemaEvolution: &pipeline.SchemaEvolution{Enabled: &enabled},
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyAppend,
+		},
+		ExecutableFile: pipeline.ExecutableFile{Content: "asset query"},
+		Hooks: pipeline.Hooks{
+			Pre:  []pipeline.Hook{{Query: "DECLARE cutoff DATE DEFAULT date '{{ end_date }}'"}},
+			Post: []pipeline.Hook{{Query: "DELETE FROM dashboard.evolving WHERE dt < date '{{ end_date }}'"}},
+		},
+	}
+	p := &pipeline.Pipeline{
+		Name:               "test-pipeline",
+		Assets:             []*pipeline.Asset{asset},
+		DefaultConnections: map[string]string{"google_cloud_platform": "gcp-conn"},
+	}
+
+	extractor := new(mockExtractor)
+	extractor.On("CloneForAsset", mock.Anything, p, asset).Return(extractor, nil)
+	extractor.On("ExtractQueriesFromString", "asset query").Return([]*query.Query{{Query: "select cutoff as dt"}}, nil)
+
+	validator := &recordingSchemaEvolutionValidator{}
+	connections := new(mockConnectionManager)
+	connections.On("GetConnection", "gcp-conn").Return(validator)
+
+	rule := &QueryValidatorRule{
+		TaskType:     pipeline.AssetTypeBigqueryQuery,
+		Connections:  connections,
+		Extractor:    extractor,
+		HookRenderer: jinja.NewRendererWithStartEndDates(&endDate, &endDate, &endDate, "test-pipeline", "test-run-id", nil),
+		Logger:       zap.NewNop().Sugar(),
+	}
+
+	issues, err := rule.ValidateAsset(ctx, p, asset)
+	require.NoError(t, err)
+	assert.Empty(t, issues)
+	require.NotNil(t, validator.asset)
+	assert.Equal(t, "select cutoff as dt", validator.rawQuery)
+	assert.Equal(t, "DECLARE cutoff DATE DEFAULT date '2024-01-31'", validator.asset.Hooks.Pre[0].Query)
+	assert.Equal(t, "DELETE FROM dashboard.evolving WHERE dt < date '2024-01-31'", validator.asset.Hooks.Post[0].Query)
+
+	asset.Hooks.Post = []pipeline.Hook{{Query: "SELECT {{ broken"}}
+	issues, err = rule.ValidateAsset(ctx, p, asset)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Contains(t, issues[0].Description, "Failed to render hooks")
+}
+
 func TestQueryValidatorRule_RendersIncrementalPredicate(t *testing.T) {
 	t.Parallel()
 
