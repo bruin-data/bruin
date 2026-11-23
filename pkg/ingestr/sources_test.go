@@ -548,3 +548,16 @@ func TestBreezyHRAndPrivatusSourceTables(t *testing.T) {
 	require.Equal(t, "date", byName["breakdown:<dimension>"].IncKey)
 	require.Equal(t, "replace", byName["sites"].IncStrategy)
 }
+
+func TestPeeringDBSourceTables(t *testing.T) {
+	t.Parallel()
+
+	source, err := GetSourceTables("peeringdb")
+	require.NoError(t, err)
+	require.Len(t, source.Tables, 13)
+	for _, table := range source.Tables {
+		require.Equal(t, "id", table.PrimaryKey, table.Name)
+		require.Equal(t, "updated", table.IncKey, table.Name)
+		require.Equal(t, "merge", table.IncStrategy, table.Name)
+	}
+}

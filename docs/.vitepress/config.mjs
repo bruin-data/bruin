@@ -403,6 +403,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Personio", link: "/ingestion/personio"},
                                     {text: "PhantomBuster", link: "/ingestion/phantombuster"},
                                     {text: "Pipedrive", link: "/ingestion/pipedrive"},
+                                    {text: "PeeringDB", link: "/ingestion/peeringdb"},
                                     {text: "Pinterest", link: "/ingestion/pinterest"},
                                     {text: "PlanetScale", link: "/ingestion/planetscale"},
                                     {text: "Polymarket", link: "/ingestion/polymarket"},

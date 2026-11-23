@@ -2706,6 +2706,7 @@ var ConnectionlessIngestrSources = map[string]string{
 	"chess.com":         "chess://",
 	"frankfurter.dev":   "frankfurter://",
 	"stat.ripe.net":     "ripestat://",
+	"peeringdb.com":     "peeringdb://",
 	"finance.yahoo.com": "yfinance://",
 }
 
