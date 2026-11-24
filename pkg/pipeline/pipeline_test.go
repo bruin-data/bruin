@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -601,6 +603,53 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	}
 	assert.Equal(t, "git-metadata", pipeline.LegacyID)
 	assert.Equal(t, commit, pipeline.Commit)
+}
+
+func Test_Builder_GitMetadataIsSetBeforeAssetMutators(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "pipeline.yml"), []byte("name: commit-mutator\n"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(repoRoot, "assets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(repoRoot, "assets", "probe.sql"), []byte("/* @bruin\nname: probe\ntype: duckdb.sql\n@bruin */\nselect 1\n"), 0o644))
+
+	runGit := func(args ...string) string {
+		t.Helper()
+		gitCmd := exec.CommandContext(t.Context(), "git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+		gitCmd.Dir = repoRoot
+		out, err := gitCmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		return strings.TrimSpace(string(out))
+	}
+	runGit("init", "-q")
+
+	newBuilder := func(seen *string) *pipeline.Builder {
+		b := pipeline.NewBuilder(pipeline.BuilderConfig{
+			PipelineFileName:    []string{"pipeline.yml"},
+			TasksDirectoryNames: []string{"assets"},
+		}, pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs()), pipeline.CreateTaskFromFileComments(afero.NewOsFs()), afero.NewOsFs(), nil, nil)
+		b.AddAssetMutator(func(_ context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
+			*seen = p.Commit
+			return a, nil
+		})
+		return b
+	}
+
+	// No commits yet: HEAD cannot be resolved, which must not fail the build.
+	var seen string
+	p, err := newBuilder(&seen).CreatePipelineFromPath(t.Context(), repoRoot, pipeline.WithMutate(), pipeline.WithGitMetadata())
+	require.NoError(t, err)
+	assert.Empty(t, p.Commit)
+
+	runGit("add", ".")
+	runGit("commit", "-q", "-m", "init")
+	head := runGit("rev-parse", "HEAD")
+
+	p, err = newBuilder(&seen).CreatePipelineFromPath(t.Context(), repoRoot, pipeline.WithMutate(), pipeline.WithGitMetadata())
+	require.NoError(t, err)
+	require.Len(t, p.Assets, 1)
+	assert.Equal(t, head, p.Commit)
+	assert.Equal(t, head, seen, "asset mutators must see the commit")
 }
 
 func Test_pipelineBuilder_DoesNotLoadPipelineSemanticModels(t *testing.T) {
@@ -3126,6 +3175,26 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesSnowflakeIcebergDefaults(t *tes
 	assert.Equal(t, "asset/location", got.Snowflake.BaseLocation)
 }
 
+func TestBuilder_SetupDefaultsFromPipelineAppliesBigQueryIcebergDefaults(t *testing.T) {
+	t.Parallel()
+
+	defaults := &pipeline.DefaultValues{
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, TableFormat: "iceberg"},
+		BigQuery: pipeline.BigQueryConfig{
+			StorageURI:              "gs://bucket/shared",
+			CloudResourceConnection: "my-project.eu.my_conn",
+		},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{Type: pipeline.AssetTypeBigqueryQuery}, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+	assert.Equal(t, pipeline.MaterializationTableFormatIceberg, got.Materialization.TableFormat)
+	assert.Equal(t, "my-project.eu.my_conn", got.BigQuery.CloudResourceConnection)
+	// A shared folder would make Iceberg tables overwrite each other's files.
+	assert.Empty(t, got.BigQuery.StorageURI)
+}
+
 func TestBuilder_SetupDefaultsFromPipelineSkipsTableFormatForUnsupportedAssets(t *testing.T) {
 	t.Parallel()
 
@@ -3206,7 +3275,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 			},
 		},
 		CustomChecks: []pipeline.CustomCheck{
-			{Name: "row_count", Query: "select asset", Value: 1},
+			{Name: "row_count", Query: "select asset", Value: "1"},
 		},
 		Notifications: &pipeline.Notifications{
 			Slack: []pipeline.SlackNotification{{Channel: "#asset"}},
@@ -3258,7 +3327,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 			},
 		},
 		CustomChecks: []pipeline.CustomCheck{
-			{Name: "row_count", Description: "default row count", Query: "select default", Value: 2},
+			{Name: "row_count", Description: "default row count", Query: "select default", Value: "2"},
 			{Name: "freshness", Query: "select 0", Count: &customCount},
 		},
 		Metadata: pipeline.EmptyStringMap{"catalog": "default"},
@@ -4128,5 +4197,23 @@ func TestPipeline_GetAllConnectionNamesForAsset_SourceAssetsAreConnectionless(t 
 			require.NoError(t, err)
 			assert.Empty(t, names)
 		})
+	}
+}
+
+func TestCustomCheckValueKeepsExactNumbers(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"9007199254740993", "3014136.99", "0"} {
+		var check pipeline.CustomCheck
+		require.NoError(t, yaml.Unmarshal([]byte("name: c\nquery: select 1\nvalue: "+value), &check))
+		assert.Equal(t, value, check.Value.String())
+
+		asJSON, err := json.Marshal(check)
+		require.NoError(t, err)
+		assert.Contains(t, string(asJSON), `"value":`+value+`,`)
+
+		asYAML, err := yaml.Marshal(check)
+		require.NoError(t, err)
+		assert.Contains(t, string(asYAML), "value: "+value+"\n")
 	}
 }

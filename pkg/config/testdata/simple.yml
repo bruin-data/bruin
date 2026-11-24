@@ -206,6 +206,29 @@ environments:
       dune:
         - name: "dune-1"
           api_key: "dune-api-key-123"
+      odoo:
+        - name: "odoo-1"
+          host: "mycompany.odoo.com"
+          port: 8443
+          api_key: "odoo-api-key-123"
+          database: "mycompany"
+          username: "me@example.com"
+          scheme: "https"
+          api: "jsonrpc"
+          page_size: 500
+      breezyhr:
+        - name: "breezyhr-1"
+          api_key: "breezyhr-api-key-123"
+          company_id: "abc123"
+      peeringdb:
+        - name: "peeringdb-1"
+          api_key: "peeringdb-api-key-123"
+      privatus:
+        - name: "privatus-1"
+          api_key: "privatus-api-key-123"
+          site_ids:
+            - "pa_AB12CD34EF"
+            - "pa_XY98ZW76VU"
       appsflyer:
         - name: conn19
           api_key: "appsflyerkey"

@@ -180,6 +180,25 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 		},
 		{
+			name: "delete+insert adds the incremental predicate to the delete",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "batch_id",
+					IncrementalPredicate: "target.dt >= '2026-07-01'",
+				},
+			},
+			query: "SELECT 1",
+			want: []string{
+				"CREATE TEMPORARY VIEW __bruin_tmp_.+ AS SELECT 1\n",
+				"\nDELETE FROM my\\.asset AS target WHERE batch_id in \\(SELECT DISTINCT batch_id FROM __bruin_tmp_.+\\) AND \\(target\\.dt >= '2026-07-01'\\)",
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+",
+				"DROP VIEW IF EXISTS __bruin_tmp_.+",
+			},
+		},
+		{
 			name: "delete+insert builds a proper transaction",
 			task: &pipeline.Asset{
 				Name: "my.asset",

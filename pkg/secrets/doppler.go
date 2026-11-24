@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -41,18 +42,18 @@ func (h *httpDopplerClient) GetSecret(ctx context.Context, secretName string) (m
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch secrets from Doppler")
+		return nil, &config.SecretsBackendUnavailableError{Err: errors.Wrap(err, "failed to fetch secrets from Doppler")}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.Errorf("doppler API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, &config.SecretsBackendUnavailableError{Err: errors.Errorf("doppler API returned status %d: %s", resp.StatusCode, string(body))}
 	}
 
 	var allSecrets map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&allSecrets); err != nil {
-		return nil, errors.Wrap(err, "failed to decode Doppler response")
+		return nil, &config.SecretsBackendUnavailableError{Err: errors.Wrap(err, "failed to decode Doppler response")}
 	}
 
 	secretValue, ok := allSecrets[secretName]
@@ -79,6 +80,32 @@ type DopplerClient struct {
 	logger                  logger.Logger
 	cacheConnections        map[string]any
 	cacheConnectionsDetails map[string]any
+
+	lookupMu sync.RWMutex
+	// lookupErrors holds why reading a connection failed, except for a missing secret. Once
+	// recorded, an error stays for the run, as in the Vault client.
+	lookupErrors map[string]error
+}
+
+// LookupError implements config.ConnectionLookupErrors.
+func (c *DopplerClient) LookupError(name string) error {
+	c.lookupMu.RLock()
+	defer c.lookupMu.RUnlock()
+	return c.lookupErrors[name]
+}
+
+// recordLookup remembers why reading a connection failed, so a connection reported missing
+// because Doppler couldn't be read says so. A missing secret is just a missing connection.
+func (c *DopplerClient) recordLookup(name string, err error) {
+	if err == nil || isSecretNotFound(err) {
+		return
+	}
+	c.lookupMu.Lock()
+	defer c.lookupMu.Unlock()
+	if c.lookupErrors == nil {
+		c.lookupErrors = make(map[string]error)
+	}
+	c.lookupErrors[name] = err
 }
 
 // NewDopplerClientFromEnv creates a new Doppler client from environment variables.
@@ -131,6 +158,7 @@ func NewDopplerClient(logger logger.Logger, token, project, config string) (*Dop
 // GetConnection retrieves a connection by name from Doppler.
 func (c *DopplerClient) GetConnection(name string) any {
 	conn, err := c.ResolveConnection(name)
+	c.recordLookup(name, err)
 	if err != nil {
 		logLookupFailure(c.logger, err)
 		return nil
@@ -163,6 +191,7 @@ func (c *DopplerClient) GetConnectionDetails(name string) any {
 	}
 
 	manager, err := c.getDopplerManager(name)
+	c.recordLookup(name, err)
 	if err != nil {
 		logLookupFailure(c.logger, err)
 		return nil

@@ -111,6 +111,25 @@ func TestHasAttachmentStatement(t *testing.T) {
 	}
 }
 
+func TestExecContextRunsScriptStatementsSeparately(t *testing.T) {
+	t.Parallel()
+	ctx, cleanup := WithConnectionReuse(t.Context())
+	t.Cleanup(cleanup)
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+
+	// Semicolons in literals and multibyte text must not split a statement.
+	_, err = conn.ExecContext(ctx, "CREATE TABLE numbers AS SELECT 'é;ü' AS v, 1 AS n; INSERT INTO numbers VALUES ('a;b', 2);\n-- trailing comment")
+	require.NoError(t, err)
+	var count int
+	require.NoError(t, conn.QueryRowContext(ctx, "SELECT count(*) FROM numbers WHERE v IN ('é;ü', 'a;b')").Scan(&count))
+	require.Equal(t, 2, count)
+
+	// DuckDB shifts the reported line by the statements before the failing one in a script.
+	_, err = conn.ExecContext(ctx, "BEGIN TRANSACTION;\nDROP TABLE IF EXISTS out;\nCREATE TABLE out AS SELECT n,\n  nope\nFROM numbers\nWHERE n > 0;\nCOMMIT;")
+	require.ErrorContains(t, err, "LINE 2:   nope")
+}
+
 func TestConnectionReuseUserAttachments(t *testing.T) {
 	t.Parallel()
 	for _, api := range []string{"exec", "query", "row"} {
@@ -725,4 +744,22 @@ func TestQuackConnectionsUseTheirOwnDriver(t *testing.T) {
 	path, err = local.driverPath()
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(home, "adbc", "duckdb.toml"), path)
+}
+
+func TestIsValidChecksSingleStatementsOnly(t *testing.T) {
+	t.Parallel()
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+	c := &Client{connection: conn}
+	_, err = conn.ExecContext(t.Context(), "CREATE SCHEMA reporting; CREATE TABLE reporting.orders AS SELECT 1 AS id")
+	require.NoError(t, err)
+
+	// A semicolon in a string does not make a script, so the bad column is still caught.
+	_, err = c.IsValid(t.Context(), &query.Query{Query: "SELECT nope, ';' FROM reporting.orders"})
+	require.ErrorContains(t, err, "nope")
+
+	// USE changes what the next statement reads, which EXPLAIN on its own cannot apply.
+	valid, err := c.IsValid(t.Context(), &query.Query{Query: "USE reporting; SELECT * FROM orders"})
+	require.NoError(t, err)
+	require.True(t, valid)
 }

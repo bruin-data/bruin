@@ -343,7 +343,7 @@ type customCheck struct {
 	Name          string        `yaml:"name"`
 	Description   string        `yaml:"description"`
 	Query         string        `yaml:"query"`
-	Value         int64         `yaml:"value"`
+	Value         CheckNumber   `yaml:"value"`
 	Count         *int64        `yaml:"count"`
 	Blocking      *bool         `yaml:"blocking"`
 	Retries       *int          `yaml:"retries,omitempty"`
@@ -461,6 +461,8 @@ type bigquery struct {
 	RequirePartitionFilter  *bool    `yaml:"require_partition_filter"`
 	PartitionExpirationDays *float64 `yaml:"partition_expiration_days"`
 	PartitionKeyImmutable   *bool    `yaml:"partition_key_immutable"`
+	StorageURI              string   `yaml:"storage_uri"`
+	CloudResourceConnection string   `yaml:"cloud_resource_connection"`
 }
 
 type doris struct {
@@ -724,6 +726,8 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			RequirePartitionFilter:  definition.BigQuery.RequirePartitionFilter,
 			PartitionExpirationDays: definition.BigQuery.PartitionExpirationDays,
 			PartitionKeyImmutable:   definition.BigQuery.PartitionKeyImmutable,
+			StorageURI:              definition.BigQuery.StorageURI,
+			CloudResourceConnection: definition.BigQuery.CloudResourceConnection,
 		},
 		ClickHouse: definition.ClickHouse,
 		Doris: DorisConfig{

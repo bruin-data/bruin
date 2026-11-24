@@ -64,7 +64,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 
 	queries := []string{
 		fmt.Sprintf("CREATE TEMPORARY VIEW %s AS %s\n", tempTableName, query),
-		fmt.Sprintf("\nDELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		"\n" + ansisql.BuildIncrementalDelete(task.Name, fmt.Sprintf("%s in (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName), mat.IncrementalPredicate),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP VIEW IF EXISTS " + tempTableName,
 	}

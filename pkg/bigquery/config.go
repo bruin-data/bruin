@@ -26,20 +26,50 @@ type Config struct {
 	MaxQueryCostSoft                 *float64
 	EnvMaxBillableBytes              *int64
 	ReadOnly                         bool
+	// StorageURI is the Cloud Storage prefix that Iceberg tables are stored under, e.g. gs://bucket.
+	StorageURI string
+	// ReadAPI selects how ingestr reads BigQuery source tables: "storage" (the Storage Read API) or "rest".
+	// Empty leaves the choice to ingestr, which defaults to the Storage Read API.
+	ReadAPI string
+}
+
+const (
+	ReadAPIStorage = "storage"
+	ReadAPIREST    = "rest"
+)
+
+// ValidateReadAPI accepts the values ingestr understands for the BigQuery source's read_api URI parameter.
+func ValidateReadAPI(value string) error {
+	if value != ReadAPIStorage && value != ReadAPIREST {
+		return fmt.Errorf("invalid read_api %q: must be %q or %q", value, ReadAPIStorage, ReadAPIREST)
+	}
+
+	return nil
 }
 
 // MaxBillableBytesByConnectionEnv lets Bruin Cloud cap an agent run's BigQuery connections: a JSON object of connection name to bytes.
 const MaxBillableBytesByConnectionEnv = "BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION"
 
+// MaxQueryCostSoftByConnectionEnv sets soft limits the same way: a JSON object of connection name to USD.
+const MaxQueryCostSoftByConnectionEnv = "BRUIN_BIGQUERY_MAX_QUERY_COST_SOFT_BY_CONNECTION"
+
 func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
-	raw := strings.TrimSpace(os.Getenv(MaxBillableBytesByConnectionEnv))
+	return connectionLimitFromEnv[int64](MaxBillableBytesByConnectionEnv, connectionName, "bytes")
+}
+
+func MaxQueryCostSoftFromEnv(connectionName string) (*float64, error) {
+	return connectionLimitFromEnv[float64](MaxQueryCostSoftByConnectionEnv, connectionName, "USD")
+}
+
+func connectionLimitFromEnv[T int64 | float64](envName, connectionName, unit string) (*T, error) {
+	raw := strings.TrimSpace(os.Getenv(envName))
 	if raw == "" {
 		return nil, nil //nolint:nilnil // unset means no cap
 	}
 
-	var limits map[string]int64
+	var limits map[string]T
 	if err := json.Unmarshal([]byte(raw), &limits); err != nil || limits == nil {
-		return nil, fmt.Errorf("%s must be a JSON object of connection name to bytes, got %q", MaxBillableBytesByConnectionEnv, raw)
+		return nil, fmt.Errorf("%s must be a JSON object of connection name to %s, got %q", envName, unit, raw)
 	}
 
 	limit, ok := limits[connectionName]
@@ -47,10 +77,18 @@ func MaxBillableBytesFromEnv(connectionName string) (*int64, error) {
 		return nil, nil //nolint:nilnil // connection has no cap
 	}
 	if limit <= 0 {
-		return nil, fmt.Errorf("%s: the limit for %q must be a positive integer, got %d", MaxBillableBytesByConnectionEnv, connectionName, limit)
+		return nil, fmt.Errorf("%s: the limit for %q must be positive, got %v", envName, connectionName, limit)
 	}
 
 	return &limit, nil
+}
+
+func StricterLimit(a, b *float64) *float64 {
+	if a == nil || (b != nil && *b < *a) {
+		return b
+	}
+
+	return a
 }
 
 // The env cap is only sent to BigQuery, never dry-run first like max_billable_bytes, so scripts a dry run can't plan still run.
@@ -78,6 +116,11 @@ func (c Config) GetConnectionURI() (string, error) {
 	if c.ReadOnly {
 		return "", errors.New("read_only connections cannot be used with ingestr")
 	}
+	if c.ReadAPI != "" {
+		if err := ValidateReadAPI(c.ReadAPI); err != nil {
+			return "", err
+		}
+	}
 	// If using Application Default Credentials, return simple URI
 	// ingestr will use ADC automatically when no credentials are in the URI
 	if c.UseApplicationDefaultCredentials {
@@ -85,7 +128,7 @@ func (c Config) GetConnectionURI() (string, error) {
 		if c.Location != "" {
 			URI += "?location=" + c.Location
 		}
-		return URI, nil
+		return c.appendReadAPI(URI), nil
 	}
 
 	var creds []byte
@@ -112,7 +155,19 @@ func (c Config) GetConnectionURI() (string, error) {
 		URI += "&location=" + c.Location
 	}
 
-	return URI, nil
+	return c.appendReadAPI(URI), nil
+}
+
+func (c Config) appendReadAPI(uri string) string {
+	if c.ReadAPI == "" {
+		return uri
+	}
+	separator := "?"
+	if strings.Contains(uri, "?") {
+		separator = "&"
+	}
+
+	return uri + separator + "read_api=" + c.ReadAPI
 }
 
 func (c Config) GetIngestrURI() (string, error) {

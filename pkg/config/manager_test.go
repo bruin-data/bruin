@@ -339,6 +339,39 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey:             "dune-api-key-123",
 				},
 			},
+			Odoo: []OdooConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "odoo-1"},
+					Host:               "mycompany.odoo.com",
+					Port:               8443,
+					APIKey:             "odoo-api-key-123",
+					Database:           "mycompany",
+					Username:           "me@example.com",
+					Scheme:             "https",
+					API:                "jsonrpc",
+					PageSize:           500,
+				},
+			},
+			BreezyHR: []BreezyHRConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "breezyhr-1"},
+					APIKey:             "breezyhr-api-key-123",
+					CompanyID:          "abc123",
+				},
+			},
+			PeeringDB: []PeeringDBConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "peeringdb-1"},
+					APIKey:             "peeringdb-api-key-123",
+				},
+			},
+			Privatus: []PrivatusConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "privatus-1"},
+					APIKey:             "privatus-api-key-123",
+					SiteIDs:            []string{"pa_AB12CD34EF", "pa_XY98ZW76VU"},
+				},
+			},
 			InfluxDB: []InfluxDBConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "influxdb-1"},
@@ -1889,6 +1922,55 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Odoo connection",
+			envName:  "default",
+			connType: "odoo",
+			connName: "odoo-conn",
+			creds: map[string]interface{}{
+				"host":      "mycompany.odoo.com",
+				"port":      8443,
+				"api_key":   "key_123",
+				"database":  "mycompany",
+				"username":  "me@example.com",
+				"scheme":    "https",
+				"api":       "json2",
+				"page_size": 500,
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Breezy HR connection",
+			envName:  "default",
+			connType: "breezyhr",
+			connName: "breezyhr-conn",
+			creds: map[string]interface{}{
+				"api_key":    "key_123",
+				"company_id": "abc123",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add PeeringDB connection",
+			envName:  "default",
+			connType: "peeringdb",
+			connName: "peeringdb-conn",
+			creds: map[string]interface{}{
+				"api_key": "key_123",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Privatus connection",
+			envName:  "default",
+			connType: "privatus",
+			connName: "privatus-conn",
+			creds: map[string]interface{}{
+				"api_key":  "key_123",
+				"site_ids": []string{"pa_AB12CD34EF", "pa_XY98ZW76VU"},
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add AbraFlexi connection",
 			envName:  "default",
 			connType: "abraflexi",
@@ -2177,6 +2259,31 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.FundraiseUp, 1)
 					assert.Equal(t, tt.connName, env.Connections.FundraiseUp[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.FundraiseUp[0].APIKey)
+				case "odoo":
+					assert.Len(t, env.Connections.Odoo, 1)
+					assert.Equal(t, tt.connName, env.Connections.Odoo[0].Name)
+					assert.Equal(t, tt.creds["host"], env.Connections.Odoo[0].Host)
+					assert.Equal(t, tt.creds["port"], env.Connections.Odoo[0].Port)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Odoo[0].APIKey)
+					assert.Equal(t, tt.creds["database"], env.Connections.Odoo[0].Database)
+					assert.Equal(t, tt.creds["username"], env.Connections.Odoo[0].Username)
+					assert.Equal(t, tt.creds["scheme"], env.Connections.Odoo[0].Scheme)
+					assert.Equal(t, tt.creds["api"], env.Connections.Odoo[0].API)
+					assert.Equal(t, tt.creds["page_size"], env.Connections.Odoo[0].PageSize)
+				case "breezyhr":
+					assert.Len(t, env.Connections.BreezyHR, 1)
+					assert.Equal(t, tt.connName, env.Connections.BreezyHR[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.BreezyHR[0].APIKey)
+					assert.Equal(t, tt.creds["company_id"], env.Connections.BreezyHR[0].CompanyID)
+				case "peeringdb":
+					assert.Len(t, env.Connections.PeeringDB, 1)
+					assert.Equal(t, tt.connName, env.Connections.PeeringDB[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.PeeringDB[0].APIKey)
+				case "privatus":
+					assert.Len(t, env.Connections.Privatus, 1)
+					assert.Equal(t, tt.connName, env.Connections.Privatus[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Privatus[0].APIKey)
+					assert.Equal(t, tt.creds["site_ids"], env.Connections.Privatus[0].SiteIDs)
 				case "fireflies":
 					assert.Len(t, env.Connections.Fireflies, 1)
 					assert.Equal(t, tt.connName, env.Connections.Fireflies[0].Name)
@@ -2303,6 +2410,82 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								CouchDB: []CouchDBConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "couchdb-conn"}, Host: "localhost", Port: 5984},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Odoo connection",
+			envName:  "default",
+			connName: "odoo-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Odoo: []OdooConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "odoo-conn"}, Host: "mycompany.odoo.com", APIKey: "key_123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Breezy HR connection",
+			envName:  "default",
+			connName: "breezyhr-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								BreezyHR: []BreezyHRConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr-conn"}, APIKey: "key_123", CompanyID: "abc123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing PeeringDB connection",
+			envName:  "default",
+			connName: "peeringdb-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								PeeringDB: []PeeringDBConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb-conn"}, APIKey: "key_123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Privatus connection",
+			envName:  "default",
+			connName: "privatus-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Privatus: []PrivatusConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "privatus-conn"}, APIKey: "key_123"},
 								},
 							},
 						},
@@ -3459,6 +3642,10 @@ func TestConnections_MergeFrom(t *testing.T) {
 				BallDontLie:         []BallDontLieConnection{{ConnectionMetadata: ConnectionMetadata{Name: "balldontlie1"}}},
 				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
 				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
+				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
+				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
+				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
+				PeeringDB:           []PeeringDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb1"}}},
 			},
 			want: &Connections{
 				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
@@ -3612,6 +3799,10 @@ func TestConnections_MergeFrom(t *testing.T) {
 				BallDontLie:         []BallDontLieConnection{{ConnectionMetadata: ConnectionMetadata{Name: "balldontlie1"}}},
 				Vertica:             []VerticaConnection{{ConnectionMetadata: ConnectionMetadata{Name: "vertica1"}}},
 				Dune:                []DuneConnection{{ConnectionMetadata: ConnectionMetadata{Name: "dune1"}}},
+				Odoo:                []OdooConnection{{ConnectionMetadata: ConnectionMetadata{Name: "odoo1"}}},
+				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
+				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
+				PeeringDB:           []PeeringDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb1"}}},
 			},
 			expectedErr: false,
 		},

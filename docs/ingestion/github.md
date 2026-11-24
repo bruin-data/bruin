@@ -4,7 +4,13 @@ GitHub is a developer platform that allows developers to create, store, manage a
 
 Bruin supports GitHub as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from GitHub into your data platform.
 
-In order to set up GitHub connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. If you want to fetch from private repositories, you need to provide `access_token`, `owner` and `repo`.For details on how to obtain these credentials and to grant necessary permissions, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/github#setup-guide). If you want to fetch from public repositories, you only need to provide `owner` and `repo`.
+In order to set up GitHub connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. Which fields the connection needs depends on the tables you read:
+
+- `issues`, `pull_requests`, `stargazers` and `repo_events` read one repository, so they need `owner` and `repo`.
+- `repositories` lists the repositories of `owner`, so it needs `owner`.
+- `commits` and `pull_request_commits` can read one repository, every repository of `owner`, or a list of repositories of any owner. With a list such as `commits:bruin-data/*`, the connection needs neither `owner` nor `repo`. See [Reading commits from several repositories](#reading-commits-from-several-repositories).
+
+For details on how to create an access token and which permissions it needs, see the [ingestr GitHub documentation](https://getbruin.com/docs/ingestr/supported-sources/github.html).
 
 Follow the steps below to correctly set up GitHub as a data source and run ingestion.
 
@@ -23,9 +29,20 @@ connections:
       repo: "repo_123"
 ```
 
-- `access_token` (optional): Used for authentication to access data through the GitHub API for private repositories.
-- `owner` (required): The owner of the repository.
-- `repo` (required): The name of the repository.
+- `access_token` (optional): Used for authentication with the GitHub API. It is required for `issues`, `pull_requests`, `pull_request_commits` and `stargazers`, and for private repositories. The other tables can read public data without it, but GitHub allows only 60 unauthenticated requests per hour, against 5,000 with a token.
+- `owner` (optional): The user or organization that owns the repositories, e.g. `bruin-data`. Required for every table except `commits` and `pull_request_commits` with a repository list.
+- `repo` (optional): The name of one repository, without the owner (e.g. `ingestr`, not `bruin-data/ingestr`). It needs `owner`. Required for `issues`, `pull_requests`, `stargazers` and `repo_events`.
+
+A connection with only a token can read the commits of any repository the token can see:
+
+```yaml
+connections:
+  github:
+    - name: my-github-token
+      access_token: "token_123"
+```
+
+When GitHub reports that a rate limit is exceeded, ingestr waits for the time GitHub asks for, at most one hour per wait, and retries up to 5 times, printing a warning with each wait.
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -55,10 +72,12 @@ GitHub source allows ingesting the following sources into separate tables:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| `commits` | `sha` | `committed_at` | merge | Retrieves commits on the default branch, including signature verification (`commit.verification`). The interval start and end filter on the committer date, which `committed_at` mirrors. Commits pushed after their interval has already run are not picked up; use a lookback window (e.g. `interval_modifiers`). |
+| `commits` | `sha` (one repository) or `repo`, `sha` (several repositories) | `committed_at` | merge | Retrieves commits on the default branch of one or more repositories, with the repository's `owner/name` in `repo`, including signature verification (`commit.verification`). The interval start and end filter on the committer date, which `committed_at` mirrors. Commits pushed after their interval has already run are not picked up; use a lookback window (e.g. `interval_modifiers`). |
 | `issues` | - | – | replace | Retrieves GitHub issues along with their comments and reactions. Full reload on each run. |
 | `pull_requests` | - | – | replace | Retrieves pull requests with comments and reactions. Full reload on each run. |
+| `pull_request_commits` | `repo`, `pr_number`, `sha` | `pr_updated_at` | merge | Retrieves every commit of every pull request (open, closed and merged) of one or more repositories, with the repository's `owner/name` in `repo`, including commits removed by force pushes and signature verification. The interval start and end filter on the pull request's last update, which `pr_updated_at` mirrors. Requires ingestr v1.1.94 or later. See [Pull request commits](#pull-request-commits). |
 | `repo_events` | `id` | `created_at` | merge | Retrieves recent repository events. Appends only new events using `created_at` filter. Only events from the past 30 days allowed. |
+| `repositories` | `id` | – | replace | Retrieves the repositories of `owner`, including forks and archived repositories. Private repositories are included when the token can see them. Full reload on each run. |
 | `stargazers` | - | – | replace | Retrieves stargazers. Full reload on each run. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
@@ -70,3 +89,76 @@ bruin run assets/github_ingestion.yml
 As a result of this command, Bruin will ingest data from the given GitHub table into your Postgres database.
 
 <img alt="github" src="./media/github.png">
+
+## Reading commits from several repositories
+
+The `commits` and `pull_request_commits` tables can read many repositories into one table. Which repositories they read depends on the connection's `repo` and on an optional comma-separated list after `commits:` or `pull_request_commits:` in `source_table`. The table below shows `commits`; `pull_request_commits` reads the same repositories, but its primary key is always `repo`, `pr_number`, `sha`:
+
+| `source_table` | Connection | Repositories read | PK |
+|----------------|------------|-------------------|----|
+| `commits` | `owner` and `repo` | that repository | `sha` |
+| `commits` | `owner`, no `repo` | every repository of `owner` the token can list, except forks; archived repositories are included | `repo`, `sha` |
+| `commits:<list>` | any; the list overrides `repo` | the listed repositories | `repo`, `sha` |
+
+Each entry of the list is one of:
+
+- `<repo>`: a repository of the connection's `owner`. Without `owner` on the connection, the run fails before reading anything.
+- `<owner>/<repo>`: a repository of any owner.
+- `<owner>/*`: every repository of `<owner>` the token can list, except forks.
+
+Any other form, such as `<owner>/`, `*` or `<owner>/bruin-*`, fails the run. If a named repository does not exist or the token cannot read it, the run fails before any commit is read. A repository found through `<owner>/*` or through the connection's `owner` that GitHub refuses to serve is skipped with a warning. A repository that is both named and matched by `<owner>/*` is read once. See the [ingestr GitHub documentation](https://getbruin.com/docs/ingestr/supported-sources/github.html#reading-commits-from-several-repositories) for the full rules.
+
+For example, with the token-only connection above, this asset reads every repository of `bruin-data` except forks, plus one repository of another owner:
+
+```yaml
+name: raw.github_commits
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-github-token
+  source_table: 'commits:bruin-data/*, other-org/tool'
+
+  destination: postgres
+```
+
+With a connection that has `owner: bruin-data`, `source_table: 'commits:bruin, ingestr'` reads `bruin-data/bruin` and `bruin-data/ingestr`.
+
+> [!WARNING]
+> When the asset reads several repositories, do not mark `sha` alone as `primary_key: true` in the asset's `columns`. Bruin passes the asset's primary key to ingestr, which then uses it instead of `repo`, `sha`. A commit that is in more than one repository (for example a fork and its upstream) is then kept only once, under one of the repositories. Either leave the primary key out, or mark both `repo` and `sha`. For `pull_request_commits`, leave it out or mark `repo`, `pr_number` and `sha`.
+
+> [!WARNING]
+> To switch an existing single-repository table to several repositories, run it once with `bruin run --full-refresh`. Rows written before the `repo` column existed have no `repo`, so they would not match the new rows.
+
+## Pull request commits
+
+`pull_request_commits` lists every commit that was part of a pull request, whether the pull request is open, closed or merged. Use it to see the work that never shows up on the default branch: commits combined into one by a squash merge, commits of pull requests closed without merging, and commits removed by a force push. Every row carries the commit's signature status (`verified`, `verification_reason`), so you can check commit signing across all the work done in your repositories, not only what was merged.
+
+The table needs an `access_token` and reads the same repositories as `commits` (see [Reading commits from several repositories](#reading-commits-from-several-repositories)). There is one row per pull request and commit; a commit that is part of several pull requests appears once in each. A commit removed from a pull request by a force push stays in the table, with `replaced_by_force_push` set to `true`.
+
+Each run reads the pull requests last updated between the interval start and end. Any change counts as an update: a push, a comment, a label, a merge. To keep the table current, use a lookback window (e.g. [`interval_modifiers`](/assets/interval-modifiers)). If a pull request changes while it is read, ingestr reads it again with a warning, and fails the run if it is still changing after 4 reads.
+
+For example, with the token-only connection above, this asset reads the pull request commits of every repository of `bruin-data` and starts each run's interval 30 days early:
+
+```yaml
+name: raw.github_pull_request_commits
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-github-token
+  source_table: 'pull_request_commits:bruin-data/*'
+
+  destination: postgres
+
+interval_modifiers:
+  start: -30d
+```
+
+Bruin Cloud applies interval modifiers automatically. On the CLI they are off by default, so run the asset with `--apply-interval-modifiers` to use the lookback:
+
+```bash
+bruin run --apply-interval-modifiers assets/github_pull_request_commits.yml
+```
+
+See the [ingestr GitHub documentation](https://getbruin.com/docs/ingestr/supported-sources/github.html#pull-request-commits) for the columns and the limits of the table.

@@ -202,6 +202,29 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Iceberg asset without a storage URI fails before rendering",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "some content").
+					Return([]*query.Query{
+						{Query: "select * from users"},
+					}, nil)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "some content",
+					},
+					Materialization: pipeline.Materialization{
+						Type:        pipeline.MaterializationTypeTable,
+						TableFormat: pipeline.MaterializationTableFormatIceberg,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
 				f.e.On("ExtractQueriesFromString", "some content").
@@ -645,6 +668,7 @@ func TestBasicOperator_RunTask_IcebergExistingTable(t *testing.T) {
 				Type:              pipeline.AssetTypeBigqueryQuery,
 				ExecutableFile:    pipeline.ExecutableFile{Path: "test-file.sql", Content: "some content"},
 				Materialization:   tt.materialization,
+				BigQuery:          pipeline.BigQueryConfig{StorageURI: "gs://bucket/dataset/table"},
 				RefreshRestricted: &tt.refreshRestricted,
 			}))
 
@@ -704,6 +728,73 @@ func TestIsTableFormatMismatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, isTableFormatMismatch(tt.meta, &pipeline.Asset{Materialization: tt.asset}))
+		})
+	}
+}
+
+func TestWithIcebergSettings(t *testing.T) {
+	t.Parallel()
+
+	icebergAsset := func(name, storageURI string) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name: name,
+			Materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			BigQuery: pipeline.BigQueryConfig{StorageURI: storageURI},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		asset          *pipeline.Asset
+		prefix         string
+		wantStorageURI string
+	}{
+		{
+			name:           "built from the connection and dataset.table",
+			asset:          icebergAsset("sales.orders", ""),
+			prefix:         "gs://bucket/",
+			wantStorageURI: "gs://bucket/sales/orders",
+		},
+		{
+			name:           "project is left out of the path",
+			asset:          icebergAsset("my-project.sales.orders", ""),
+			prefix:         "gs://bucket/lake",
+			wantStorageURI: "gs://bucket/lake/sales/orders",
+		},
+		{
+			name:           "dev environments get their own folder from the prefixed dataset",
+			asset:          icebergAsset("dev_sales.orders", ""),
+			prefix:         "gs://bucket",
+			wantStorageURI: "gs://bucket/dev_sales/orders",
+		},
+		{
+			name:           "the asset's storage URI wins",
+			asset:          icebergAsset("sales.orders", "gs://other/custom"),
+			prefix:         "gs://bucket",
+			wantStorageURI: "gs://other/custom",
+		},
+		{
+			name:  "nothing on the connection",
+			asset: icebergAsset("sales.orders", ""),
+		},
+		{
+			name:   "regular tables are left alone",
+			asset:  &pipeline.Asset{Name: "sales.orders"},
+			prefix: "gs://bucket",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			original := tt.asset.BigQuery
+			got := WithIcebergSettings(tt.asset, tt.prefix)
+			assert.Equal(t, tt.wantStorageURI, got.BigQuery.StorageURI)
+			assert.Equal(t, original, tt.asset.BigQuery, "the original asset must not change")
 		})
 	}
 }

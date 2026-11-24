@@ -1,0 +1,278 @@
+{
+  "audited_version": "1.1.87",
+  "known_cdc_parameters": [
+    "cdc_backend",
+    "cdc_binary",
+    "cdc_capture_instance",
+    "cdc_delete_behavior",
+    "cdc_dest_schema",
+    "cdc_discover_interval",
+    "cdc_grpc_host",
+    "cdc_grpc_port",
+    "cdc_grpc_tls",
+    "cdc_max_await_time",
+    "cdc_mode",
+    "cdc_poll_interval",
+    "cdc_publication",
+    "cdc_schema_sample_size",
+    "cdc_server_id",
+    "cdc_slot",
+    "cdc_snapshot_chunk_size",
+    "cdc_snapshot_chunk_timeout",
+    "cdc_snapshot_chunked",
+    "cdc_snapshot_execution",
+    "cdc_snapshot_mode",
+    "cdc_snapshot_spool",
+    "cdc_sql_capture",
+    "cdc_start_lsn",
+    "cdc_state_id",
+    "cdc_stream_flush_interval",
+    "cdc_stream_flush_records",
+    "cdc_stream_metrics_addr",
+    "cdc_table_naming",
+    "cdc_tls",
+    "cdc_wal_buffer_bytes",
+    "cdc_wal_spool_dir",
+    "cdc_wal_staging"
+  ],
+  "cli": {
+    "batch-size": {
+      "parameter": "batch_size",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": "512",
+      "minimum_version": "1.1.30"
+    },
+    "cdc-delete-behavior": {
+      "parameter": "cdc_delete_behavior",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": "string(config.CDCDeleteSoft)",
+      "minimum_version": "1.1.77"
+    },
+    "cdc-snapshot-chunk-size": {
+      "parameter": "cdc_snapshot_chunk_size",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": "config.DefaultCDCSnapshotChunkSize",
+      "minimum_version": "1.1.81"
+    },
+    "cdc-snapshot-chunk-timeout": {
+      "parameter": "cdc_snapshot_chunk_timeout",
+      "status": "supported",
+      "type": "DurationFlag",
+      "default": "config.DefaultCDCSnapshotChunkTimeout",
+      "minimum_version": "1.1.81"
+    },
+    "cdc-snapshot-chunked": {
+      "parameter": "cdc_snapshot_chunked",
+      "status": "supported",
+      "type": "BoolFlag",
+      "default": null,
+      "minimum_version": "1.1.81"
+    },
+    "cdc-snapshot-execution": {
+      "parameter": "cdc_snapshot_execution",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": "config.DefaultCDCSnapshotExecution",
+      "minimum_version": "1.1.81"
+    },
+    "cdc-snapshot-mode": {
+      "parameter": "cdc_snapshot_mode",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": null,
+      "minimum_version": "1.1.78"
+    },
+    "cdc-snapshot-spool": {
+      "parameter": "cdc_snapshot_spool",
+      "status": "supported",
+      "type": "BoolFlag",
+      "default": null,
+      "minimum_version": "1.1.86"
+    },
+    "cdc-start-lsn": {
+      "parameter": "cdc_start_lsn",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": null,
+      "minimum_version": "1.1.78"
+    },
+    "cdc-table-naming": {
+      "parameter": "cdc_table_naming",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": "string(config.TableNamingSchemaTable)",
+      "minimum_version": "1.1.49"
+    },
+    "cdc-wal-buffer-bytes": {
+      "parameter": "cdc_wal_buffer_bytes",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": "config.DefaultCDCWALBufferBytes",
+      "minimum_version": "1.1.81"
+    },
+    "cdc-wal-spool-dir": {
+      "parameter": "cdc_wal_spool_dir",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": null,
+      "minimum_version": "1.1.86"
+    },
+    "cdc-wal-staging": {
+      "parameter": "cdc_wal_staging",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": "\"inmemory\"",
+      "minimum_version": "1.1.81",
+      "extended_values_minimum_version": "1.1.86"
+    },
+    "destination-parallelism": {
+      "parameter": "destination_parallelism",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": null,
+      "default_text": "\"destination-specific\"",
+      "minimum_version": "1.1.85"
+    },
+    "extract-parallelism": {
+      "parameter": "extract_parallelism",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": "config.DefaultExtractParallelism"
+    },
+    "flush-interval": {
+      "parameter": "flush_interval",
+      "status": "supported",
+      "type": "DurationFlag",
+      "default": "30 * time.Second"
+    },
+    "flush-records": {
+      "parameter": "flush_records",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": "50000"
+    },
+    "full-refresh": {
+      "parameter": "full_refresh",
+      "status": "supported",
+      "type": "BoolFlag",
+      "default": null
+    },
+    "metrics-addr": {
+      "parameter": "metrics_addr",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": null,
+      "minimum_version": "1.0.73",
+      "batch_minimum_version": "1.1.87",
+      "prometheus_minimum_version": "1.1.10"
+    },
+    "no-load-timestamp": {
+      "parameter": "no_load_timestamp",
+      "status": "supported",
+      "type": "BoolFlag",
+      "default": null,
+      "minimum_version": "1.0.39"
+    },
+    "no-run-id": {
+      "parameter": "no_run_id",
+      "status": "supported",
+      "type": "BoolFlag",
+      "default": null,
+      "minimum_version": "1.1.31"
+    },
+    "page-size": {
+      "parameter": "page_size",
+      "status": "supported",
+      "type": "IntFlag",
+      "default": "25000"
+    },
+    "refresh-id": {
+      "parameter": "bruin run --refresh-id",
+      "status": "supported",
+      "type": "StringFlag",
+      "default": null
+    },
+    "stream": {
+      "parameter": "stream",
+      "status": "supported",
+      "type": "BoolFlag",
+      "default": null
+    }
+  },
+  "uri": {
+    "binary": {
+      "parameter": "cdc_binary",
+      "status": "supported",
+      "minimum_version": "1.0.72"
+    },
+    "dest_schema": {
+      "parameter": "cdc_dest_schema",
+      "status": "supported"
+    },
+    "discover_interval": {
+      "parameter": "cdc_discover_interval",
+      "status": "supported",
+      "minimum_version": "1.0.71"
+    },
+    "mode": {
+      "parameter": "cdc_mode",
+      "status": "excluded",
+      "reason": "Deprecated URI mode is ignored upstream; Bruin keeps cdc_mode as an alias for the stream CLI flag."
+    },
+    "publication": {
+      "parameter": "cdc_publication",
+      "status": "supported"
+    },
+    "slot": {
+      "parameter": "cdc_slot",
+      "status": "supported"
+    },
+    "state_id": {
+      "parameter": "cdc_state_id",
+      "status": "supported"
+    }
+  },
+  "constants": {
+    "internal/config/config.go": {
+      "DefaultCDCSnapshotExecution": "\"serial\"",
+      "DefaultCDCSnapshotChunkSize": "10000",
+      "DefaultCDCSnapshotChunkTimeout": "30 * time.Second",
+      "DefaultCDCWALBufferBytes": "int64(64 << 20)",
+      "DefaultExtractParallelism": "5",
+      "TableNamingSchemaTable": "\"schema_table\"",
+      "CDCDeleteSoft": "\"soft\""
+    },
+    "pkg/source/postgres_cdc/source.go": {
+      "defaultDiscoverInterval": "30 * time.Second"
+    }
+  },
+  "reviewed_functions": {
+    "internal/config/config.go": {
+      "ApplyCDCChunkedSnapshotDefaults": "3b63f8a5d2d70bc71eefc64a0df6c61524005b8cb466a615dd6d81e65e71bfd2",
+      "validateCDCChunkedSnapshot": "ab71c4ba0fa8f37a707119fb540313489393bfd0cecc5d746b34e2ff3e9329a0",
+      "validateCDCTableNaming": "8065c5e158800b89c9e906948251e3bed06f7fd024f2aba017ceffaff017d63d",
+      "ValidateCDCSnapshotMode": "a8dbea7dde26aede9e014946196bdb6cb4bc8cce364d7a51c8f7eb77aec3daf0",
+      "EffectiveDestinationParallelism": "774a919298f41367cd7dceef0d232b3c223a4b8ae75042715554519a8e74a5bb"
+    },
+    "internal/config/cdc_spool.go": {
+      "ApplyCDCSnapshotSpoolDefaults": "41e33b54c6fabb50b6220f22b6a170af64197b3a0d063592983e4e2c2a68083f",
+      "validateCDCSnapshotSpool": "647c755547bb35a189b7b1a2f592b2d09809470f45281b33a033db369c18b665"
+    },
+    "pkg/source/postgres_cdc/source.go": {
+      "parseURIConfig": "341e819a87d2bd22fb05813aba0d533e3b38fe0f4ec301c8b120302ccc73a912"
+    },
+    "pkg/source/postgres/snapshot.go": {
+      "parseSnapshotURI": "780bd08166b0d40eb8f1afad85f92d0cacc6a6b5a8309b4a5bac260b29bb8857"
+    }
+  },
+  "postgres_uri": {
+    "snapshot": {
+      "parameter": "postgres_snapshot",
+      "status": "supported",
+      "minimum_version": "1.1.83"
+    }
+  }
+}

@@ -3,6 +3,7 @@ package bruincloud
 import (
 	"encoding/json"
 	"strings"
+	"time"
 )
 
 // Team is a team the caller's token can act on. CompanyPrefix is what you pass
@@ -11,6 +12,27 @@ type Team struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
 	CompanyPrefix string `json:"company_prefix"`
+}
+
+// TeamRole is a role that can be given in the team: built-in, or custom when the team has them on.
+type TeamRole struct {
+	Key         string   `json:"key"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Custom      bool     `json:"custom"`
+	Permissions []string `json:"permissions"`
+}
+
+// TeamMember is someone in the team and the role they have.
+type TeamMember struct {
+	ID            int     `json:"id"`
+	Name          string  `json:"name"`
+	Email         string  `json:"email"`
+	Role          *string `json:"role"`
+	RoleName      *string `json:"role_name"`
+	Owner         bool    `json:"owner"`
+	BruinEmployee bool    `json:"bruin_employee"`
+	ExpiresAt     *string `json:"expires_at"`
 }
 
 // Project represents a Bruin Cloud project.
@@ -152,6 +174,18 @@ type AgentMcpServersResponse struct {
 	MCPIntegrations      []AgentMcpServer    `json:"mcp_integrations"`
 	MCPKinds             map[string]string   `json:"mcp_kinds"`
 	ConnectionsByMcpKind map[string][]string `json:"connections_by_mcp_kind"`
+}
+
+type ActAsAgentResult struct {
+	Token       string        `json:"token"`
+	ExpiresAt   time.Time     `json:"expires_at"`
+	Agent       ActAsAgentRef `json:"agent"`
+	Team        string        `json:"team"`
+	Permissions []string      `json:"permissions"`
+}
+
+type ActAsAgentRef struct {
+	Name string `json:"name"`
 }
 
 // AgentConnection is one connection available to an agent — name and type only
@@ -328,9 +362,15 @@ type SendAgentMessageResponse struct {
 
 // Connection represents a Bruin Cloud connection (name and type only).
 type Connection struct {
-	Name         string   `json:"name"`
-	Type         string   `json:"type"`
-	MaxQueryCost *float64 `json:"max_query_cost,omitempty"`
+	Name             string   `json:"name"`
+	Type             string   `json:"type"`
+	MaxQueryCost     *float64 `json:"max_query_cost,omitempty"`
+	MaxQueryCostSoft *float64 `json:"max_query_cost_soft,omitempty"`
+}
+
+type CostLimits struct {
+	MaxQueryCost     *float64 `json:"max_query_cost"`
+	MaxQueryCostSoft *float64 `json:"max_query_cost_soft"`
 }
 
 // ConnectionSet represents a Bruin Cloud connection set (dev-env secret): a named
@@ -576,4 +616,62 @@ type ScheduledAgentPipelineTrigger struct {
 
 type ScheduledAgentPipelineTriggerResponse struct {
 	PipelineTrigger *ScheduledAgentPipelineTrigger `json:"pipeline_trigger"`
+}
+
+// DataAppGuide is the skill a coding agent follows to build a Bruin Cloud data app.
+// Content is markdown; Version changes whenever Content does.
+type DataAppGuide struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Version     string `json:"version"`
+	Content     string `json:"content"`
+}
+
+// DataAppGuideRef is the pointer every data-app API response carries to the guide.
+type DataAppGuideRef struct {
+	URL     string `json:"url"`
+	Version string `json:"version"`
+	Note    string `json:"note,omitempty"`
+}
+
+// DataApp is a Bruin Cloud data app. Code and the manifests are only set by GetDataApp;
+// the manifests stay raw JSON so pull writes them back exactly as stored.
+type DataApp struct {
+	ID           int              `json:"id"`
+	Title        *string          `json:"title"`
+	AgentID      *int             `json:"agent_id"`
+	Visibility   string           `json:"visibility"`
+	UpdatedAt    *string          `json:"updated_at"`
+	Version      string           `json:"version,omitempty"`
+	Code         *string          `json:"code,omitempty"`
+	Queries      json.RawMessage  `json:"queries,omitempty"`
+	HTTPRequests json.RawMessage  `json:"http_requests,omitempty"`
+	Guide        *DataAppGuideRef `json:"guide,omitempty"`
+}
+
+// DataAppSettings is what a team allows its data apps (read-only; admins change it in the UI).
+type DataAppSettings struct {
+	ReadOnly                bool             `json:"read_only"`
+	RestrictCredentialHosts bool             `json:"restrict_credential_hosts"`
+	AllowedHosts            []string         `json:"allowed_hosts"`
+	Guide                   *DataAppGuideRef `json:"guide,omitempty"`
+}
+
+// DataAppSaveInput is a push. Nil fields are left as stored; ExpectedVersion, when set,
+// makes the save fail with 409 if the app changed since that version.
+type DataAppSaveInput struct {
+	Code            *string         `json:"code,omitempty"`
+	Queries         json.RawMessage `json:"queries,omitempty"`
+	HTTPRequests    json.RawMessage `json:"http_requests,omitempty"`
+	ExpectedVersion string          `json:"expected_version,omitempty"`
+}
+
+// DataAppSaveResult is the response to a push.
+type DataAppSaveResult struct {
+	ID        int              `json:"id"`
+	Title     *string          `json:"title"`
+	UpdatedAt *string          `json:"updated_at"`
+	Version   string           `json:"version"`
+	Warnings  []string         `json:"warnings,omitempty"`
+	Guide     *DataAppGuideRef `json:"guide,omitempty"`
 }

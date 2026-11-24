@@ -3,7 +3,6 @@ package r
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -139,7 +138,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	for _, mapping := range t.Secrets {
 		conn := o.config.GetConnectionDetails(mapping.SecretKey)
 		if conn == nil {
-			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
+			return config.NewConnectionNotFoundError(ctx, "", mapping.SecretKey)
 		}
 
 		connType := o.config.GetConnectionType(mapping.SecretKey)

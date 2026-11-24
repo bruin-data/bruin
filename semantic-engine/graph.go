@@ -42,6 +42,8 @@ type queryPlan struct {
 	joinOrder       []*joinSpec
 	dimensionsByKey map[string]*dimensionBinding
 	sortsByName     map[string]*dimensionBinding
+	// shownJoin limits grand totals to the rows a detail query returns.
+	shownJoin string
 }
 
 func (e *Engine) planQuery(q *Query) (*queryPlan, error) {
@@ -91,6 +93,12 @@ func (e *Engine) planQuery(q *Query) (*queryPlan, error) {
 		}
 	}
 
+	for _, name := range e.collectInnerMetrics(q.Metrics) {
+		if err := plan.addFilterRefs(e.metrics[name].Filter); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, sort := range q.Sort {
 		if e.metrics[sort.Name] != nil {
 			continue
@@ -109,7 +117,7 @@ func (e *Engine) planQuery(q *Query) (*queryPlan, error) {
 }
 
 func (p *queryPlan) addFilterRefs(expr string) error {
-	for _, ref := range extractRefs(expr) {
+	for _, ref := range p.engine.extractRefs(expr) {
 		if p.engine.metrics[ref] != nil {
 			continue
 		}
@@ -186,17 +194,17 @@ func (p *queryPlan) dimensionSQL(binding *dimensionBinding) string {
 	expr := p.engine.dimExpr(binding.dimension, binding.ref.Granularity)
 	if binding.model == p.engine.model {
 		if p.hasJoins() {
-			return qualifySQLIdentifiers(expr, "base")
+			return qualifySQLIdentifiers(expr, "base", backslashEscapes(p.engine.Dialect))
 		}
 		return expr
 	}
 	spec := p.joinsByName[binding.relationName]
-	return qualifySQLIdentifiers(expr, spec.alias)
+	return qualifySQLIdentifiers(expr, spec.alias, backslashEscapes(p.engine.Dialect))
 }
 
 func (p *queryPlan) fromSQL() string {
 	if len(p.joinOrder) == 0 {
-		return " FROM " + p.engine.model.SourceRelation()
+		return " FROM " + p.engine.model.SourceRelation() + p.shownJoin
 	}
 
 	var sql strings.Builder
@@ -211,6 +219,7 @@ func (p *queryPlan) fromSQL() string {
 		sql.WriteString(" ON ")
 		sql.WriteString(renderJoinCondition(spec))
 	}
+	sql.WriteString(p.shownJoin)
 	return sql.String()
 }
 
@@ -535,7 +544,18 @@ var sqlIdentifierKeywords = map[string]bool{
 	"NUMERIC": true, "REAL": true, "STRING": true, "TEXT": true, "VARCHAR": true,
 }
 
-func qualifySQLIdentifiers(expr, alias string) string {
+// sqlDateParts stay bare in timestamp_trunc(ts, DAY) or extract(DOW FROM ts).
+// Kept apart from sqlIdentifierKeywords so model aliases such as day stay unquoted.
+var sqlDateParts = map[string]bool{
+	"YEAR": true, "QUARTER": true, "MONTH": true, "WEEK": true, "DAY": true,
+	"HOUR": true, "MINUTE": true, "SECOND": true, "MILLISECOND": true,
+	"MICROSECOND": true, "NANOSECOND": true, "ISOWEEK": true, "ISOYEAR": true,
+	"DAYOFWEEK": true, "DAYOFYEAR": true, "DOW": true, "DOY": true, "EPOCH": true,
+	"MONDAY": true, "TUESDAY": true, "WEDNESDAY": true, "THURSDAY": true,
+	"FRIDAY": true, "SATURDAY": true, "SUNDAY": true,
+}
+
+func qualifySQLIdentifiers(expr, alias string, backslashEscapes bool) string {
 	expr = strings.TrimSpace(expr)
 	if expr == "" || alias == "" {
 		return expr
@@ -548,7 +568,7 @@ func qualifySQLIdentifiers(expr, alias string) string {
 	for i := 0; i < len(expr); {
 		ch := expr[i]
 		if ch == '\'' || ch == '"' || ch == '`' {
-			end := scanQuoted(expr, i, ch)
+			end := scanQuoted(expr, i, ch, backslashEscapes)
 			out.WriteString(expr[i:end])
 			i = end
 			continue
@@ -573,22 +593,25 @@ func qualifySQLIdentifiers(expr, alias string) string {
 	return out.String()
 }
 
-func scanQuoted(expr string, start int, quote byte) int {
+// scanQuoted returns the index after the quoted text that starts at start.
+// A doubled quote stays inside it; with backslashEscapes, so does \'.
+func scanQuoted(expr string, start int, quote byte, backslashEscapes bool) int {
 	for i := start + 1; i < len(expr); i++ {
-		if expr[i] != quote {
-			continue
-		}
-		if quote == '\'' && i+1 < len(expr) && expr[i+1] == '\'' {
+		switch {
+		case backslashEscapes && quote == '\'' && expr[i] == '\\':
 			i++
-			continue
+		case expr[i] != quote:
+		case i+1 < len(expr) && expr[i+1] == quote:
+			i++
+		default:
+			return i + 1
 		}
-		return i + 1
 	}
 	return len(expr)
 }
 
 func shouldQualifyIdentifier(expr string, start, end int, ident string) bool {
-	if sqlIdentifierKeywords[strings.ToUpper(ident)] {
+	if upper := strings.ToUpper(ident); sqlIdentifierKeywords[upper] || sqlDateParts[upper] {
 		return false
 	}
 	prev := previousNonSpace(expr, start)

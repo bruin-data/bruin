@@ -29,6 +29,26 @@ func TestBasicOperator_CDCChunkedSnapshotParameters(t *testing.T) {
 		{name: "opt in uses engine defaults", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true}, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
 		{name: "quoted boolean", params: pipeline.ParameterMap{"cdc_snapshot_chunked": "true"}, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
 		{name: "explicitly disabled", params: pipeline.ParameterMap{"cdc_snapshot_chunked": false}, wantFlags: []string{"--cdc-snapshot-chunked=false"}},
+		{name: "spool uses engine staging default", params: pipeline.ParameterMap{"cdc_snapshot_spool": true}, wantFlags: []string{"--cdc-snapshot-spool=true"}},
+		{name: "quoted spool boolean", params: pipeline.ParameterMap{"cdc_snapshot_spool": "true"}, wantFlags: []string{"--cdc-snapshot-spool=true"}},
+		{name: "disabled spool", params: pipeline.ParameterMap{"cdc_snapshot_spool": false}, wantFlags: []string{"--cdc-snapshot-spool=false"}},
+		{name: "spool memory", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_wal_staging": "memory"}, wantFlags: []string{"--cdc-snapshot-spool=true", "--cdc-wal-staging", "memory"}},
+		{name: "spool inmemory", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_wal_staging": "inmemory"}, wantFlags: []string{"--cdc-snapshot-spool=true", "--cdc-wal-staging", "inmemory"}},
+		{name: "spool destination", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_wal_staging": "destination"}, wantFlags: []string{"--cdc-snapshot-spool=true", "--cdc-wal-staging", "destination"}},
+		{
+			name: "spool persistent disk and buffer",
+			params: pipeline.ParameterMap{
+				"cdc_snapshot_spool": true, "cdc_wal_staging": "disk", "cdc_wal_spool_dir": "/persistent/spool with spaces", "cdc_wal_buffer_bytes": int64(1 << 32),
+			},
+			wantFlags: []string{"--cdc-snapshot-spool=true", "--cdc-wal-staging", "disk", "--cdc-wal-spool-dir", "/persistent/spool with spaces", "--cdc-wal-buffer-bytes", "4294967296"},
+		},
+		{
+			name: "spool preserves inactive chunk tuning",
+			params: pipeline.ParameterMap{
+				"cdc_snapshot_spool": true, "cdc_snapshot_chunked": false, "cdc_snapshot_chunk_size": 0, "cdc_snapshot_chunk_timeout": "-1s",
+			},
+			wantFlags: []string{"--cdc-snapshot-chunked=false", "--cdc-snapshot-spool=true", "--cdc-snapshot-chunk-size", "0", "--cdc-snapshot-chunk-timeout", "-1s"},
+		},
 		{
 			name: "serial tuning",
 			params: pipeline.ParameterMap{
@@ -56,14 +76,27 @@ func TestBasicOperator_CDCChunkedSnapshotParameters(t *testing.T) {
 		{name: "deprecated stream alias", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc_mode": "stream"}, stream: true, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
 		{name: "finite full refresh", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true}, fullRefresh: true, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
 		{name: "streaming full refresh", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "stream": true}, stream: true, fullRefresh: true, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
+		{name: "spool streaming", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "stream": true}, stream: true, wantFlags: []string{"--cdc-snapshot-spool=true"}},
+		{name: "spool deprecated stream alias", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_mode": "stream"}, stream: true, wantFlags: []string{"--cdc-snapshot-spool=true"}},
+		{name: "spool finite full refresh", params: pipeline.ParameterMap{"cdc_snapshot_spool": true}, fullRefresh: true, wantFlags: []string{"--cdc-snapshot-spool=true"}},
+		{name: "spool streaming full refresh", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "stream": true}, stream: true, fullRefresh: true, wantFlags: []string{"--cdc-snapshot-spool=true"}},
 		{name: "PostgreSQL CDC URI alias", sourceURI: "postgresql+cdc://user:pass@localhost:5432/db", wantURI: "postgresql+cdc://user:pass@localhost:5432/db?slot=bruin_slot", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true}, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
 		{name: "first supported release", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "version": "v1.1.81"}, wantFlags: []string{"--cdc-snapshot-chunked=true"}},
+		{name: "first spool release", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "version": "v1.1.86"}, wantFlags: []string{"--cdc-snapshot-spool=true"}},
+		{name: "older spool engine", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "version": "v1.1.85"}, wantErr: "require ingestr 1.1.86 or newer"},
+		{name: "disabled spool on old engine", params: pipeline.ParameterMap{"cdc_snapshot_spool": false, "version": "v1.1.85"}, wantErr: "require ingestr 1.1.86 or newer"},
+		{name: "memory alias on old engine", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc_wal_staging": "memory", "version": "v1.1.85"}, wantErr: "require ingestr 1.1.86 or newer"},
+		{name: "spool legacy engine", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "version": "v0"}, wantErr: "require ingestr 1.1.86 or newer"},
 		{name: "older engine", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "version": "v1.1.80"}, wantErr: "require ingestr 1.1.81 or newer"},
 		{name: "legacy engine", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "version": "v0"}, wantErr: "require ingestr 1.1.81 or newer"},
 		{name: "non CDC", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc": false}, wantErr: "cdc: true"},
 		{name: "non PostgreSQL CDC", sourceURI: "mysql://user:pass@localhost:3306/db", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true}, wantErr: "only supported for PostgreSQL CDC"},
 		{name: "destination requires explicit parallel", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc_wal_staging": "destination"}, wantErr: "parallel"},
 		{name: "runtime validates numeric tuning", params: pipeline.ParameterMap{"cdc_snapshot_chunked": true, "cdc_snapshot_chunk_size": 0}, wantErr: "cdc_snapshot_chunk_size"},
+		{name: "spool non PostgreSQL CDC", sourceURI: "mysql://user:pass@localhost:3306/db", params: pipeline.ParameterMap{"cdc_snapshot_spool": true}, wantErr: "only supported for PostgreSQL CDC"},
+		{name: "spool chunked conflict", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_snapshot_chunked": true}, wantErr: "cdc_snapshot_spool cannot be combined with cdc_snapshot_chunked"},
+		{name: "spool zero buffer", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_wal_buffer_bytes": 0}, wantErr: "cdc_wal_buffer_bytes"},
+		{name: "spool disk without directory", params: pipeline.ParameterMap{"cdc_snapshot_spool": true, "cdc_wal_staging": "disk"}, wantErr: "cdc_wal_spool_dir is required"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -104,7 +137,8 @@ func TestBasicOperator_CDCChunkedSnapshotParameters(t *testing.T) {
 					want = append(want, "--stream")
 				}
 				chunked, _ := params.GetString("cdc_snapshot_chunked")
-				if chunked != "true" {
+				spool, _ := params.GetString("cdc_snapshot_spool")
+				if chunked != "true" && spool != "true" {
 					want = append(want, "--interval-start", "2026-11-01T00:00:00Z", "--interval-end", "2026-11-02T00:00:00Z")
 				}
 				if tt.fullRefresh {

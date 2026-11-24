@@ -98,7 +98,7 @@ func (s *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, asset *
 			return ctx.Err()
 		case <-timeout.C:
 			wait.Stop()
-			return errors.Errorf("Sensor timed out after %s", helpers.GetSensorTimeout(asset))
+			return &helpers.SensorTimeoutError{Timeout: helpers.GetSensorTimeout(asset)}
 		case <-wait.C:
 		}
 	}

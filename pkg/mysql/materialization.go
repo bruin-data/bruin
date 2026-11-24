@@ -69,11 +69,22 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	// MySQL only aliases the target of a single-table DELETE from 8.0.16, so the predicate uses
+	// the multi-table form, which every MySQL and MariaDB version supports.
+	deleteQuery := fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName)
+	if strings.TrimSpace(mat.IncrementalPredicate) != "" {
+		conditions := ansisql.AddIncrementalPredicate(
+			[]string{fmt.Sprintf("%s IN (SELECT DISTINCT %s FROM %s)", mat.IncrementalKey, mat.IncrementalKey, tempTableName)},
+			mat.IncrementalPredicate,
+		)
+		deleteQuery = fmt.Sprintf("DELETE target FROM %s AS target WHERE %s", asset.Name, strings.Join(conditions, " AND "))
+	}
+
 	queries := []string{
 		"START TRANSACTION",
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
 		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
-		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		deleteQuery,
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
 		"COMMIT",

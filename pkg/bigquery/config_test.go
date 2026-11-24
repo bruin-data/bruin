@@ -18,6 +18,8 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 		AccessToken         string
 		Credentials         *google.Credentials
 		Location            string
+		UseADC              bool
+		ReadAPI             string
 		wantErr             bool
 		Expected            string
 	}{
@@ -66,18 +68,56 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 			wantErr:             false,
 			Expected:            "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==&location=location",
 		},
+		{
+			Name:            "creds json with read_api",
+			ProjectID:       "project-id",
+			CredentialsJSON: "{\"creds\":\"some-creds\"}",
+			Location:        "location",
+			ReadAPI:         "rest",
+			Expected:        "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==&location=location&read_api=rest",
+		},
+		{
+			Name:      "adc",
+			ProjectID: "project-id",
+			UseADC:    true,
+			Expected:  "bigquery://project-id",
+		},
+		{
+			Name:      "adc with read_api",
+			ProjectID: "project-id",
+			UseADC:    true,
+			ReadAPI:   "storage",
+			Expected:  "bigquery://project-id?read_api=storage",
+		},
+		{
+			Name:      "adc with location and read_api",
+			ProjectID: "project-id",
+			UseADC:    true,
+			Location:  "EU",
+			ReadAPI:   "rest",
+			Expected:  "bigquery://project-id?location=EU&read_api=rest",
+		},
+		{
+			Name:      "invalid read_api",
+			ProjectID: "project-id",
+			UseADC:    true,
+			ReadAPI:   "REST",
+			wantErr:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
 
 			config := Config{
-				ProjectID:           tt.ProjectID,
-				CredentialsFilePath: tt.CredentialsFilePath,
-				CredentialsJSON:     tt.CredentialsJSON,
-				AccessToken:         tt.AccessToken,
-				Credentials:         tt.Credentials,
-				Location:            tt.Location,
+				ProjectID:                        tt.ProjectID,
+				CredentialsFilePath:              tt.CredentialsFilePath,
+				CredentialsJSON:                  tt.CredentialsJSON,
+				AccessToken:                      tt.AccessToken,
+				Credentials:                      tt.Credentials,
+				Location:                         tt.Location,
+				UseApplicationDefaultCredentials: tt.UseADC,
+				ReadAPI:                          tt.ReadAPI,
 			}
 
 			result, err := config.GetConnectionURI()
@@ -234,6 +274,44 @@ func TestMaxBillableBytesFromEnv(t *testing.T) { //nolint:paralleltest // uses t
 	}
 }
 
+func TestMaxQueryCostSoftFromEnv(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	for _, tc := range []struct {
+		name         string
+		byConnection string
+		want         *float64
+		wantErr      bool
+	}{
+		{name: "unset means no soft limit"},
+		{name: "per-connection soft limit", byConnection: `{"bq-prod": 2.5, "bq-dev": 9}`, want: float64Ptr(2.5)},
+		{name: "a connection missing from the map has no soft limit", byConnection: `{"bq-dev": 9}`},
+		{name: "invalid map fails closed", byConnection: `{"bq-prod": "lots"}`, wantErr: true},
+		{name: "null map fails closed", byConnection: `null`, wantErr: true},
+		{name: "non-positive value fails closed", byConnection: `{"bq-prod": 0}`, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(MaxQueryCostSoftByConnectionEnv, tc.byConnection)
+
+			got, err := MaxQueryCostSoftFromEnv("bq-prod")
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestStricterLimit(t *testing.T) {
+	t.Parallel()
+
+	require.Nil(t, StricterLimit(nil, nil))
+	require.Equal(t, float64Ptr(5), StricterLimit(float64Ptr(5), nil))
+	require.Equal(t, float64Ptr(1), StricterLimit(nil, float64Ptr(1)))
+	require.Equal(t, float64Ptr(1), StricterLimit(float64Ptr(5), float64Ptr(1)))
+	require.Equal(t, float64Ptr(0.5), StricterLimit(float64Ptr(0.5), float64Ptr(1)))
+}
+
 func TestBytesBilledLimitTakesTheStricterCap(t *testing.T) {
 	t.Parallel()
 
@@ -252,5 +330,9 @@ func TestEnvCapAloneDoesNotTriggerTheDryRunCheck(t *testing.T) {
 }
 
 func int64Ptr(v int64) *int64 {
+	return &v
+}
+
+func float64Ptr(v float64) *float64 {
 	return &v
 }

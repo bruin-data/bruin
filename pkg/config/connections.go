@@ -93,6 +93,8 @@ type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	MaxBillableBytesSoft             *int64   `yaml:"max_billable_bytes_soft,omitempty" json:"max_billable_bytes_soft,omitempty" mapstructure:"max_billable_bytes_soft"`
 	MaxQueryCostSoft                 *float64 `yaml:"max_query_cost_soft,omitempty" json:"max_query_cost_soft,omitempty" mapstructure:"max_query_cost_soft"`
 	ReadOnly                         bool     `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
+	StorageURI                       string   `yaml:"storage_uri,omitempty" json:"storage_uri,omitempty" mapstructure:"storage_uri"`
+	ReadAPI                          string   `yaml:"read_api,omitempty" json:"read_api,omitempty" mapstructure:"read_api"`
 	rawCredentials                   *google.Credentials
 }
 
@@ -131,6 +133,12 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	}
 	if c.MaxQueryCostSoft != nil {
 		m["max_query_cost_soft"] = *c.MaxQueryCostSoft
+	}
+	if c.StorageURI != "" {
+		m["storage_uri"] = c.StorageURI
+	}
+	if c.ReadAPI != "" {
+		m["read_api"] = c.ReadAPI
 	}
 
 	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
@@ -191,6 +199,12 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	}
 	if c.MaxQueryCostSoft != nil {
 		payload["max_query_cost_soft"] = *c.MaxQueryCostSoft
+	}
+	if c.StorageURI != "" {
+		payload["storage_uri"] = c.StorageURI
+	}
+	if c.ReadAPI != "" {
+		payload["read_api"] = c.ReadAPI
 	}
 
 	return json.Marshal(payload)
@@ -1033,6 +1047,51 @@ func (c DuneConnection) GetName() string {
 	return c.Name
 }
 
+type OdooConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Scheme             string `yaml:"scheme,omitempty" json:"scheme,omitempty" mapstructure:"scheme" jsonschema:"default=https"`
+	API                string `yaml:"api,omitempty" json:"api,omitempty" mapstructure:"api" jsonschema:"default=auto"`
+	PageSize           int    `yaml:"page_size,omitempty" json:"page_size,omitempty" mapstructure:"page_size" jsonschema:"default=1000"`
+}
+
+func (c OdooConnection) GetName() string {
+	return c.Name
+}
+
+type BreezyHRConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	CompanyID          string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
+}
+
+func (c BreezyHRConnection) GetName() string {
+	return c.Name
+}
+
+type PrivatusConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string   `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	SiteIDs            []string `yaml:"site_ids,omitempty" json:"site_ids,omitempty" mapstructure:"site_ids"`
+}
+
+func (c PrivatusConnection) GetName() string {
+	return c.Name
+}
+
+type PeeringDBConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c PeeringDBConnection) GetName() string {
+	return c.Name
+}
+
 type GranolaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
@@ -1397,8 +1456,8 @@ func (c SnapchatAdsConnection) GetName() string {
 type GitHubConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	AccessToken        string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token" sensitive:"true"`
-	Owner              string `yaml:"owner,omitempty" json:"owner" mapstructure:"owner"`
-	Repo               string `yaml:"repo,omitempty" json:"repo" mapstructure:"repo"`
+	Owner              string `yaml:"owner,omitempty" json:"owner,omitempty" mapstructure:"owner"`
+	Repo               string `yaml:"repo,omitempty" json:"repo,omitempty" mapstructure:"repo"`
 }
 
 func (c GitHubConnection) GetName() string {
@@ -2044,6 +2103,24 @@ type ADLSConnection struct {
 }
 
 func (c ADLSConnection) GetName() string {
+	return c.Name
+}
+
+type AzureBlobConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	AccountName        string `yaml:"account_name,omitempty" json:"account_name,omitempty" mapstructure:"account_name"`
+	ConnectionString   string `yaml:"connection_string,omitempty" json:"connection_string,omitempty" mapstructure:"connection_string" sensitive:"true"`
+	AccountKey         string `yaml:"account_key,omitempty" json:"account_key,omitempty" mapstructure:"account_key" sensitive:"true"`
+	SASToken           string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token" sensitive:"true"`
+	TenantID           string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	ContainerName      string `yaml:"container_name,omitempty" json:"container_name,omitempty" mapstructure:"container_name"`
+	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+}
+
+func (c AzureBlobConnection) GetName() string {
 	return c.Name
 }
 

@@ -301,6 +301,41 @@ func TestClient_GetConnection_ReturnsConnection(t *testing.T) {
 	require.NotNil(t, conn)
 }
 
+func TestClient_GetConnection_GCPReadAPIReachesIngestrURI(t *testing.T) {
+	t.Parallel()
+	c := &Client{
+		client: &mockVaultClient{
+			response: &vault.Response[schema.KvV2ReadResponse]{
+				Data: schema.KvV2ReadResponse{
+					Data: map[string]any{
+						"details": map[string]any{
+							"project_id":                          "my-project",
+							"use_application_default_credentials": true,
+							"read_api":                            "rest",
+						},
+						"type": "google_cloud_platform",
+					},
+				},
+			},
+		},
+		mountPath:               "mount",
+		path:                    "path",
+		logger:                  &mockLogger{},
+		cacheConnections:        make(map[string]any),
+		cacheConnectionsDetails: make(map[string]any),
+	}
+
+	deets, ok := c.GetConnectionDetails("gcp").(*config.GoogleCloudPlatformConnection)
+	require.True(t, ok)
+	require.Equal(t, "rest", deets.ReadAPI)
+
+	conn, ok := c.GetConnection("gcp").(interface{ GetIngestrURI() (string, error) })
+	require.True(t, ok)
+	uri, err := conn.GetIngestrURI()
+	require.NoError(t, err)
+	require.Equal(t, "bigquery://my-project?read_api=rest", uri)
+}
+
 func TestClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 	t.Parallel()
 	c := &Client{
@@ -766,4 +801,41 @@ func TestClient_GetConnectionsConfig(t *testing.T) {
 
 	summary := connections.ConnectionsSummaryList()
 	require.Equal(t, map[string]string{"pg": "postgres", "gen": "generic"}, summary)
+}
+
+func TestClient_LookupError_TellsAnUnreadableSecretFromAMissingOne(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockVaultClient{err: errors.New("Get \"https://vault/v1/secret\": context deadline exceeded")}
+	c := &Client{client: mock, mountPath: "mount", path: "path", logger: &mockLogger{}}
+
+	require.Nil(t, c.GetConnection("gcp-prod"))
+	var unavailable *config.SecretsBackendUnavailableError
+	require.ErrorAs(t, c.LookupError("gcp-prod"), &unavailable, "Vault couldn't be read")
+
+	mock.err = &vault.ResponseError{StatusCode: 404, Errors: []string{}}
+	require.Nil(t, c.GetConnection("missing"))
+	require.NoError(t, c.LookupError("missing"), "the secret doesn't exist")
+
+	mock.err = errors.New("Vault returned HTTP status 500")
+	require.Nil(t, c.GetConnectionDetails("other"))
+	require.Error(t, c.LookupError("other"), "details are read the same way")
+}
+
+// Another asset reading the same connection successfully mustn't erase why this asset's read
+// failed: it asks for the reason only after its own read returned.
+func TestClient_LookupError_SurvivesALaterSuccessfulRead(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockVaultClient{err: errors.New("context deadline exceeded")}
+	c := &Client{client: mock, mountPath: "mount", path: "path", logger: &mockLogger{}}
+	require.Nil(t, c.GetConnection("pg-prod"))
+
+	mock.err = nil
+	mock.response = &vault.Response[schema.KvV2ReadResponse]{Data: schema.KvV2ReadResponse{Data: map[string]any{
+		"type":    "postgres",
+		"details": map[string]any{"username": "u", "password": "p", "host": "h", "port": 5432, "database": "d"},
+	}}}
+	require.NotNil(t, c.GetConnection("pg-prod"))
+	require.Error(t, c.LookupError("pg-prod"))
 }

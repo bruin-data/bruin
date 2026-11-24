@@ -47,7 +47,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.1.86"
+	IngestrVersionV1 = "1.1.97"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -68,8 +68,8 @@ func ingestrEnvVars(args []string) (map[string]string, error) {
 			env["ADBC_DRIVER_PATH"] = dir
 		}
 	}
-	if slices.ContainsFunc(args, duck.IsQuackURI) {
-		// Quack needs the DuckDB 2.0+ driver, so its directory is searched first.
+	if slices.ContainsFunc(args, func(arg string) bool { return duck.IsQuackURI(arg) || duck.IsDuckDB2FileURI(arg) }) {
+		// Quack and DuckDB 2.0 files need the 2.0 driver, so its directory is searched first.
 		dir, err := duck.QuackADBCDriverDir()
 		if err != nil {
 			return nil, err

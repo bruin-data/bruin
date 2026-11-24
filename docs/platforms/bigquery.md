@@ -42,6 +42,13 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
           # descriptive error unless they pass --dangerously-bypass-soft-limits.
           max_billable_bytes_soft: 100000000000
           max_query_cost_soft: 0.50 # USD
+
+          # Optional Cloud Storage folder for Iceberg tables, see Iceberg tables below.
+          storage_uri: gs://my-bucket/iceberg
+
+          # Optional: how ingestr assets read from this connection, `storage` (default) or `rest`.
+          # See Ingestr read API below.
+          read_api: rest
 ```
 
 ### Query cost limits
@@ -53,7 +60,9 @@ There are two places to cap what a BigQuery query can cost. Which one applies de
 | Locally, with credentials from your `.bruin.yml` | `max_query_cost` / `max_billable_bytes` (and the `_soft` variants) on the connection, as above |
 | Through Bruin Cloud: cloud query mode (`use_cloud`), the Bruin Cloud API, Bruin Cloud agents | The connection's cost limit in its Bruin Cloud connection set, in the app or with [`bruin cloud connection-sets cost-limit`](../commands/cloud.md#cost-limit) |
 
-Costs are estimated at BigQuery's on-demand price of $6.25 per TiB. Bruin Cloud passes its limits to agent runs as `BRUIN_BIGQUERY_MAX_BILLABLE_BYTES_BY_CONNECTION`, a JSON object of connection name to bytes. When one applies to a connection, the stricter of it and the connection's `max_billable_bytes` is sent to BigQuery with each SQL query, and BigQuery refuses queries that would bill more. It doesn't apply to ingestr or Python assets, which don't run through Bruin's BigQuery client.
+Costs are estimated at BigQuery's on-demand price of $6.25 per TiB. Limits set in Bruin Cloud also apply to agent runs. They don't cover ingestr or Python assets.
+
+Soft limits work like `max_query_cost_soft`: only `bruin query` checks them, and `--dangerously-bypass-soft-limits` skips them.
 
 ### Authentication Options
 
@@ -121,6 +130,78 @@ connections:
 ```
 
 Read-only mode requires `service_account_file` or `service_account_json`; ADC and access tokens are not supported. Ingestr and BigQuery Data Transfer are unavailable in this mode. Defaults to `false`.
+
+### Ingestr read API
+
+`read_api` picks how [ingestr assets](../assets/ingestr.md) that use this connection as their source read BigQuery:
+
+| Value | Reads through |
+|---|---|
+| `storage` | The BigQuery Storage Read API. This is the default, and the fastest. |
+| `rest` | The BigQuery REST API only. Ingestr never creates a Storage Read API session and doesn't fall back to it. |
+
+```yaml
+connections:
+  google_cloud_platform:
+    - name: bigquery-rest
+      project_id: my-project
+      service_account_file: /path/to/service-account.json
+      read_api: rest
+```
+
+Use `rest` when the credentials lack the `bigquery.readsessions.*` permissions, an organization policy or VPC Service Controls blocks the Storage Read API, or you don't want to pay for Storage Read API usage. It's much slower on large tables. Ingestr's [BigQuery source docs](https://getbruin.com/docs/ingestr/supported-sources/bigquery.html#choosing-the-read-api) describe which REST calls each read uses.
+
+When unset, Bruin leaves the choice to ingestr, which uses the Storage Read API. An ingestr asset can override the connection with its own [`read_api` parameter](../assets/ingestr.md#parameter-reference). The setting only affects ingestr reads: SQL assets, `bruin query` and BigQuery destinations ignore it. It requires ingestr v1.1.92 or later, which is the default; an asset whose `parameters.version` pins an older release fails before it runs.
+
+## Iceberg tables
+
+Set `table_format: iceberg` to create a [BigQuery Iceberg table](https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery). BigQuery keeps the table's files in your Cloud Storage bucket.
+
+::: warning Required
+Set `storage_uri` on the connection or in the asset's `bigquery:` block. Without either, the run fails.
+:::
+
+With `storage_uri` on the connection, each table goes to its own folder, `<storage_uri>/<dataset>/<table>`. For the example below and `storage_uri: gs://my-bucket/iceberg`, that's `gs://my-bucket/iceberg/analytics/orders`. Dev environments with a schema prefix get their own folder, such as `gs://my-bucket/iceberg/dev_analytics/orders`.
+
+```bruin-sql
+/* @bruin
+name: analytics.orders
+type: bq.sql
+materialization:
+    type: table
+    table_format: iceberg
+
+bigquery:
+    storage_uri: gs://my-bucket/analytics/orders # optional with storage_uri on the connection
+    cloud_resource_connection: my-project.europe-west3.my_connection # optional
+@bruin */
+
+select order_id, status from raw.orders
+```
+
+| Field | Description |
+| --- | --- |
+| `storage_uri` | The table's folder in Cloud Storage. Required unless the connection sets `storage_uri`, which it overrides. Give every table its own folder, including dev copies made with a schema prefix: BigQuery rejects a folder another table already uses. |
+| `cloud_resource_connection` | Optional. The [Cloud resource connection](https://cloud.google.com/bigquery/docs/create-cloud-resource-connection) BigQuery writes the files with, as `project.region.name`. Defaults to the project's [default connection](https://docs.cloud.google.com/bigquery/docs/default-connections). |
+
+In `pipeline.yml`, `default.bigquery.cloud_resource_connection` applies to every asset; `storage_uri` doesn't, because it must be different for each table.
+
+### Setup
+
+Before the first run, set up a Cloud resource connection, the bucket permissions, and the roles for the account Bruin runs as. Follow BigQuery's guides:
+
+- [Required roles for Iceberg tables](https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#required-roles)
+- [Create a Cloud resource connection](https://cloud.google.com/bigquery/docs/create-cloud-resource-connection)
+- [Default connections](https://docs.cloud.google.com/bigquery/docs/default-connections), if you don't set `cloud_resource_connection`
+
+With the default connection, missing setup or permissions show up only as `An internal error occurred`.
+
+### Limitations
+
+- No `TRUNCATE`, so `truncate+insert` uses `DELETE` instead.
+- No `JSON`, `BIGNUMERIC`, `INTERVAL`, `RANGE`, or `GEOGRAPHY` columns, and no integer-range partitioning.
+- An existing table can't switch between native and Iceberg in place. Run the asset once with `--full-refresh` to drop it and create the right type; without it, an Iceberg asset over a native table or a view fails. Assets with `refresh_restricted: true` never run a full refresh, so drop the table yourself.
+- Dropping or replacing a table leaves its files in the bucket.
 
 ## BigQuery Assets
 
@@ -264,7 +345,7 @@ join marketing.attribution as a
 
 Sensors are a special type of assets that are used to wait on certain external signals.
 
-Checks if a table exists in BigQuery, runs by default every 30 seconds until this table is available.
+Checks if a table exists in BigQuery, runs by default every 30 seconds until this table is available. If a check fails with a temporary BigQuery error, such as an internal error or a rate limit, the sensor checks again after `poke_interval` instead of failing, up to 10 times in a row; `timeout` still applies.
 
 ```yaml
 name: string
@@ -293,7 +374,7 @@ parameters:
 
 ### `bq.sensor.query`
 
-Checks if a query returns any results in BigQuery, runs by default every 30 seconds until this query returns any results.
+Checks if a query returns any results in BigQuery, runs by default every 30 seconds until this query returns any results. If a check fails with a temporary BigQuery error, such as an internal error or a rate limit, the sensor checks again after `poke_interval` instead of failing, up to 10 times in a row; `timeout` still applies.
 
 ```yaml
 name: string

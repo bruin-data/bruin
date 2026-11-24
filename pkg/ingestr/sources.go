@@ -36,6 +36,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Azure Data Lake Storage Gen2 (user-defined paths)
 	"adls": {},
 
+	// Azure Blob Storage (user-defined paths)
+	"azure_blob": {},
+
 	// Adapty - Subscription monetization platform
 	"adapty": {
 		{Name: "analytics?chart_id=<chart_id>", IncKey: "date", IncStrategy: "delete+insert"},
@@ -671,9 +674,11 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// GitHub - Developer platform
 	"github": {
 		{Name: "commits", PrimaryKey: "sha", IncKey: "committed_at", IncStrategy: "merge"},
+		{Name: "commits:<repo>,<owner>/<repo>,<owner>/*", PrimaryKey: "repo, sha", IncKey: "committed_at", IncStrategy: "merge"},
 		{Name: "issues", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "pull_requests", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "repo_events", PrimaryKey: "id", IncKey: "created_at", IncStrategy: "merge"},
+		{Name: "repositories", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 		{Name: "stargazers", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
@@ -1016,6 +1021,102 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Notion - Workspace
 	"notion": {
 		{Name: "<database_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// Odoo - ERP and business apps suite. Besides the named tables below, source_table accepts any
+	// technical model name, such as fleet.vehicle or a custom x_vehicles model.
+	"odoo": {
+		{Name: "partners", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "partner_categories", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "users", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "companies", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "currencies", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "currency_rates", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "countries", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "product_categories", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "product_templates", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "uoms", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "pricelists", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "sale_orders", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "sale_order_lines", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "purchase_orders", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "purchase_order_lines", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "crm_leads", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "crm_stages", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "crm_teams", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "account_moves", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "account_move_lines", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "account_payments", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "accounts", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "journals", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "taxes", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "payment_terms", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "analytic_lines", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "stock_pickings", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "stock_moves", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "stock_move_lines", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "stock_quants", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "stock_locations", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "warehouses", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "projects", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "project_tasks", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "project_task_stages", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "employees", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "departments", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "jobs", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "activities", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "messages", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+		{Name: "<model_name>", PrimaryKey: "id", IncKey: "write_date", IncStrategy: "merge"},
+	},
+
+	// Breezy HR - Recruiting platform. Only position_stream is incremental; the other tables are replaced in full.
+	"breezyhr": {
+		{Name: "departments", PrimaryKey: "company_id,id", IncKey: "", IncStrategy: "replace"},
+		{Name: "pipelines", PrimaryKey: "company_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "questionnaires", PrimaryKey: "company_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "custom_fields", PrimaryKey: "company_id,type,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "positions", PrimaryKey: "_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "position_team_members", PrimaryKey: "position_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "position_stream", PrimaryKey: "_id", IncKey: "timestamp", IncStrategy: "delete+insert"},
+		{Name: "position_custom_fields", PrimaryKey: "position_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidates", PrimaryKey: "_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_stream", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_scorecards", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_questionnaires", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "candidate_custom_fields", PrimaryKey: "candidate_id,_id", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// Privatus - Privacy-focused web analytics. Daily tables rewrite whole days;
+	// breakdown:<dimension> accepts any API dimension, such as country or prop:plan.
+	"privatus": {
+		{Name: "workspaces", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "sites", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "goals", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "daily_stats", PrimaryKey: "site_id,date", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "pages", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "referrers", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "events", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "goal_conversions", PrimaryKey: "site_id,date,goal_id", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "breakdown:<dimension>", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
+	},
+
+	// PeeringDB - Public database of networks, exchanges, and facilities. Every table merges on id
+	// by its update time and keeps deleted objects with status "deleted".
+	"peeringdb": {
+		{Name: "organizations", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "campuses", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "carriers", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "carrier_facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchanges", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchange_facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchange_lans", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "exchange_prefixes", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "networks", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "network_facilities", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "network_exchange_lans", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
+		{Name: "network_contacts", PrimaryKey: "id", IncKey: "updated", IncStrategy: "merge"},
 	},
 
 	// Okta - Identity and access management platform

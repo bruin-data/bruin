@@ -141,6 +141,24 @@ func (c *APIClient) ListTeams(ctx context.Context) ([]Team, error) {
 	return resp.Teams, err
 }
 
+// ListTeamRoles returns the roles that can be given in the team, with their permissions.
+func (c *APIClient) ListTeamRoles(ctx context.Context) ([]TeamRole, error) {
+	var resp struct {
+		Roles []TeamRole `json:"roles"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/team/roles", nil, &resp)
+	return resp.Roles, err
+}
+
+// ListTeamMembers returns everyone in the team with their role. It needs a personal API token.
+func (c *APIClient) ListTeamMembers(ctx context.Context) ([]TeamMember, error) {
+	var resp struct {
+		Members []TeamMember `json:"members"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/team/members", nil, &resp)
+	return resp.Members, err
+}
+
 // --- Projects ---
 
 func (c *APIClient) ListProjects(ctx context.Context) ([]Project, error) {
@@ -549,6 +567,15 @@ func (c *APIClient) GetGlossaryEntity(ctx context.Context, project, entityName s
 
 // --- Agents ---
 
+// ActAsAgent exchanges the caller's own token for a short-lived token owned by the agent.
+func (c *APIClient) ActAsAgent(ctx context.Context, agentID int) (*ActAsAgentResult, error) {
+	var result ActAsAgentResult
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/agents/%d/act-as", agentID), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) ListAgents(ctx context.Context) ([]Agent, error) {
 	var resp struct {
 		Agents []Agent `json:"agents"`
@@ -618,8 +645,11 @@ type ConnectionSetQueryResult struct {
 // columnar result. The SQL is sent verbatim — cloud query mode does not accept
 // template variables. A non-2xx response (e.g. a query error or a non-read-only
 // statement) surfaces as an *APIError.
-func (c *APIClient) RunConnectionSetQuery(ctx context.Context, connectionSetID int, connection, query string) (*ConnectionSetQueryResult, error) {
+func (c *APIClient) RunConnectionSetQuery(ctx context.Context, connectionSetID int, connection, query string, bypassSoftLimit bool) (*ConnectionSetQueryResult, error) {
 	body := map[string]any{"connection": connection, "query": query}
+	if bypassSoftLimit {
+		body["bypass_soft_limit"] = true
+	}
 	var raw json.RawMessage
 	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/connection-sets/%d/query", connectionSetID), body, &raw); err != nil {
 		return nil, err
@@ -946,24 +976,19 @@ func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connecti
 	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d", setID), body, nil)
 }
 
-// SetConnectionSetCostLimit sets the set's max cost per BigQuery query in USD; nil removes it.
-func (c *APIClient) SetConnectionSetCostLimit(ctx context.Context, setID int, maxQueryCost *float64) (*float64, error) {
-	var resp struct {
-		MaxQueryCost *float64 `json:"max_query_cost"`
-	}
-	body := map[string]any{"max_query_cost": maxQueryCost}
-	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/cost-limit", setID), body, &resp)
-	return resp.MaxQueryCost, err
+// SetConnectionSetCostLimit updates the cost limits (USD per query) on every BigQuery connection in the set.
+// Only the keys in changes are sent; a nil value removes that limit.
+func (c *APIClient) SetConnectionSetCostLimit(ctx context.Context, setID int, changes map[string]*float64) (*CostLimits, error) {
+	var resp CostLimits
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/cost-limit", setID), changes, &resp)
+	return &resp, err
 }
 
-// SetConnectionCostLimit sets one BigQuery connection's max cost per query in USD; nil removes it.
-func (c *APIClient) SetConnectionCostLimit(ctx context.Context, setID int, connection string, maxQueryCost *float64) (*float64, error) {
-	var resp struct {
-		MaxQueryCost *float64 `json:"max_query_cost"`
-	}
-	body := map[string]any{"max_query_cost": maxQueryCost}
-	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/connections/%s/cost-limit", setID, url.PathEscape(connection)), body, &resp)
-	return resp.MaxQueryCost, err
+// SetConnectionCostLimit updates one BigQuery connection's cost limits the same way.
+func (c *APIClient) SetConnectionCostLimit(ctx context.Context, setID int, connection string, changes map[string]*float64) (*CostLimits, error) {
+	var resp CostLimits
+	err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d/connections/%s/cost-limit", setID, url.PathEscape(connection)), changes, &resp)
+	return &resp, err
 }
 
 func (c *APIClient) DeleteConnectionSet(ctx context.Context, setID int) error {
@@ -1419,4 +1444,79 @@ func (c *APIClient) GetCostExplorer(ctx context.Context, req CostExplorerRequest
 	var resp CostExplorerResponse
 	err := c.doRequest(ctx, http.MethodPost, "/cost-explorer", req, &resp)
 	return &resp, err
+}
+
+// --- Data Apps ---
+
+func (c *APIClient) GetDataAppGuide(ctx context.Context) (*DataAppGuide, error) {
+	var guide DataAppGuide
+	if err := c.doRequest(ctx, http.MethodGet, "/data-apps/guide", nil, &guide); err != nil {
+		return nil, err
+	}
+	return &guide, nil
+}
+
+func (c *APIClient) ListDataApps(ctx context.Context) ([]DataApp, error) {
+	var resp struct {
+		DataApps []DataApp `json:"data_apps"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/data-apps", nil, &resp)
+	return resp.DataApps, err
+}
+
+func (c *APIClient) GetDataAppSettings(ctx context.Context) (*DataAppSettings, error) {
+	var settings DataAppSettings
+	if err := c.doRequest(ctx, http.MethodGet, "/data-apps/settings", nil, &settings); err != nil {
+		return nil, err
+	}
+	return &settings, nil
+}
+
+// CreateDataApp creates an empty app. agentID 0 leaves it without an agent (set one later
+// with UpdateDataApp); an empty visibility takes the server default.
+func (c *APIClient) CreateDataApp(ctx context.Context, title string, agentID int, visibility string) (*DataApp, error) {
+	body := map[string]any{}
+	if title != "" {
+		body["title"] = title
+	}
+	if agentID > 0 {
+		body["agent_id"] = agentID
+	}
+	if visibility != "" {
+		body["visibility"] = visibility
+	}
+	var app DataApp
+	if err := c.doRequest(ctx, http.MethodPost, "/data-apps", body, &app); err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *APIClient) GetDataApp(ctx context.Context, id int) (*DataApp, error) {
+	var app DataApp
+	if err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/data-apps/%d", id), nil, &app); err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *APIClient) SaveDataApp(ctx context.Context, id int, input DataAppSaveInput) (*DataAppSaveResult, error) {
+	var result DataAppSaveResult
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/data-apps/%d", id), input, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateDataApp changes an app's title and/or agent; fields holds only what to change.
+func (c *APIClient) UpdateDataApp(ctx context.Context, id int, fields map[string]any) (*DataApp, error) {
+	var app DataApp
+	if err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/data-apps/%d", id), fields, &app); err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *APIClient) DeleteDataApp(ctx context.Context, id int) error {
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/data-apps/%d", id), nil, nil)
 }

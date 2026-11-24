@@ -77,7 +77,33 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 	q := queries[0]
-	materialized, err := o.materializer.Render(t, q.String())
+
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
+	}
+
+	conn, ok := rawConn.(DB)
+	if !ok {
+		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
+	}
+
+	renderAsset := t
+	if preparer, ok := conn.(interface {
+		PrepareAssetForRender(asset *pipeline.Asset) *pipeline.Asset
+	}); ok {
+		renderAsset = preparer.PrepareAssetForRender(t)
+	}
+	if renderAsset.Materialization.IsIceberg() && renderAsset.BigQuery.StorageURI == "" {
+		return errors.Errorf("asset '%s' is an Iceberg table but has no storage URI, set bigquery.storage_uri on the asset or storage_uri on the '%s' connection", t.Name, connName)
+	}
+
+	materialized, err := o.materializer.Render(renderAsset, q.String())
 	if err != nil {
 		return err
 	}
@@ -99,21 +125,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 
 		q.Query = renderedQueries[0].Query
-	}
-
-	connName, err := p.GetConnectionNameForAsset(t)
-	if err != nil {
-		return err
-	}
-
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(DB)
-	if !ok {
-		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
 	}
 
 	queryToRun := q
@@ -178,6 +189,25 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return nil
+}
+
+// WithIcebergSettings fills in the storage URI from the connection's prefix when the asset doesn't set one.
+// It becomes <prefix>/<dataset>/<table>, so every table has its own folder.
+func WithIcebergSettings(asset *pipeline.Asset, storageURIPrefix string) *pipeline.Asset {
+	if !asset.Materialization.IsIceberg() {
+		return asset
+	}
+
+	withSettings := *asset
+	storageURIPrefix = strings.TrimSuffix(storageURIPrefix, "/")
+	if withSettings.BigQuery.StorageURI == "" && storageURIPrefix != "" {
+		nameParts := strings.Split(asset.Name, ".")
+		if len(nameParts) > 2 {
+			nameParts = nameParts[len(nameParts)-2:]
+		}
+		withSettings.BigQuery.StorageURI = storageURIPrefix + "/" + strings.Join(nameParts, "/")
+	}
+	return &withSettings
 }
 
 type checkRunner interface {
@@ -331,17 +361,23 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
 	}
 	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
+	transientErrors := 0
 	for {
 		select {
 		case <-timeout:
 			query.LogQueryID(ctx, "BigQuery", lastJobID)
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 		default:
 			res, err := conn.Select(sinkCtx, qry[0])
 			if err != nil {
 				query.LogQueryID(ctx, "BigQuery", lastJobID)
-				return err
+				transientErrors++
+				if stop := pokeAgainAfter(ctx, err, o.sensorMode, t, transientErrors, timeout, sensorTimeout); stop != nil {
+					return stop
+				}
+				continue
 			}
+			transientErrors = 0
 			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
 				return errors.Wrap(err, "failed to parse query sensor result")
@@ -362,6 +398,45 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
 			}
 		}
+	}
+}
+
+// maxTransientPollRetries is how many times in a row a sensor polls again after a transient
+// BigQuery error. A query that keeps failing this way isn't a passing glitch, so the sensor fails
+// rather than polling until its timeout; a successful poll starts the count over.
+const maxTransientPollRetries = 10
+
+// pokeAgainAfter decides whether a waiting sensor polls again after its query failed with err,
+// the inARow-th failure in a row, and waits the poke interval if so. A transient BigQuery error,
+// such as a job that failed inside BigQuery, says nothing about the data the sensor waits for;
+// failing the sensor would throw away the time it already waited. It returns nil to poll again,
+// and otherwise the error to fail the sensor with: err itself, or the sensor's timeout or the
+// task's cancellation if either cuts the wait short.
+func pokeAgainAfter(ctx context.Context, err error, sensorMode string, t *pipeline.Asset, inARow int, timeout <-chan time.Time, sensorTimeout time.Duration) error {
+	if sensorMode == "once" || sensorMode == "" || ctx.Err() != nil || !isTransient(err) {
+		return err
+	}
+	printer, hasPrinter := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if inARow > maxTransientPollRetries {
+		if hasPrinter {
+			fmt.Fprintln(printer, "Info: Sensor query failed with a transient BigQuery error", inARow, "times in a row, giving up")
+		}
+		return err
+	}
+	pokeInterval := helpers.GetPokeInterval(ctx, t)
+	if hasPrinter {
+		fmt.Fprintf(printer, "Info: Sensor query failed with a transient BigQuery error, trying again in %d seconds (retry %d of %d): %v\n",
+			pokeInterval, inARow, maxTransientPollRetries, err)
+	}
+	wait := time.NewTimer(time.Duration(pokeInterval) * time.Second)
+	defer wait.Stop()
+	select {
+	case <-wait.C:
+		return nil
+	case <-timeout:
+		return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -432,17 +507,23 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
 	}
 	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
+	transientErrors := 0
 	for {
 		select {
 		case <-timeout:
 			query.LogQueryID(ctx, "BigQuery", lastJobID)
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 		default:
 			res, err := conn.Select(sinkCtx, extractedQuery)
 			if err != nil {
 				query.LogQueryID(ctx, "BigQuery", lastJobID)
-				return err
+				transientErrors++
+				if stop := pokeAgainAfter(ctx, err, ts.sensorMode, t, transientErrors, timeout, sensorTimeout); stop != nil {
+					return stop
+				}
+				continue
 			}
+			transientErrors = 0
 			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
 				return errors.Wrap(err, "failed to parse query sensor result")

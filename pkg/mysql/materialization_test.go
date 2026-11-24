@@ -119,6 +119,28 @@ COMMIT;$`,
 			),
 		},
 		{
+			name: "delete+insert adds the incremental predicate to the delete",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:                 pipeline.MaterializationTypeTable,
+					Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey:       "id",
+					IncrementalPredicate: "target.dt >= '2026-07-01'",
+				},
+			},
+			query: "SELECT id, value FROM source",
+			wantRegex: regexp.MustCompile(
+				`(?s)^START TRANSACTION;
+DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
+CREATE TEMPORARY TABLE __bruin_tmp_[^;\n]+ AS SELECT id, value FROM source;
+DELETE target FROM analytics\.orders AS target WHERE id IN \(SELECT DISTINCT id FROM __bruin_tmp_[^;\n]+\) AND \(target\.dt >= '2026-07-01'\);
+INSERT INTO analytics\.orders SELECT \* FROM __bruin_tmp_[^;\n]+;
+DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
+COMMIT;$`,
+			),
+		},
+		{
 			name: "merge upserts with default updates",
 			asset: &pipeline.Asset{
 				Name: "analytics.orders",

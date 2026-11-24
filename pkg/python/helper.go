@@ -20,8 +20,10 @@ var ingestrValueParameterFlags = []string{
 	"schema_contract",
 	"schema_naming",
 	"page_size",
+	"batch_size",
 	"loader_file_size",
 	"extract_parallelism",
+	"destination_parallelism",
 	"extract_partition_by",
 	"extract_partition_interval",
 	"sql_reflection_level",
@@ -59,6 +61,12 @@ func isStreamingParams(params pipeline.ParameterMap) bool {
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
 	runFullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	fullRefresh := asset.FullRefreshEnabled(runFullRefresh)
+	if err := ValidateIngestrLoadParameters(asset.Parameters, ingestrVersion(ctx)); err != nil {
+		return nil, err
+	}
+	if addr := IngestrMetricsAddress(asset.Parameters); addr != "" {
+		cmdArgs = append(cmdArgs, "--metrics-addr", addr)
+	}
 	cmdArgs = appendIngestrParameterFlags(asset.Parameters, cmdArgs)
 	cmdArgs = appendIngestrMaskFlags(asset.Parameters, asset.Columns, cmdArgs, columnOpts != nil && columnOpts.NormalizeColumnNames)
 
@@ -79,11 +87,9 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		}
 	}
 
-	cdc, _ := asset.Parameters.GetString("cdc")
-	chunked, _ := asset.Parameters.GetString("cdc_snapshot_chunked")
-	// Chunked CDC copies complete tables, so scheduler intervals cannot filter it.
-	chunkedCDC := cdc == "true" && chunked == "true"
-	if !chunkedCDC && ctx.Value(pipeline.RunConfigStartDate) != nil {
+	// Chunked and spooled CDC snapshots copy complete tables.
+	fullTableCDC := IsCDCFullTableSnapshot(asset)
+	if !fullTableCDC && ctx.Value(pipeline.RunConfigStartDate) != nil {
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
 			// If full-refresh and asset has a start_date, use that instead
@@ -106,7 +112,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	// In streaming mode --interval-end would truncate the live tail, so only bound
 	// the initial snapshot with --interval-start and leave the stream open-ended.
 	streaming := isStreamingParams(asset.Parameters)
-	if !chunkedCDC && !streaming && ctx.Value(pipeline.RunConfigEndDate) != nil {
+	if !fullTableCDC && !streaming && ctx.Value(pipeline.RunConfigEndDate) != nil {
 		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 		if okParse {
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
@@ -200,6 +206,12 @@ func appendIngestrParameterFlags(params pipeline.ParameterMap, cmdArgs []string)
 	for _, param := range ingestrBoolParameterFlags {
 		if value, exists := params.GetString(param); exists && value == "true" {
 			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-"))
+		}
+	}
+
+	for _, param := range []string{"no_load_timestamp", "no_run_id"} {
+		if value, exists := params.GetString(param); exists {
+			cmdArgs = append(cmdArgs, "--"+strings.ReplaceAll(param, "_", "-")+"="+value)
 		}
 	}
 

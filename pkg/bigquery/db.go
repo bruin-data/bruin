@@ -2,6 +2,8 @@ package bigquery
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -119,6 +121,11 @@ func (d *Client) Location() string {
 	return d.config.Location
 }
 
+// PrepareAssetForRender fills in connection-level settings that the materialized query needs.
+func (d *Client) PrepareAssetForRender(asset *pipeline.Asset) *pipeline.Asset {
+	return WithIcebergSettings(asset, d.config.StorageURI)
+}
+
 func (d *Client) UsesApplicationDefaultCredentials() bool {
 	return d.config.UseApplicationDefaultCredentials
 }
@@ -228,6 +235,30 @@ func applyJobIDPrefix(ctx context.Context, bqQuery *bigquery.Query) {
 	bqQuery.AddJobIDSuffix = true
 }
 
+// applyRunScopedJobID gives the main query of a Bruin Cloud run a job ID derived from the run,
+// the asset and the SQL, so a retry of the asset uses the same ID and can find the job of an
+// earlier attempt (see runQueryJob). Other queries keep the library's random suffix.
+func applyRunScopedJobID(ctx context.Context, bqQuery *bigquery.Query, q *query.Query) {
+	runID, asset := q.Annotations["run_id"], q.Annotations["asset"]
+	if bqQuery.JobID == "" || runID == "" || asset == "" || query.QueryTypeFromContext(ctx) != query.QueryTypeMain {
+		return
+	}
+	sql := q.Query
+	// The annotation comment carries the try number, which changes on every attempt.
+	if rest, ok := strings.CutPrefix(sql, ansisql.AnnotationCommentPrefix); ok {
+		if _, body, found := strings.Cut(rest, "\n"); found {
+			sql = body
+		}
+	}
+	h := sha256.New()
+	for _, part := range []string{runID, asset, sql} {
+		h.Write([]byte(part))
+		h.Write([]byte{0})
+	}
+	bqQuery.JobID += "-" + hex.EncodeToString(h.Sum(nil))[:32]
+	bqQuery.AddJobIDSuffix = false
+}
+
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return false, err
@@ -285,6 +316,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 		return err
 	}
 	bqQuery := d.queryForExecution(ctx, q.String())
+	applyRunScopedJobID(ctx, bqQuery, q)
 	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
 		return formatError(err)
@@ -313,7 +345,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 	bqQuery := d.queryForExecution(ctx, q.String())
 	job, rows, err := d.startQuery(ctx, bqQuery)
 	if err != nil {
-		return nil, formatError(err)
+		return nil, queryError(err)
 	}
 	defer cancelJobOnContextCancellation(ctx, job)
 	if job != nil {
@@ -323,7 +355,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 		rows, err = job.Read(ctx)
 	}
 	if err != nil {
-		return nil, formatError(err)
+		return nil, queryError(err)
 	}
 
 	result := make([][]interface{}, 0)
@@ -334,6 +366,9 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 			break
 		}
 		if err != nil {
+			if hasTransientReason(err) {
+				return nil, &transientError{err: err}
+			}
 			return nil, err
 		}
 
@@ -767,11 +802,22 @@ func formatError(err error) error {
 	}
 
 	if googleError.Code == 404 || googleError.Code == 400 {
-		return fmt.Errorf("%s", googleError.Message)
+		return &formattedError{msg: googleError.Message, err: err}
 	}
 
 	return googleError
 }
+
+// formattedError shows only BigQuery's message, while keeping the error it came from reachable,
+// e.g. for its reason.
+type formattedError struct {
+	msg string
+	err error
+}
+
+func (e *formattedError) Error() string { return e.msg }
+
+func (e *formattedError) Unwrap() error { return e.err }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
 func (d *Client) Ping(ctx context.Context) error {
@@ -974,6 +1020,11 @@ func (d *Client) IsMaterializationTypeMismatch(ctx context.Context, meta *bigque
 }
 
 func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	// Assets without a materialization manage their own objects.
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+
 	tableRef, err := d.getTableRef(ctx, tableName)
 	if err != nil {
 		return err

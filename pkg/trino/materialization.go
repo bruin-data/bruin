@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -59,6 +60,10 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) {
+	if err := ansisql.RejectDeleteInsertPredicate(asset, "Trino"); err != nil {
+		return "", err
+	}
+
 	mat := asset.Materialization
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)

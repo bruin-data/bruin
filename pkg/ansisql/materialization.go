@@ -33,6 +33,15 @@ func AddIncrementalPredicate(conditions []string, predicate string) []string {
 	return append(conditions, "("+predicate+")")
 }
 
+// RejectDeleteInsertPredicate fails when an incremental_predicate is set on a platform whose
+// delete+insert doesn't apply it, so the setting isn't silently ignored when validation is skipped.
+func RejectDeleteInsertPredicate(asset *pipeline.Asset, platform string) error {
+	if strings.TrimSpace(asset.Materialization.IncrementalPredicate) == "" {
+		return nil
+	}
+	return fmt.Errorf("incremental_predicate is not supported for %s delete+insert materialization", platform)
+}
+
 // BuildIncrementalDelete builds the DELETE of a delete+insert. With an
 // incremental_predicate, the target is aliased as `target` and the predicate
 // is ANDed onto the condition; without one, the statement is unchanged.

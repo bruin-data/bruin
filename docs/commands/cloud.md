@@ -24,7 +24,7 @@ export BRUIN_CLOUD_API_KEY="your-api-key-here"
 bruin cloud projects list
 ```
 
-Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → repository login → global login. Run `bruin cloud auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
+Authentication priority is `--api-key` → `BRUIN_CLOUD_API_KEY` → [act-as session](#act-as) → repository login → global login. Run `bruin cloud auth status` to check which one you are using. If your repository has multiple `bruin` connections, specify the token with `--api-key` or `BRUIN_CLOUD_API_KEY`.
 
 To save an existing token for a repository, add a `bruin` connection to its `.bruin.yml`:
 
@@ -99,6 +99,18 @@ bruin cloud auth status
 
 Use `--api-key` or `--team` to inspect an explicit override. This checks local credentials; Cloud validates the token and permissions when an API command runs.
 
+### `act-as`
+
+Run cloud commands as one of your team's agents, with its permissions instead of your login's; Cloud logs the actions as the agent. Needs a global login with "Allow acting as agents" ticked on the login page; in a terminal, `act-as` opens that login page for you when your login lacks it.
+
+```bash
+bruin cloud act-as --agent-id 12   # start
+bruin cloud act-as                 # show the session
+bruin cloud act-as --stop          # use your own login again
+```
+
+The session stays on the team it started on and renews automatically with your own login. When the agent isn't allowed to do something, the error names the missing permission; add it to the agent's Cloud CLI permissions rather than stopping the session, since stopping switches back to your own login. `--api-key` and `BRUIN_CLOUD_API_KEY` still take precedence, and `bruin cloud logout --global` ends the session. Add `--output json` for machine-readable output.
+
 ### `teams`
 
 List the teams your token can act on. Run this to discover the company prefix to pass to `--team` (or `BRUIN_CLOUD_TEAM`) — needed when your personal API key belongs to more than one team.
@@ -115,6 +127,14 @@ bruin cloud teams list
 | 1  | Acme   | acme           |
 | 2  | Globex | globex         |
 +----+--------+----------------+
+```
+
+See the team's roles (built-in and custom, with their permissions) and who has which. Both are read-only: create roles and change members in Team Settings. Both need **View team settings**; `members` also needs a personal API key, since it shows email addresses.
+
+```bash
+bruin cloud teams roles
+bruin cloud teams members
+bruin cloud teams roles --output json   # each role's full permission list
 ```
 
 > [!TIP]
@@ -977,10 +997,13 @@ Cap what a single BigQuery query can cost on a BigQuery connection in this set, 
 
 ```bash
 bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --max-query-cost 0.10
+bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --max-query-cost-soft 0.05
 bruin cloud connection-sets cost-limit --set-id 7 --connection my_bq --remove
 ```
 
-Without `--connection`, the limit is applied to every BigQuery connection in the set. The limit is in USD (minimum `0.01`) and shows in `connection-sets get`. The same call over the API is `PUT /api/v1/connection-sets/{id}/connections/{name}/cost-limit` with `{"max_query_cost": 0.10}` (`null` removes it).
+`--max-query-cost` is the hard limit. Queries over the soft limit (`--max-query-cost-soft`) are refused too, unless the caller confirms: `bruin query --dangerously-bypass-soft-limits`, or `"bypass_soft_limit": true` on the API. `--remove` clears both limits; `--remove-hard` and `--remove-soft` clear one.
+
+Without `--connection`, the limits are applied to every BigQuery connection in the set. Limits are in USD (minimum `0.01`) and show in `connection-sets get`. The same call over the API is `PUT /api/v1/connection-sets/{id}/connections/{name}/cost-limit` with `{"max_query_cost": 0.10, "max_query_cost_soft": 0.05}`; only the keys you send change, and `null` removes a limit.
 
 It needs the `connection-set:cost-limit` permission, and an agent's own run token can't change it. Queries run with credentials from your local `.bruin.yml` are not affected; cap those with `max_query_cost` on the connection (see [BigQuery](../platforms/bigquery.md#query-cost-limits)).
 
@@ -1270,6 +1293,88 @@ Delete a dashboard so it stops appearing. Requires manage-access (the dashboard 
 
 ```bash
 bruin cloud dashboards delete --dashboard-id 42
+```
+
+---
+
+### `data-apps`
+
+Build Bruin Cloud data apps from your own coding agent (Claude Code, Cursor, …). An app is three files — the HTML (`data-app.html`), its warehouse queries (`data-app.queries.json`) and its HTTP requests (`data-app.http.json`) — stored in Bruin Cloud. Its queries and requests run on the connections of the agent it's bound to.
+
+#### `guide`
+
+Print the guide a coding agent follows to build a data app, as markdown it can use as a skill. With `--output json` you also get its `name`, `description` and a `version` that changes whenever the guide does:
+
+```bash
+bruin cloud data-apps guide
+bruin cloud data-apps guide --output json
+```
+
+#### `list`
+
+List the data apps you can view (id, title, agent, visibility, last updated):
+
+```bash
+bruin cloud data-apps list
+```
+
+#### `settings`
+
+Show what the team allows its data apps: whether warehouse queries are read-only, and which domains a request may send a connection's credentials to. A team admin changes these in Bruin Cloud → AI settings → Data Apps.
+
+```bash
+bruin cloud data-apps settings
+```
+
+#### `create`
+
+Create an empty app. `--agent-id` can be left out and set later with `update`; until then the app's queries can't run. Apps are private unless `--visibility team`.
+
+```bash
+bruin cloud data-apps create --title "Sales overview" --agent-id 7
+```
+
+#### `get`
+
+Show an app's agent, version, and the queries and requests it declares:
+
+```bash
+bruin cloud data-apps get --data-app-id 42
+```
+
+#### `pull`
+
+Write an app's three files into a folder (default: the current one), plus a `.bruin-data-app.json` recording which app and version they came from. It won't overwrite local files that differ from the app unless you pass `--force`.
+
+```bash
+bruin cloud data-apps pull --data-app-id 42 --dir sales/
+```
+
+#### `push`
+
+Save the files to Bruin Cloud. Point at the folder `pull` wrote, or at the files directly; only the files you give are saved.
+
+```bash
+bruin cloud data-apps push --data-app-id 42 --dir sales/
+bruin cloud data-apps push --data-app-id 42 --html report.html --queries queries.json
+```
+
+After a `pull`, the push sends the version it was based on: if someone saved the app since, it fails instead of overwriting their change. Pull again, re-apply your change and push — or pass `--force` to overwrite.
+
+#### `update`
+
+Rename an app or set its agent. Changing the agent is limited to the app's creator and team admins, and an agent can be changed but not removed.
+
+```bash
+bruin cloud data-apps update --data-app-id 42 --title "Sales" --agent-id 8
+```
+
+#### `delete`
+
+Delete an app (its creator or a team admin only):
+
+```bash
+bruin cloud data-apps delete --data-app-id 42
 ```
 
 ---

@@ -358,6 +358,17 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
 		})
 	}
+	if err := python.ValidateIngestrCDCParameters(asset); err != nil {
+		issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+	}
+	if version, err := python.ResolveIngestrVersion(asset); err == nil {
+		if err := python.ValidateIngestrCDCParameterVersion(asset, version); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+		if err := python.ValidateIngestrLoadParameters(asset.Parameters, version); err != nil {
+			issues = append(issues, &Issue{Task: asset, Description: err.Error()})
+		}
+	}
 	if mode, exists := asset.Parameters.GetString("cdc_mode"); exists && mode != "stream" && mode != "batch" {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -1654,7 +1665,7 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		if asset.Materialization.IncrementalPredicate != "" && !supportsIncrementalPredicate(asset) {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake and Postgres.",
+				Description: "Incremental predicate is only supported with the 'merge' strategy, or with 'delete+insert' on DuckDB, BigQuery, Snowflake, Postgres, Databricks, MySQL, MS SQL and Oracle.",
 			})
 		}
 
@@ -1802,7 +1813,9 @@ func supportsIncrementalPredicate(asset *pipeline.Asset) bool {
 		return true
 	case pipeline.MaterializationStrategyDeleteInsert:
 		switch asset.Type {
-		case pipeline.AssetTypeDuckDBQuery, pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery, pipeline.AssetTypePostgresQuery:
+		case pipeline.AssetTypeDuckDBQuery, pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery, pipeline.AssetTypePostgresQuery,
+			pipeline.AssetTypeDatabricksQuery, pipeline.AssetTypeMySQLQuery, pipeline.AssetTypeMsSQLQuery,
+			pipeline.AssetTypeOracleQuery:
 			return true
 		default:
 			return false
@@ -2300,6 +2313,9 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 
 			q := &query.Query{Query: renderedQuery}
 			valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), q)
+			if tableNotBuiltYet(err, p, asset, assetRenderer.Render) {
+				continue
+			}
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,
@@ -2329,6 +2345,12 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 		// including hooks. Validating hooks independently would break shared
 		// script scope, such as a pre-hook DECLARE referenced by the asset query.
 		if asset.Type == pipeline.AssetTypeBigqueryQuery {
+			return issues, nil
+		}
+
+		// DuckDB runs hooks in order, so a hook often uses a schema or table an earlier hook
+		// created; EXPLAIN against the unchanged database would reject it.
+		if asset.Type == pipeline.AssetTypeDuckDBQuery || asset.Type == pipeline.AssetTypeMotherduckQuery {
 			return issues, nil
 		}
 
@@ -2484,6 +2506,9 @@ func (g *GlossaryChecker) EnsureParentDomainsExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
+// ansiEscape matches the terminal highlighting SQLGlot puts in its parse errors.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 type UsedTableValidatorRule struct {
 	renderer jinja.RendererInterface
 	parser   sqlparser.Parser
@@ -2521,7 +2546,7 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "failed to get missing dependencies: " + err.Error(),
+			Description: "failed to get missing dependencies: " + ansiEscape.ReplaceAllString(err.Error(), ""),
 		})
 		return issues, nil //nolint
 	}
@@ -2721,19 +2746,28 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 
 	validationCtx := context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
 
+	// Interval modifiers and pipeline macros are user content, so a template that fails to
+	// render is reported against the asset instead of aborting the validation of every pipeline.
+	renderFailure := func(err error) []*Issue {
+		return []*Issue{{
+			Task:        asset,
+			Description: fmt.Sprintf("failed to render the time interval for asset %v: %v", asset.Name, err),
+		}}
+	}
+
 	r, err := intervalRenderer.CloneForAsset(validationCtx, p, asset)
 	if err != nil {
-		return nil, err
+		return renderFailure(err), nil
 	}
 
 	renderedStartDate, err := r.Render("{{ start_datetime }}")
 	if err != nil {
-		return nil, err
+		return renderFailure(err), nil
 	}
 
 	renderedEndDate, err := r.Render("{{ end_datetime }}")
 	if err != nil {
-		return nil, err
+		return renderFailure(err), nil
 	}
 
 	parsedStartDate, err := time.Parse("2006-01-02T15:04:05", renderedStartDate)

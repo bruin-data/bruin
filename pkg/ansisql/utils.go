@@ -17,6 +17,8 @@ import (
 const (
 	DefaultQueryAnnotations = "default"
 	QueryLogCharacterLimit  = 10000
+	// AnnotationCommentPrefix starts the comment line that carries the annotations in the SQL.
+	AnnotationCommentPrefix = "-- @bruin.config: "
 )
 
 // mergeAnnotations marshals the baseline fields merged with the user-provided
@@ -87,7 +89,7 @@ func AddAnnotationJSONComment(q *query.Query, annotationJSON string) (*query.Que
 	}
 
 	annotatedQuery := *q
-	annotatedQuery.Query = fmt.Sprintf("-- @bruin.config: %s\n", annotationJSON) + q.Query
+	annotatedQuery.Query = AnnotationCommentPrefix + annotationJSON + "\n" + q.Query
 	annotatedQuery.Annotations = annotationTags
 	return &annotatedQuery, nil
 }

@@ -69,9 +69,18 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error
 	// BigQuery treats TRUNCATE TABLE as a DML statement, so the truncate and insert can
 	// run inside a single transaction. This makes the full refresh atomic: readers never
 	// observe the intermediate empty table, and a failed insert rolls back the truncate.
+	truncate := "TRUNCATE TABLE " + task.Name
+	if task.Materialization.IsIceberg() {
+		// Iceberg tables reject TRUNCATE TABLE. Filtering on the raw partition column satisfies
+		// require_partition_filter, which a filter on TIMESTAMP_TRUNC(ts, MONTH) wouldn't.
+		truncate = fmt.Sprintf("DELETE FROM %s WHERE TRUE", task.Name)
+		if column := partitionColumn(task.Materialization.PartitionBy); column != "" {
+			truncate = fmt.Sprintf("DELETE FROM %s WHERE `%s` IS NULL OR `%s` IS NOT NULL", task.Name, column, column)
+		}
+	}
 	queries := []string{
 		"BEGIN TRANSACTION",
-		"TRUNCATE TABLE " + task.Name,
+		truncate,
 		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
 		"COMMIT TRANSACTION",
 	}
@@ -445,6 +454,12 @@ func partitionExpressionReferencesColumn(expression, column string) bool {
 		return false
 	}
 
+	column = strings.Trim(strings.TrimSpace(column), "`")
+	return strings.EqualFold(partitionColumn(expression), column)
+}
+
+// partitionColumn returns the column a partition expression is built on, e.g. ts for DATE(ts).
+func partitionColumn(expression string) string {
 	candidate := strings.TrimSpace(expression)
 	for {
 		openParen := strings.IndexByte(candidate, '(')
@@ -477,16 +492,29 @@ func partitionExpressionReferencesColumn(expression, column string) bool {
 		candidate = strings.TrimSpace(argument[:end])
 	}
 
-	candidate = strings.Trim(strings.TrimSpace(candidate), "`")
-	column = strings.Trim(strings.TrimSpace(column), "`")
-	return strings.EqualFold(candidate, column)
+	return strings.Trim(strings.TrimSpace(candidate), "`")
 }
 
+// buildTableOptions returns the OPTIONS clause of a CREATE TABLE statement. For Iceberg tables it is
+// prefixed with the WITH CONNECTION clause, which BigQuery expects right before OPTIONS.
 func buildTableOptions(asset *pipeline.Asset, partitioned bool) (string, error) {
-	options := make([]string, 0, 2)
+	options := make([]string, 0, 5)
 
 	if err := validateRequirePartitionFilter(asset, partitioned); err != nil {
 		return "", err
+	}
+
+	connectionClause := ""
+	if asset.Materialization.IsIceberg() {
+		connectionClause = "WITH CONNECTION DEFAULT "
+		if conn := strings.Trim(asset.BigQuery.CloudResourceConnection, "`"); conn != "" {
+			connectionClause = "WITH CONNECTION `" + conn + "` "
+		}
+		options = append(options, "file_format = 'PARQUET'", "table_format = 'ICEBERG'")
+		// The operator rejects Iceberg assets without one before rendering.
+		if asset.BigQuery.StorageURI != "" {
+			options = append(options, fmt.Sprintf("storage_uri = %q", asset.BigQuery.StorageURI))
+		}
 	}
 	if asset.BigQuery.RequirePartitionFilter != nil && *asset.BigQuery.RequirePartitionFilter {
 		options = append(options, "require_partition_filter = TRUE")
@@ -512,7 +540,7 @@ func buildTableOptions(asset *pipeline.Asset, partitioned bool) (string, error) 
 		return "", nil
 	}
 
-	return "OPTIONS (" + strings.Join(options, ", ") + ")", nil
+	return connectionClause + "OPTIONS (" + strings.Join(options, ", ") + ")", nil
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {

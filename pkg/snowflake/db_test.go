@@ -6,6 +6,9 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
+	"github.com/snowflakedb/gosnowflake/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1005,6 +1009,15 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			expectedError: "unable to retrieve table metadata for 'TEST_SCHEMA.TEST_TABLE': query error",
 		},
 		{
+			name: "existing table is left alone for an asset without a materialization",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No query expected: Bruin doesn't manage the object.
+			},
+		},
+		{
 			name: "materialization type matches, no action taken",
 			mockSetup: func(mock sqlmock.Sqlmock) {
 				// Mock the SELECT query to return the same type
@@ -1789,5 +1802,31 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, gotQuery)
 		})
+	}
+}
+
+func TestNewDB_SilencesDriverLogging(t *testing.T) {
+	t.Parallel()
+
+	// The driver binds its log handler to the stderr it saw at package init, so the
+	// check runs in a subprocess and inspects what actually reached its stderr.
+	const canary = "bruin-snowflake-driver-log-canary"
+	if mode := os.Getenv("BRUIN_SNOWFLAKE_LOG_TEST"); mode != "" {
+		// The driver raises its level to fatal when GITHUB_ACTIONS is set, so pin it.
+		require.NoError(t, gosnowflake.GetLogger().SetLogLevel("error"))
+		if mode == "silenced" {
+			_, err := NewDB(&Config{Account: "my-account", Username: "my-user", Password: "test-password", Region: "eu-west-1"})
+			require.NoError(t, err)
+		}
+		gosnowflake.GetLogger().Error(canary)
+		return
+	}
+
+	for mode, wantLogged := range map[string]bool{"default": true, "silenced": false} {
+		command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestNewDB_SilencesDriverLogging$")
+		command.Env = append(os.Environ(), "BRUIN_SNOWFLAKE_LOG_TEST="+mode)
+		output, err := command.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		assert.Equal(t, wantLogged, strings.Contains(string(output), canary), "mode %s: %s", mode, output)
 	}
 }

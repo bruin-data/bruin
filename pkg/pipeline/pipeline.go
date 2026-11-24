@@ -192,6 +192,10 @@ var defaultMapping = map[string]string{
 	"mongo":                 "mongo-default",
 	"mysql":                 "mysql-default",
 	"notion":                "notion-default",
+	"odoo":                  "odoo-default",
+	"breezyhr":              "breezyhr-default",
+	"privatus":              "privatus-default",
+	"peeringdb":             "peeringdb-default",
 	"hana":                  "hana-default",
 	"shopify":               "shopify-default",
 	"gorgias":               "gorgias-default",
@@ -253,6 +257,7 @@ var defaultMapping = map[string]string{
 	"elasticsearch":         "elasticsearch-default",
 	"vertica":               "vertica-default",
 	"adls":                  "adls-default",
+	"azure_blob":            "azure_blob-default",
 	"allium":                "allium-default",
 	"anthropic":             "anthropic-default",
 	"apifootball":           "apifootball-default",
@@ -655,6 +660,7 @@ const (
 // tableFormatAssetTypes lists the asset types that can create tables in a non-default table format.
 var tableFormatAssetTypes = map[AssetType]bool{
 	AssetTypeSnowflakeQuery: true,
+	AssetTypeBigqueryQuery:  true,
 }
 
 // SupportsTableFormat reports whether assets of this type can set materialization.table_format.
@@ -1142,7 +1148,11 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 
 	type Alias struct {
 		Key      string `yaml:"key"`
-		InjectAs string `yaml:"inject_as"`
+		InjectAs string `yaml:"inject_as,omitempty"`
+	}
+
+	if s.InjectedKey == s.SecretKey {
+		s.InjectedKey = ""
 	}
 
 	return Alias{
@@ -1151,11 +1161,65 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 	}, nil
 }
 
+// CheckNumber is a custom check value kept as written, so decimals and integers above 2^53 compare exactly.
+type CheckNumber string //nolint:recvcheck
+
+func (n CheckNumber) String() string {
+	if n == "" {
+		return "0"
+	}
+	return string(n)
+}
+
+func (n CheckNumber) IsZero() bool {
+	f, err := strconv.ParseFloat(n.String(), 64)
+	return err == nil && f == 0
+}
+
+func (n CheckNumber) MarshalJSON() ([]byte, error) {
+	return []byte(n.String()), nil
+}
+
+func (n *CheckNumber) UnmarshalJSON(data []byte) error {
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err != nil {
+		return errors.Wrap(err, "custom check value must be a number")
+	}
+	*n = CheckNumber(num)
+	return nil
+}
+
+func (n CheckNumber) MarshalYAML() (interface{}, error) {
+	tag := "!!float"
+	if _, err := strconv.ParseInt(n.String(), 10, 64); err == nil {
+		tag = "!!int"
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: n.String()}, nil
+}
+
+func (n *CheckNumber) UnmarshalYAML(node *yaml.Node) error {
+	var i int64
+	if node.ShortTag() == "!!int" && node.Decode(&i) == nil {
+		*n = CheckNumber(strconv.FormatInt(i, 10))
+		return nil
+	}
+	if _, err := strconv.ParseFloat(node.Value, 64); err == nil {
+		*n = CheckNumber(node.Value)
+		return nil
+	}
+	var f float64
+	if err := node.Decode(&f); err != nil {
+		return errors.Errorf("custom check value must be a number, got '%s'", node.Value)
+	}
+	*n = CheckNumber(strconv.FormatFloat(f, 'f', -1, 64))
+	return nil
+}
+
 type CustomCheck struct {
 	ID            string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name          string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description   string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value         int64           `json:"value" yaml:"value" mapstructure:"value"`
+	Value         CheckNumber     `json:"value" yaml:"value" mapstructure:"value"`
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
@@ -1289,6 +1353,9 @@ type BigQueryConfig struct {
 	RequirePartitionFilter  *bool    `json:"require_partition_filter,omitempty" yaml:"require_partition_filter,omitempty" mapstructure:"require_partition_filter"`
 	PartitionExpirationDays *float64 `json:"partition_expiration_days,omitempty" yaml:"partition_expiration_days,omitempty" mapstructure:"partition_expiration_days"`
 	PartitionKeyImmutable   *bool    `json:"partition_key_immutable,omitempty" yaml:"partition_key_immutable,omitempty" mapstructure:"partition_key_immutable"`
+	// StorageURI and CloudResourceConnection only apply to Iceberg tables.
+	StorageURI              string `json:"storage_uri,omitempty" yaml:"storage_uri,omitempty" mapstructure:"storage_uri"`
+	CloudResourceConnection string `json:"cloud_resource_connection,omitempty" yaml:"cloud_resource_connection,omitempty" mapstructure:"cloud_resource_connection"`
 }
 
 func (b BigQueryConfig) MarshalJSON() ([]byte, error) {
@@ -1301,7 +1368,8 @@ func (b BigQueryConfig) MarshalJSON() ([]byte, error) {
 }
 
 func (b BigQueryConfig) IsZero() bool {
-	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil
+	return b.RequirePartitionFilter == nil && b.PartitionExpirationDays == nil && b.PartitionKeyImmutable == nil &&
+		b.StorageURI == "" && b.CloudResourceConnection == ""
 }
 
 type ClickHouseConfig struct {
@@ -2693,6 +2761,7 @@ var ConnectionlessIngestrSources = map[string]string{
 	"chess.com":         "chess://",
 	"frankfurter.dev":   "frankfurter://",
 	"stat.ripe.net":     "ripestat://",
+	"peeringdb.com":     "peeringdb://",
 	"finance.yahoo.com": "yfinance://",
 }
 
@@ -3009,6 +3078,8 @@ type createPipelineConfig struct {
 
 type CreatePipelineOption func(*createPipelineConfig)
 
+// WithGitMetadata fills Pipeline.Commit from the git repository containing the
+// pipeline. The commit is left empty when it cannot be resolved.
 func WithGitMetadata() CreatePipelineOption {
 	return func(o *createPipelineConfig) {
 		o.parseGitMetadata = true
@@ -3075,10 +3146,12 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
 
+	// Resolve the commit before any mutator runs so rendered asset parameters
+	// see commit_hash. A missing HEAD (e.g. a repository with no commits yet)
+	// is not fatal: the commit is left empty.
 	if config.parseGitMetadata {
-		pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing commit: %w", err)
+		if commit, commitErr := git.CurrentCommit(pathToPipeline); commitErr == nil {
+			pipeline.Commit = commit
 		}
 	}
 
@@ -3585,6 +3658,10 @@ func mergeBigQueryDefaults(target *BigQueryConfig, defaults BigQueryConfig) {
 		value := *defaults.PartitionKeyImmutable
 		target.PartitionKeyImmutable = &value
 	}
+	if target.CloudResourceConnection == "" {
+		target.CloudResourceConnection = defaults.CloudResourceConnection
+	}
+	// StorageURI isn't inherited: BigQuery rejects two Iceberg tables on the same folder.
 }
 
 func mergeClickHouseDefaults(target *ClickHouseConfig, defaults ClickHouseConfig) {
@@ -3988,7 +4065,7 @@ func findCustomCheckIndex(checks []CustomCheck, name string) int {
 func mergeCustomCheckDefault(target *CustomCheck, defaults CustomCheck) {
 	applyStringDefault(&target.Name, defaults.Name)
 	applyStringDefault(&target.Description, defaults.Description)
-	if target.Value == 0 && defaults.Value != 0 {
+	if target.Value.IsZero() && !defaults.Value.IsZero() {
 		target.Value = defaults.Value
 	}
 	if target.Count == nil {

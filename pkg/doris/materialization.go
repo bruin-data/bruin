@@ -78,6 +78,10 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) {
+	if err := ansisql.RejectDeleteInsertPredicate(asset, "Doris"); err != nil {
+		return "", err
+	}
+
 	if asset.Materialization.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", pipeline.MaterializationStrategyDeleteInsert)
 	}

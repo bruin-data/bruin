@@ -35,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
+	"github.com/bruin-data/bruin/pkg/failurereport"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/inference"
@@ -206,10 +207,15 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			// Check if this is upstream failed
 			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
 
-			if isUpstreamFailed {
+			switch {
+			case isUpstreamFailed:
 				assetStatus = "UPSTREAM FAILED"
 				assetColor = color.New(color.FgYellow)
-			} else {
+			case hasFailedCheck(results):
+				// Matches the summary, which counts the asset as failed due to checks.
+				assetStatus = "FAIL"
+				assetColor = color.New(color.FgRed)
+			default:
 				assetStatus = "PASS"
 				assetColor = color.New(color.FgGreen)
 			}
@@ -246,6 +252,15 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 
 		fmt.Println()
 	}
+}
+
+func hasFailedCheck(results map[string]*scheduler.TaskExecutionResult) bool {
+	for key, result := range results {
+		if key != "main" && result != nil && result.Error != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func find(slice []scheduler.TaskInstance, item scheduler.TaskInstance) (int, bool) { // nolint:unparam
@@ -1258,6 +1273,10 @@ func Run(isDebug *bool) *cli.Command {
 			// Errors are printed below, once credential masking is installed: a
 			// connection error can echo the DSN or URI it failed on, password included.
 			connectionManager, errs = connectionManagerFromConfig(runCtx, cm, logger)
+			// A connection reported missing can then say that its secrets backend couldn't be read.
+			if lookupErrors, ok := connectionManager.(config.ConnectionLookupErrors); ok {
+				runCtx = context.WithValue(runCtx, config.ConnectionLookupErrorsContextKey, lookupErrors)
+			}
 
 			foundPipeline := pipelineInfo.Pipeline
 			connectionOverride, err := continuedConnectionOverride(c.String("connection-override"), c.Bool("continue"), runConfig.ConnectionOverride)
@@ -1709,7 +1728,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}
 	}
 
-	opts = append(opts, pipeline.WithMutate())
+	opts = append(opts, pipeline.WithMutate(), pipeline.WithGitMetadata())
 	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		errorPrinter.Println("Failed to build pipeline: ", err.Error())
@@ -1765,6 +1784,10 @@ func buildStandalonePythonPipeline(ctx context.Context, inputPath string) (*pipe
 			Path: filepath.Join(scriptDir, "pipeline.yml"),
 		},
 		MacrosPath: filepath.Join(scriptDir, "macros"),
+	}
+	// Set before mutation so rendered parameters see commit_hash; left empty when HEAD is unavailable.
+	if commit, commitErr := git.CurrentCommit(scriptDir); commitErr == nil {
+		pl.Commit = commit
 	}
 
 	pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)
@@ -1950,10 +1973,13 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	fmt.Println(tree.String())
 }
 
+// printErrorsMinimal prints each failed asset's error, followed by a failurereport line that says
+// in a machine-readable way why it failed. Minimal logs are what Bruin Cloud runs with.
 func printErrorsMinimal(errorsInTaskResults []*scheduler.TaskExecutionResult) {
 	for _, result := range errorsInTaskResults {
 		assetName := result.Instance.GetAsset().Name
 		fmt.Printf("\n  %s: %s\n", assetName, result.Error)
+		fmt.Println(failurereport.Line(assetName, result.Error))
 	}
 }
 
@@ -1964,7 +1990,7 @@ func printSingleCheckError(result *scheduler.TaskExecutionResult) {
 	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
 	if ok {
 		fmt.Printf("Error: %s\n\n", checkErr.Message)
-		fmt.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
+		fmt.Printf("Result: %s (expected: %s)\n\n", checkErr.Result, checkErr.Expected)
 		fmt.Println("Query:")
 		fmt.Println(checkErr.Query + "\n")
 	} else {
@@ -2131,7 +2157,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftSeed) || s.WillRunTaskOfType(pipeline.AssetTypePostgresSeed) ||
-		s.WillRunTaskOfType(pipeline.AssetTypePostgresQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypePostgresTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypePostgresQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypePostgresTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypePostgresSource) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftSource) {
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     postgres.NewMaterializer(fullRefresh),
@@ -2179,6 +2206,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypePostgresSource][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeRedshiftSource][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypeRedshiftSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -2204,7 +2237,8 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
-	if s.WillRunTaskOfType(pipeline.AssetTypeDremioQuery) || estimateCustomCheckType == pipeline.AssetTypeDremioQuery || s.WillRunTaskOfType(pipeline.AssetTypeDremioQuerySensor) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeDremioQuery) || estimateCustomCheckType == pipeline.AssetTypeDremioQuery || s.WillRunTaskOfType(pipeline.AssetTypeDremioQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDremioSource) {
 		dremioFileExtractor := &query.FileQuerySplitterExtractor{
 			Fs:       fs,
 			Renderer: renderer,
@@ -2219,6 +2253,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDremioQuerySensor][scheduler.TaskInstanceTypeMain] = dremioQuerySensor
 		mainExecutors[pipeline.AssetTypeDremioQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = dremioCheckRunner
 		mainExecutors[pipeline.AssetTypeDremioQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeDremioSource][scheduler.TaskInstanceTypeColumnCheck] = dremioCheckRunner
+		mainExecutors[pipeline.AssetTypeDremioSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeSailQuery) || estimateCustomCheckType == pipeline.AssetTypeSailQuery || s.WillRunTaskOfType(pipeline.AssetTypeSailQuerySensor) {
 		sailFileExtractor := &query.FileQuerySplitterExtractor{
@@ -2319,7 +2357,7 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
 	}
-	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeTableSensor)
+	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSource)
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     snowflake.NewMaterializer(fullRefresh),
@@ -2351,6 +2389,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSnowflakeSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeSnowflakeSeed][scheduler.TaskInstanceTypeMetadataPush] = sfMetadataPushOperator
 
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeSnowflakeSource][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
@@ -2363,7 +2405,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSeed) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSource) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSource) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     mssql.NewMaterializer(fullRefresh),
 			Hoister: hoister,
@@ -2418,6 +2461,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSynapseQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
 		mainExecutors[pipeline.AssetTypeSynapseQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeMsSQLSource][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeMsSQLSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseSource][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		// we set the Python runners to run the checks on MsSQL
 		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
@@ -2427,7 +2476,8 @@ func SetupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuery) || estimateCustomCheckType == pipeline.AssetTypeVerticaQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaSeed) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeVerticaSource) {
 		verticaOperator := vertica.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     vertica.NewMaterializer(fullRefresh),
 			Hoister: hoister,
@@ -2452,6 +2502,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeVerticaTableSensor][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
 		mainExecutors[pipeline.AssetTypeVerticaTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeVerticaSource][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
+		mainExecutors[pipeline.AssetTypeVerticaSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		if estimateCustomCheckType == pipeline.AssetTypeVerticaQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
@@ -2463,7 +2517,8 @@ func SetupExecutors(
 		estimateCustomCheckType == pipeline.AssetTypeFabricQuery || estimateCustomCheckType == pipeline.AssetTypeFabricQueryLegacy ||
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricSeed) || s.WillRunTaskOfType(pipeline.AssetTypeFabricSeedLegacy) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensorLegacy) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricSource) {
 		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     fabric.NewMaterializer(fullRefresh),
 			Hoister: hoister,
@@ -2501,6 +2556,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeMain] = fabricTableSensor
 		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
 		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeFabricSource][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeFabricQuery || estimateCustomCheckType == pipeline.AssetTypeFabricQueryLegacy {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
@@ -2547,7 +2606,8 @@ func SetupExecutors(
 
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeAthenaTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSQLSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeAthenaTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSQLSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeAthenaSource) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerListWithLocation{
 			Mat:     athena.NewMaterializer(fullRefresh),
 			Hoister: hoister,
@@ -2572,6 +2632,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeAthenaSQLSensor][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
 		mainExecutors[pipeline.AssetTypeAthenaSQLSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeAthenaSource][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		if estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
@@ -2580,7 +2644,8 @@ func SetupExecutors(
 
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery ||
-		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSource) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     duck.NewMaterializer(fullRefresh),
 			Hoister: hoister,
@@ -2600,6 +2665,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDuckDBQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
 		mainExecutors[pipeline.AssetTypeDuckDBQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeDuckDBSource][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		if estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
@@ -2608,7 +2677,8 @@ func SetupExecutors(
 
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeClickHouse) || estimateCustomCheckType == pipeline.AssetTypeClickHouse ||
-		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSource) {
 		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2629,6 +2699,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeClickHouseTableSensor][scheduler.TaskInstanceTypeMain] = clickHouseTableSensor
 		mainExecutors[pipeline.AssetTypeClickHouseTableSensor][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
 		mainExecutors[pipeline.AssetTypeClickHouseTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeClickHouseSource][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
+		mainExecutors[pipeline.AssetTypeClickHouseSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeClickHouse {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
@@ -2734,7 +2808,8 @@ func SetupExecutors(
 		estimateCustomCheckType == pipeline.AssetTypeDorisQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDorisSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDorisQuerySensor) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeDorisTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeDorisTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDorisSource) {
 		dorisOperator := doris.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
 		dorisCheckRunner := doris.NewColumnCheckOperator(conn)
 		dorisQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2756,13 +2831,18 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeMain] = dorisTableSensor
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
 		mainExecutors[pipeline.AssetTypeDorisTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeDorisSource][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
+		mainExecutors[pipeline.AssetTypeDorisSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeStarRocksQuery) ||
 		estimateCustomCheckType == pipeline.AssetTypeStarRocksQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksQuerySensor) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeStarRocksSource) {
 		starRocksOperator := starrocks.NewBasicOperator(conn, wholeFileExtractor, fullRefresh, hoister, parser)
 		starRocksCheckRunner := starrocks.NewColumnCheckOperator(conn)
 		starRocksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2784,6 +2864,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeMain] = starRocksTableSensor
 		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
 		mainExecutors[pipeline.AssetTypeStarRocksTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		// Source assets don't execute, but their checks still query the existing table.
+		mainExecutors[pipeline.AssetTypeStarRocksSource][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
+		mainExecutors[pipeline.AssetTypeStarRocksSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeAgentClaudeCode) {

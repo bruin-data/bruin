@@ -116,3 +116,20 @@ func TestMaterializer_Render(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteInsertRejectsIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "my.asset",
+		Materialization: pipeline.Materialization{
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+			IncrementalKey:       "id",
+			IncrementalPredicate: "dt >= '2026-07-01'",
+		},
+	}
+
+	_, err := buildIncrementalQuery(asset, "SELECT 1")
+	require.EqualError(t, err, "incremental_predicate is not supported for Sail delete+insert materialization")
+}

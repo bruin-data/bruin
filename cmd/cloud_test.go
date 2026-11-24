@@ -334,7 +334,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 22)
+	assert.Len(t, cmd.Commands, 24)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -343,8 +343,10 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "login")
 	assert.Contains(t, subNames, "logout")
 	assert.Contains(t, subNames, "auth")
+	assert.Contains(t, subNames, "act-as")
 	assert.Contains(t, subNames, "teams")
 	assert.Contains(t, subNames, "cost")
+	assert.Contains(t, subNames, "data-apps")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
 	assert.Contains(t, subNames, "runs")
@@ -362,6 +364,18 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
 	assert.Contains(t, subNames, "config")
+}
+
+func TestCloudTeamsCommand_Subcommands(t *testing.T) {
+	t.Parallel()
+	cmd := CloudTeams()
+	require.NotNil(t, cmd)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Equal(t, []string{"list", "roles", "members"}, subNames)
 }
 
 func TestCloudSkillsCommand_Help(t *testing.T) {
@@ -2062,4 +2076,83 @@ func TestOutputSchemaFromFlagsCompacts(t *testing.T) {
 	assert.JSONEq(t, `{"type":"object","properties":{}}`, string(got))
 	assert.NotContains(t, string(got), " ")
 	assert.NotContains(t, string(got), "\n")
+}
+
+func TestCloudConnectionSetsCostLimit_Body(t *testing.T) { //nolint:paralleltest // uses t.Setenv
+	for _, tt := range []struct {
+		name     string
+		args     []string
+		wantPath string
+		wantBody map[string]any
+		wantErr  bool
+	}{
+		{name: "hard limit on every BigQuery connection", args: []string{"--max-query-cost", "1"}, wantPath: "/connection-sets/7/cost-limit", wantBody: map[string]any{"max_query_cost": 1.0}},
+		{name: "soft limit on one connection", args: []string{"--connection", "bq", "--max-query-cost-soft", "0.5"}, wantPath: "/connection-sets/7/connections/bq/cost-limit", wantBody: map[string]any{"max_query_cost_soft": 0.5}},
+		{name: "both limits", args: []string{"--max-query-cost", "10", "--max-query-cost-soft", "1"}, wantPath: "/connection-sets/7/cost-limit", wantBody: map[string]any{"max_query_cost": 10.0, "max_query_cost_soft": 1.0}},
+		{name: "remove clears both", args: []string{"--remove"}, wantPath: "/connection-sets/7/cost-limit", wantBody: map[string]any{"max_query_cost": nil, "max_query_cost_soft": nil}},
+		{name: "remove only the soft limit", args: []string{"--remove-soft"}, wantPath: "/connection-sets/7/cost-limit", wantBody: map[string]any{"max_query_cost_soft": nil}},
+		{name: "set hard and remove soft", args: []string{"--max-query-cost", "2", "--remove-soft"}, wantPath: "/connection-sets/7/cost-limit", wantBody: map[string]any{"max_query_cost": 2.0, "max_query_cost_soft": nil}},
+		{name: "no action", wantErr: true},
+		{name: "set and remove the same limit", args: []string{"--max-query-cost", "2", "--remove-hard"}, wantErr: true},
+		{name: "remove combined with a set", args: []string{"--remove", "--max-query-cost-soft", "1"}, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPath string
+			var gotBody map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+				_, _ = w.Write([]byte(`{"id":7,"max_query_cost":null,"max_query_cost_soft":null}`))
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+			t.Setenv("BRUIN_CLOUD_TEAM", "")
+			t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+			cmd := cloudConnectionSetsCostLimit()
+			cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+			err := cmd.Run(t.Context(), append([]string{"cost-limit", "--api-key", "test-key", "--set-id", "7", "--output", "json"}, tt.args...))
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Empty(t, gotPath, "no request should be sent for invalid flags")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantPath, gotPath)
+			assert.Equal(t, tt.wantBody, gotBody)
+		})
+	}
+}
+
+func TestCloudConnectionSetsCostLimit_PrintsOnlyChangedLimits(t *testing.T) { //nolint:paralleltest // uses t.Setenv and os.Stdout
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":7,"max_query_cost":1}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+	t.Setenv("BRUIN_CLOUD_TEAM", "")
+	t.Chdir(writeTempConfigRepo(t, configWithoutCloudYML))
+
+	originalStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		_ = reader.Close()
+		_ = writer.Close()
+	})
+
+	cmd := cloudConnectionSetsCostLimit()
+	err = cmd.Run(t.Context(), []string{"cost-limit", "--api-key", "test-key", "--set-id", "7", "--output", "json", "--max-query-cost", "1"})
+	require.NoError(t, err)
+	os.Stdout = originalStdout
+	require.NoError(t, writer.Close())
+
+	output, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(output, &got))
+	assert.Equal(t, map[string]any{"id": 7.0, "connection": "", "max_query_cost": 1.0}, got)
 }

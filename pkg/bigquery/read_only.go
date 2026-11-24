@@ -15,7 +15,7 @@ func (d *Client) isReadOnly() bool {
 
 func (d *Client) startQuery(ctx context.Context, q *bigquery.Query) (*bigquery.Job, *bigquery.RowIterator, error) {
 	if !d.isReadOnly() {
-		job, err := q.Run(ctx)
+		job, err := d.runQueryJob(ctx, q)
 		return job, nil, err
 	}
 	rows, err := q.Read(ctx)

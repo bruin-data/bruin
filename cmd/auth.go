@@ -25,11 +25,7 @@ func CloudAuth() *cli.Command {
 			if auth.connection != "" {
 				_, _ = fmt.Fprintf(writer, "Connection: %s/%s\n", auth.environment, auth.connection)
 			}
-			team := resolveTeam(c)
-			if team == "" && auth.source == cloudAuthGlobal {
-				team = auth.team
-			}
-			if team != "" {
+			if team := effectiveTeam(c, auth); team != "" {
 				_, _ = fmt.Fprintf(writer, "Default team: %s\n", team)
 			}
 			_, _ = fmt.Fprintln(writer, "Local credential found. API validity and permissions are checked by Cloud on each request.")
@@ -50,7 +46,7 @@ type logoutDependencies struct {
 func logoutCommand(deps logoutDependencies) *cli.Command {
 	return &cli.Command{Name: "logout", Usage: "Remove a repository or global Bruin Cloud login", Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "repo", Usage: "Remove the selected repository bruin connection"},
-		&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Remove the global login and its OS credential-store token"},
+		&cli.BoolFlag{Name: cloudAuthGlobal, Usage: "Remove the global login"},
 		&cli.BoolFlag{Name: "revoke", Usage: "Also revoke the token in Bruin Cloud"},
 	}, Action: func(ctx context.Context, c *cli.Command) error {
 		if c.Bool("repo") && c.Bool(cloudAuthGlobal) {
@@ -147,6 +143,11 @@ func logoutCommand(deps logoutDependencies) *cli.Command {
 				return fmt.Errorf("global login was not removed: %w", err)
 			}
 			_, _ = fmt.Fprintln(output, "Token revoked in Bruin Cloud. Other copies of this token are now invalid.")
+		}
+		if session, err := store.ClearActAs(ctx); err != nil {
+			return err
+		} else if session != nil {
+			_, _ = fmt.Fprintln(output, actAsStoppedMessage(session))
 		}
 		if err := store.Delete(); err != nil {
 			return err

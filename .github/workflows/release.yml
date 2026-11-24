@@ -21,12 +21,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
       - name: Authenticate pinned ingestr and generate embedded hashes
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/generate_ingestr_hashes.py
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: ingestr-hashes
           path: pkg/python/ingestr_hashes.json
@@ -45,15 +45,15 @@ jobs:
         if: matrix.suite == 'integration-test' && runner.os == 'Linux'
         run: |
           nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: ingestr-hashes
           path: pkg/python
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
@@ -96,16 +96,16 @@ jobs:
     needs: [verify-ingestr]
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: ingestr-hashes
           path: pkg/python
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: 'go.mod'
           # Blacksmith caches Go builds through GOCACHEPROG.
@@ -145,14 +145,14 @@ jobs:
     needs: [verify-ingestr]
     runs-on: blacksmith-8vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: ingestr-hashes
           path: pkg/python
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: 'go.mod'
           # Blacksmith caches Go builds through GOCACHEPROG.
@@ -160,7 +160,7 @@ jobs:
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache darwin
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@v6.1.0
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
@@ -174,14 +174,14 @@ jobs:
     needs: [verify-ingestr]
     runs-on: blacksmith-8vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: ingestr-hashes
           path: pkg/python
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: 'go.mod'
           # Blacksmith caches Go builds through GOCACHEPROG.
@@ -189,7 +189,7 @@ jobs:
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache linux
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@v6.1.0
         with:
           path: dist/linux
           key: linux-${{ env.sha_short }}
@@ -203,20 +203,20 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [prepare-linux, prepare-darwin, integration-tests]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache@v6.1.0
         with:
           path: dist/linux
           key: linux-${{ env.sha_short }}
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache@v6.1.0
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
-      - uses: goreleaser/goreleaser-action@b508e2e3ef3b19d4e4146d4f8fb3ba9db644a757 # v3
+      - uses: goreleaser/goreleaser-action@v7.3.0
         with:
           distribution: goreleaser-pro
           version: v2.3.2
@@ -235,13 +235,13 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: ingestr-hashes
           path: pkg/python
 
-      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
+      - uses: msys2/setup-msys2@v2.33.0
         with:
           msystem: UCRT64
           update: true
@@ -252,13 +252,13 @@ jobs:
             mingw-w64-ucrt-x86_64-winpthreads
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
 
       - name: Release
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        uses: goreleaser/goreleaser-action@v7.3.0
         with:
           version: v2.3.2
           distribution: goreleaser-pro
@@ -278,15 +278,19 @@ jobs:
           CGO_LDFLAGS: "-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
 
       - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/windows/bruin_Windows_x86_64.zip
-          asset_name: bruin_Windows_x86_64.zip
-          tag: ${{ github.ref }}
-          overwrite: false
-          make_latest: false
-          prerelease: false
+        # Use the host shell/PATH, not the job's MSYS2 shell, for GitHub CLI.
+        shell: bash
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Windows can finish before the Unix job creates the release.
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --latest=false \
+              --title "$GITHUB_REF_NAME" --notes "" || gh release view "$GITHUB_REF_NAME" >/dev/null
+          fi
+          # Deliberately omit --clobber: an existing asset must not be replaced.
+          gh release upload "$GITHUB_REF_NAME" dist/windows/bruin_Windows_x86_64.zip
 
   dockerBuild:
     needs: [verify-ingestr]
@@ -299,29 +303,29 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: ingestr-hashes
           path: pkg/python
 
       - name: Log in to the Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: bruin-data
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Set up Depot
-        uses: depot/setup-action@15c09a5f77a0840ad4bce955686522a257853461 # v1
+        uses: depot/setup-action@v1.7.2
 
       - name: Build and push Docker image
-        uses: depot/build-push-action@98e78adca7817480b8185f474a400b451d74e287 # v1
+        uses: depot/build-push-action@v1.19.0
         with:
           context: .
           platforms: linux/amd64
@@ -340,10 +344,10 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Log in to the Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: bruin-data
@@ -417,7 +421,7 @@ jobs:
     name: Installer Script on Windows
     needs: [release-windows, release-unix]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
       - name: Show directories
         shell: bash
         run: pwd && cd && pwd
@@ -450,7 +454,7 @@ jobs:
     name: Installer Script on Linux
     needs: [release-windows, release-unix]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v7.0.1
       - name: Extract tag from ref
         id: extract_tag
         run: |
@@ -483,18 +487,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [install-unix, install-windows]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Extract tag from ref
-        id: extract_tag
-        run: |
-          ref_name="${GITHUB_REF##*/}"
-          echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Release promote to latest
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         if: startsWith(github.ref, 'refs/tags/')
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ env.tag }}
-          prerelease: false
-          make_latest: true
-          clear_attachments: false
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --prerelease=false --latest

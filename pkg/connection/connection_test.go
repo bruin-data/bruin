@@ -1172,6 +1172,115 @@ func TestManager_AddInfluxDBConnectionFromConfigStoresConnectionDetails(t *testi
 	assert.Same(t, configuration, m.GetConnectionDetails("test"))
 }
 
+func TestManager_AddOdooConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	assert.Nil(t, m.GetConnection("test"))
+
+	configuration := &config.OdooConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		Host:               "mycompany.odoo.com",
+		Port:               8443,
+		APIKey:             "key_123",
+		Database:           "mycompany",
+		Username:           "me@example.com",
+	}
+
+	err := m.AddOdooConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.Odoo["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.Odoo["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "odoo://mycompany.odoo.com:8443?api_key=key_123&database=mycompany&username=me%40example.com", uri)
+}
+
+func TestManager_AddBreezyHRConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.BreezyHRConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "breezy_pat_123",
+		CompanyID:          "abc123",
+	}
+
+	require.NoError(t, m.AddBreezyHRConnectionFromConfig(configuration))
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.BreezyHR["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.BreezyHR["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "breezyhr://?api_key=breezy_pat_123&company_id=abc123", uri)
+}
+
+func TestManager_AddPeeringDBConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.PeeringDBConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "abc.123",
+	}
+
+	require.NoError(t, m.AddPeeringDBConnectionFromConfig(configuration))
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.PeeringDB["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.PeeringDB["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "peeringdb://?api_key=abc.123", uri)
+}
+
+func TestManager_AddPrivatusConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.PrivatusConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "pat_123",
+		SiteIDs:            []string{"pa_AB12", "pa_CD34"},
+	}
+
+	require.NoError(t, m.AddPrivatusConnectionFromConfig(configuration))
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.Privatus["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.Privatus["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "privatus://?api_key=pat_123&site_ids=pa_AB12%2Cpa_CD34", uri)
+}
+
 func TestManager_AddCouchDBConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 

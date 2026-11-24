@@ -217,6 +217,31 @@ func TestLocalOperator_RunTask(t *testing.T) {
 			wantErr: assert.Error,
 		},
 		{
+			name:     "should report a missing secret as a missing connection",
+			task:     assetWithSecrets,
+			pipeline: &pipeline.Pipeline{Name: "test-pipeline"},
+			ctx: func(t *testing.T) context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				return ctx
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").Return(repo, nil)
+				mf.On("FindModulePath", repo, mock.Anything).Return(testModule, nil)
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+				msf.On("GetConnectionDetails", "key1").Return(nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...any) bool {
+				var missing *config.MissingConnectionError
+				return assert.ErrorAs(t, err, &missing) && assert.Equal(t, "key1", missing.Name)
+			},
+		},
+		{
 			name:     "should inject BRUIN_CONNECTION when asset has a connection",
 			task:     assetWithConnection,
 			pipeline: &pipeline.Pipeline{Name: "test-pipeline"},

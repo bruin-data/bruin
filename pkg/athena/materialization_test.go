@@ -1351,3 +1351,20 @@ func TestColumnMetadataDDL(t *testing.T) {
 	require.Contains(t, createTable, "decimal(10, 2)")
 	require.Contains(t, createTable, "varchar(255)")
 }
+
+func TestDeleteInsertRejectsIncrementalPredicate(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "my.asset",
+		Materialization: pipeline.Materialization{
+			Type:                 pipeline.MaterializationTypeTable,
+			Strategy:             pipeline.MaterializationStrategyDeleteInsert,
+			IncrementalKey:       "id",
+			IncrementalPredicate: "dt >= '2026-07-01'",
+		},
+	}
+
+	_, err := buildIncrementalQuery(asset, "SELECT 1", "s3://bucket")
+	require.EqualError(t, err, "incremental_predicate is not supported for Athena delete+insert materialization")
+}

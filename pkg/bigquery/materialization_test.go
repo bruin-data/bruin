@@ -847,6 +847,96 @@ COMMIT TRANSACTION;`,
 	}
 }
 
+func TestMaterializer_RenderIceberg(t *testing.T) {
+	t.Parallel()
+
+	icebergOptions := `WITH CONNECTION DEFAULT OPTIONS (file_format = 'PARQUET', table_format = 'ICEBERG', storage_uri = "gs://bucket/my/asset")`
+	icebergAsset := func(strategy pipeline.MaterializationStrategy) *pipeline.Asset {
+		return &pipeline.Asset{
+			Name:    "my.asset",
+			Columns: []pipeline.Column{{Name: "id", Type: "INT64", PrimaryKey: true}},
+			Materialization: pipeline.Materialization{
+				Type:        pipeline.MaterializationTypeTable,
+				Strategy:    strategy,
+				TableFormat: pipeline.MaterializationTableFormatIceberg,
+			},
+			BigQuery: pipeline.BigQueryConfig{StorageURI: "gs://bucket/my/asset"},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		task        *pipeline.Asset
+		fullRefresh bool
+		want        string
+	}{
+		{
+			name: "create+replace",
+			task: icebergAsset(pipeline.MaterializationStrategyCreateReplace),
+			want: "CREATE OR REPLACE TABLE my.asset   " + icebergOptions + " AS\nSELECT 1",
+		},
+		{
+			name: "create+replace with partition, cluster and table options",
+			task: func() *pipeline.Asset {
+				a := icebergAsset(pipeline.MaterializationStrategyCreateReplace)
+				a.Materialization.PartitionBy = "DATE(ts)"
+				a.Materialization.ClusterBy = []string{"id"}
+				a.BigQuery.RequirePartitionFilter = boolp(true)
+				return a
+			}(),
+			want: "CREATE OR REPLACE TABLE my.asset PARTITION BY DATE(ts) CLUSTER BY id WITH CONNECTION DEFAULT " +
+				`OPTIONS (file_format = 'PARQUET', table_format = 'ICEBERG', storage_uri = "gs://bucket/my/asset", require_partition_filter = TRUE) AS` + "\nSELECT 1",
+		},
+		{
+			name: "create+replace with a named cloud resource connection",
+			task: func() *pipeline.Asset {
+				a := icebergAsset(pipeline.MaterializationStrategyCreateReplace)
+				a.BigQuery.CloudResourceConnection = "proj.eu.conn"
+				return a
+			}(),
+			want: "CREATE OR REPLACE TABLE my.asset   WITH CONNECTION `proj.eu.conn` " +
+				`OPTIONS (file_format = 'PARQUET', table_format = 'ICEBERG', storage_uri = "gs://bucket/my/asset") AS` + "\nSELECT 1",
+		},
+		{
+			name:        "full refresh recreates the Iceberg table",
+			task:        icebergAsset(pipeline.MaterializationStrategyMerge),
+			fullRefresh: true,
+			want:        "CREATE OR REPLACE TABLE my.asset   " + icebergOptions + " AS\nSELECT 1",
+		},
+		{
+			name: "truncate+insert deletes instead of truncating",
+			task: icebergAsset(pipeline.MaterializationStrategyTruncateInsert),
+			want: "BEGIN TRANSACTION;\nDELETE FROM my.asset WHERE TRUE;\nINSERT INTO my.asset SELECT 1;\nCOMMIT TRANSACTION;",
+		},
+		{
+			name: "truncate+insert on a partitioned table filters on the partition column",
+			task: func() *pipeline.Asset {
+				a := icebergAsset(pipeline.MaterializationStrategyTruncateInsert)
+				a.Materialization.PartitionBy = "TIMESTAMP_TRUNC(ts, MONTH)"
+				requireFilter := true
+				a.BigQuery.RequirePartitionFilter = &requireFilter
+				return a
+			}(),
+			want: "BEGIN TRANSACTION;\nDELETE FROM my.asset WHERE `ts` IS NULL OR `ts` IS NOT NULL;\nINSERT INTO my.asset SELECT 1;\nCOMMIT TRANSACTION;",
+		},
+		{
+			name: "ddl",
+			task: icebergAsset(pipeline.MaterializationStrategyDDL),
+			want: "CREATE TABLE IF NOT EXISTS my.asset (\n  id INT64,\n  PRIMARY KEY (id) NOT ENFORCED\n)\n" + icebergOptions,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			render, err := NewMaterializer(tt.fullRefresh).Render(tt.task, "SELECT 1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, render)
+		})
+	}
+}
+
 func TestMergeRequiredPartitionFilterGeneratedSQL(t *testing.T) {
 	t.Parallel()
 

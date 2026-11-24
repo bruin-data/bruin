@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/99designs/keyring"
 	"github.com/bruin-data/bruin/pkg/cloudauth"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/spf13/afero"
@@ -143,7 +142,7 @@ func TestLoginInWorktree(t *testing.T) {
 				auth, err := resolveCloudAuthWithStore(&cli.Command{}, func() (*cloudauth.Credential, error) {
 					t.Fatal("must prefer the worktree login over the global login")
 					return nil, nil
-				})
+				}, nil)
 				require.NoError(t, err)
 				assert.Equal(t, "repo", auth.source)
 				assert.Equal(t, "worktree-token", auth.token)
@@ -243,7 +242,7 @@ func TestCloudAuthPrecedenceAndFailures(t *testing.T) {
 	resolve := func(args ...string) (string, error) {
 		var value string
 		command := &cli.Command{Name: "test", Flags: []cli.Flag{apiKeyFlag()}, Action: func(_ context.Context, c *cli.Command) error {
-			auth, err := resolveCloudAuthWithStore(c, global)
+			auth, err := resolveCloudAuthWithStore(c, global, nil)
 			value = auth.token
 			return err
 		}}
@@ -324,8 +323,7 @@ func TestLoginDestinationWithoutProjectConfig(t *testing.T) {
 			nested := filepath.Join(dir, "nested")
 			require.NoError(t, os.Mkdir(nested, 0o700))
 			t.Chdir(nested)
-			secrets := keyring.NewArrayKeyring(nil)
-			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
 			authorizations := 0
 			deps := loginDependencies{
 				interactive: func() bool { return true },
@@ -397,8 +395,7 @@ func TestLoginOutsideRepository(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := loginTestRepo(t, "")
 			require.NoError(t, os.RemoveAll(filepath.Join(dir, ".git")))
-			secrets := keyring.NewArrayKeyring(nil)
-			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml"), Open: func() (cloudauth.SecretStore, error) { return secrets, nil }}
+			store := cloudauth.Store{Path: filepath.Join(t.TempDir(), "cloud.yml")}
 			authorizations := 0
 			deps := loginDependencies{
 				interactive: func() bool { return true },
