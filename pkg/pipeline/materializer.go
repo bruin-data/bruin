@@ -26,6 +26,10 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 		return removeComments(query), nil
 	}
 
+	if err := m.checkFirstRunStrategy(asset, query); err != nil {
+		return "", err
+	}
+
 	strategy := mat.Strategy
 	if asset.FullRefreshEnabled(m.FullRefresh) && mat.Type == MaterializationTypeTable {
 		// Only override to CreateReplace if strategy is not explicitly set to DDL
@@ -51,6 +55,23 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	}
 
 	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+}
+
+// checkFirstRunStrategy renders a first run's own strategy and returns its
+// error. A first run builds the table with create+replace, so without this an
+// unsupported strategy or a missing setting would only fail on the next run.
+func (m *Materializer) checkFirstRunStrategy(asset *Asset, query string) error {
+	if !asset.IsFirstRun() {
+		return nil
+	}
+
+	mat := asset.Materialization
+	matFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]
+	if !ok {
+		return fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+	}
+	_, err := matFunc(asset, query)
+	return err
 }
 
 func removeComments(query string) string {
