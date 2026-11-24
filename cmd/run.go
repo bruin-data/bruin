@@ -2622,7 +2622,7 @@ func SetupExecutors(
 		databricksTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		registerDatabricksExecutors(mainExecutors, databricksExecutorSet{
-			main:        databricksOperator,
+			main:        autocreate.Wrap(databricksOperator, conn),
 			check:       databricksCheckRunner,
 			customCheck: customCheckRunner,
 			seed:        seedOperator,

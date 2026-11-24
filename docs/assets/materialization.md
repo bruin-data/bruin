@@ -745,7 +745,7 @@ Defaults fill in every field an asset leaves empty, and an asset can override a 
 
 — means the key is ignored. Both keys are also ignored on PostgreSQL, Redshift, DuckDB, MySQL, Oracle, Dremio, Sail, Fabric, and Doris.
 
-- **Databricks:** both keys only take effect with `ddl`. `create+replace` fails if `cluster_by` is set and ignores `partition_by`.
+- **Databricks:** both keys only take effect with `ddl`. `create+replace` fails if `cluster_by` is set and ignores `partition_by`, and so do full refreshes and first runs of the other strategies, except SCD2.
 - **MSSQL, Synapse, Vertica:** `cluster_by` fails with `create+replace` and full refreshes, and is ignored by other strategies.
 - **ClickHouse:** `partition_by` accepts an expression such as `toYYYYMM(created_at)`, and `cluster_by` becomes the `ORDER BY` sorting key. See [ClickHouse table options](#clickhouse-table-options).
 - **Doris:** set the layout in the `doris` block, for example `doris.distributed_by`.
@@ -1659,7 +1659,7 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 | [Redshift](../platforms/redshift.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [DuckDB](../platforms/duckdb.md) / [MotherDuck](../platforms/motherduck.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [MySQL](../platforms/mysql.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| [Databricks](../platforms/databricks.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| [Databricks](../platforms/databricks.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [Athena](../platforms/athena.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [Spark](../platforms/spark.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [ClickHouse](../platforms/clickhouse.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
