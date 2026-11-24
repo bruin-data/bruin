@@ -3696,6 +3696,78 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "duckdb_incremental_first_run",
+			workflow: e2e.Workflow{
+				Name: "duckdb_incremental_first_run",
+				Steps: []e2e.Task{
+					{
+						Name:    "first-run-00: drop the tables left by earlier runs",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "DROP SCHEMA IF EXISTS first_run CASCADE;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "first-run-01: run without --full-refresh while the tables are missing",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-incremental-first-run")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "first-run-02: run again to load into the created tables",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-incremental-first-run")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "first-run-03: query the merged table",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM first_run.orders ORDER BY order_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-incremental-first-run/expectations/orders.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "first-run-04: query the appended table",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM first_run.events ORDER BY event_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-incremental-first-run/expectations/events.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "duckdb_merge_materialization",
 			workflow: e2e.Workflow{
 				Name: "duckdb_merge_materialization",
