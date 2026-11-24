@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/pkg/errors"
 )
@@ -234,6 +235,28 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 func (c *Client) Ping(ctx context.Context) error {
 	_, err := c.Select(ctx, &query.Query{Query: "SELECT 1"})
 	return err
+}
+
+// RelationExists reports whether a table or view named tableName exists, so an
+// incremental asset can create its table on the first run. It runs SHOW TABLES
+// on the connection pool the operator uses, so the name resolves against the
+// same current catalog and namespace as the materialized query; see
+// sail.SparkSQLRelationExists. TableExists is not used: its ADBC object listing
+// opens a new session per call and depends on the driver reporting catalogs.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	capability, ok := tablename.For("spark")
+	if !ok {
+		return false, errors.New("Spark table-name capability not found")
+	}
+	if err := capability.CheckName(tableName); err != nil {
+		return false, err
+	}
+	conn, err := c.conn(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	return sail.SparkSQLRelationExists(ctx, conn, strings.Split(tableName, "."))
 }
 
 func (c *Client) TableExists(ctx context.Context, tableName string) (bool, error) {
