@@ -49,9 +49,10 @@ Where the engine deliberately differs from sqlglot:
 - **SQL is not rewritten where that changes its meaning:** `SORT_ARRAY(x)` and Hive's
   `SORT_ARRAY(x, FALSE)` are kept, since the newer rewrites move NULLs or drop the descending order;
   MySQL `ALTER TABLE` options are kept as written; DuckDB `~` / `!~` stay operators, since whether
-  they mean a full or a partial match depends on the server version; a `\xHH` byte escape
-  (ClickHouse strings, Postgres and Redshift `E'...'`) that is not part of a UTF-8 character stays
-  that byte (`'\xFF'` is written back as `'\xff'`, not as `'ÿ'`, whose UTF-8 bytes differ).
+  they mean a full or a partial match depends on the server version; a byte escape (`\xHH` or
+  `\OOO` in ClickHouse, Postgres `E'...'` and Redshift strings) that is not part of a UTF-8
+  character stays that byte, written back in an escape the target reads as a byte (`'\xFF'` stays
+  `'\xff'`, not `'ÿ'`, whose UTF-8 bytes differ; Redshift gets `'\377'`).
 
 - **Error messages name expression classes plainly** (`Required keyword: 'expression' missing
   for Mul`), not by their Python module path.

@@ -505,9 +505,9 @@ func (g *Generator) escapeStr(text string, escapeBackslash bool, delimiter strin
 			ch := text[i : i+size]
 			i += size
 			if r == utf8.RuneError && size == 1 {
-				// A raw byte from a byte escape: \xHH again where the dialect reads that as a byte.
-				if g.d.T.NUMERIC_ESCAPES_ARE_BYTES {
-					ch = hexEscapeRawBytes(ch)
+				// A raw byte from a byte escape: escaped again where the dialect reads one as a byte.
+				if f := g.rawByteEscape(); f != "" {
+					ch = fmt.Sprintf(f, ch[0])
 				}
 				b.WriteString(ch)
 				continue
@@ -533,13 +533,28 @@ func (g *Generator) escapeStr(text string, escapeBackslash bool, delimiter strin
 	return strings.ReplaceAll(g.replaceLineBreaks(text), delimiter, escapedDelimiter)
 }
 
-// hexEscapeRawBytes writes each byte of s that is not part of a UTF-8 character as \xHH.
-func hexEscapeRawBytes(s string) string {
+// rawByteEscape is the format of the escape that the dialect reads as one byte: \xHH, or \OOO
+// where only octal escapes are read (Redshift). It is "" when numeric escapes are not bytes.
+func (g *Generator) rawByteEscape() string {
+	if !g.d.T.NUMERIC_ESCAPES_ARE_BYTES {
+		return ""
+	}
+	if spec, ok := g.d.T.NUMERIC_ESCAPES["x"]; ok && spec[2] >= 2 && spec[3] >= 0xFF {
+		return "\\x%02x"
+	}
+	if spec, ok := g.d.T.NUMERIC_ESCAPES["0"]; ok && spec[2] >= 3 && spec[3] >= 0xFF {
+		return "\\%03o"
+	}
+	return ""
+}
+
+// escapeRawBytes writes each byte of s that is not part of a UTF-8 character with format.
+func escapeRawBytes(s, format string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); {
 		r, size := utf8.DecodeRuneInString(s[i:])
 		if r == utf8.RuneError && size == 1 {
-			fmt.Fprintf(&b, "\\x%02x", s[i])
+			fmt.Fprintf(&b, format, s[i])
 		} else {
 			b.WriteString(s[i : i+size])
 		}

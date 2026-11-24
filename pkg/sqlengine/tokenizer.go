@@ -1359,7 +1359,7 @@ func (t *tokenizerCore) scanNumericEscape() string {
 		t.advance(end-start+1, false)
 		if isByte && value > 0x7F {
 			// Not part of a UTF-8 character: keep the byte itself, which the generator writes
-			// back as \xHH. Decoding it as the code point (\xFF as ÿ) would change the bytes.
+			// back as a byte escape. Decoding it as the code point (\xFF as ÿ) changes the bytes.
 			return string([]byte{byte(value)})
 		}
 		return string(rune(value))

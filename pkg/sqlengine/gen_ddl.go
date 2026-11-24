@@ -1371,8 +1371,8 @@ func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 		text = strings.ReplaceAll(text, seq[0], seq[1])
 	}
 	text = strings.ReplaceAll(text, g.identifierEnd, g.escapedIdentifierEnd)
-	if g.d.T.NUMERIC_ESCAPES_ARE_BYTES && !utf8.ValidString(text) {
-		text = hexEscapeRawBytes(text)
+	if f := g.rawByteEscape(); f != "" && !utf8.ValidString(text) {
+		text = escapeRawBytes(text, f)
 	}
 	firstChar := ""
 	if r := []rune(text); len(r) > 0 {
