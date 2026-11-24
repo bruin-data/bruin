@@ -3275,7 +3275,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 			},
 		},
 		CustomChecks: []pipeline.CustomCheck{
-			{Name: "row_count", Query: "select asset", Value: 1},
+			{Name: "row_count", Query: "select asset", Value: "1"},
 		},
 		Notifications: &pipeline.Notifications{
 			Slack: []pipeline.SlackNotification{{Channel: "#asset"}},
@@ -3327,7 +3327,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 			},
 		},
 		CustomChecks: []pipeline.CustomCheck{
-			{Name: "row_count", Description: "default row count", Query: "select default", Value: 2},
+			{Name: "row_count", Description: "default row count", Query: "select default", Value: "2"},
 			{Name: "freshness", Query: "select 0", Count: &customCount},
 		},
 		Metadata: pipeline.EmptyStringMap{"catalog": "default"},
@@ -4197,5 +4197,23 @@ func TestPipeline_GetAllConnectionNamesForAsset_SourceAssetsAreConnectionless(t 
 			require.NoError(t, err)
 			assert.Empty(t, names)
 		})
+	}
+}
+
+func TestCustomCheckValueKeepsExactNumbers(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"9007199254740993", "3014136.99", "0"} {
+		var check pipeline.CustomCheck
+		require.NoError(t, yaml.Unmarshal([]byte("name: c\nquery: select 1\nvalue: "+value), &check))
+		assert.Equal(t, value, check.Value.String())
+
+		asJSON, err := json.Marshal(check)
+		require.NoError(t, err)
+		assert.Contains(t, string(asJSON), `"value":`+value+`,`)
+
+		asYAML, err := yaml.Marshal(check)
+		require.NoError(t, err)
+		assert.Contains(t, string(asYAML), "value: "+value+"\n")
 	}
 }

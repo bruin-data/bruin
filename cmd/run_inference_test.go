@@ -26,7 +26,7 @@ func TestSetupExecutorsRoutesInferenceChecksToTheWarehouse(t *testing.T) { //nol
 		Columns: []pipeline.Column{
 			{Name: "id", PrimaryKey: true, Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
 		},
-		CustomChecks: []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: 1}},
+		CustomChecks: []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: "1"}},
 	}
 	p := &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{asset}}
 	python.InferIngestrDestinations(p, staticConnectionTypes{"warehouse": "duckdb"})
@@ -48,4 +48,29 @@ func TestSetupExecutorsRoutesInferenceChecksToTheWarehouse(t *testing.T) { //nol
 	duckExecutors := executors[pipeline.AssetTypeDuckDBQuery]
 	assert.IsType(t, &ansisql.ColumnCheckOperator{}, duckExecutors[scheduler.TaskInstanceTypeColumnCheck])
 	assert.IsType(t, &ansisql.CustomCheckOperator{}, duckExecutors[scheduler.TaskInstanceTypeCustomCheck])
+}
+
+// Not parallel: SetupExecutors mutates the shared executor.DefaultExecutorsV2.
+func TestSetupExecutorsRunsChecksOnDuckDBSourceAssets(t *testing.T) { //nolint:paralleltest
+	asset := &pipeline.Asset{
+		Name: "main.items",
+		Type: pipeline.AssetTypeDuckDBSource,
+		Columns: []pipeline.Column{
+			{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+		},
+		CustomChecks: []pipeline.CustomCheck{{Name: "always fails", Query: "select 1", Value: "0"}},
+	}
+	p := &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{asset}}
+
+	conn, errs := connection.NewManagerFromConfig(&config.Config{SelectedEnvironment: &config.Environment{Connections: &config.Connections{}}})
+	require.Empty(t, errs)
+
+	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+	now := time.Now()
+	executors, err := SetupExecutors(s, conn, now, now, now, p.Name, "run", false, "", nil, nil, nil, "", "default")
+	require.NoError(t, err)
+
+	sourceExecutors := executors[pipeline.AssetTypeDuckDBSource]
+	assert.IsType(t, &ansisql.ColumnCheckOperator{}, sourceExecutors[scheduler.TaskInstanceTypeColumnCheck])
+	assert.IsType(t, &ansisql.CustomCheckOperator{}, sourceExecutors[scheduler.TaskInstanceTypeCustomCheck])
 }
