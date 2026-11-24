@@ -632,8 +632,9 @@ func lineageFor(in lineageInput, schemas map[string]*SchemaMap) (rec lineageCase
 	}
 	opt, err := OptimizeSafe(parsed.Copy(), schema, d, lineageRules)
 	if err != nil {
-		// Column lineage falls back to every optimizer rule when its own rules fail.
-		if opt, err = OptimizeSafe(parsed, schema, d, nil); err != nil {
+		// Column lineage falls back to every optimizer rule, under the base dialect, when its own
+		// rules fail.
+		if opt, err = OptimizeSafe(parsed, schema, MustDialect(""), nil); err != nil {
 			rec.Error = errorText(err)
 			return rec
 		}

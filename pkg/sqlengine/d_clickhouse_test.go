@@ -3,8 +3,8 @@ package sqlengine
 import "testing"
 
 // TestClickHouseStringEscapes checks how ClickHouse string literals are decoded and written back:
-// \xHH escapes are bytes, so runs that form UTF-8 decode as one character and other bytes as the
-// character of that code point; \e, \N, \/, \", \=, \` and a backslash before a control character
+// \xHH escapes are bytes, so runs that form UTF-8 decode as one character and any other byte above
+// 0x7F stays that byte, written back as \xHH; \e, \N, \/, \", \=, \` and a backslash before a control character
 // are decoded too, while unknown escapes and short \x escapes keep their backslash. Control
 // characters are written as \xHH unless they have a named escape.
 func TestClickHouseStringEscapes(t *testing.T) {
@@ -16,10 +16,13 @@ func TestClickHouseStringEscapes(t *testing.T) {
 		{`SELECT '\xC3\xA9'`, `SELECT 'é'`, "é"},
 		{`SELECT '\xE2\x82\xAC'`, `SELECT '€'`, "€"},
 		{`SELECT '\xF0\x9F\x98\x80'`, `SELECT '😀'`, "😀"},
-		{`SELECT '\xC3'`, `SELECT 'Ã'`, "\u00c3"},
-		{`SELECT '\xE2\x82'`, "SELECT '\u00e2\u0082'", "\u00e2\u0082"},
-		{`SELECT '\xc3\x28'`, `SELECT 'Ã('`, "\u00c3("},
-		{`SELECT '\xFF'`, `SELECT 'ÿ'`, "\u00ff"},
+		{`SELECT '\xC3'`, `SELECT '\xc3'`, "\xc3"},
+		{`SELECT '\xE2\x82'`, `SELECT '\xe2\x82'`, "\xe2\x82"},
+		{`SELECT '\xc3\x28'`, `SELECT '\xc3('`, "\xc3("},
+		{`SELECT '\xFF'`, `SELECT '\xff'`, "\xff"},
+		{`SELECT '\x80'`, `SELECT '\x80'`, "\x80"},
+		{`SELECT 'a\xC3\xA9\xFFb'`, `SELECT 'aé\xffb'`, "aé\xffb"},
+		{`SELECT '\xFF\xC3\xA9'`, `SELECT '\xffé'`, "\xffé"},
 		{`SELECT '\x27'`, `SELECT ''''`, "'"},
 		{`SELECT '\x5C'`, `SELECT '\\'`, `\`},
 		{`SELECT '\x00'`, `SELECT '\0'`, "\x00"},
@@ -71,6 +74,7 @@ func TestClickHouseStringEscapes(t *testing.T) {
 		`SELECT 1 AS "a\x41"`:     `SELECT 1 AS "aA"`,
 		"SELECT 1 AS `a\\x41`":    `SELECT 1 AS "aA"`,
 		`SELECT 1 AS "a\xC3\xA9"`: `SELECT 1 AS "aé"`,
+		`SELECT 1 AS "a\xFF"`:     `SELECT 1 AS "a\xff"`,
 		`SELECT 1 AS "a\Nb"`:      `SELECT 1 AS "ab"`,
 	} {
 		if got := transpileOne(t, "clickhouse", "clickhouse", sql); got != want {

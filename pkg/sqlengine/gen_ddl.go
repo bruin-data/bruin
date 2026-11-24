@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 func (g *Generator) uncacheSQL(expression *Expr) string {
@@ -1370,6 +1371,9 @@ func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 		text = strings.ReplaceAll(text, seq[0], seq[1])
 	}
 	text = strings.ReplaceAll(text, g.identifierEnd, g.escapedIdentifierEnd)
+	if g.d.T.NUMERIC_ESCAPES_ARE_BYTES && !utf8.ValidString(text) {
+		text = hexEscapeRawBytes(text)
+	}
 	firstChar := ""
 	if r := []rune(text); len(r) > 0 {
 		firstChar = string(r[0])

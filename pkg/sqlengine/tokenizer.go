@@ -1283,7 +1283,8 @@ func (t *tokenizerCore) readByteEscape(pos int) (int, int) {
 // few digits, a lone UTF-16 surrogate (unless loneSurrogateReplacement is set) or an escape at
 // the end of the input, which is left to the unterminated string check. With
 // numericEscapesAreBytes, a byte escape that starts a valid UTF-8 sequence of byte escapes (e.g.
-// \xC3\xA9) decodes to that one character, and octal values wrap around to a byte (\541 is \x61).
+// \xC3\xA9) decodes to that one character, any other byte above 0x7F stays that raw byte, and
+// octal values wrap around to a byte (\541 is \x61).
 func (t *tokenizerCore) scanNumericEscape() string {
 	start := t.current
 	peek := t.peek
@@ -1329,8 +1330,7 @@ func (t *tokenizerCore) scanNumericEscape() string {
 		}
 	}
 
-	// Decode one UTF-8 character at a time; a byte run that is not valid UTF-8 falls back to
-	// decoding each byte as a code point. Only 0xC2..0xF4 can start a multi-byte character.
+	// Decode one UTF-8 character at a time. Only 0xC2..0xF4 can start a multi-byte character.
 	if isByte && value >= 0xC2 && value <= 0xF4 {
 		run := []byte{byte(value)}
 		runEnd := end
@@ -1357,6 +1357,11 @@ func (t *tokenizerCore) scanNumericEscape() string {
 
 	if value >= 0 && end < t.size {
 		t.advance(end-start+1, false)
+		if isByte && value > 0x7F {
+			// Not part of a UTF-8 character: keep the byte itself, which the generator writes
+			// back as \xHH. Decoding it as the code point (\xFF as ÿ) would change the bytes.
+			return string([]byte{byte(value)})
+		}
 		return string(rune(value))
 	}
 	return ""

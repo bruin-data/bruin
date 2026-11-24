@@ -187,7 +187,8 @@ def record_annotate():
     return len(cases)
 
 
-# The rules column lineage runs; when they fail it falls back to every rule (the default list).
+# The rules column lineage runs; when they fail it falls back to every rule (the default list)
+# under the base dialect.
 LINEAGE_RULES = (qualify, unnest_subqueries, merge_subqueries, annotate_types)
 
 
@@ -214,7 +215,7 @@ def lineage_case(c, schemas):
         try:
             opt = optimize(parsed.copy(), schema=schema, dialect=d, rules=LINEAGE_RULES)
         except Exception:
-            opt = optimize(parsed, schema=schema, dialect=d)
+            opt = optimize(parsed, schema=schema)
     except Exception as e:
         rec["error"] = error_text(e)
         return rec

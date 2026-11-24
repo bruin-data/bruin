@@ -3,6 +3,7 @@ package sqlengine
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 func (g *Generator) varSQL(expression *Expr) string {
@@ -499,8 +500,18 @@ func (g *Generator) escapeStr(text string, escapeBackslash bool, delimiter strin
 
 	if supportsEscapeSequences {
 		var b strings.Builder
-		for _, r := range text {
-			ch := string(r)
+		for i := 0; i < len(text); {
+			r, size := utf8.DecodeRuneInString(text[i:])
+			ch := text[i : i+size]
+			i += size
+			if r == utf8.RuneError && size == 1 {
+				// A raw byte from a byte escape: \xHH again where the dialect reads that as a byte.
+				if g.d.T.NUMERIC_ESCAPES_ARE_BYTES {
+					ch = hexEscapeRawBytes(ch)
+				}
+				b.WriteString(ch)
+				continue
+			}
 			if escapeBackslash || ch != "\\" {
 				if m, ok := g.d.S.ESCAPED_SEQUENCES[ch]; ok {
 					b.WriteString(m)
@@ -520,6 +531,21 @@ func (g *Generator) escapeStr(text string, escapeBackslash bool, delimiter strin
 	}
 
 	return strings.ReplaceAll(g.replaceLineBreaks(text), delimiter, escapedDelimiter)
+}
+
+// hexEscapeRawBytes writes each byte of s that is not part of a UTF-8 character as \xHH.
+func hexEscapeRawBytes(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			fmt.Fprintf(&b, "\\x%02x", s[i])
+		} else {
+			b.WriteString(s[i : i+size])
+		}
+		i += size
+	}
+	return b.String()
 }
 
 func (g *Generator) loaddataSQL(expression *Expr) string {
