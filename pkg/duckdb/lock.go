@@ -147,12 +147,18 @@ func databaseLockKey(path string) string {
 	// GetIngestrURI adds duckdb:/// to the configured path, including when
 	// that path is absolute. Use the same key as native SQL operations.
 	path = strings.TrimPrefix(path, "duckdb:///")
-	if path != "" && path != ":memory:" && !strings.HasPrefix(path, "md:") {
+	if isLocalFilePath(path) {
 		if absolute, err := filepath.Abs(path); err == nil {
 			path = absolute
 		}
 	}
 	return path
+}
+
+// isLocalFilePath reports whether a DuckDB path names a file on disk rather
+// than an in-memory database or MotherDuck.
+func isLocalFilePath(path string) bool {
+	return path != "" && path != ":memory:" && !strings.HasPrefix(path, "md:")
 }
 
 func databaseLockFor(path string) *databaseLock {

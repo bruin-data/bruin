@@ -1,11 +1,31 @@
 package duck
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/mask"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestConfig_UsesDuckDB2DriverForDuckDB2Files(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// The first 20 bytes of files written by DuckDB 1.5.2 (version 64) and 2.0.0 (version 999).
+	v1 := filepath.Join(dir, "v1.duckdb")
+	v2 := filepath.Join(dir, "v2.duckdb")
+	require.NoError(t, os.WriteFile(v1, []byte("R\xf6\r\xaa\xd0\x87\xa1\xadDUCK\x40\x00\x00\x00\x00\x00\x00\x00"), 0o600))
+	require.NoError(t, os.WriteFile(v2, []byte("*]\x13\xb0O\x19!qDUCK\xe7\x03\x00\x00\x00\x00\x00\x00"), 0o600))
+
+	assert.False(t, Config{Path: v1}.usesDuckDB2Driver())
+	assert.True(t, Config{Path: v2}.usesDuckDB2Driver())
+	assert.False(t, Config{Path: filepath.Join(dir, "new.duckdb")}.usesDuckDB2Driver())
+	assert.True(t, Config{Quack: true}.usesDuckDB2Driver())
+	assert.False(t, IsDuckDB2FileURI("duckdb:///"+v1))
+	assert.True(t, IsDuckDB2FileURI("duckdb:///"+v2))
+}
 
 func TestConfig_ToDBConnectionURI(t *testing.T) {
 	t.Parallel()
