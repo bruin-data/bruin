@@ -5560,18 +5560,20 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 		assert.Empty(t, issues)
 	})
 
-	t.Run("DuckDB hooks are skipped because they depend on earlier hooks", func(t *testing.T) {
+	t.Run("DuckDB and MotherDuck hooks are skipped because they depend on earlier hooks", func(t *testing.T) {
 		t.Parallel()
 
-		duckAsset := &pipeline.Asset{
-			Name:  "duck_with_hooks",
-			Type:  pipeline.AssetTypeDuckDBQuery,
-			Hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "CREATE SCHEMA s"}, {Query: "CREATE TABLE s.t (a INT)"}}},
-		}
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Schema with name s does not exist")}}
-		issues, err := ValidateHookQueryDryRun(cm)(t.Context(), p, duckAsset)
-		require.NoError(t, err)
-		assert.Empty(t, issues)
+		for _, assetType := range []pipeline.AssetType{pipeline.AssetTypeDuckDBQuery, pipeline.AssetTypeMotherduckQuery} {
+			duckAsset := &pipeline.Asset{
+				Name:  "duck_with_hooks",
+				Type:  assetType,
+				Hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "CREATE SCHEMA s"}, {Query: "CREATE TABLE s.t (a INT)"}}},
+			}
+			issues, err := ValidateHookQueryDryRun(cm)(t.Context(), p, duckAsset)
+			require.NoError(t, err)
+			assert.Empty(t, issues, assetType)
+		}
 	})
 
 	t.Run("BigQuery hooks are validated with the complete asset script", func(t *testing.T) {

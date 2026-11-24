@@ -2350,7 +2350,7 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 
 		// DuckDB runs hooks in order, so a hook often uses a schema or table an earlier hook
 		// created; EXPLAIN against the unchanged database would reject it.
-		if asset.Type == pipeline.AssetTypeDuckDBQuery {
+		if asset.Type == pipeline.AssetTypeDuckDBQuery || asset.Type == pipeline.AssetTypeMotherduckQuery {
 			return issues, nil
 		}
 

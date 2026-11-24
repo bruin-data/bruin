@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -128,6 +129,9 @@ func Lint(isDebug *bool) *cli.Command {
 
 			fullRefresh := c.Bool("full-refresh")
 			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
+			// Keep each DuckDB file open across checks, as a run does, instead of reopening it per query.
+			lintCtx, closeDuckDB := duck.WithConnectionReuse(lintCtx)
+			defer closeDuckDB()
 
 			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, &defaultExecutionDate, "<bruin-validation>", runID, nil)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
@@ -555,10 +559,22 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 		logger.Debug("no Postgres connections found, skipping Postgres validation")
 	}
 
-	if len(cfg.SelectedEnvironment.Connections.DuckDB) > 0 {
+	duckDBRules := []struct {
+		identifier  string
+		taskType    pipeline.AssetType
+		connections int
+	}{
+		{"duckdb-validator", pipeline.AssetTypeDuckDBQuery, len(cfg.SelectedEnvironment.Connections.DuckDB)},
+		{"motherduck-validator", pipeline.AssetTypeMotherduckQuery, len(cfg.SelectedEnvironment.Connections.MotherDuck)},
+	}
+	for _, r := range duckDBRules {
+		if r.connections == 0 {
+			logger.Debugf("no connections found, skipping %s", r.identifier)
+			continue
+		}
 		rules = append(rules, &lint.QueryValidatorRule{
-			Identifier:  "duckdb-validator",
-			TaskType:    pipeline.AssetTypeDuckDBQuery,
+			Identifier:  r.identifier,
+			TaskType:    r.taskType,
 			Connections: connectionManager,
 			// Whole file, like a run: the client skips scripts whose USE or SET it cannot apply.
 			Extractor: &query.WholeFileExtractor{
@@ -568,8 +584,6 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 			WorkerCount: 32,
 			Logger:      logger,
 		})
-	} else {
-		logger.Debug("no DuckDB connections found, skipping DuckDB validation")
 	}
 
 	return rules
