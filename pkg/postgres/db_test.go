@@ -1,11 +1,14 @@
 package postgres
 
 import (
+	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"
@@ -1359,6 +1362,49 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, gotQuery)
+		})
+	}
+}
+
+func TestClient_CreateSchemaIfNotExist(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		execErr error
+		wantErr string
+	}{
+		{name: "creates the schema"},
+		{name: "schema created by a parallel asset", execErr: &pgconn.PgError{Code: "23505", Message: `duplicate key value violates unique constraint "pg_namespace_nspname_index"`}},
+		{name: "other errors fail", execErr: &pgconn.PgError{Code: "42501", Message: "permission denied for database bruin"}, wantErr: "failed to create or ensure schema: Demo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool(pgxmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mock.Close()
+
+			expectation := mock.ExpectExec(`CREATE SCHEMA IF NOT EXISTS "Demo"`)
+			if tt.execErr != nil {
+				expectation.WillReturnError(tt.execErr)
+			} else {
+				expectation.WillReturnResult(pgxmock.NewResult("CREATE SCHEMA", 0))
+			}
+
+			client := Client{connection: mock, schemaCache: &sync.Map{}}
+			err = client.CreateSchemaIfNotExist(context.Background(), &pipeline.Asset{Name: "Demo.items"})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+
+			// The schema is cached, so the next asset in it does not run CREATE SCHEMA again.
+			require.NoError(t, client.CreateSchemaIfNotExist(context.Background(), &pipeline.Asset{Name: "Demo.others"}))
+			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }

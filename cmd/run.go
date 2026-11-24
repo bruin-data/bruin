@@ -2209,12 +2209,13 @@ func SetupExecutors(
 		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
 		rsTableSensor := redshift.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+		pgMainOperator := autocreate.Wrap(pgOperator, conn)
 
-		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
+		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgMainOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
-		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgMainOperator
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
