@@ -292,6 +292,17 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return result, nil
 }
 
+// IsValid binds the query with EXPLAIN, which checks syntax, tables, and columns without running it.
+// A script with several statements is reported valid unchecked: EXPLAIN covers only its first
+// statement, DuckDB would run the rest, and later statements may depend on earlier ones (USE, SET).
+func (c *Client) IsValid(ctx context.Context, q *query.Query) (bool, error) {
+	if statements, err := splitStatements(q.String()); err == nil && len(statements) > 1 {
+		return true, nil
+	}
+	_, err := c.DryRunQuery(ctx, q)
+	return err == nil, err
+}
+
 func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
 	explainQuery := &query.Query{Query: "EXPLAIN " + q.String()}
 	explainResult, err := c.SelectWithSchema(ctx, explainQuery)
