@@ -402,7 +402,7 @@ var missingTableError = regexp.MustCompile(`Table with name (.+?) does not exist
 
 // tableNotBuiltYet reports whether err is about a missing table that the pipeline creates before
 // this asset runs, as opposed to a misspelled name: another asset that builds it on the same
-// connection, or one of this asset's pre-hooks.
+// connection, or a pre-hook of this asset that creates it.
 func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset) bool {
 	if err == nil {
 		return false
@@ -411,14 +411,17 @@ func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset) bo
 	if match == nil {
 		return false
 	}
-	if len(asset.Hooks.Pre) > 0 {
-		return true
+	missing := strings.ToLower(strings.Trim(match[1], `"`))
+	createsMissing := regexp.MustCompile(`(?is)\bcreate\b[^;]*\b` + regexp.QuoteMeta(missing) + `\b`)
+	for _, hook := range asset.Hooks.Pre {
+		if createsMissing.MatchString(hook.Query) {
+			return true
+		}
 	}
 	connName, connErr := p.GetConnectionNameForAsset(asset)
 	if connErr != nil {
 		return false
 	}
-	missing := strings.ToLower(strings.Trim(match[1], `"`))
 	for _, builder := range p.Assets {
 		name := strings.ToLower(builder.Name)
 		if name != missing && !strings.HasSuffix(name, "."+missing) {

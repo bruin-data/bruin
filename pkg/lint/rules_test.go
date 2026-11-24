@@ -5417,6 +5417,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		check := []pipeline.CustomCheck{{Name: "c", Query: "SELECT count(*) FROM orders"}}
 		reader := &pipeline.Asset{Name: "reader", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse", CustomChecks: check}
 		withHook := &pipeline.Asset{Name: "hooked", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse", CustomChecks: check, Hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "CREATE TABLE orders AS SELECT 1"}}}}
+		withSetHook := &pipeline.Asset{Name: "set_hooked", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse", CustomChecks: check, Hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "SET threads = 2"}, {Query: "CREATE TABLE audit AS SELECT 1"}}}}
 		missingOrders := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Catalog Error: Table with name orders does not exist!")}}
 		for _, tt := range []struct {
 			name    string
@@ -5428,6 +5429,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 			{"built on another connection", &pipeline.Asset{Name: "orders", Type: pipeline.AssetTypeDuckDBQuery, Connection: "other"}, reader, 1},
 			{"declared as a source", &pipeline.Asset{Name: "orders", Type: pipeline.AssetTypeDuckDBSource, Connection: "warehouse"}, reader, 1},
 			{"created by a pre-hook", &pipeline.Asset{Name: "unrelated", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse"}, withHook, 0},
+			{"pre-hook that creates nothing", &pipeline.Asset{Name: "unrelated", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse"}, withSetHook, 1},
 		} {
 			pl := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.builder, tt.asset}}
 			issues, err := ValidateCustomCheckQueryDryRun(missingOrders, jinja.NewRendererWithYesterday("test", "test"))(t.Context(), pl, tt.asset)
