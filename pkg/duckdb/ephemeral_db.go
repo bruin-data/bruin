@@ -488,22 +488,17 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 	}
 	defer cleanup()
 
-	stmt, err := conn.NewStatement()
-	if err != nil {
-		return nil, err
+	// DuckDB points errors in a multi-statement script at the wrong line, so run the
+	// statements one by one on this session, which keeps their transactions intact.
+	sqlStr = inlineQueryArgs(sqlStr, arguments)
+	statements, err := splitStatements(sqlStr)
+	if err != nil || len(statements) < 2 {
+		statements = []string{sqlStr}
 	}
-	defer stmt.Close()
-
-	if err := stmt.SetSqlQuery(inlineQueryArgs(sqlStr, arguments)); err != nil {
-		return nil, transactionError(err)
-	}
-
-	reader, _, err := stmt.ExecuteQuery(ctx)
-	if err != nil {
-		return nil, transactionError(err)
-	}
-	if reader != nil {
-		reader.Release()
+	for _, statement := range statements {
+		if err := execADBCStatement(ctx, conn, statement); err != nil {
+			return nil, transactionError(err)
+		}
 	}
 
 	return driver.RowsAffected(0), nil
