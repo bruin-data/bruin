@@ -154,12 +154,18 @@ func nativeMergeAsset(columns []pipeline.Column) *pipeline.Asset {
 
 const (
 	nativeMergeStaging = "CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n"
-	nativeMergeGuard   = "IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
+	nativeMergeGuard   = "BEGIN TRY\n" +
+		"IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
 		"BEGIN\n" +
-		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
 		"THROW 50000, N'Fabric merge into dbo.Table failed: the query returned more than one row for the same primary key (id). Deduplicate the query so that each key appears once.', 1;\n" +
 		"END;\n"
-	nativeMergeCleanup = "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];"
+	// A failed guard or MERGE drops the staging table and rethrows the error.
+	nativeMergeCleanup = "END TRY\n" +
+		"BEGIN CATCH\n" +
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
+		"THROW;\n" +
+		"END CATCH;\n" +
+		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];"
 )
 
 func TestBuildNativeMergeQuery(t *testing.T) {
@@ -405,17 +411,13 @@ func TestNativeMergeCreatesMissingTableForRefreshRestrictedAssets(t *testing.T) 
 		"END;\n" +
 		"CREATE TABLE [dbo].[Table__bruin_tmp_abcefghi] AS\n" +
 		query + ";\n" +
-		"IF EXISTS (SELECT 1 FROM [dbo].[Table__bruin_tmp_abcefghi] GROUP BY [id] HAVING COUNT(*) > 1)\n" +
-		"BEGIN\n" +
-		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];\n" +
-		"THROW 50000, N'Fabric merge into dbo.Table failed: the query returned more than one row for the same primary key (id). Deduplicate the query so that each key appears once.', 1;\n" +
-		"END;\n" +
+		nativeMergeGuard +
 		"MERGE INTO [dbo].[Table] target\n" +
 		"USING [dbo].[Table__bruin_tmp_abcefghi] source\n" +
 		"ON target.[id] = source.[id]\n" +
 		"WHEN MATCHED THEN UPDATE SET target.[name] = source.[name]\n" +
 		"WHEN NOT MATCHED BY TARGET THEN INSERT ([id], [name], [updated_at]) VALUES (source.[id], source.[name], source.[updated_at]);\n" +
-		"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp_abcefghi];"
+		nativeMergeCleanup
 
 	// Even a full refresh keeps a refresh_restricted asset on its strategy.
 	for _, fullRefresh := range []bool{false, true} {

@@ -159,6 +159,7 @@ With `fabric_native_merge`:
 - New keys insert the declared `columns`, so every column you want written must be listed.
 - `incremental_predicate` is added to `WHEN MATCHED`, for example `WHEN MATCHED AND (source.updated_at > target.updated_at)`. It needs at least one `update_on_merge` or `merge_sql` column.
 - The run fails before the `MERGE` when the query returns the same primary key more than once, with an error that names the key columns. The default delete+insert mode inserts every duplicate instead.
+- The duplicate check and the `MERGE` run in a `TRY...CATCH` block. If either fails, Bruin drops the staging table and returns the original error, so failed runs don't leave staging tables behind.
 
 > [!WARNING]
 > Turning on `fabric_native_merge` for an existing asset changes what happens to matched rows. A non-key column without `update_on_merge` or `merge_sql` stops being updated. Add `update_on_merge: true` to every column that should keep updating, or `merge_sql` for a conditional update, before you turn it on.

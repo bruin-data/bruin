@@ -213,11 +213,12 @@ func buildNativeMergeQuery(asset *pipeline.Asset, query string) (string, error) 
 			buildCreateTableStatement(asset),
 		))
 	}
+	// The staging table has a unique name, so a failed run would leave it behind
+	// for good. The CATCH block drops it and rethrows the original error.
 	queries = append(
 		queries,
 		"CREATE TABLE "+tempName+" AS\n"+strings.TrimSuffix(strings.TrimSpace(query), ";"),
-		buildDuplicateKeyGuard(asset.Name, pkCols, tempName),
-		strings.Join(mergeLines, "\n"),
+		"BEGIN TRY\n"+buildDuplicateKeyGuard(asset.Name, pkCols, tempName)+";\n"+strings.Join(mergeLines, "\n")+";\nEND TRY\nBEGIN CATCH\nDROP TABLE IF EXISTS "+tempName+";\nTHROW;\nEND CATCH",
 		"DROP TABLE IF EXISTS "+tempName,
 	)
 
@@ -227,6 +228,7 @@ func buildNativeMergeQuery(asset *pipeline.Asset, query string) (string, error) 
 // buildDuplicateKeyGuard fails the run when the staged rows repeat a primary
 // key. MERGE would otherwise either fail with a generic "same row more than
 // once" error, when the key already exists, or insert every copy, when it doesn't.
+// It runs inside the TRY block, so the CATCH block drops the staging table.
 func buildDuplicateKeyGuard(assetName string, pkCols []string, tempName string) string {
 	quotedKeys := make([]string, len(pkCols))
 	for i, col := range pkCols {
@@ -242,10 +244,9 @@ func buildDuplicateKeyGuard(assetName string, pkCols []string, tempName string) 
 	message = strings.ReplaceAll(strings.ReplaceAll(message, "%", "%%"), "'", "''")
 
 	return fmt.Sprintf(
-		"IF EXISTS (SELECT 1 FROM %s GROUP BY %s HAVING COUNT(*) > 1)\nBEGIN\nDROP TABLE IF EXISTS %s;\nTHROW 50000, N'%s', 1;\nEND",
+		"IF EXISTS (SELECT 1 FROM %s GROUP BY %s HAVING COUNT(*) > 1)\nBEGIN\nTHROW 50000, N'%s', 1;\nEND",
 		tempName,
 		strings.Join(quotedKeys, ", "),
-		tempName,
 		message,
 	)
 }
