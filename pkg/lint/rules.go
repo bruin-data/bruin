@@ -2313,7 +2313,7 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 
 			q := &query.Query{Query: renderedQuery}
 			valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), q)
-			if tableNotBuiltYet(err, p, asset) {
+			if tableNotBuiltYet(err, p, asset, assetRenderer.Render) {
 				continue
 			}
 			if err != nil {

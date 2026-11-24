@@ -204,7 +204,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		return issues, nil
 	}
 	valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
-	if tableNotBuiltYet(err, p, asset) {
+	if tableNotBuiltYet(err, p, asset, renderWith(extractor)) {
 		return issues, nil
 	}
 	if err != nil {
@@ -366,7 +366,7 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 				return
 			}
 			valid, err := valll.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
-			if tableNotBuiltYet(err, p, task) {
+			if tableNotBuiltYet(err, p, task, renderWith(extractor)) {
 				q.Logger.Debugf("skipping query validation for asset '%s', it reads a table that has not been built yet", task.Name)
 				return
 			}
@@ -403,7 +403,8 @@ var missingTableError = regexp.MustCompile(`Table with name (.+?) does not exist
 // tableNotBuiltYet reports whether err is about a missing table that the pipeline creates before
 // this asset runs, as opposed to a misspelled name: another asset that builds it on the same
 // connection, or a pre-hook of this asset that creates it.
-func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset) bool {
+// render resolves the Jinja in a hook with the asset's context, as a run does.
+func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset, render func(string) (string, error)) bool {
 	if err == nil {
 		return false
 	}
@@ -414,7 +415,11 @@ func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset) bo
 	missing := strings.ToLower(strings.Trim(match[1], `"`))
 	createsMissing := regexp.MustCompile(`(?is)\bcreate\b[^;]*\b` + regexp.QuoteMeta(missing) + `\b`)
 	for _, hook := range asset.Hooks.Pre {
-		if createsMissing.MatchString(hook.Query) {
+		hookQuery, renderErr := render(hook.Query)
+		if renderErr != nil {
+			hookQuery = hook.Query
+		}
+		if createsMissing.MatchString(hookQuery) {
 			return true
 		}
 	}
@@ -436,6 +441,17 @@ func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset) bo
 		}
 	}
 	return false
+}
+
+// renderWith renders text through an asset's query extractor, which applies its Jinja context.
+func renderWith(extractor query.QueryExtractor) func(string) (string, error) {
+	return func(text string) (string, error) {
+		queries, err := extractor.ExtractQueriesFromString(text)
+		if err != nil || len(queries) == 0 {
+			return text, err
+		}
+		return queries[0].Query, nil
+	}
 }
 
 func (q *QueryValidatorRule) bufferSize() int {
