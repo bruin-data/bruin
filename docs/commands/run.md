@@ -70,6 +70,45 @@ table td:first-child {
 | `--query-annotations` | str | - | Attach annotations to SQL queries for tracking. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
 | `--backfill-id` | str | - | Tag this run as part of a backfill group; written to the run log as `backfill_id` so related runs can be grouped. |
 | `--backfill-total` | int | `0` | Total number of chunks in this backfill; written to the run log as `backfill_total` so progress can be reported. Informational only — it does not affect scheduling or execution. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. With `json`, the logs go to stderr and stdout gets only the [run result](#machine-readable-results). |
+
+### Machine-readable results
+
+Every run writes its result to `logs/runs/<pipeline>/<run-id>.json`, and `--output json` prints the same document to stdout. It lists each asset with the outcome of each of its tasks: the asset itself (`main`), its column checks (`column_test`), custom checks (`custom_test`) and metadata push (`metadata_push`). A failed task carries the reason in `error`, and `summary` counts the tasks by type and status. The exit code is the same as in plain mode.
+
+```bash
+bruin run -o json my-pipeline 2>/dev/null | jq '.state[].tasks[] | select(.status == "failed")'
+```
+
+```json
+{
+  "run_id": "2026_11_20_06_58_12",
+  "summary": {
+    "main": { "succeeded": 1, "upstream_failed": 1 },
+    "column_test": { "failed": 1, "succeeded": 1 },
+    "custom_test": { "succeeded": 1 }
+  },
+  "state": [
+    {
+      "name": "main.items",
+      "status": "failed",
+      "tasks": [
+        { "type": "main", "status": "succeeded" },
+        { "type": "column_test", "name": "id.not_null", "status": "failed", "error": "column 'id' has 1 null values" },
+        { "type": "column_test", "name": "quantity.non_negative", "status": "succeeded" },
+        { "type": "custom_test", "name": "row_count", "status": "succeeded" }
+      ]
+    },
+    {
+      "name": "main.downstream",
+      "status": "failed",
+      "tasks": [{ "type": "main", "status": "upstream_failed" }]
+    }
+  ]
+}
+```
+
+A task's status is one of `succeeded`, `failed`, `upstream_failed` (not run because something it depends on failed), `skipped` (filtered out of the run, or already done in the run that `--continue` resumes), or `pending` (not run because the run was aborted). The document also has the run's `parameters`, `cmdline` and `timestamp`. If the run fails before any asset runs, for example on a missing connection, stdout gets `{"error": "..."}` and the reason is printed on stderr. If there is nothing to run, stdout gets `{"state": []}`.
 
 ### Backfill identity in the run log
 

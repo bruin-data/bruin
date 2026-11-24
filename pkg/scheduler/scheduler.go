@@ -115,14 +115,16 @@ type TaskInstance interface {
 }
 
 type PipelineState struct {
-	Cmdline           []string              `json:"cmdline"`
-	Parameters        RunConfig             `json:"parameters"`
-	Metadata          Metadata              `json:"metadata"`
-	State             []*PipelineAssetState `json:"state"`
-	Version           string                `json:"version"`
-	TimeStamp         time.Time             `json:"timestamp"`
-	RunID             string                `json:"run_id"`
-	CompatibilityHash string                `json:"compatibility_hash"`
+	Cmdline    []string  `json:"cmdline"`
+	Parameters RunConfig `json:"parameters"`
+	Metadata   Metadata  `json:"metadata"`
+	// Summary counts the run's tasks by type, then by status.
+	Summary           map[string]map[string]int `json:"summary,omitempty"`
+	State             []*PipelineAssetState     `json:"state"`
+	Version           string                    `json:"version"`
+	TimeStamp         time.Time                 `json:"timestamp"`
+	RunID             string                    `json:"run_id"`
+	CompatibilityHash string                    `json:"compatibility_hash"`
 	// BackfillID groups the per-run logs of one backfill (--backfill-id).
 	BackfillID string `json:"backfill_id,omitempty"`
 	// BackfillTotal is the backfill's chunk count, for progress (--backfill-total).
@@ -156,8 +158,17 @@ type RunConfig struct {
 }
 
 type PipelineAssetState struct {
-	Name   string `json:"name"`
+	Name   string               `json:"name"`
+	Status string               `json:"status"`
+	Tasks  []*PipelineTaskState `json:"tasks,omitempty"`
+}
+
+// PipelineTaskState is the outcome of one of an asset's tasks: the asset itself or one of its checks.
+type PipelineTaskState struct {
+	Type   string `json:"type"`
+	Name   string `json:"name,omitempty"`
 	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
 }
 
 type Metadata struct {
@@ -340,6 +351,20 @@ type Scheduler struct {
 
 	runID          string
 	onStatusChange func(StatusChangeEvent)
+
+	taskErrors map[TaskInstance]error
+	// MaskError redacts credentials from the failure reasons written to the run state.
+	MaskError func(string) string
+}
+
+func (s *Scheduler) recordError(result *TaskExecutionResult) {
+	if result.Error == nil {
+		return
+	}
+	if s.taskErrors == nil {
+		s.taskErrors = make(map[TaskInstance]error)
+	}
+	s.taskErrors[result.Instance] = result.Error
 }
 
 type ConnectionDetailsGetter interface {
@@ -907,6 +932,7 @@ func (s *Scheduler) drainInFlightResults(timeout time.Duration) []*TaskExecution
 		select {
 		case res := <-s.Results:
 			drained = append(drained, res)
+			s.recordError(res)
 			// Record the task's final state but do not propagate failures
 			// to downstream — the run is aborting, downstream should remain
 			// in their pre-abort state (typically Pending/Queued) so the
@@ -949,6 +975,7 @@ func (s *Scheduler) drainInFlightResults(timeout time.Duration) []*TaskExecution
 func (s *Scheduler) Tick(result *TaskExecutionResult) bool {
 	s.taskScheduleLock.Lock()
 	defer s.taskScheduleLock.Unlock()
+	s.recordError(result)
 	if result.Instance.GetStatus() != Skipped {
 		s.MarkTaskInstance(result.Instance, Succeeded, false)
 	}
@@ -1157,8 +1184,17 @@ func (s *Scheduler) hasPipelineFinished() bool {
 
 func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfig, backfillID string, backfillTotal int, runID, statePath string) error {
 	dict := make(map[string][]TaskInstanceStatus)
+	tasks := make(map[string][]*PipelineTaskState)
+	summary := make(map[string]map[string]int)
 	for _, task := range s.taskInstances {
 		dict[task.GetAsset().Name] = append(dict[task.GetAsset().Name], task.GetStatus())
+
+		taskState := s.taskState(task)
+		tasks[task.GetAsset().Name] = append(tasks[task.GetAsset().Name], taskState)
+		if summary[taskState.Type] == nil {
+			summary[taskState.Type] = make(map[string]int)
+		}
+		summary[taskState.Type][taskState.Status]++
 	}
 
 	state := make([]*PipelineAssetState, 0, len(dict))
@@ -1167,6 +1203,7 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfi
 		state = append(state, &PipelineAssetState{
 			Name:   key,
 			Status: result.String(),
+			Tasks:  tasks[key],
 		})
 	}
 
@@ -1177,6 +1214,7 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfi
 			Version: version.Version,
 			OS:      runtime.GOOS,
 		},
+		Summary:           summary,
 		State:             state,
 		Version:           "1.0.0",
 		TimeStamp:         time.Now(),
@@ -1191,6 +1229,23 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfi
 		return err
 	}
 	return nil
+}
+
+func (s *Scheduler) taskState(task TaskInstance) *PipelineTaskState {
+	taskState := &PipelineTaskState{Type: task.GetType().String(), Status: task.GetStatus().String()}
+	switch t := task.(type) {
+	case *ColumnCheckInstance:
+		taskState.Name = t.Column.Name + "." + t.Check.Name
+	case *CustomCheckInstance:
+		taskState.Name = t.Check.Name
+	}
+	if err := s.taskErrors[task]; err != nil {
+		taskState.Error = err.Error()
+		if s.MaskError != nil {
+			taskState.Error = s.MaskError(taskState.Error)
+		}
+	}
+	return taskState
 }
 
 func (s *Scheduler) RestoreState(state *PipelineState) error {
