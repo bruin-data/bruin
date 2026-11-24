@@ -2164,7 +2164,7 @@ func SetupExecutors(
 		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
-		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
+		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(bqOperator, conn)
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
