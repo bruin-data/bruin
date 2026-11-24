@@ -726,3 +726,21 @@ func TestQuackConnectionsUseTheirOwnDriver(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(home, "adbc", "duckdb.toml"), path)
 }
+
+func TestIsValidChecksSingleStatementsOnly(t *testing.T) {
+	t.Parallel()
+	conn, err := NewEphemeralConnection(Config{Path: ":memory:"})
+	require.NoError(t, err)
+	c := &Client{connection: conn}
+	_, err = conn.ExecContext(t.Context(), "CREATE SCHEMA reporting; CREATE TABLE reporting.orders AS SELECT 1 AS id")
+	require.NoError(t, err)
+
+	// A semicolon in a string does not make a script, so the bad column is still caught.
+	_, err = c.IsValid(t.Context(), &query.Query{Query: "SELECT nope, ';' FROM reporting.orders"})
+	require.ErrorContains(t, err, "nope")
+
+	// USE changes what the next statement reads, which EXPLAIN on its own cannot apply.
+	valid, err := c.IsValid(t.Context(), &query.Query{Query: "USE reporting; SELECT * FROM orders"})
+	require.NoError(t, err)
+	require.True(t, valid)
+}

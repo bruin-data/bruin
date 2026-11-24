@@ -41,7 +41,7 @@ Legacy `int` types and unquoted YAML `null` types are normalized only for this c
 
 One of the beneficial features of the `validate` command is the ability to perform a dry-run validation on the destination data platform. This means, effectively Bruin runs a dry-run version of the query to ensure that the query is valid and can be executed on the destination data platform. This gives a very strong peace of mind in terms of the accuracy of the queries from a syntactical and semantical perspective, and also ensures that the query can be executed on the destination data platform.
 
-Dry-run is automatically enabled for BigQuery and Snowflake.
+Dry-run is automatically enabled for BigQuery and Snowflake. DuckDB assets and their custom checks are checked with `EXPLAIN`, which catches syntax errors and misspelled tables and columns without running the query; a table that another asset in the pipeline builds is not reported as missing before its first run.
 
 Semantic models in the repository-level `semantic/` directory are also validated. Model structure is checked on every run, including `--fast` and asset-scoped validation. Dedicated `source.query` values and parenthesized `source.table` subqueries are dry-run against a pipeline SQL connection when one is available.
 

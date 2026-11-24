@@ -18,4 +18,4 @@ custom_checks:
       query: select true
 @bruin */
 
-select "I'm the standard" as msg
+select 'I''m the standard' as msg

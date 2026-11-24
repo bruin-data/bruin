@@ -555,5 +555,22 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 		logger.Debug("no Postgres connections found, skipping Postgres validation")
 	}
 
+	if len(cfg.SelectedEnvironment.Connections.DuckDB) > 0 {
+		rules = append(rules, &lint.QueryValidatorRule{
+			Identifier:  "duckdb-validator",
+			TaskType:    pipeline.AssetTypeDuckDBQuery,
+			Connections: connectionManager,
+			// Whole file, like a run: the client skips scripts whose USE or SET it cannot apply.
+			Extractor: &query.WholeFileExtractor{
+				Fs:       fs,
+				Renderer: renderer,
+			},
+			WorkerCount: 32,
+			Logger:      logger,
+		})
+	} else {
+		logger.Debug("no DuckDB connections found, skipping DuckDB validation")
+	}
+
 	return rules
 }

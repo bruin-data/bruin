@@ -4363,6 +4363,18 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "parse error highlighting is stripped",
+			asset: &pipeline.Asset{
+				Type:           pipeline.AssetTypeDuckDBQuery,
+				ExecutableFile: pipeline.ExecutableFile{Content: "SELEC 1"},
+			},
+			setup: func(p *mockSQLParser) {
+				p.On("GetMissingDependenciesForAsset", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, errors.New("Invalid expression / Unexpected token. Line 1, Col: 5.\n  \x1b[4mSELEC\x1b[0m 1"))
+			},
+			want:    []string{"failed to get missing dependencies: Invalid expression / Unexpected token. Line 1, Col: 5.\n  SELEC 1"},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "no missing dependencies, no error",
 			asset: &pipeline.Asset{
 				Type:            pipeline.AssetTypeBigqueryQuery,
@@ -5388,6 +5400,42 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		assert.Contains(t, issues[0].Description, "Custom check query is invalid")
 	})
 
+	t.Run("missing table is caught unless an asset builds it", func(t *testing.T) {
+		t.Parallel()
+		unbuilt := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Catalog Error: Table with name asset1 does not exist!")}}
+		issues, err := ValidateCustomCheckQueryDryRun(unbuilt, jinja.NewRendererWithYesterday("test", "test"))(t.Context(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+
+		misspelled := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Catalog Error: Table with name aset1 does not exist!")}}
+		issues, err = ValidateCustomCheckQueryDryRun(misspelled, jinja.NewRendererWithYesterday("test", "test"))(t.Context(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "aset1 does not exist")
+
+		// Only an asset that builds the table on the checked connection, or a pre-hook, excuses it.
+		check := []pipeline.CustomCheck{{Name: "c", Query: "SELECT count(*) FROM orders"}}
+		reader := &pipeline.Asset{Name: "reader", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse", CustomChecks: check}
+		withHook := &pipeline.Asset{Name: "hooked", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse", CustomChecks: check, Hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "CREATE TABLE orders AS SELECT 1"}}}}
+		missingOrders := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Catalog Error: Table with name orders does not exist!")}}
+		for _, tt := range []struct {
+			name    string
+			builder *pipeline.Asset
+			asset   *pipeline.Asset
+			want    int
+		}{
+			{"built on the same connection", &pipeline.Asset{Name: "main.orders", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse"}, reader, 0},
+			{"built on another connection", &pipeline.Asset{Name: "orders", Type: pipeline.AssetTypeDuckDBQuery, Connection: "other"}, reader, 1},
+			{"declared as a source", &pipeline.Asset{Name: "orders", Type: pipeline.AssetTypeDuckDBSource, Connection: "warehouse"}, reader, 1},
+			{"created by a pre-hook", &pipeline.Asset{Name: "unrelated", Type: pipeline.AssetTypeDuckDBQuery, Connection: "warehouse"}, withHook, 0},
+		} {
+			pl := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.builder, tt.asset}}
+			issues, err := ValidateCustomCheckQueryDryRun(missingOrders, jinja.NewRendererWithYesterday("test", "test"))(t.Context(), pl, tt.asset)
+			require.NoError(t, err)
+			assert.Len(t, issues, tt.want, tt.name)
+		}
+	})
+
 	t.Run("custom check with empty query", func(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
@@ -5504,6 +5552,20 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
 		validator := ValidateHookQueryDryRun(cm)
 		issues, err := validator(t.Context(), p, pythonAssetWithHooks)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("DuckDB hooks are skipped because they depend on earlier hooks", func(t *testing.T) {
+		t.Parallel()
+
+		duckAsset := &pipeline.Asset{
+			Name:  "duck_with_hooks",
+			Type:  pipeline.AssetTypeDuckDBQuery,
+			Hooks: pipeline.Hooks{Pre: []pipeline.Hook{{Query: "CREATE SCHEMA s"}, {Query: "CREATE TABLE s.t (a INT)"}}},
+		}
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("Schema with name s does not exist")}}
+		issues, err := ValidateHookQueryDryRun(cm)(t.Context(), p, duckAsset)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
