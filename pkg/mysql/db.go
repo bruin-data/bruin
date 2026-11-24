@@ -417,6 +417,83 @@ func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	}
 }
 
+// RelationExists reports whether a table or view named tableName exists, so an
+// incremental asset can create its table on the first run. The materializer
+// writes the name unquoted, so `table` resolves in the connection's default
+// database and `database.table` as written. Whether names are case-sensitive
+// depends on the server's lower_case_table_names, so they are compared
+// case-insensitively, which can only report more relations as existing.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	switch c.config.(type) {
+	case Config, *Config:
+	default:
+		// Vitess and PlanetScale share this client, but their information_schema
+		// is routed and rewritten per keyspace, so a lookup is not reliable there.
+		// Reporting the table as existing keeps the incremental load, without a
+		// warning on every run.
+		return true, nil
+	}
+
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 2 {
+		return false, fmt.Errorf("table name must be in format database.table or table, '%s' given", tableName)
+	}
+	for _, part := range parts {
+		if !isUnquotedIdentifier(part) {
+			return false, fmt.Errorf("cannot check whether table '%s' exists: only unquoted names made of letters, digits, '_' and '$' are supported", tableName)
+		}
+	}
+
+	schema := "DATABASE()"
+	args := []any{parts[len(parts)-1]}
+	if len(parts) == 2 {
+		schema = "?"
+		args = append(args, parts[0])
+	}
+
+	if err := c.initializeDB(ctx); err != nil {
+		return false, err
+	}
+	conn, cleanup, err := c.queryConnection(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer cleanup()
+
+	q := "SELECT COUNT(*) FROM information_schema.tables WHERE LOWER(table_name) = LOWER(?) AND LOWER(table_schema) = LOWER(" + schema + ")"
+	rows, err := conn.QueryContext(ctx, q, args...)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+	}
+	defer rows.Close()
+
+	var count int64
+	if rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+	}
+
+	return count > 0, nil
+}
+
+// isUnquotedIdentifier reports whether name only has characters that MySQL
+// accepts in an unquoted identifier, so it can be looked up literally.
+func isUnquotedIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x80 && r != '_' && r != '$' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	if asset == nil {
 		return errors.New("asset cannot be nil")

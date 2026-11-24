@@ -430,6 +430,100 @@ ORDER BY database, name;
 	return summary, nil
 }
 
+// RelationExists reports whether a table, view, dictionary or any other
+// relation named tableName exists, so an incremental asset can create its table
+// on the first run. The materializer writes the name unquoted, so `table`
+// resolves in the session's current database and `database.table` as written,
+// and ClickHouse compares both case-sensitively. With a cluster configured, a
+// first run replaces the table ON CLUSTER, so the relation counts when any
+// replica has it.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 2 {
+		return false, fmt.Errorf("table name must be in format database.table or table, '%s' given", tableName)
+	}
+	for _, part := range parts {
+		if !isUnquotedIdentifier(part) {
+			return false, fmt.Errorf("cannot check whether table '%s' exists: only unquoted names made of letters, digits and underscores are supported", tableName)
+		}
+	}
+
+	database, table := parts[0], parts[len(parts)-1]
+	if len(parts) == 1 {
+		current, err := c.currentDatabase(ctx)
+		if err != nil {
+			return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+		}
+		database = current
+	}
+
+	source := "system.tables"
+	args := []any{database, table}
+	if cluster := c.GetCluster(); cluster != "" {
+		source = "clusterAllReplicas(?, system.tables)"
+		args = append([]any{cluster}, args...)
+	}
+
+	rows, err := c.connection.Query(ctx, "SELECT count() FROM "+source+" WHERE database = ? AND name = ?", args...)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+	defer rows.Close()
+
+	var count uint64
+	if rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	return count > 0, nil
+}
+
+func (c *Client) currentDatabase(ctx context.Context) (string, error) {
+	rows, err := c.connection.Query(ctx, "SELECT currentDatabase()")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	var database string
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return "", err
+		}
+		return "", errors.New("the current database could not be read")
+	}
+	if err := rows.Scan(&database); err != nil {
+		return "", err
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	if database == "" {
+		return "", errors.New("the current database could not be read")
+	}
+
+	return database, nil
+}
+
+// isUnquotedIdentifier reports whether name is written the same quoted or
+// unquoted, so it can be looked up literally in system tables.
+func isUnquotedIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r != '_' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	tableComponents := strings.Split(tableName, ".")
 	for _, component := range tableComponents {

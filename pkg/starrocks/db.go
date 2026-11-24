@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -358,6 +359,75 @@ func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	default:
 		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
 	}
+}
+
+// RelationExists reports whether a table or view named tableName exists, so an
+// incremental asset can create its table on the first run. The materializer
+// quotes each part of the name, so `table` resolves in the connection's
+// default database and `database.table` as written, both in the session's
+// catalog. Only default_catalog is checked, because the lookup reads its
+// information_schema. Names are compared case-insensitively, which can only
+// report more relations as existing.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 2 {
+		return false, fmt.Errorf("table name must be in format database.table or table, '%s' given", tableName)
+	}
+	for _, part := range parts {
+		if !isPlainIdentifier(part) {
+			return false, fmt.Errorf("cannot check whether table '%s' exists: only names made of letters, digits, '_', '-' and '$' are supported", tableName)
+		}
+	}
+
+	schema := "DATABASE()"
+	if len(parts) == 2 {
+		schema = quoteStringLiteral(parts[0])
+	}
+	// Names are validated above, so the literals need no escaping. Placeholders
+	// would need server-side prepared statements, which StarRocks may not support.
+	q := "SELECT COUNT(*) FROM information_schema.tables WHERE LOWER(table_name) = LOWER(" + quoteStringLiteral(parts[len(parts)-1]) + ") AND LOWER(table_schema) = LOWER(" + schema + ")"
+
+	if err := c.initializeDB(ctx); err != nil {
+		return false, err
+	}
+
+	// Both lookups run on one connection, so they see the same catalog.
+	conn, err := c.conn.Connx(ctx)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+	}
+	defer conn.Close()
+
+	var catalog string
+	if err := conn.QueryRowContext(ctx, "SELECT CATALOG()").Scan(&catalog); err != nil {
+		return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+	}
+	if catalog != "default_catalog" {
+		// The lookup only covers default_catalog. Reporting the table as existing
+		// keeps the incremental load, without a warning on every run.
+		return true, nil
+	}
+
+	var count int64
+	if err := conn.QueryRowContext(ctx, q).Scan(&count); err != nil {
+		return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+	}
+
+	return count > 0, nil
+}
+
+// isPlainIdentifier reports whether name only has characters that need no
+// escaping in a string literal or a quoted identifier.
+func isPlainIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r != '_' && r != '-' && r != '$' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
