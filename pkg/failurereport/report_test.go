@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -146,6 +149,57 @@ func TestClassify(t *testing.T) {
 			want: Report{Class: Unknown, Source: "postgres", SQLState: "22012"},
 		},
 		{
+			name: "missing secret looked up without a MissingConnectionError",
+			err:  fmt.Errorf("failed to resolve source connection 'pg': %w", notFoundError{}),
+			want: Report{Class: MissingConnection, Code: "connection_missing", Source: "secrets"},
+		},
+		{
+			name: "secrets backend unavailable without a MissingConnectionError",
+			err:  fmt.Errorf("failed to resolve source connection 'pg': %w", &config.SecretsBackendUnavailableError{Err: errors.New("timeout")}),
+			want: Report{Class: Infra, Code: "secrets_backend", Source: "secrets"},
+		},
+		{
+			name: "bigquery access denied reported as an invalid query",
+			err: &googleapi.Error{
+				Code: 400, Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}},
+				Message: "Access Denied: Table p:d.t: User does not have permission to query table p:d.t, or perhaps it does not exist.",
+			},
+			want: Report{Class: Permission, Code: "access_denied", Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
+		},
+		{
+			name: "bigquery job access denied reported as an invalid query",
+			err:  &bigquery.Error{Reason: "invalidQuery", Message: "Access Denied: Table p:d.t: User does not have permission to query table p:d.t"},
+			want: Report{Class: Permission, Code: "access_denied", Source: "bigquery", Reason: "invalidQuery"},
+		},
+		{
+			name: "database doesn't answer",
+			err: fmt.Errorf("failed to create schema: %w", errors.Join(
+				&net.OpError{Op: "dial", Net: "tcp", Err: timeoutError{}},
+				&net.OpError{Op: "dial", Net: "tcp", Err: timeoutError{}},
+			)),
+			want: Report{Class: Transient, Code: "timeout", Source: "network"},
+		},
+		{
+			name: "connection refused",
+			err:  &net.OpError{Op: "dial", Net: "tcp", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)},
+			want: Report{Class: Transient, Code: "connection_reset", Source: "network"},
+		},
+		{
+			name: "host doesn't exist",
+			err:  &net.OpError{Op: "dial", Net: "tcp", Err: &net.DNSError{Err: "no such host", Name: "db.example.com", IsNotFound: true}},
+			want: Report{Class: Connection, Code: "host_not_found", Source: "network"},
+		},
+		{
+			name: "dns server failing",
+			err:  &net.DNSError{Err: "server misbehaving", Name: "db.example.com", IsTemporary: true},
+			want: Report{Class: Transient, Code: "dns_error", Source: "network"},
+		},
+		{
+			name: "joined errors report the first one's type",
+			err:  fmt.Errorf("x: %w", errors.Join(errors.New("a"), errors.New("b"))),
+			want: Report{Class: Unknown, ErrorType: "*errors.errorString"},
+		},
+		{
 			name: "anything else",
 			err:  fmt.Errorf("running asset: %w", errors.New("exit status 1")),
 			want: Report{Class: Unknown, ErrorType: "*errors.errorString"},
@@ -158,6 +212,17 @@ func TestClassify(t *testing.T) {
 		})
 	}
 }
+
+type notFoundError struct{}
+
+func (notFoundError) Error() string        { return "secret 'pg' not found in Vault" }
+func (notFoundError) Is(target error) bool { return target == config.ErrConnectionNotFound }
+
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
 
 func TestLine(t *testing.T) {
 	t.Parallel()

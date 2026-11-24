@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+// ErrConnectionNotFound matches, with errors.Is, a secrets backend's error for a connection
+// that doesn't exist, as opposed to one that couldn't be read.
+var ErrConnectionNotFound = errors.New("connection not found")
+
 // MissingConnectionError is returned when a requested connection cannot be found.
 type MissingConnectionError struct {
 	Role            string

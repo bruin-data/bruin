@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
+	"syscall"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -85,6 +88,16 @@ func Classify(err error) Report {
 		return Report{Class: MissingConnection, Code: "connection_missing", Source: "bruin", Connection: missingConnection.Name}
 	}
 
+	// A secrets backend that couldn't be read, or a connection that isn't in it, reached without a
+	// MissingConnectionError, e.g. through ingestr's connection lookup.
+	var unavailable *config.SecretsBackendUnavailableError
+	if errors.As(err, &unavailable) {
+		return Report{Class: Infra, Code: "secrets_backend", Source: "secrets"}
+	}
+	if errors.Is(err, config.ErrConnectionNotFound) {
+		return Report{Class: MissingConnection, Code: "connection_missing", Source: "secrets"}
+	}
+
 	var assetTimeout *executor.AssetTimeoutError
 	if errors.As(err, &assetTimeout) {
 		return Report{Class: AssetTimeout, Code: "asset_timeout", Source: "bruin"}
@@ -103,7 +116,7 @@ func Classify(err error) Report {
 	var bqErr *bigquery.Error
 	if errors.As(err, &bqErr) {
 		report := Report{Source: "bigquery", Reason: bqErr.Reason}
-		report.Class, report.Code = bigQueryReason(bqErr.Reason)
+		report.Class, report.Code = bigQueryReason(bqErr.Reason, bqErr.Message)
 		return report
 	}
 
@@ -114,7 +127,30 @@ func Classify(err error) Report {
 		return report
 	}
 
+	if report, ok := classifyNetwork(err); ok {
+		return report
+	}
+
 	return Report{Class: Unknown, ErrorType: innermostType(err)}
+}
+
+// classifyNetwork classifies a failure to reach a service, e.g. a database that doesn't answer.
+func classifyNetwork(err error) (Report, bool) {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		if dnsErr.IsNotFound {
+			return Report{Class: Connection, Code: "host_not_found", Source: "network"}, true
+		}
+		return Report{Class: Transient, Code: "dns_error", Source: "network"}, true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return Report{Class: Transient, Code: "timeout", Source: "network"}, true
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return Report{Class: Transient, Code: "connection_reset", Source: "network"}, true
+	}
+	return Report{}, false
 }
 
 func classifyGoogleAPI(apiErr *googleapi.Error) Report {
@@ -122,7 +158,7 @@ func classifyGoogleAPI(apiErr *googleapi.Error) Report {
 	if len(apiErr.Errors) > 0 {
 		report.Reason = apiErr.Errors[0].Reason
 	}
-	report.Class, report.Code = bigQueryReason(report.Reason)
+	report.Class, report.Code = bigQueryReason(report.Reason, apiErr.Message)
 	if report.Class != Unknown {
 		return report
 	}
@@ -137,7 +173,13 @@ func classifyGoogleAPI(apiErr *googleapi.Error) Report {
 
 // bigQueryReason maps BigQuery's error reasons, see
 // https://cloud.google.com/bigquery/docs/error-messages.
-func bigQueryReason(reason string) (string, string) {
+func bigQueryReason(reason, message string) (string, string) {
+	// A query reading a table it may not read fails as an invalid query, with a message such as
+	// "Access Denied: Table p:d.t: User does not have permission to query table p:d.t, or perhaps
+	// it does not exist."
+	if reason == "invalidQuery" && strings.HasPrefix(message, "Access Denied:") {
+		return Permission, "access_denied"
+	}
 	switch reason {
 	case "backendError", "internalError", "jobBackendError", "jobInternalError":
 		return Transient, "bq_retryable"
@@ -178,12 +220,21 @@ func sqlState(code string) (string, string) {
 	return Unknown, ""
 }
 
+// innermostType follows the error chain, taking the first error where several were joined.
 func innermostType(err error) string {
 	if err == nil {
 		return ""
 	}
 	for {
-		next := errors.Unwrap(err)
+		var next error
+		switch e := err.(type) { //nolint:errorlint // walks the chain by hand
+		case interface{ Unwrap() []error }:
+			if joined := e.Unwrap(); len(joined) > 0 {
+				next = joined[0]
+			}
+		default:
+			next = errors.Unwrap(err)
+		}
 		if next == nil {
 			return fmt.Sprintf("%T", err)
 		}

@@ -3,6 +3,7 @@ package secrets
 import (
 	"fmt"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
 )
@@ -10,6 +11,9 @@ import (
 type secretNotFoundError struct{ msg string }
 
 func (e *secretNotFoundError) Error() string { return e.msg }
+
+// Is makes a missing secret match config.ErrConnectionNotFound.
+func (e *secretNotFoundError) Is(target error) bool { return target == config.ErrConnectionNotFound }
 
 func newSecretNotFoundError(format string, args ...any) *secretNotFoundError {
 	return &secretNotFoundError{msg: fmt.Sprintf(format, args...)}
