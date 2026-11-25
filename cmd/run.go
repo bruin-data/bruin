@@ -790,10 +790,25 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "backfill-total",
 				Usage: "total number of chunks in this backfill; written to the run log so progress can be reported. Informational only.",
 			},
+			outputFlag(),
 		},
 		DisableSliceFlagSeparator: true,
-		Action: func(ctx context.Context, c *cli.Command) error {
+		Action: func(ctx context.Context, c *cli.Command) (runErr error) {
 			defer RecoverFromPanic()
+			// With -o json, logs go to stderr and stdout gets only the run state file.
+			var stateFile string
+			if c.String("output") == "json" {
+				stdout, colorOut := os.Stdout, color.Output
+				os.Stdout, color.Output = os.Stderr, os.Stderr
+				defer func() {
+					os.Stdout, color.Output = stdout, colorOut
+					r := recover()
+					printRunResultJSON(stateFile, runErr, r != nil)
+					if r != nil {
+						panic(r) // RecoverFromPanic logs it and exits
+					}
+				}()
+			}
 			childState := os.Getenv(backfillChildStateEnv)
 			childGeneration := os.Getenv(backfillChildGenerationEnv)
 			childTimezone := os.Getenv(backfillTimezoneEnv)
@@ -1055,6 +1070,7 @@ func Run(isDebug *bool) *cli.Command {
 				}
 
 				runConfig = &pipelineState.Parameters
+				runConfig.Output = c.String("output")
 
 				parsedStartDate, parsedEndDate, err := ParseDate(runConfig.StartDate, runConfig.EndDate, logger)
 				if err != nil {
@@ -1406,6 +1422,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
+			s.MaskError = masker.Mask
 
 			if c.Bool("continue") {
 				if err := s.RestoreState(pipelineState); err != nil {
@@ -1571,6 +1588,7 @@ func Run(isDebug *bool) *cli.Command {
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, backfillID, backfillTotal, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
+				stateFile = filepath.Join(statePath, runID+".json")
 
 				errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
 				for _, res := range results {
@@ -1621,6 +1639,7 @@ func Run(isDebug *bool) *cli.Command {
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, backfillID, backfillTotal, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
+				stateFile = filepath.Join(statePath, runID+".json")
 
 				errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
 				for _, res := range results {
@@ -1669,6 +1688,27 @@ func Run(isDebug *bool) *cli.Command {
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
 	}
+}
+
+// printRunResultJSON prints the run state file, or an error when the run stopped before writing it.
+func printRunResultJSON(stateFile string, runErr error, panicked bool) {
+	if stateFile != "" {
+		content, err := os.ReadFile(stateFile) //nolint:gosec // G304: the run's own state file.
+		if err != nil {
+			printErrorJSON(errors.Wrap(err, "the run finished but its result could not be read"))
+			return
+		}
+		fmt.Println(string(content))
+		return
+	}
+	if runErr == nil && !panicked {
+		fmt.Println(`{"state": []}`) // nothing to run
+		return
+	}
+	if runErr == nil || runErr.Error() == "" {
+		runErr = errors.New("bruin run failed; the reason is printed on stderr")
+	}
+	printErrorJSON(runErr)
 }
 
 func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.PipelineState, error) {
