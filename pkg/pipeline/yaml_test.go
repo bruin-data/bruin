@@ -983,12 +983,16 @@ func TestUpstreamModeJSONRoundTrip(t *testing.T) {
 func TestConvertYamlToTask_SmartRetries(t *testing.T) {
 	t.Parallel()
 
-	task, err := pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries: false\n"))
+	task, err := pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries:\n  enabled: false\n"))
 	require.NoError(t, err)
 	require.NotNil(t, task.SmartRetries)
-	require.False(t, *task.SmartRetries)
+	require.NotNil(t, task.SmartRetries.Enabled)
+	require.False(t, *task.SmartRetries.Enabled)
 
 	task, err = pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\n"))
 	require.NoError(t, err)
 	require.Nil(t, task.SmartRetries, "unset, so the pipeline's setting applies")
+
+	_, err = pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries: true\n"))
+	require.ErrorContains(t, err, "smart_retries must be an object")
 }
