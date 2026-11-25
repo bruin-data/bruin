@@ -118,7 +118,6 @@ variables:
 - [Catchup](#catchup)
 - [Metadata push](#metadata-push)
 - [Retries](#retries)
-- [Smart Retries](#smart-retries)
 - [Rerun Cooldown](#rerun-cooldown)
 - [Concurrency](#concurrency)
 - [Max Active Steps](#max-active-steps)
@@ -337,6 +336,10 @@ retries: 2
 
 **Inheritance:** The pipeline-level `retries` is the default for every asset and every quality check in the pipeline. An [asset can override it](../assets/definition-schema.md#retries) with its own `retries`, and a [check can override it](../quality/overview.md#retries) again, following the resolution chain **check → asset → pipeline**. An explicit value (including `0`, meaning no retries) at any level wins over the inherited default.
 
+<!-- Hidden until the orchestrator applies smart_retries (BRU-6587). When shown, also add
+"- [Smart Retries](#smart-retries)" to the contents after Retries, and this row to the default table:
+| smart_retries      | Boolean                    | —       | Default for [smart retries](#smart-retries) |
+
 ### Smart Retries
 
 Let Bruin Cloud retry failed assets based on why they failed, instead of always retrying up to `retries` times.
@@ -358,6 +361,8 @@ With smart retries, a failed asset is retried as follows:
 - **Default:** `false`
 
 **Inheritance:** The pipeline-level `smart_retries` is the default for every asset in the pipeline, and can be set for all assets under [`default`](#default-pipeline-level-defaults) as well. An [asset can override it](../assets/definition-schema.md#smart_retries) with its own `smart_retries`.
+
+-->
 
 ### Rerun Cooldown
 
@@ -472,7 +477,6 @@ Fields:
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers). Applied automatically in Bruin Cloud; needs `--apply-interval-modifiers` on the CLI |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 | retries            | Integer                    | —       | Default asset retries            |
-| smart_retries      | Boolean                    | —       | Default for [smart retries](#smart-retries) |
 | timeout            | String (Go duration)       | —       | Default asset timeout (for example, `1h30m`) |
 | rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
