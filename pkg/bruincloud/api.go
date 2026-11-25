@@ -1062,22 +1062,33 @@ func (c *APIClient) SetSkillAgents(ctx context.Context, skillID int, agentIDs []
 
 // --- Dashboards ---
 
-func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
+// ListDashboards lists the dashboards the caller can view. An agent's run sees
+// only its agent's dashboards unless all is set; then it sees every dashboard
+// the person it runs for can view.
+func (c *APIClient) ListDashboards(ctx context.Context, all bool) ([]Dashboard, error) {
 	var resp struct {
 		Dashboards []Dashboard `json:"dashboards"`
 	}
-	err := c.doRequest(ctx, http.MethodGet, "/dashboards", nil, &resp)
+	err := c.doRequest(ctx, http.MethodGet, "/dashboards"+allQuery(all), nil, &resp)
 	return resp.Dashboards, err
 }
 
 // ListDashboardFolders returns the team's dashboard folders, including empty
 // ones (folders with no dashboards, which never surface in the dashboard list).
-func (c *APIClient) ListDashboardFolders(ctx context.Context) ([]DashboardFolder, error) {
+// all counts the same dashboards ListDashboards(all) lists.
+func (c *APIClient) ListDashboardFolders(ctx context.Context, all bool) ([]DashboardFolder, error) {
 	var resp struct {
 		Folders []DashboardFolder `json:"folders"`
 	}
-	err := c.doRequest(ctx, http.MethodGet, "/dashboard-folders", nil, &resp)
+	err := c.doRequest(ctx, http.MethodGet, "/dashboard-folders"+allQuery(all), nil, &resp)
 	return resp.Folders, err
+}
+
+func allQuery(all bool) string {
+	if all {
+		return "?all=1"
+	}
+	return ""
 }
 
 // GetDashboard returns a single dashboard. state selects which definition to
