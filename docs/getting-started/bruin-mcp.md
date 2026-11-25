@@ -14,7 +14,7 @@ Please make sure you have [Bruin CLI installed](/getting-started/introduction/in
 
 ### Use the full path to `bruin`
 
-The Bruin installer puts the `bruin` binary in `~/.local/bin` and adds that folder to `PATH` in your shell profile (`~/.zshrc`, `~/.bashrc`, etc.). Your terminal reads that profile, but editors and desktop apps opened from the Dock, Start menu or app launcher usually don't. Cursor, VS Code, Claude Desktop and the Codex app and IDE extension all fall into this group. If you configure the MCP server with just `bruin`, these apps can fail to start it, often without any error message.
+The Bruin installer puts the `bruin` binary in `~/.local/bin` and adds that folder to `PATH` in your shell profile (`~/.zshrc`, `~/.bashrc`, etc.). Your terminal reads that profile, but editors and desktop apps opened from the Dock, Start menu or app launcher usually don't. Cursor, VS Code, Claude Desktop, GitHub Copilot in JetBrains IDEs, Visual Studio, Xcode and Eclipse, and the Codex app and IDE extension all fall into this group. If you configure the MCP server with just `bruin`, these apps can fail to start it, often without any error message.
 
 To avoid this, use the full path to the `bruin` binary in your MCP configuration. To find it on macOS or Linux, run:
 
@@ -30,7 +30,7 @@ cygpath -m "$(which bruin)"
 # e.g. C:/Users/YourName/.local/bin/bruin.exe
 ```
 
-The examples below use `/path/to/bruin` as a placeholder. Replace it with the path you got here. The CLI commands for Claude Code and Codex fill in the path for you via `$(which bruin)`.
+The examples below use `/path/to/bruin` as a placeholder. Replace it with the path you got here. The CLI commands for Claude Code, Codex and Copilot CLI fill in the path for you via `$(which bruin)`.
 
 ### Claude Code
 
@@ -119,6 +119,113 @@ args = ["mcp"]
 ```
 
 Run `codex mcp list` to check that the server is registered, and `/mcp` inside a Codex session to see the Bruin tools.
+
+### GitHub Copilot
+
+GitHub Copilot can use Bruin MCP in your editor, in the Copilot CLI, and in the Copilot coding agent on GitHub.
+
+:::tip
+On Copilot Business or Enterprise, an organization or enterprise admin has to turn on the **MCP servers in Copilot** policy first. It is off by default. Copilot Free, Pro and Pro+ users don't need it.
+:::
+
+#### VS Code
+
+Copilot Chat in VS Code reads the MCP servers you set up in [VS Code](#vs-code), so follow those steps. Then open Copilot Chat, switch to **Agent** mode, and click the tools icon to check that the Bruin tools are listed.
+
+#### JetBrains IDEs, Visual Studio, Xcode and Eclipse
+
+Copilot in these editors keeps MCP servers in an `mcp.json` file. Open it from Copilot:
+
+- **JetBrains IDEs**: click the Copilot icon in the bottom-right corner, select **Open Chat**, switch to **Agent** mode, click the tools icon, then **Add MCP Tools**.
+- **Visual Studio** (17.14 or newer): open **View > GitHub Copilot Chat**, switch to **Agent** mode, click the tools icon, then the plus icon.
+- **Xcode**: open the **GitHub Copilot for Xcode** app settings, go to the **MCP** tab, then click **Edit Config**.
+- **Eclipse**: click the Copilot icon in the status bar, select **Open Chat**, then click the **Configure Tools...** icon.
+
+Add the `bruin` server to the file:
+
+```json
+{
+  "servers": {
+    "bruin": {
+      "type": "stdio",
+      "command": "/path/to/bruin",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Save the file and start a new chat in **Agent** mode.
+
+#### Copilot CLI
+
+Run the following command in your terminal:
+
+```bash
+copilot mcp add bruin -- "$(which bruin)" mcp
+```
+
+This adds the server to `~/.copilot/mcp-config.json`. You can also add it from inside a Copilot session with `/mcp add`, or write the file by hand:
+
+```json
+{
+  "mcpServers": {
+    "bruin": {
+      "type": "local",
+      "command": "/path/to/bruin",
+      "args": ["mcp"],
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+Run `copilot mcp list` to check that the server is registered, and `/mcp show bruin` inside a Copilot session to see the Bruin tools.
+
+#### Copilot coding agent
+
+The Copilot coding agent works on GitHub's runners, so Bruin has to be installed there before the agent starts. Add a `.github/workflows/copilot-setup-steps.yml` file to your repository's default branch. The job must be called `copilot-setup-steps`, otherwise Copilot ignores it:
+
+```yaml
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: bruin-data/setup-bruin@main
+```
+
+Then go to your repository's **Settings > Copilot > MCP servers**, paste the following into **MCP configuration**, and click **Save MCP configuration**:
+
+```json
+{
+  "mcpServers": {
+    "bruin": {
+      "type": "local",
+      "command": "bruin",
+      "args": ["mcp"],
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+The coding agent runs MCP tools without asking for approval. If Bruin needs credentials, add them as secrets to the repository's `copilot` environment with names that start with `COPILOT_MCP_`, and pass them to the server under `env` in the MCP configuration. Copilot doesn't pass secrets without that prefix to MCP servers.
+
+To check the setup, assign an issue to Copilot, open the agent session logs, and expand the **Start MCP Servers** step. The Bruin tools are listed there.
 
 ### Troubleshooting
 
