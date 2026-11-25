@@ -994,5 +994,16 @@ func TestConvertYamlToTask_SmartRetries(t *testing.T) {
 	require.Nil(t, task.SmartRetries, "unset, so the pipeline's setting applies")
 
 	_, err = pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries: true\n"))
-	require.ErrorContains(t, err, "smart_retries must be an object")
+	require.ErrorContains(t, err, "cannot unmarshal !!bool `true` into pipeline.SmartRetriesConfig")
+}
+
+func TestValidateAssetYAML_SmartRetriesTypo(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "typo.asset.yml", []byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries:\n  enable: true\n"), 0o644))
+	require.ErrorContains(t, pipeline.ValidateAssetYAML(fs, "typo.asset.yml", pipeline.YamlTask), "field enable not found")
+
+	require.NoError(t, afero.WriteFile(fs, "ok.asset.yml", []byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries:\n  enabled: true\n"), 0o644))
+	require.NoError(t, pipeline.ValidateAssetYAML(fs, "ok.asset.yml", pipeline.YamlTask))
 }

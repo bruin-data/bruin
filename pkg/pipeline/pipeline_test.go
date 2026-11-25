@@ -1917,7 +1917,7 @@ func TestPipeline_SmartRetries(t *testing.T) {
 	assert.Nil(t, unset.SmartRetries)
 
 	var bare pipeline.Pipeline
-	require.ErrorContains(t, yaml.Unmarshal([]byte("name: test\nsmart_retries: true\n"), &bare), "smart_retries must be an object")
+	require.ErrorContains(t, yaml.Unmarshal([]byte("name: test\nsmart_retries: true\n"), &bare), "cannot unmarshal !!bool `true` into pipeline.SmartRetriesConfig")
 
 	// The pipeline and its assets carry it in the JSON the orchestrator reads, only when set.
 	encoded, err := json.Marshal(&pipeline.Pipeline{Name: "test", SmartRetries: p.SmartRetries, Assets: []*pipeline.Asset{

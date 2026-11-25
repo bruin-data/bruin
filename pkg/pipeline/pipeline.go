@@ -1500,14 +1500,6 @@ type SmartRetriesConfig struct {
 	Enabled *bool `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
 }
 
-func (c *SmartRetriesConfig) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind != yaml.MappingNode {
-		return errors.Errorf("smart_retries must be an object, e.g. `smart_retries: {enabled: true}`, got '%s'", value.Value)
-	}
-	type plain SmartRetriesConfig
-	return value.Decode((*plain)(c))
-}
-
 func (c *SmartRetriesConfig) IsZero() bool {
 	return c == nil || c.Enabled == nil
 }
