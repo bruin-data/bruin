@@ -682,6 +682,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "single-check",
 				Usage: "runs a single column or custom check by ID",
 			},
+			&cli.IntFlag{
+				Name:  "show-failing-rows",
+				Usage: "when a check fails, print up to this many of the rows that failed it; this runs one more query per failed check",
+			},
 			&cli.StringSliceFlag{
 				Name:    "exclude-tag",
 				Aliases: []string{"x"},
@@ -955,6 +959,9 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigQueryAnnotations, runConfig.Annotations)
+			if n := c.Int("show-failing-rows"); n > 0 {
+				runCtx = ansisql.WithFailingRowSamples(runCtx, n)
+			}
 
 			// Preview load uses WithOnlyPipeline so we can introspect the
 			// pipeline.yml metadata (notably .Variants) before requiring the user

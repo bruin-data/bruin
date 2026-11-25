@@ -46,6 +46,28 @@ Quality checks can also be executed on their own without running the asset again
 bruin run --only checks assets/my_asset.sql
 ```
 
+## Showing failing rows
+
+A failed check reports how many rows failed. Add `--show-failing-rows N` to also print up to `N` of those rows under the error:
+
+```bash
+bruin run --only checks --show-failing-rows 5 assets/my_asset.sql
+```
+
+```text
+└── id.not_null - column 'id' has 1 null values
+    failing rows:
+    +------+------+----------+
+    | id   | name | quantity |
+    +------+------+----------+
+    | NULL | b    | 3        |
+    +------+------+----------+
+```
+
+For `unique`, Bruin prints the repeated values and how many times each appears. For [custom checks](./custom.md) that use `count`, it prints rows from the check's query; checks that use `value` return a single number and show no rows.
+
+Bruin runs one more query for each failed check, so the option can add cost on warehouses that bill per query, and the printed rows appear in the run logs.
+
 ## Semantic layer checks
 
 Semantic models can have their own quality checks on dimensions, metrics, and the model as a whole. `bruin run` does not run these checks. Use `bruin semantic check` instead. See [semantic layer quality checks](../core-concepts/semantic-layer.md#quality-checks) for details.

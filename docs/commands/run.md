@@ -51,6 +51,7 @@ table td:first-child {
 | `--selector` | str | - | Select assets with dbt-style syntax. Supports `tag:`, `path:`, `file:`, `fqn:`, `+`, `n+`, `@`, space unions, and comma intersections. |
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--single-check` | str | - | Run a single column or custom check by ID. |
+| `--show-failing-rows` | int | `0` | When a check fails, print up to this many of the rows that failed it. `0` turns it off. Runs one more query per failed check. See [Showing failing rows](/quality/overview#showing-failing-rows). |
 | `--exclude-tag` | str | - | Exclude assets with the given tag. |
 | `--only` | []str | `'main', 'checks', 'push-metadata'` | Limit the types of execution steps to run. By default it runs `main` and `checks`, while `push-metadata` is optional if defined in the pipeline definition. |
 | `--exp-use-winget-for-uv` | bool | `false` | Use PowerShell to manage and install `uv` on Windows. Has no effect on non-Windows systems. |

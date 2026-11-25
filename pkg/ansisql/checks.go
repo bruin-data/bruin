@@ -3,14 +3,19 @@ package ansisql
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/pkg/errors"
 )
 
@@ -31,6 +36,15 @@ func (e *CheckError) Error() string {
 	return e.Message
 }
 
+type failingRowSamplesKey struct{}
+
+// WithFailingRowSamples makes failed checks fetch up to limit of their failing rows and print them in the error.
+func WithFailingRowSamples(ctx context.Context, limit int) context.Context {
+	return context.WithValue(ctx, failingRowSamplesKey{}, limit)
+}
+
+var countQueryPrefix = regexp.MustCompile(`(?is)^\s*SELECT\s+COUNT(?:_BIG)?\s*\(\s*\*\s*\)\s+FROM\s+`)
+
 type CountableQueryCheck struct {
 	conn                config.ConnectionGetter
 	expectedQueryResult int64
@@ -40,6 +54,8 @@ type CountableQueryCheck struct {
 	// expectedValue and valueError replace the integer fields for custom checks, whose values may have decimals.
 	expectedValue string
 	valueError    func(actual string) error
+	// samplesQuery selects the failing rows. Column checks written as SELECT count(*) FROM ... derive it.
+	samplesQuery string
 }
 
 func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult int64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
@@ -52,20 +68,32 @@ func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult in
 	}
 }
 
+// WithSamplesQuery sets the query that selects the failing rows, for checks that don't count them with SELECT count(*) FROM ...
+func (c *CountableQueryCheck) WithSamplesQuery(samplesQuery string) *CountableQueryCheck {
+	c.samplesQuery = samplesQuery
+	return c
+}
+
 func (c *CountableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	conn, err := ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset())
 	if err != nil {
 		return err
 	}
 
-	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, c.queryInstance, ti.GetAsset().Name, ti.Column.Name, c.checkName, ti.Pipeline.Name)
+	if c.samplesQuery == "" && countQueryPrefix.MatchString(c.queryInstance.Query) {
+		c.samplesQuery = countQueryPrefix.ReplaceAllString(c.queryInstance.Query, "SELECT * FROM ")
+	}
+	annotate := func(q *query.Query) (*query.Query, error) {
+		return AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, c.checkName, ti.Pipeline.Name)
+	}
+	annotatedQuery, err := annotate(c.queryInstance)
 	if err != nil {
 		return errors.Wrap(err, "failed to add annotation comment")
 	}
 	c.queryInstance = annotatedQuery
 	ti.ExecutedQuery = c.queryInstance.Query
 
-	return c.check(ctx, conn)
+	return c.check(ctx, conn, annotate)
 }
 
 func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
@@ -74,17 +102,20 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 		return err
 	}
 
-	annotatedQuery, err := AddCustomCheckAnnotationComment(ctx, c.queryInstance, ti.GetAsset().Name, c.checkName, ti.Pipeline.Name)
+	annotate := func(q *query.Query) (*query.Query, error) {
+		return AddCustomCheckAnnotationComment(ctx, q, ti.GetAsset().Name, c.checkName, ti.Pipeline.Name)
+	}
+	annotatedQuery, err := annotate(c.queryInstance)
 	if err != nil {
 		return errors.Wrap(err, "failed to add annotation comment")
 	}
 	c.queryInstance = annotatedQuery
 	ti.ExecutedQuery = c.queryInstance.Query
 
-	return c.check(ctx, conn)
+	return c.check(ctx, conn, annotate)
 }
 
-func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) error {
+func (c *CountableQueryCheck) check(ctx context.Context, connectionName string, annotate func(*query.Query) (*query.Query, error)) error {
 	q := c.conn.GetConnection(connectionName)
 	if q == nil {
 		return config.NewConnectionNotFoundError(ctx, "", connectionName)
@@ -112,7 +143,7 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 			Query:    c.queryInstance.Query,
 			Result:   actual,
 			Expected: c.expectedValue,
-			Message:  c.valueError(actual).Error(),
+			Message:  c.valueError(actual).Error() + c.failingRows(ctx, q, annotate),
 		}
 	}
 
@@ -126,11 +157,81 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 			Query:    c.queryInstance.Query,
 			Result:   strconv.FormatInt(count, 10),
 			Expected: strconv.FormatInt(c.expectedQueryResult, 10),
-			Message:  c.customError(count).Error(),
+			Message:  c.customError(count).Error() + c.failingRows(ctx, q, annotate),
 		}
 	}
 
 	return nil
+}
+
+type schemaSelector interface {
+	SelectWithSchema(ctx context.Context, query *query.Query) (*query.QueryResult, error)
+}
+
+type limiter interface {
+	Limit(query string, limit int64) string
+}
+
+// failingRows returns a table of up to the requested number of failing rows, or "" when they are
+// not requested or can't be fetched, so the check still fails with its count.
+func (c *CountableQueryCheck) failingRows(ctx context.Context, conn any, annotate func(*query.Query) (*query.Query, error)) string {
+	limit, _ := ctx.Value(failingRowSamplesKey{}).(int)
+	s, ok := conn.(schemaSelector)
+	if limit <= 0 || c.samplesQuery == "" || !ok {
+		return ""
+	}
+
+	samplesQuery := fmt.Sprintf("SELECT * FROM (\n%s\n) AS t LIMIT %d", c.samplesQuery, limit)
+	if l, ok := conn.(limiter); ok {
+		samplesQuery = l.Limit(c.samplesQuery, int64(limit))
+	}
+	annotated, err := annotate(&query.Query{Query: samplesQuery})
+	if err != nil {
+		return ""
+	}
+	res, err := s.SelectWithSchema(ctx, annotated)
+	if err != nil || len(res.Rows) == 0 {
+		return ""
+	}
+
+	t := table.NewWriter()
+	t.Style().Format.Header = text.FormatDefault
+	header := make(table.Row, len(res.Columns))
+	for i, name := range res.Columns {
+		header[i] = name
+	}
+	t.AppendHeader(header)
+	for _, row := range res.Rows {
+		cells := make(table.Row, len(row))
+		for i, value := range row {
+			cells[i] = formatSampleValue(value)
+		}
+		t.AppendRow(cells)
+	}
+
+	title := "failing rows:"
+	if len(res.Rows) >= limit {
+		title = fmt.Sprintf("first %d failing rows:", limit)
+	}
+	return "\n" + title + "\n" + t.Render()
+}
+
+func formatSampleValue(value any) string {
+	var s string
+	switch v := value.(type) {
+	case nil:
+		return "NULL"
+	case []byte:
+		s = string(v)
+	case time.Time:
+		s = v.Format(time.RFC3339Nano)
+	default:
+		s = fmt.Sprint(v)
+	}
+	if utf8.RuneCountInString(s) > 50 {
+		s = string([]rune(s)[:47]) + "..."
+	}
+	return s
 }
 
 type NotNullCheck struct {
@@ -173,7 +274,16 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
 		},
+		samplesQuery: DuplicateValuesQuery(ti.GetAsset().Name, ti.Column.Name, "COUNT"),
 	}).Check(ctx, ti)
+}
+
+// DuplicateValuesQuery selects each repeated non-null value of a column with how often it appears.
+func DuplicateValuesQuery(tableName, column, countFunction string) string {
+	return fmt.Sprintf(
+		"SELECT %s, %s(*) AS row_count FROM %s WHERE %s IS NOT NULL GROUP BY %s HAVING %s(*) > 1",
+		column, countFunction, tableName, column, column, countFunction,
+	)
 }
 
 // RelationshipsCheck verifies that every non-null value in a child column
@@ -488,8 +598,11 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 		qq = qry
 	}
 	expected := ti.Check.Value.String()
+	// Only count checks return the failing rows themselves; a value check's query returns one number.
+	samplesQuery := ""
 	if ti.Check.Count != nil {
 		expected = strconv.FormatInt(*ti.Check.Count, 10)
+		samplesQuery = qq
 		// No AS before the alias: Oracle rejects it (ORA-03048), and every other dialect accepts both forms.
 		qq = fmt.Sprintf("SELECT count(*) FROM (%s) t", qq)
 	}
@@ -502,6 +615,7 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 		valueError: func(actual string) error {
 			return errors.Errorf("custom check '%s' has returned %s instead of the expected %s", ti.Check.Name, actual, expected)
 		},
+		samplesQuery: samplesQuery,
 	}).CustomCheck(ctx, ti)
 }
 
