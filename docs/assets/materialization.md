@@ -1653,7 +1653,7 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 
 | Platform | merge | time_interval | SCD2 by column | SCD2 by time | Data Vault | [First run](#first-run) |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| [BigQuery](../platforms/bigquery.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| [BigQuery](../platforms/bigquery.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [Snowflake](../platforms/snowflake.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [PostgreSQL](../platforms/postgres.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | [Redshift](../platforms/redshift.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -1698,6 +1698,7 @@ For `delete+insert`:
 Other differences:
 
 - **Athena** materializations always create Iceberg tables. See [Athena](../platforms/athena.md).
+- **BigQuery** looks for the table on the [first run](#first-run) with the `tables.get` API, which is not billed. In a dataset with case-insensitive names, a table whose name differs only in case counts as existing.
 - **Oracle** builds `scd2_by_column` assets as a plain table on a full refresh, and closes records that left the source only when the source returns at least one row.
 
 ### ClickHouse table options

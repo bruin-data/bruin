@@ -226,7 +226,7 @@ where event_name = "install"
 
 #### BigQuery table options
 
-The top-level `bigquery` block configures BigQuery-specific table options and partition-scoped merge behavior. Table options are applied when Bruin creates a table with a `create+replace` or `ddl` materialization. Partition expiration is also supported during an SCD2 full refresh.
+The top-level `bigquery` block configures BigQuery-specific table options and partition-scoped merge behavior. Table options are applied when Bruin creates a table with a `create+replace` or `ddl` materialization, or on the [first run](../assets/materialization.md#first-run) of an incremental asset. Partition expiration is also supported during an SCD2 full refresh.
 
 ```bruin-sql
 /* @bruin
