@@ -422,7 +422,8 @@ func TestCustomCheckCount(t *testing.T) {
 
 	checkQuery := "SELECT {{ 1+2 }}"
 	rendered := "SELECT 3"
-	wrappedQuery := &query.Query{Query: fmt.Sprintf("SELECT count(*) FROM (%s) AS t", rendered)}
+	// Oracle rejects AS before a table alias, so the wrapper must not use it.
+	wrappedQuery := &query.Query{Query: fmt.Sprintf("SELECT count(*) FROM (%s) t", rendered)}
 
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {
