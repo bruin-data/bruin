@@ -723,7 +723,19 @@ Delete an agent. Cascades to its scheduled agents, dashboards and chat threads, 
 bruin cloud agents delete --agent-id <agent-id>
 ```
 
-#### `connections`
+#### `queries`
+
+Read the queries your team's agents ran: the agents' own query log, kept for 30 days (not the warehouse's query history). Each query is labeled with its agent, where it ran (the scout or routine, else the thread) and who started the thread. You see the agents and threads your token can read; a token made for one agent's run sees only that agent.
+
+```bash
+bruin cloud queries list
+bruin cloud queries list --agent-id 3 --since 2026-11-01
+bruin cloud queries list --thread-id 812 --output json
+```
+
+`--limit` counts messages (default 20, max 100), and a message can hold several queries. When there are more, the table ends with `More: --before <id>`; pass that to get the next page (in JSON, it's `next_before`). With `--output json` each query also has its `columns`, up to 50 `rows` and the full `row_count`.
+
+### `connections`
 
 List the connections available to an agent — names and types only (never credential values). Use it to pick a connection the agent can actually query, e.g. for a dashboard's `connection`:
 
