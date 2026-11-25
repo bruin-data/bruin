@@ -944,7 +944,7 @@ bruin cloud connections delete --name my_pg
 
 ### `connection-sets`
 
-Manage connection **sets** — named bundles of connections an agent runs against (assigned to an agent via its connection set). Distinct from individual connections. Credentials are write-only: reads never return config values, and create/update always send a full config per connection (read from the local `.bruin.yml`).
+Manage connection **sets** — named bundles of connections an agent runs against (assigned to an agent via its connection set). Distinct from individual connections. Credentials are write-only: reads never return config values, and the connections you pass to create/update are sent with their full config (read from the local `.bruin.yml`).
 
 #### `list`
 

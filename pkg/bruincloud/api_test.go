@@ -863,7 +863,7 @@ func TestUpdateConnectionSet(t *testing.T) {
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, []any{
 			map[string]any{"type": "postgres", "name": "pg", "config": map[string]any{"password": "secret"}},
-			map[string]any{"type": "bigquery", "name": "bq"},
+			map[string]any{"type": "mssql", "name": "ms"},
 		}, body["connections"])
 
 		w.WriteHeader(http.StatusOK)
@@ -872,7 +872,7 @@ func TestUpdateConnectionSet(t *testing.T) {
 
 	err := client.UpdateConnectionSet(t.Context(), 9, []ConnectionSetInput{
 		{Type: "postgres", Name: "pg", Config: map[string]any{"password": "secret"}},
-	}, []ConnectionSetRetain{{Type: "bigquery", Name: "bq"}}, false)
+	}, []ConnectionSetRetain{{Type: "mssql", Name: "ms"}}, false)
 	require.NoError(t, err)
 }
 
