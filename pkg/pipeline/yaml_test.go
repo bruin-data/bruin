@@ -979,3 +979,16 @@ func TestUpstreamModeJSONRoundTrip(t *testing.T) {
 		assert.Equal(t, mode, decoded.Mode)
 	}
 }
+
+func TestConvertYamlToTask_SmartRetries(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\nsmart_retries: false\n"))
+	require.NoError(t, err)
+	require.NotNil(t, task.SmartRetries)
+	require.False(t, *task.SmartRetries)
+
+	task, err = pipeline.ConvertYamlToTask([]byte("name: dataset.asset\ntype: duckdb.sql\n"))
+	require.NoError(t, err)
+	require.Nil(t, task.SmartRetries, "unset, so the pipeline's setting applies")
+}
