@@ -1654,7 +1654,7 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 | Platform | merge | time_interval | SCD2 by column | SCD2 by time | Data Vault | [First run](#first-run) |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | [BigQuery](../platforms/bigquery.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| [Snowflake](../platforms/snowflake.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| [Snowflake](../platforms/snowflake.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [PostgreSQL](../platforms/postgres.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | [Redshift](../platforms/redshift.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [DuckDB](../platforms/duckdb.md) / [MotherDuck](../platforms/motherduck.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -1700,6 +1700,7 @@ Other differences:
 - **Athena** materializations always create Iceberg tables. See [Athena](../platforms/athena.md).
 - **BigQuery** looks for the table on the [first run](#first-run) with the `tables.get` API, which is not billed. In a dataset with case-insensitive names, a table whose name differs only in case counts as existing.
 - **Oracle** builds `scd2_by_column` assets as a plain table on a full refresh, and closes records that left the source only when the source returns at least one row.
+- **Snowflake** checks for an incremental asset's table with `SHOW OBJECTS`, which needs no warehouse. If the table is not listed, Bruin confirms that it is missing in `INFORMATION_SCHEMA.TABLES` before the [first run](#first-run). That query runs on the connection's warehouse, even when the asset sets a [`warehouse`](../platforms/snowflake.md#overriding-the-warehouse-per-asset) parameter.
 
 ### ClickHouse table options
 
