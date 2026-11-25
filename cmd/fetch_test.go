@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -927,6 +929,33 @@ func TestFormatQueryRowsForJSON_Marshal(t *testing.T) {
 			assert.Equal(t, tt.expected, string(payload))
 		})
 	}
+}
+
+type failingCSVWriter struct{}
+
+func (failingCSVWriter) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func TestWriteQueryResultsCSV(t *testing.T) {
+	t.Parallel()
+
+	result := &query.QueryResult{
+		Columns: []string{"name"},
+		Rows:    [][]interface{}{{"bruin"}},
+	}
+
+	t.Run("flush error", func(t *testing.T) {
+		t.Parallel()
+		require.ErrorIs(t, writeQueryResultsCSV(failingCSVWriter{}, result), io.ErrClosedPipe)
+	})
+
+	t.Run("successful output", func(t *testing.T) {
+		t.Parallel()
+		var out bytes.Buffer
+		require.NoError(t, writeQueryResultsCSV(&out, result))
+		assert.Equal(t, "name\nbruin\n", out.String())
+	})
 }
 
 func TestWriteCSVFile(t *testing.T) {

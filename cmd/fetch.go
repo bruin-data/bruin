@@ -398,21 +398,9 @@ func Query() *cli.Command {
 					}
 					fmt.Println(string(jsonData))
 				case "csv":
-					writer := csv.NewWriter(os.Stdout)
-					defer writer.Flush()
-					if shouldOutputExecutionSummary(result) {
-						if err = writeExecutionSummaryCSV(writer, result.Execution); err != nil {
-							return handleError(output, err)
-						}
-					} else {
-						if err = writer.Write(result.Columns); err != nil {
-							return handleError(output, errors.Wrap(err, "failed to write CSV header"))
-						}
-						for _, row := range result.Rows {
-							if err = writer.Write(formatQueryRowForCSV(row)); err != nil {
-								return handleError(output, errors.Wrap(err, "failed to write CSV row"))
-							}
-						}
+					if err := writeQueryResultsCSV(os.Stdout, result); err != nil {
+						fmt.Fprintln(os.Stderr, "Error:", err)
+						return cli.Exit("", 1)
 					}
 				default:
 					fmt.Printf("Invalid output type: %s\n", output)
@@ -423,6 +411,27 @@ func Query() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func writeQueryResultsCSV(out io.Writer, result *query.QueryResult) error {
+	writer := csv.NewWriter(out)
+	if shouldOutputExecutionSummary(result) {
+		if err := writeExecutionSummaryCSV(writer, result.Execution); err != nil {
+			return err
+		}
+	} else {
+		if err := writer.Write(result.Columns); err != nil {
+			return errors.Wrap(err, "failed to write CSV header")
+		}
+		for _, row := range result.Rows {
+			if err := writer.Write(formatQueryRowForCSV(row)); err != nil {
+				return errors.Wrap(err, "failed to write CSV row")
+			}
+		}
+	}
+
+	writer.Flush()
+	return errors.Wrap(writer.Error(), "failed to flush CSV output")
 }
 
 func validateQueryCommandFlags(c *cli.Command) error {
