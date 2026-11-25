@@ -2156,3 +2156,22 @@ func TestCloudConnectionSetsCostLimit_PrintsOnlyChangedLimits(t *testing.T) { //
 	require.NoError(t, json.Unmarshal(output, &got))
 	assert.Equal(t, map[string]any{"id": 7.0, "connection": "", "max_query_cost": 1.0}, got)
 }
+
+func TestConnectionsToRetain(t *testing.T) {
+	t.Parallel()
+
+	existing := []bruincloud.Connection{
+		{Type: "postgres", Name: "my_pg"},
+		{Type: "google_cloud_platform", Name: "warehouse"},
+	}
+	inputs := []bruincloud.ConnectionSetInput{
+		{Type: "postgres", Name: "my_pg", Config: map[string]any{"password": "new"}},
+		{Type: "snowflake", Name: "sf", Config: map[string]any{"account": "acme"}},
+	}
+
+	assert.Equal(
+		t,
+		[]bruincloud.ConnectionSetRetain{{Type: "google_cloud_platform", Name: "warehouse"}},
+		connectionsToRetain(existing, inputs),
+	)
+}

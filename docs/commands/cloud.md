@@ -975,11 +975,13 @@ Use `--skip-validation` to skip the live connection test, and `--environment` / 
 
 #### `update`
 
-Replace a set's connections — the set becomes exactly the connections you pass:
+Add connections to a set, or update ones already in it, from the local `.bruin.yml`. The set's other connections keep their stored credentials:
 
 ```bash
 bruin cloud connection-sets update --set-id 7 --connection my_pg
 ```
+
+Pass `--replace` to drop the other connections, so the set becomes exactly the ones you pass.
 
 #### `delete`
 

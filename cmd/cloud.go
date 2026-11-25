@@ -4889,12 +4889,13 @@ func cloudConnectionSetsCreate() *cli.Command {
 func cloudConnectionSetsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Replace a connection set's connections with ones from the local .bruin.yml",
+		Usage: "Add or update connections in a connection set from the local .bruin.yml, keeping the rest",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
-			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to include, read from the local .bruin.yml; repeat for multiple. The set becomes exactly these connections.", Required: true},
+			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to add or update, read from the local .bruin.yml; repeat for multiple", Required: true},
+			&cli.BoolFlag{Name: "replace", Usage: "drop the set's other connections, so the set becomes exactly these"},
 			&cli.StringFlag{Name: "environment", Usage: "the .bruin.yml environment to read from (default: selected environment)"},
 			&cli.StringFlag{Name: "config-file", Usage: "path to the .bruin.yml file"},
 			&cli.BoolFlag{Name: "skip-validation", Usage: "skip the live connection test"},
@@ -4920,15 +4921,42 @@ func cloudConnectionSetsUpdate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if err := client.UpdateConnectionSet(ctx, c.Int("set-id"), inputs, c.Bool("skip-validation")); err != nil {
+			var retained []bruincloud.ConnectionSetRetain
+			if !c.Bool("replace") {
+				existing, err := client.ListConnectionSetConnections(ctx, c.Int("set-id"))
+				if err != nil {
+					printError(err, output, "Failed to read connection set")
+					return cli.Exit("", 1)
+				}
+				retained = connectionsToRetain(existing, inputs)
+			}
+
+			if err := client.UpdateConnectionSet(ctx, c.Int("set-id"), inputs, retained, c.Bool("skip-validation")); err != nil {
 				printError(err, output, "Failed to update connection set")
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Updated connection set %d (%d connection(s))", c.Int("set-id"), len(inputs)))
+			printSuccessForOutput(output, fmt.Sprintf("Updated connection set %d (%d connection(s))", c.Int("set-id"), len(inputs)+len(retained)))
 			return nil
 		},
 	}
+}
+
+// connectionsToRetain is the set's existing connections that inputs don't
+// replace. Names match exactly, so a case-only clash is refused by the API
+// rather than renaming the stored connection.
+func connectionsToRetain(existing []bruincloud.Connection, inputs []bruincloud.ConnectionSetInput) []bruincloud.ConnectionSetRetain {
+	replaced := make(map[string]bool, len(inputs))
+	for _, input := range inputs {
+		replaced[input.Name] = true
+	}
+	retained := make([]bruincloud.ConnectionSetRetain, 0, len(existing))
+	for _, connection := range existing {
+		if !replaced[connection.Name] {
+			retained = append(retained, bruincloud.ConnectionSetRetain{Type: connection.Type, Name: connection.Name})
+		}
+	}
+	return retained
 }
 
 func cloudConnectionSetsDelete() *cli.Command {

@@ -948,11 +948,18 @@ func (c *APIClient) ListConnectionSetConnections(ctx context.Context, setID int)
 }
 
 // ConnectionSetInput is one connection in a create/update payload: a name, its
-// type, and its full credentials (the API requires full config, never partial).
+// type, and its full credentials (the API never merges a partial config).
 type ConnectionSetInput struct {
 	Type   string         `json:"type"`
 	Name   string         `json:"name"`
 	Config map[string]any `json:"config"`
+}
+
+// ConnectionSetRetain names a connection already in the set. It carries no
+// config key, which tells the API to keep the stored credentials.
+type ConnectionSetRetain struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
 }
 
 func (c *APIClient) CreateConnectionSet(ctx context.Context, name string, connections []ConnectionSetInput, skipValidation bool) (*ConnectionSet, error) {
@@ -968,9 +975,16 @@ func (c *APIClient) CreateConnectionSet(ctx context.Context, name string, connec
 	return &result, nil
 }
 
-func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connections []ConnectionSetInput, skipValidation bool) error {
+func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connections []ConnectionSetInput, retained []ConnectionSetRetain, skipValidation bool) error {
+	all := make([]any, 0, len(connections)+len(retained))
+	for _, connection := range connections {
+		all = append(all, connection)
+	}
+	for _, connection := range retained {
+		all = append(all, connection)
+	}
 	body := map[string]any{
-		"connections":     connections,
+		"connections":     all,
 		"skip_validation": skipValidation,
 	}
 	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d", setID), body, nil)
