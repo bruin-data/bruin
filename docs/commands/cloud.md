@@ -725,7 +725,7 @@ bruin cloud agents delete --agent-id <agent-id>
 
 #### `queries`
 
-Read the queries your team's agents ran: the agents' own query log, kept for 30 days (not the warehouse's query history). Each query is labeled with its agent, where it ran (the scout or routine, else the thread) and who started the thread. You see the agents and threads your token can read; a token made for one agent's run sees only that agent.
+Read the queries your team's agents ran: the agents' own query log, kept for 30 days (not the warehouse's query history). Each query is labeled with its agent, where it ran (the scout or routine, else the thread) and who started the thread. It needs the `agent:query:list` permission, which only Organization Admins and AI Admins have, and shows everyone's threads on the agents you can reach. Agents can't read it.
 
 ```bash
 bruin cloud queries list

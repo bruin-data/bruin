@@ -4469,7 +4469,7 @@ func CloudQueries() *cli.Command {
 func cloudQueriesList() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
-		Usage: "List the queries agents ran (their own query log, kept 30 days), newest first, with the agent, thread and schedule behind each",
+		Usage: "List the queries agents ran (their own query log, kept 30 days), newest first, with the agent, thread and schedule behind each. Admins and AI admins only",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
