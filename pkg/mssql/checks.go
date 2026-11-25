@@ -82,5 +82,5 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 	qq := fmt.Sprintf("SELECT COUNT_BIG(%s) - COUNT_BIG(DISTINCT %s) FROM %s", ti.Column.Name, ti.Column.Name, ti.GetAsset().Name)
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "unique", func(count int64) error {
 		return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
-	}).Check(ctx, ti)
+	}).WithSamplesQuery(ansisql.DuplicateValuesQuery(ti.GetAsset().Name, ti.Column.Name, "COUNT_BIG")).Check(ctx, ti)
 }

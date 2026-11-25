@@ -130,7 +130,7 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "unique", func(count int64) error {
 		return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
-	}).Check(ctx, ti)
+	}).WithSamplesQuery(ansisql.DuplicateValuesQuery(QuoteIdentifier(ti.GetAsset().Name), QuoteIdentifier(ti.Column.Name), "COUNT_BIG")).Check(ctx, ti)
 }
 
 type NotNullCheck struct {
