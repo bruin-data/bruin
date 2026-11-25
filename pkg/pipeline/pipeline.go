@@ -1514,6 +1514,7 @@ type Asset struct { //nolint:recvcheck
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries      *bool              `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	Timeout           DurationSeconds    `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
@@ -2450,6 +2451,7 @@ type Pipeline struct {
 	Catchup            CatchupMode            `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries       *bool                  `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
@@ -2536,6 +2538,7 @@ type DefaultValues struct {
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries      *bool                  `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	Timeout           DurationSeconds        `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
@@ -2583,6 +2586,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		IntervalModifiers: asset.IntervalModifiers,
 		RerunCooldown:     asset.RerunCooldown,
 		Retries:           asset.Retries,
+		SmartRetries:      asset.SmartRetries,
 		Timeout:           asset.Timeout,
 		RefreshRestricted: asset.RefreshRestricted,
 		Notifications:     asset.Notifications,
@@ -3613,6 +3617,9 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if asset.Retries == nil && defaults.Retries != nil {
 		asset.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if asset.SmartRetries == nil && defaults.SmartRetries != nil {
+		asset.SmartRetries = cloneBoolPtr(defaults.SmartRetries)
 	}
 	if asset.Timeout == 0 {
 		asset.Timeout = defaults.Timeout

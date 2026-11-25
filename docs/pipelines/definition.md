@@ -118,6 +118,7 @@ variables:
 - [Catchup](#catchup)
 - [Metadata push](#metadata-push)
 - [Retries](#retries)
+- [Smart Retries](#smart-retries)
 - [Rerun Cooldown](#rerun-cooldown)
 - [Concurrency](#concurrency)
 - [Max Active Steps](#max-active-steps)
@@ -336,6 +337,28 @@ retries: 2
 
 **Inheritance:** The pipeline-level `retries` is the default for every asset and every quality check in the pipeline. An [asset can override it](../assets/definition-schema.md#retries) with its own `retries`, and a [check can override it](../quality/overview.md#retries) again, following the resolution chain **check → asset → pipeline**. An explicit value (including `0`, meaning no retries) at any level wins over the inherited default.
 
+### Smart Retries
+
+Let Bruin Cloud retry failed assets based on why they failed, instead of always retrying up to `retries` times.
+
+```yaml
+smart_retries: true
+```
+
+With smart retries, a failed asset is retried as follows:
+
+- **Temporary failures**, such as timeouts, rate limits and service errors, are retried right away (or after `rerun_cooldown`), up to 100 times, without using the asset's `retries`.
+- **Out of memory:** the asset is retried on the next larger instance, using one of its `retries`.
+- **Failures a retry doesn't fix**, such as a SQL error, a missing connection, missing permissions or disabled billing, aren't retried.
+- **Anything else** is retried up to `retries` times, as without smart retries.
+
+`retries: 0` still means no retries. Quality checks aren't affected.
+
+- **Type:** `Boolean`
+- **Default:** `false`
+
+**Inheritance:** The pipeline-level `smart_retries` is the default for every asset in the pipeline, and can be set for all assets under [`default`](#default-pipeline-level-defaults) as well. An [asset can override it](../assets/definition-schema.md#smart_retries) with its own `smart_retries`.
+
 ### Rerun Cooldown
 
 Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
@@ -449,6 +472,7 @@ Fields:
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers). Applied automatically in Bruin Cloud; needs `--apply-interval-modifiers` on the CLI |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 | retries            | Integer                    | —       | Default asset retries            |
+| smart_retries      | Boolean                    | —       | Default for [smart retries](#smart-retries) |
 | timeout            | String (Go duration)       | —       | Default asset timeout (for example, `1h30m`) |
 | rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
