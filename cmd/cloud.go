@@ -5772,6 +5772,10 @@ func cloudDashboardsList() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
+			&cli.BoolFlag{
+				Name:  "all",
+				Usage: "in an agent's run, list every dashboard the person it runs for can view, not just the agent's own",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -5783,7 +5787,7 @@ func cloudDashboardsList() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboards, err := client.ListDashboards(ctx)
+			dashboards, err := client.ListDashboards(ctx, c.Bool("all"))
 			if err != nil {
 				printError(err, output, "Failed to list dashboards")
 				return cli.Exit("", 1)
@@ -5826,6 +5830,10 @@ func cloudDashboardsFolders() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
+			&cli.BoolFlag{
+				Name:  "all",
+				Usage: "count the dashboards dashboards list --all shows",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -5837,7 +5845,7 @@ func cloudDashboardsFolders() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			folders, err := client.ListDashboardFolders(ctx)
+			folders, err := client.ListDashboardFolders(ctx, c.Bool("all"))
 			if err != nil {
 				printError(err, output, "Failed to list dashboard folders")
 				return cli.Exit("", 1)

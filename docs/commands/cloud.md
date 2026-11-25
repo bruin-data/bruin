@@ -1020,6 +1020,12 @@ bruin cloud dashboards list
 bruin cloud dashboards list --output json
 ```
 
+In an agent's run, the list shows only that agent's dashboards. Pass `--all` to list every dashboard the person the run is for can view (`dashboards folders --all` counts the same set):
+
+```bash
+bruin cloud dashboards list --all --output json
+```
+
 #### `folders`
 
 Lists the team's dashboard folders with their id, name, and dashboard count. Folders

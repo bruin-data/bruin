@@ -1574,6 +1574,7 @@ func TestListDashboards(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/dashboards", r.URL.Path)
+		assert.Empty(t, r.URL.RawQuery)
 		w.WriteHeader(http.StatusOK)
 		// Match the API's snake_case shape exactly, so the tag mapping is covered.
 		writeJSON(t, w, map[string]any{
@@ -1583,12 +1584,36 @@ func TestListDashboards(t *testing.T) {
 		})
 	})
 
-	dashboards, err := client.ListDashboards(t.Context())
+	dashboards, err := client.ListDashboards(t.Context(), false)
 	require.NoError(t, err)
 	require.Len(t, dashboards, 1)
 	assert.Equal(t, "Revenue", *dashboards[0].Title)
 	require.NotNil(t, dashboards[0].UpdatedAt)
 	assert.Equal(t, "2026-07-06T10:00:00+00:00", *dashboards[0].UpdatedAt)
+}
+
+func TestListDashboardsAll(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/dashboards", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("all"))
+		writeJSON(t, w, map[string]any{"dashboards": []map[string]any{}})
+	})
+
+	_, err := client.ListDashboards(t.Context(), true)
+	require.NoError(t, err)
+}
+
+func TestListDashboardFoldersAll(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/dashboard-folders", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("all"))
+		writeJSON(t, w, map[string]any{"folders": []DashboardFolder{}})
+	})
+
+	_, err := client.ListDashboardFolders(t.Context(), true)
+	require.NoError(t, err)
 }
 
 func TestGetDashboard(t *testing.T) {
@@ -1722,7 +1747,7 @@ func TestListDashboardFolders(t *testing.T) {
 		}})
 	})
 
-	folders, err := client.ListDashboardFolders(t.Context())
+	folders, err := client.ListDashboardFolders(t.Context(), false)
 	require.NoError(t, err)
 	require.Len(t, folders, 2)
 	assert.Equal(t, DashboardFolder{ID: 1, Name: "Finance", DashboardCount: 2}, folders[0])
