@@ -710,6 +710,28 @@ func (m Materialization) IsSCD2() bool {
 	return m.Strategy == MaterializationStrategySCD2ByColumn || m.Strategy == MaterializationStrategySCD2ByTime
 }
 
+// LoadsExistingTable reports whether the materialization writes into a table
+// that has to exist already, instead of creating or replacing it. Only these
+// assets need their table created on the first run.
+func (m Materialization) LoadsExistingTable() bool {
+	if m.Type != MaterializationTypeTable {
+		return false
+	}
+
+	switch m.Strategy {
+	case MaterializationStrategyAppend,
+		MaterializationStrategyMerge,
+		MaterializationStrategyDeleteInsert,
+		MaterializationStrategyTimeInterval,
+		MaterializationStrategyTruncateInsert,
+		MaterializationStrategySCD2ByColumn,
+		MaterializationStrategySCD2ByTime:
+		return true
+	default:
+		return false
+	}
+}
+
 func (m Materialization) IsIceberg() bool {
 	return m.TableFormat == MaterializationTableFormatIceberg
 }
@@ -1522,6 +1544,9 @@ type Asset struct { //nolint:recvcheck
 
 	upstream   []*Asset
 	downstream []*Asset
+
+	// firstRun marks a copy made by FirstRun for an incremental asset whose table does not exist yet.
+	firstRun bool
 }
 
 // IsEnabled returns the asset's resolved enabled value. It panics if enabled
@@ -1555,13 +1580,32 @@ func (a *Asset) FullRefreshRequested(runFullRefresh bool) bool {
 }
 
 // FullRefreshEnabled applies the asset-level full-refresh restriction to the
-// effective request from FullRefreshRequested.
+// effective request from FullRefreshRequested. A FirstRun copy always reports a
+// full refresh, because its table has to be created from the query.
 func (a *Asset) FullRefreshEnabled(runFullRefresh bool) bool {
+	if a.IsFirstRun() {
+		return true
+	}
 	if !a.FullRefreshRequested(runFullRefresh) {
 		return false
 	}
 
 	return a == nil || a.RefreshRestricted == nil || !*a.RefreshRestricted
+}
+
+// FirstRun returns a copy of the asset to run when its table does not exist yet.
+// The copy reports a full refresh, so the materialization creates the table from
+// the query instead of loading into it, the `full_refresh` template variable is
+// true, and refresh_restricted does not apply: there is no data to protect.
+func (a *Asset) FirstRun() *Asset {
+	firstRun := *a
+	firstRun.firstRun = true
+	return &firstRun
+}
+
+// IsFirstRun reports whether the asset is a FirstRun copy.
+func (a *Asset) IsFirstRun() bool {
+	return a != nil && a.firstRun
 }
 
 func (a *Asset) EnabledValue() (bool, error) {
