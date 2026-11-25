@@ -944,7 +944,7 @@ bruin cloud connections delete --name my_pg
 
 ### `connection-sets`
 
-Manage connection **sets** — named bundles of connections an agent runs against (assigned to an agent via its connection set). Distinct from individual connections. Credentials are write-only: reads never return config values, and create/update always send a full config per connection (read from the local `.bruin.yml`).
+Manage connection **sets** — named bundles of connections an agent runs against (assigned to an agent via its connection set). Distinct from individual connections. Credentials are write-only: reads never return config values, and the connections you pass to create/update are sent with their full config (read from the local `.bruin.yml`).
 
 #### `list`
 
@@ -975,11 +975,13 @@ Use `--skip-validation` to skip the live connection test, and `--environment` / 
 
 #### `update`
 
-Replace a set's connections — the set becomes exactly the connections you pass:
+Add connections to a set, or update ones already in it, from the local `.bruin.yml`. The set's other connections keep their stored credentials:
 
 ```bash
 bruin cloud connection-sets update --set-id 7 --connection my_pg
 ```
+
+Pass `--replace` to drop the other connections, so the set becomes exactly the ones you pass.
 
 #### `delete`
 
