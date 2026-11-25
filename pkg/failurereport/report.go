@@ -180,6 +180,9 @@ func bigQueryReason(reason, message string) (string, string) {
 	if reason == "invalidQuery" && strings.HasPrefix(message, "Access Denied:") {
 		return Permission, "access_denied"
 	}
+	// Otherwise invalidQuery says little: BigQuery uses it for most errors while running a query,
+	// a syntax error as well as a missing table or a transaction aborted by a concurrent update,
+	// which a retry fixes. It is left unknown, with the reason, for the reader to decide.
 	switch reason {
 	case "backendError", "internalError", "jobBackendError", "jobInternalError":
 		return Transient, "bq_retryable"
@@ -193,8 +196,6 @@ func bigQueryReason(reason, message string) (string, string) {
 		return ProviderLimits, "provider_billing_disabled"
 	case "accessDenied":
 		return Permission, "access_denied"
-	case "invalidQuery":
-		return UserCode, "sql_error"
 	case "notFound":
 		return UserCode, "missing_object"
 	}

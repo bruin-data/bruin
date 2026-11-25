@@ -84,9 +84,9 @@ func TestClassify(t *testing.T) {
 			want: Report{Class: Permission, Code: "access_denied", Source: "google_api", Reason: "accessDenied", HTTPStatus: 403},
 		},
 		{
-			name: "bigquery invalid query",
+			name: "bigquery invalid query is left to the reader",
 			err:  googleErr(400, "invalidQuery"),
-			want: Report{Class: UserCode, Code: "sql_error", Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
+			want: Report{Class: Unknown, Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
 		},
 		{
 			name: "bigquery table not found",
@@ -165,6 +165,14 @@ func TestClassify(t *testing.T) {
 				Message: "Access Denied: Table p:d.t: User does not have permission to query table p:d.t, or perhaps it does not exist.",
 			},
 			want: Report{Class: Permission, Code: "access_denied", Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
+		},
+		{
+			name: "bigquery transaction aborted by a concurrent update, reported as an invalid query",
+			err: &googleapi.Error{
+				Code: 400, Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}},
+				Message: "Query error: Transaction is aborted due to concurrent update against table p:d.t. at [100:1]",
+			},
+			want: Report{Class: Unknown, Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
 		},
 		{
 			name: "bigquery job access denied reported as an invalid query",
