@@ -5832,7 +5832,7 @@ func cloudDashboardsFolders() *cli.Command {
 			outputFlag(),
 			&cli.BoolFlag{
 				Name:  "all",
-				Usage: "count the dashboards dashboards list --all shows",
+				Usage: "count the same dashboards that `list --all` shows",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
