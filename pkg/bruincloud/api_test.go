@@ -2401,3 +2401,54 @@ func TestDeleteSemanticLayer(t *testing.T) {
 
 	require.NoError(t, client.DeleteSemanticLayer(t.Context(), 9))
 }
+
+func TestListAgentQueries(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/queries", r.URL.Path)
+		assert.Equal(t, "3", r.URL.Query().Get("agent_id"))
+		assert.Equal(t, "2026-11-01", r.URL.Query().Get("since"))
+		assert.Equal(t, "90", r.URL.Query().Get("before"))
+		assert.False(t, r.URL.Query().Has("thread_id"))
+		// Match the API's snake_case shape exactly, so the tag mapping is covered.
+		writeJSON(t, w, map[string]any{
+			"queries": []map[string]any{{
+				"message_pair_id": 80,
+				"agent":           map[string]any{"id": 3, "name": "Sales"},
+				"thread":          map[string]any{"id": 7, "title": "Findings: Improvements", "type": "scheduled_execution"},
+				"scheduled_run":   map[string]any{"id": 5, "title": "Findings: Improvements", "kind": "scout"},
+				"started_by":      nil,
+				"query":           "select 1",
+				"connection":      "warehouse",
+				"success":         true,
+				"rows":            [][]any{{1}},
+				"row_count":       1,
+			}},
+			"next_before": 80,
+		})
+	})
+
+	page, err := client.ListAgentQueries(t.Context(), ListAgentQueriesOptions{AgentID: 3, Since: "2026-11-01", Before: 90})
+	require.NoError(t, err)
+	require.Len(t, page.Queries, 1)
+	q := page.Queries[0]
+	assert.Equal(t, AgentQueryRef{ID: 3, Name: "Sales"}, q.Agent)
+	assert.Equal(t, "scheduled_execution", q.Thread.Type)
+	require.NotNil(t, q.ScheduledRun)
+	assert.Equal(t, "scout", q.ScheduledRun.Kind)
+	assert.Nil(t, q.StartedBy)
+	require.NotNil(t, page.NextBefore)
+	assert.Equal(t, 80, *page.NextBefore)
+}
+
+func TestListAgentQueriesKeepsLargeIntegers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"queries":[{"agent":{"id":3,"name":"Sales"},"thread":{"id":7,"type":"chat"},"query":"select id","rows":[[9007199254740993]]}],"next_before":null}`))
+	})
+
+	page, err := client.ListAgentQueries(t.Context(), ListAgentQueriesOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, json.Number("9007199254740993"), page.Queries[0].Rows[0][0])
+}

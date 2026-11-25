@@ -816,6 +816,39 @@ func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, of
 	return resp.Threads, err
 }
 
+// ListAgentQueries pages through every query the team's agents ran that the
+// token can read, newest message first.
+func (c *APIClient) ListAgentQueries(ctx context.Context, opts ListAgentQueriesOptions) (*AgentQueriesPage, error) {
+	params := url.Values{}
+	for key, value := range map[string]int{"agent_id": opts.AgentID, "thread_id": opts.ThreadID, "limit": opts.Limit, "before": opts.Before} {
+		if value > 0 {
+			params.Set(key, strconv.Itoa(value))
+		}
+	}
+	for key, value := range map[string]string{"since": opts.Since, "until": opts.Until} {
+		if value != "" {
+			params.Set(key, value)
+		}
+	}
+	path := "/queries"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+	var raw json.RawMessage
+	if err := c.doRequest(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return nil, err
+	}
+
+	// Decode row cells as json.Number so integers beyond 2^53 keep full precision.
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var page AgentQueriesPage
+	if err := dec.Decode(&page); err != nil {
+		return nil, fmt.Errorf("failed to parse queries: %w", err)
+	}
+	return &page, nil
+}
+
 // UpdateAgentThread renames a thread (title) and/or archives it (archived); the
 // server also unpins an archived thread.
 func (c *APIClient) UpdateAgentThread(ctx context.Context, agentID, threadID int, fields map[string]any) (*AgentThread, error) {
