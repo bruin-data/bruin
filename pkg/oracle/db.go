@@ -91,6 +91,11 @@ func trimTrailingSQLComments(q string) string {
 	}
 }
 
+// Limit wraps the query so it returns at most limit rows; Oracle has no LIMIT clause.
+func (db *Client) Limit(q string, limit int64) string {
+	return fmt.Sprintf("SELECT * FROM (\n%s\n) WHERE ROWNUM <= %d", strings.TrimRight(q, "; \n\t"), limit)
+}
+
 func (db *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
