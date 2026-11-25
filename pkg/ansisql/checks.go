@@ -490,7 +490,8 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 	expected := ti.Check.Value.String()
 	if ti.Check.Count != nil {
 		expected = strconv.FormatInt(*ti.Check.Count, 10)
-		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
+		// No AS before the alias: Oracle rejects it (ORA-03048), and every other dialect accepts both forms.
+		qq = fmt.Sprintf("SELECT count(*) FROM (%s) t", qq)
 	}
 
 	return (&CountableQueryCheck{
