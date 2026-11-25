@@ -834,9 +834,17 @@ func (c *APIClient) ListAgentQueries(ctx context.Context, opts ListAgentQueriesO
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
-	var page AgentQueriesPage
-	if err := c.doRequest(ctx, http.MethodGet, path, nil, &page); err != nil {
+	var raw json.RawMessage
+	if err := c.doRequest(ctx, http.MethodGet, path, nil, &raw); err != nil {
 		return nil, err
+	}
+
+	// Decode row cells as json.Number so integers beyond 2^53 keep full precision.
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var page AgentQueriesPage
+	if err := dec.Decode(&page); err != nil {
+		return nil, fmt.Errorf("failed to parse queries: %w", err)
 	}
 	return &page, nil
 }

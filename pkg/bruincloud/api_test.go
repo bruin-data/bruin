@@ -2414,3 +2414,14 @@ func TestListAgentQueries(t *testing.T) {
 	require.NotNil(t, page.NextBefore)
 	assert.Equal(t, 80, *page.NextBefore)
 }
+
+func TestListAgentQueriesKeepsLargeIntegers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"queries":[{"agent":{"id":3,"name":"Sales"},"thread":{"id":7,"type":"chat"},"query":"select id","rows":[[9007199254740993]]}],"next_before":null}`))
+	})
+
+	page, err := client.ListAgentQueries(t.Context(), ListAgentQueriesOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, json.Number("9007199254740993"), page.Queries[0].Rows[0][0])
+}

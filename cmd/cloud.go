@@ -4503,6 +4503,13 @@ func cloudQueriesList() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
+			for _, name := range []string{"agent-id", "thread-id", "limit", "before"} {
+				if c.IsSet(name) && c.Int(name) <= 0 {
+					printError(fmt.Errorf("--%s must be a positive integer, got %d", name, c.Int(name)), output, "Invalid --"+name)
+					return cli.Exit("", 1)
+				}
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
