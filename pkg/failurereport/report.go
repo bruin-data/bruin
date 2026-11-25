@@ -174,11 +174,8 @@ func classifyGoogleAPI(apiErr *googleapi.Error) Report {
 // bigQueryReason maps BigQuery's error reasons, see
 // https://cloud.google.com/bigquery/docs/error-messages.
 func bigQueryReason(reason, message string) (string, string) {
-	// A query reading a table it may not read fails as an invalid query, with a message such as
-	// "Access Denied: Table p:d.t: User does not have permission to query table p:d.t, or perhaps
-	// it does not exist."
-	if reason == "invalidQuery" && strings.HasPrefix(message, "Access Denied:") {
-		return Permission, "access_denied"
+	if reason == "invalidQuery" {
+		return invalidQuery(message)
 	}
 	switch reason {
 	case "backendError", "internalError", "jobBackendError", "jobInternalError":
@@ -193,10 +190,45 @@ func bigQueryReason(reason, message string) (string, string) {
 		return ProviderLimits, "provider_billing_disabled"
 	case "accessDenied":
 		return Permission, "access_denied"
-	case "invalidQuery":
-		return UserCode, "sql_error"
 	case "notFound":
 		return UserCode, "missing_object"
+	}
+	return Unknown, ""
+}
+
+// invalidQueryMessages tell apart the failures BigQuery reports as invalidQuery, by the start of
+// BigQuery's message (after "Query error: ", which some carry). The reason covers most errors in a
+// query: a syntax error as well as a missing table or a transaction aborted by a concurrent
+// update, which a retry fixes, so it is no class on its own.
+var invalidQueryMessages = []struct {
+	prefix      string
+	class, code string
+}{
+	// "Access Denied: Table p:d.t: User does not have permission to query table p:d.t, or perhaps
+	// it does not exist." and "Access Denied: Dataset p:d: Permission bigquery.tables.create denied".
+	{"Access Denied:", Permission, "access_denied"},
+	// "Not found: Table p:d.t was not found in location US".
+	{"Not found: Table", UserCode, "missing_object"},
+	{"Not found: Dataset", UserCode, "missing_object"},
+	// "Transaction is aborted due to concurrent update against table p:d.t."
+	{"Transaction is aborted due to concurrent update", Transient, "concurrent_update"},
+	{"Syntax error:", UserCode, "sql_error"},
+	// "Unrecognized name: pickup_datetime at [3:8]".
+	{"Unrecognized name:", UserCode, "sql_error"},
+	{"No matching signature for", UserCode, "sql_error"},
+	// "Inserted row has wrong column count; Has 5, expected 6 at [1:1]".
+	{"Inserted row has wrong column count", UserCode, "sql_error"},
+	// "Query column 3 has type STRUCT<...> which cannot be inserted into column x, which has type ...".
+	{"Query column ", UserCode, "sql_error"},
+}
+
+// invalidQuery classifies an invalidQuery error by its message; one it doesn't know is unknown.
+func invalidQuery(message string) (string, string) {
+	message = strings.TrimPrefix(strings.TrimSpace(message), "Query error: ")
+	for _, m := range invalidQueryMessages {
+		if strings.HasPrefix(message, m.prefix) {
+			return m.class, m.code
+		}
 	}
 	return Unknown, ""
 }

@@ -84,9 +84,9 @@ func TestClassify(t *testing.T) {
 			want: Report{Class: Permission, Code: "access_denied", Source: "google_api", Reason: "accessDenied", HTTPStatus: 403},
 		},
 		{
-			name: "bigquery invalid query",
+			name: "bigquery invalid query is left to the reader",
 			err:  googleErr(400, "invalidQuery"),
-			want: Report{Class: UserCode, Code: "sql_error", Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
+			want: Report{Class: Unknown, Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
 		},
 		{
 			name: "bigquery table not found",
@@ -167,6 +167,14 @@ func TestClassify(t *testing.T) {
 			want: Report{Class: Permission, Code: "access_denied", Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
 		},
 		{
+			name: "bigquery transaction aborted by a concurrent update, reported as an invalid query",
+			err: &googleapi.Error{
+				Code: 400, Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}},
+				Message: "Query error: Transaction is aborted due to concurrent update against table p:d.t. at [100:1]",
+			},
+			want: Report{Class: Transient, Code: "concurrent_update", Source: "google_api", Reason: "invalidQuery", HTTPStatus: 400},
+		},
+		{
 			name: "bigquery job access denied reported as an invalid query",
 			err:  &bigquery.Error{Reason: "invalidQuery", Message: "Access Denied: Table p:d.t: User does not have permission to query table p:d.t"},
 			want: Report{Class: Permission, Code: "access_denied", Source: "bigquery", Reason: "invalidQuery"},
@@ -223,6 +231,42 @@ type timeoutError struct{}
 func (timeoutError) Error() string   { return "i/o timeout" }
 func (timeoutError) Timeout() bool   { return true }
 func (timeoutError) Temporary() bool { return true }
+
+// BigQuery reports most query errors as invalidQuery; its message says which. The messages are
+// BigQuery's, as seen in Bruin Cloud.
+func TestClassifyBigQueryInvalidQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		message   string
+		wantClass string
+		wantCode  string
+	}{
+		{"Access Denied: Table p:d.t: User does not have permission to query table p:d.t, or perhaps it does not exist. at [2:1]", Permission, "access_denied"},
+		{"Access Denied: Dataset p:d: Permission bigquery.tables.create denied on dataset p:d (or it may not exist).", Permission, "access_denied"},
+		{"Not found: Table p:d.t was not found in location US at [12:7]", UserCode, "missing_object"},
+		{"Not found: Dataset p:d was not found in location EU", UserCode, "missing_object"},
+		{"Query error: Transaction is aborted due to concurrent update against table p:d.t. Transaction ID: 6b0d. at [100:1]", Transient, "concurrent_update"},
+		{"Syntax error: Unexpected keyword FROM at [3:1]", UserCode, "sql_error"},
+		{"Unrecognized name: pickup_datetime at [4:9]", UserCode, "sql_error"},
+		{"No matching signature for operator = for argument types: STRING, INT64. at [2:7]", UserCode, "sql_error"},
+		{"Query error: Inserted row has wrong column count; Has 5, expected 6 at [1:1]", UserCode, "sql_error"},
+		{"Query error: Query column 3 has type STRUCT<event_id STRING> which cannot be inserted into column payload, which has type STRING at [1:1]", UserCode, "sql_error"},
+		{"Division by zero: 1 / 0", Unknown, ""},
+		{"", Unknown, ""},
+	}
+	for _, tt := range tests {
+		for _, err := range []error{
+			&googleapi.Error{Code: 400, Message: tt.message, Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}}},
+			&bigquery.Error{Reason: "invalidQuery", Message: tt.message},
+		} {
+			got := Classify(err)
+			assert.Equal(t, tt.wantClass, got.Class, tt.message)
+			assert.Equal(t, tt.wantCode, got.Code, tt.message)
+			assert.Equal(t, "invalidQuery", got.Reason, tt.message)
+		}
+	}
+}
 
 func TestLine(t *testing.T) {
 	t.Parallel()
