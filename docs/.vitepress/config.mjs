@@ -138,6 +138,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Dashboards", link: "/cloud/dashboards"},
                     {text: "Semantic Layers", link: "/cloud/semantic-layers"},
                     {
+                        text: "Streams",
+                        collapsed: true,
+                        items: [
+                            {text: "Overview", link: "/cloud/streams/overview"},
+                            {text: "Start from an Existing Snapshot", link: "/cloud/streams/existing-snapshot"},
+                        ],
+                    },
+                    {
                         text: "AI Agents",
                         collapsed: true,
                         items: [
