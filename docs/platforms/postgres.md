@@ -612,7 +612,7 @@ parameters:
 
 ### `pg.source`
 
-Defines PostgreSQL source assets for documenting existing tables and views in your PostgreSQL database. These assets are no-op (they don't execute), but are useful for:
+Defines PostgreSQL source assets for documenting existing tables and views in your PostgreSQL database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing PostgreSQL tables and views
 - Adding column descriptions and metadata

@@ -456,7 +456,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `bq.source`
 
-Defines BigQuery source assets for documenting existing tables and views in your BigQuery database. These assets are no-op (they don't execute), but are useful for:
+Defines BigQuery source assets for documenting existing tables and views in your BigQuery database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing BigQuery tables and views
 - Adding column descriptions and metadata

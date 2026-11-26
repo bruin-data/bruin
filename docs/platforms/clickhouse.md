@@ -645,7 +645,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `clickhouse.source`
 
-Defines ClickHouse source assets for documenting existing tables and views in your ClickHouse database. These assets are no-op (they don't execute), but are useful for:
+Defines ClickHouse source assets for documenting existing tables and views in your ClickHouse database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing ClickHouse tables and views
 - Adding column descriptions and metadata

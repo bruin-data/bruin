@@ -107,7 +107,7 @@ WHERE modified_date > '{{ start_date }}'
 
 ## Source assets
 
-Use `fabric.source` to document an existing Fabric Warehouse table or view for metadata and lineage without executing it.
+Use `fabric.source` to document an existing Fabric Warehouse table or view for metadata and lineage. These assets don't execute, but their quality checks do.
 
 ```yaml
 name: dbo.customers

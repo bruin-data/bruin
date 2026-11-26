@@ -271,7 +271,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `databricks.source`
 
-Defines Databricks source assets for documenting existing tables and views in your Databricks database. These assets are no-op (they don't execute), but are useful for:
+Defines Databricks source assets for documenting existing tables and views in your Databricks database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing Databricks tables and views
 - Adding column descriptions and metadata

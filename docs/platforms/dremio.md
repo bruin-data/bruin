@@ -103,7 +103,7 @@ WHERE event_name = 'install'
 
 ### `dremio.source`
 
-Defines an existing Dremio table or view for metadata and lineage without executing it.
+Defines an existing Dremio table or view for metadata and lineage. These assets don't execute, but their quality checks do.
 
 ```yaml
 name: analytics.events
