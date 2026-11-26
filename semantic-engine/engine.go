@@ -520,7 +520,12 @@ func (e *Engine) totalSQL(q *Query, metrics []string, dims []DimensionRef, restr
 	restrict = restrict && (len(grandTotal.Filters) < len(q.Filters) || len(grandTotal.Segments) < len(q.Segments) || (len(shown.Dimensions) > 0 && q.Limit > 0))
 	planned := grandTotal
 	if restrict {
-		planned.Dimensions = append(slices.Clone(shown.Dimensions), dims...)
+		planned.Dimensions = slices.Clone(shown.Dimensions)
+		for _, d := range dims {
+			if !slices.Contains(planned.Dimensions, d) {
+				planned.Dimensions = append(planned.Dimensions, d)
+			}
+		}
 	}
 	totalPlan, err := grandTotalEngine.planQuery(&planned)
 	if err != nil {
@@ -565,16 +570,19 @@ func (e *Engine) totalSQL(q *Query, metrics []string, dims []DimensionRef, restr
 }
 
 // GenerateSeriesSQL returns metrics per q's dimensions and by (by alone with
-// total), ordered by by: one point per row and x, such as for a sparkline.
-func (e *Engine) GenerateSeriesSQL(q *Query, by DimensionRef, metrics []string, total bool) (string, error) {
-	sql, x, err := e.seriesSQL(q, by, metrics, total)
+// total), ordered by by: one point per row and x, such as for a sparkline. It
+// covers only the rows q returns and, with limit > 0, each row's last limit
+// points. A by among q's dimensions keeps every point, since each row needs the
+// ones before its own x.
+func (e *Engine) GenerateSeriesSQL(q *Query, by DimensionRef, metrics []string, limit int, total bool) (string, error) {
+	sql, x, err := e.seriesSQL(q, by, metrics, limit, !slices.Contains(q.Dimensions, by), total)
 	if err != nil {
 		return "", err
 	}
 	return sql + " ORDER BY " + x, nil
 }
 
-func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, total bool) (sql, x string, err error) {
+func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, limit int, restrict, total bool) (sql, x string, err error) {
 	dims := []DimensionRef{by}
 	if !total {
 		dims = q.Dimensions
@@ -594,18 +602,32 @@ func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, total bo
 		return "", "", errors.New("window metrics are not supported in series")
 	}
 	x = plan.dimensionBinding(by).outputAlias
+	var cols, keys []string
 	for _, d := range dims {
-		if d != by && plan.dimensionBinding(d).outputAlias == x {
+		alias := plan.dimensionBinding(d).outputAlias
+		if d != by && alias == x {
 			return "", "", fmt.Errorf("%s and dimension %s both return column %s", by.Name, d.Name, x)
+		}
+		cols = append(cols, alias)
+		if d != by {
+			keys = append(keys, alias)
 		}
 	}
 	if slices.Contains(metrics, x) {
 		return "", "", fmt.Errorf("%s and metric %s both return column %s", by.Name, x, x)
 	}
-	if sql, err = e.totalSQL(q, metrics, dims, total); err != nil {
+	if sql, err = e.totalSQL(q, metrics, dims, restrict || total); err != nil {
 		return "", "", err
 	}
-	return "SELECT * FROM (" + sql + ") points WHERE " + x + " IS NOT NULL", x, nil
+	if limit <= 0 || (!total && slices.Contains(q.Dimensions, by)) {
+		return "SELECT * FROM (" + sql + ") points WHERE " + x + " IS NOT NULL", x, nil
+	}
+	partition := ""
+	if len(keys) > 0 {
+		partition = "PARTITION BY " + strings.Join(keys, ", ") + " "
+	}
+	return fmt.Sprintf("SELECT %s FROM (SELECT points.*, ROW_NUMBER() OVER (%sORDER BY %s DESC) AS __series_rank FROM (%s) points WHERE %s IS NOT NULL) ranked WHERE __series_rank <= %d",
+		strings.Join(append(cols, metrics...), ", "), partition, x, sql, x, limit), x, nil
 }
 
 // Series is one list column for AddSeriesSQL.
@@ -678,7 +700,7 @@ func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool)
 				metrics = append(metrics, s.Metric)
 			}
 		}
-		points, x, err := e.seriesSQL(q, by, metrics, total)
+		points, x, err := e.seriesSQL(q, by, metrics, 0, false, total)
 		if err != nil {
 			return "", false, err
 		}

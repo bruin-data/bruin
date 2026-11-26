@@ -2969,19 +2969,48 @@ func TestGenerateSeriesSQL(t *testing.T) {
 		Filters:    []Filter{{Dimension: "status", Operator: "equals", Value: "completed"}, {Expression: "sum(amount) > 100"}},
 		Sort:       []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 10,
 	}
-	rows, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, false)
+	rows, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A HAVING filter picks the table's rows; applied per day it would drop points.
-	expectContains(t, rows, "GROUP BY 1, 2")
-	expectContains(t, rows, "WHERE status = 'completed'")
-	expectContains(t, rows, ") grand_total) points WHERE order_date IS NOT NULL ORDER BY order_date")
-	for _, unwanted := range []string{"HAVING", "> 100", "LIMIT", "INNER JOIN"} {
-		expectNotContains(t, rows, unwanted)
+	// Points cover only the rows the table shows; its HAVING filter and limit pick
+	// them, and applied per day they would drop points.
+	perDay, shownRows := splitShownGrandTotal(t, rows)
+	expectContains(t, shownRows, "HAVING sum(amount) > 100")
+	expectContains(t, shownRows, "LIMIT 10")
+	expectContains(t, perDay, "WHERE status = 'completed' GROUP BY 1, 2")
+	expectContains(t, perDay, ") grand_total) points WHERE order_date IS NOT NULL ORDER BY order_date")
+	for _, unwanted := range []string{"HAVING", "> 100", "LIMIT", "ROW_NUMBER"} {
+		expectNotContains(t, perDay, unwanted)
 	}
+	// Without a limit or HAVING filter every row is shown, so nothing is joined.
+	all, err := e.GenerateSeriesSQL(&Query{Dimensions: q.Dimensions, Metrics: q.Metrics}, day, []string{"order_count"}, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectNotContains(t, all, "INNER JOIN")
+	// A limit keeps each row's last points in SQL.
+	last, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, last, "SELECT country, order_date, order_count FROM (SELECT points.*, ROW_NUMBER() OVER (PARTITION BY country ORDER BY order_date DESC) AS __series_rank FROM (")
+	expectContains(t, last, ") ranked WHERE __series_rank <= 30 ORDER BY order_date")
+	lastTotal, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 30, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, lastTotal, "ROW_NUMBER() OVER (ORDER BY order_date DESC)")
+	// A daily table's row needs the points before its own day, which it may not show.
+	daily := &Query{Dimensions: []DimensionRef{{Name: "country"}, day}, Metrics: []string{"revenue"}, Limit: 10}
+	window, err := e.GenerateSeriesSQL(daily, day, []string{"order_count"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectNotContains(t, window, "ROW_NUMBER")
+	expectNotContains(t, window, "INNER JOIN")
 	// The total row's points cover only the rows the table shows.
-	total, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, true)
+	total, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2991,11 +3020,11 @@ func TestGenerateSeriesSQL(t *testing.T) {
 
 	// A weekly table with a daily x would return two order_date columns.
 	weekly := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue"}}
-	if _, err := e.GenerateSeriesSQL(weekly, day, []string{"revenue"}, false); err == nil || !strings.Contains(err.Error(), "both return column order_date") {
+	if _, err := e.GenerateSeriesSQL(weekly, day, []string{"revenue"}, 0, false); err == nil || !strings.Contains(err.Error(), "both return column order_date") {
 		t.Fatalf("expected a column clash, got %v", err)
 	}
 	// Window metrics would be NULL at every point.
-	if _, err := e.GenerateSeriesSQL(q, day, []string{"running_revenue"}, false); err == nil || !strings.Contains(err.Error(), "window metrics") {
+	if _, err := e.GenerateSeriesSQL(q, day, []string{"running_revenue"}, 0, false); err == nil || !strings.Contains(err.Error(), "window metrics") {
 		t.Fatalf("expected a window metric error, got %v", err)
 	}
 }
@@ -3016,7 +3045,7 @@ func TestGenerateSeriesSQLOrdersByJoinedGranularity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sql, err := e.GenerateSeriesSQL(&Query{Dimensions: []DimensionRef{{Name: "status"}}, Metrics: []string{"revenue"}}, DimensionRef{Name: "customers.signup", Granularity: "month"}, []string{"revenue"}, false)
+	sql, err := e.GenerateSeriesSQL(&Query{Dimensions: []DimensionRef{{Name: "status"}}, Metrics: []string{"revenue"}}, DimensionRef{Name: "customers.signup", Granularity: "month"}, []string{"revenue"}, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
