@@ -2957,3 +2957,134 @@ func TestFilterValueBackslashStaysInString(t *testing.T) {
 		expectContains(t, sql, want)
 	}
 }
+
+func TestGenerateSeriesSQL(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	day := DimensionRef{Name: "order_date", Granularity: "day"}
+	q := &Query{
+		Dimensions: []DimensionRef{{Name: "country"}},
+		Metrics:    []string{"revenue"},
+		Filters:    []Filter{{Dimension: "status", Operator: "equals", Value: "completed"}, {Expression: "sum(amount) > 100"}},
+		Sort:       []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 10,
+	}
+	rows, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A HAVING filter picks the table's rows; applied per day it would drop points.
+	expectContains(t, rows, "GROUP BY 1, 2")
+	expectContains(t, rows, "WHERE status = 'completed'")
+	expectContains(t, rows, ") grand_total) points WHERE order_date IS NOT NULL ORDER BY order_date")
+	for _, unwanted := range []string{"HAVING", "> 100", "LIMIT", "INNER JOIN"} {
+		expectNotContains(t, rows, unwanted)
+	}
+	// The total row's points cover only the rows the table shows.
+	total, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, shown := splitShownGrandTotal(t, total)
+	expectContains(t, shown, "HAVING sum(amount) > 100")
+	expectContains(t, total, "SELECT order_date, order_count FROM (")
+
+	// A weekly table with a daily x would return two order_date columns.
+	weekly := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue"}}
+	if _, err := e.GenerateSeriesSQL(weekly, day, []string{"revenue"}, false); err == nil || !strings.Contains(err.Error(), "both return column order_date") {
+		t.Fatalf("expected a column clash, got %v", err)
+	}
+	// Window metrics would be NULL at every point.
+	if _, err := e.GenerateSeriesSQL(q, day, []string{"running_revenue"}, false); err == nil || !strings.Contains(err.Error(), "window metrics") {
+		t.Fatalf("expected a window metric error, got %v", err)
+	}
+}
+
+func TestGenerateSeriesSQLOrdersByJoinedGranularity(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{
+		{Name: "signup", Type: "time", Granularities: map[string]string{"month": "date_trunc('month', signup)"}},
+	}}
+	orders := &Model{
+		Name: "orders", Source: Source{Table: "orders"},
+		Joins:      []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		Dimensions: []Dimension{{Name: "status", Type: "string"}},
+		Metrics:    []Metric{{Name: "revenue", Expression: "sum(amount)"}},
+	}
+	e, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := e.GenerateSeriesSQL(&Query{Dimensions: []DimensionRef{{Name: "status"}}, Metrics: []string{"revenue"}}, DimensionRef{Name: "customers.signup", Granularity: "month"}, []string{"revenue"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "AS customers_signup_month")
+	expectContains(t, sql, "ORDER BY customers_signup_month")
+}
+
+func TestAddSeriesSQL(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	e.Dialect = "bigquery"
+	day := DimensionRef{Name: "order_date", Granularity: "day"}
+	q := &Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 5}
+	detail, err := e.GenerateSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	series := []Series{{By: day, Metric: "revenue", Limit: 30}, {By: day, Metric: "order_count"}}
+	sql, ok, err := e.AddSeriesSQL(q, detail, series, false)
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	// Columns sharing an x read one daily grouping.
+	if got := strings.Count(sql, "LEFT JOIN"); got != 1 {
+		t.Fatalf("expected one join, got %d\nSQL: %s", got, sql)
+	}
+	for _, want := range []string{
+		"SELECT __rows.*, __series_join_0.__series_0, __series_join_0.__series_1 FROM (" + detail + ") __rows",
+		"ARRAY_AGG(STRUCT(order_date AS x, CAST(revenue AS FLOAT64) AS y) ORDER BY order_date DESC LIMIT 30) AS __series_0",
+		"ARRAY_AGG(STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y) ORDER BY order_date DESC) AS __series_1",
+		"GROUP BY country) __series_join_0",
+		"(__rows.country = __series_join_0.country OR (__rows.country IS NULL AND __series_join_0.country IS NULL))",
+		"ORDER BY __rows.revenue DESC, __rows.country ASC",
+	} {
+		expectContains(t, sql, want)
+	}
+
+	total, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql, ok, err = e.AddSeriesSQL(q, total, series, true); err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	expectContains(t, sql, "FROM ("+total+") __rows LEFT JOIN (SELECT ARRAY_AGG(")
+	expectContains(t, sql, ") __series_join_0 ON TRUE")
+
+	// A window cuts each row's points from its group, so every point is fetched.
+	daily := &Query{Dimensions: []DimensionRef{{Name: "country"}, day}, Metrics: []string{"revenue"}}
+	if _, ok, _ := e.AddSeriesSQL(daily, detail, series, false); ok {
+		t.Fatal("merged a window")
+	}
+	e.Dialect = "duckdb"
+	if sql, ok, err = e.AddSeriesSQL(q, detail, series, false); err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	expectContains(t, sql, "ARRAY_AGG({'x': order_date, 'y': CAST(revenue AS DOUBLE)} ORDER BY order_date DESC)[1:30] AS __series_0")
+	e.Dialect = "snowflake"
+	if _, ok, _ := e.AddSeriesSQL(q, detail, series, false); ok {
+		t.Fatal("merged on a dialect without lists")
+	}
+	// A DECIMAL x inside a list may not reach the caller, so a number x isn't merged.
+	model := richTestModel()
+	model.Dimensions = append(model.Dimensions, Dimension{Name: "amount", Type: "number"})
+	numeric := minimalEngine(t, model)
+	numeric.Dialect = "duckdb"
+	if _, ok, _ := numeric.AddSeriesSQL(q, detail, []Series{{By: DimensionRef{Name: "amount"}, Metric: "revenue"}}, false); ok {
+		t.Fatal("merged a number x")
+	}
+}
