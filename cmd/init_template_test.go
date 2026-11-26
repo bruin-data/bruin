@@ -19,6 +19,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestInitDuckDBExampleCreatesDefaultConnection(t *testing.T) {
+	targetRoot := t.TempDir()
+	t.Chdir(targetRoot)
+	out, err := exec.CommandContext(t.Context(), "git", "init", targetRoot).CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	require.NoError(t, Init().Run(t.Context(), []string{"init", "duckdb-example"}))
+
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), filepath.Join(targetRoot, ".bruin.yml"))
+	require.NoError(t, err)
+	require.Len(t, cm.SelectedEnvironment.Connections.DuckDB, 1)
+	require.Equal(t, "duckdb-default", cm.SelectedEnvironment.Connections.DuckDB[0].Name)
+
+	gitignore, err := os.ReadFile(filepath.Join(targetRoot, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, strings.Split(string(gitignore), "\n"), "/duckdb.db")
+	require.Contains(t, strings.Split(string(gitignore), "\n"), "/duckdb.db.wal")
+}
+
 func TestInitSelfHealDemoCopiesPipelineTemplate(t *testing.T) {
 	targetRoot := t.TempDir()
 	t.Chdir(targetRoot)
