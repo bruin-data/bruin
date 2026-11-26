@@ -561,3 +561,24 @@ func TestPeeringDBSourceTables(t *testing.T) {
 		require.Equal(t, "merge", table.IncStrategy, table.Name)
 	}
 }
+
+func TestBrevoSourceTables(t *testing.T) {
+	t.Parallel()
+
+	brevo, err := GetSourceTables("brevo")
+	require.NoError(t, err)
+	require.Len(t, brevo.Tables, 22)
+
+	byName := map[string]*SourceTable{}
+	for _, table := range brevo.Tables {
+		byName[table.Name] = table
+	}
+	require.Equal(t, "category,name", byName["contact_attributes"].PrimaryKey)
+	require.Equal(t, "email", byName["blocked_contacts"].PrimaryKey)
+	require.Equal(t, "updatedAt", byName["orders"].IncKey)
+	require.Equal(t, "merge", byName["contacts"].IncStrategy)
+	require.Equal(t, "date", byName["transactional_email_reports"].IncKey)
+	require.Empty(t, byName["custom_events"].PrimaryKey)
+	require.Equal(t, "delete+insert", byName["whatsapp_events"].IncStrategy)
+	require.Equal(t, "replace", byName["whatsapp_campaigns"].IncStrategy)
+}

@@ -194,6 +194,7 @@ var defaultMapping = map[string]string{
 	"notion":                "notion-default",
 	"odoo":                  "odoo-default",
 	"breezyhr":              "breezyhr-default",
+	"brevo":                 "brevo-default",
 	"privatus":              "privatus-default",
 	"peeringdb":             "peeringdb-default",
 	"hana":                  "hana-default",

@@ -329,6 +329,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "BambooHR", link: "/ingestion/bamboohr"},
                                     {text: "Braze", link: "/ingestion/braze"},
                                     {text: "Breezy HR", link: "/ingestion/breezyhr"},
+                                    {text: "Brevo", link: "/ingestion/brevo"},
                                     {text: "Bruin", link: "/ingestion/bruin"},
                                     {text: "Cassandra", link: "/ingestion/cassandra"},
                                     {text: "Chargebee", link: "/ingestion/chargebee"},

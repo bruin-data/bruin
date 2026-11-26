@@ -195,6 +195,7 @@ type Connections struct {
 	Privatus            []PrivatusConnection            `yaml:"privatus,omitempty" json:"privatus,omitempty" mapstructure:"privatus"`
 	PeeringDB           []PeeringDBConnection           `yaml:"peeringdb,omitempty" json:"peeringdb,omitempty" mapstructure:"peeringdb"`
 	BreezyHR            []BreezyHRConnection            `yaml:"breezyhr,omitempty" json:"breezyhr,omitempty" mapstructure:"breezyhr"`
+	Brevo               []BrevoConnection               `yaml:"brevo,omitempty" json:"brevo,omitempty" mapstructure:"brevo"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -2022,6 +2023,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.PeeringDB = append(env.Connections.PeeringDB, conn)
+	case "brevo":
+		var conn BrevoConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Brevo = append(env.Connections.Brevo, conn)
 	case "breezyhr":
 		var conn BreezyHRConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -2443,6 +2451,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Privatus = removeConnection(env.Connections.Privatus, connectionName)
 	case "peeringdb":
 		env.Connections.PeeringDB = removeConnection(env.Connections.PeeringDB, connectionName)
+	case "brevo":
+		env.Connections.Brevo = removeConnection(env.Connections.Brevo, connectionName)
 	case "breezyhr":
 		env.Connections.BreezyHR = removeConnection(env.Connections.BreezyHR, connectionName)
 	default:
@@ -2717,6 +2727,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Privatus, source.Privatus)
 	mergeConnectionList(&c.PeeringDB, source.PeeringDB)
 	mergeConnectionList(&c.BreezyHR, source.BreezyHR)
+	mergeConnectionList(&c.Brevo, source.Brevo)
 	c.buildConnectionKeyMap()
 	return nil
 }
