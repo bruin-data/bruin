@@ -38,3 +38,7 @@ jobs:
     - run: bruin unit-test ./bruin-pipeline/
       name: Unit Test Pipeline
 ```
+
+## Snowflake in CI/CD
+
+To test a Snowflake pipeline on every pull request without paying for a dev warehouse, see the [Snowflake in CI/CD](../getting-started/tutorials/localstack-snowflake.md) tutorial. It runs the pipeline and its quality checks against the LocalStack Snowflake emulator.

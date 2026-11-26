@@ -16,6 +16,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/spf13/afero"
@@ -769,6 +770,14 @@ func TestAddLimitToQuery(t *testing.T) {
 			limit:    20,
 			conn:     &MockMSSQLDB{},
 			expected: "SELECT TOP 20 * FROM (\nSELECT * FROM table\n) as t",
+		},
+		{
+			// Oracle has no LIMIT clause, so the fallback must use the connection's ROWNUM wrapper.
+			name:     "query with oracle connection",
+			query:    "SELECT id FROM orders AS OF TIMESTAMP SYSTIMESTAMP ORDER BY id;",
+			limit:    3,
+			conn:     &oracle.Client{},
+			expected: "SELECT * FROM (\nSELECT id FROM orders AS OF TIMESTAMP SYSTIMESTAMP ORDER BY id\n) WHERE ROWNUM <= 3",
 		},
 		{
 			name:     "complex query with joins",

@@ -747,3 +747,7 @@ columns:
     type: "VARCHAR"
     description: "Current account status such as active, inactive, or suspended"
 ```
+
+## Snowflake in CI/CD
+
+To test your Snowflake pipelines on every pull request without paying for a dev warehouse, see the [Snowflake in CI/CD](../getting-started/tutorials/localstack-snowflake.md) tutorial. It runs them and their quality checks against the LocalStack Snowflake emulator in GitHub Actions.

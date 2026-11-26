@@ -70,6 +70,45 @@ table td:first-child {
 | `--query-annotations` | str | - | Attach annotations to SQL queries for tracking. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
 | `--backfill-id` | str | - | Tag this run as part of a backfill group; written to the run log as `backfill_id` so related runs can be grouped. |
 | `--backfill-total` | int | `0` | Total number of chunks in this backfill; written to the run log as `backfill_total` so progress can be reported. Informational only — it does not affect scheduling or execution. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. With `json`, the logs go to stderr and stdout gets only the [run result](#machine-readable-results). |
+
+### Machine-readable results
+
+Every run writes its result to `logs/runs/<pipeline>/<run-id>.json`, and `--output json` prints the same document to stdout. It lists each asset with the outcome of each of its tasks: the asset itself (`main`), its column checks (`column_test`), custom checks (`custom_test`) and metadata push (`metadata_push`). A failed task carries the reason in `error`, and `summary` counts the tasks by type and status. The exit code is the same as in plain mode.
+
+```bash
+bruin run -o json my-pipeline 2>/dev/null | jq '.state[].tasks[] | select(.status == "failed")'
+```
+
+```json
+{
+  "run_id": "2026_11_20_06_58_12",
+  "summary": {
+    "main": { "succeeded": 1, "upstream_failed": 1 },
+    "column_test": { "failed": 1, "succeeded": 1 },
+    "custom_test": { "succeeded": 1 }
+  },
+  "state": [
+    {
+      "name": "main.items",
+      "status": "failed",
+      "tasks": [
+        { "type": "main", "status": "succeeded" },
+        { "type": "column_test", "name": "id.not_null", "status": "failed", "error": "column 'id' has 1 null values" },
+        { "type": "column_test", "name": "quantity.non_negative", "status": "succeeded" },
+        { "type": "custom_test", "name": "row_count", "status": "succeeded" }
+      ]
+    },
+    {
+      "name": "main.downstream",
+      "status": "failed",
+      "tasks": [{ "type": "main", "status": "upstream_failed" }]
+    }
+  ]
+}
+```
+
+A task's status is one of `succeeded`, `failed`, `upstream_failed` (not run because something it depends on failed), `skipped` (filtered out of the run, or already done in the run that `--continue` resumes), or `pending` (not run because the run was aborted). The document also has the run's `parameters`, `cmdline` and `timestamp`. If the run fails before any asset runs, for example on a missing connection, stdout gets `{"error": "..."}` and the reason is printed on stderr. If there is nothing to run, stdout gets `{"state": []}`.
 
 ### Backfill identity in the run log
 
@@ -327,6 +366,31 @@ Bruin merges the custom JSON with fields that identify the execution step. The s
 Annotations are applied to every rendered statement in a multi-statement asset, including materialization and hook statements. User-provided fields override standard fields with the same name.
 
 Databricks sends the same fields as native statement-level query tags in addition to the SQL annotation comment, so they are available in Databricks query history and `system.query.history.query_tags`.
+
+## Failure reports
+
+When `bruin run` runs with `--minimal-logs`, which is how Bruin Cloud runs pipelines, each failed asset's error is followed by a line that says in a machine-readable way why the asset failed. Bruin Cloud uses it to decide whether retrying the asset can help.
+
+```
+  analytics.daily: The job encountered an error during execution. Retrying the job may solve the problem.
+bruin-failure: {"asset":"analytics.daily","class":"transient","code":"bq_retryable","source":"google_api","reason":"jobBackendError","http_status":400}
+```
+
+The line starts with `bruin-failure: ` and holds a JSON object. It never repeats the error message.
+
+| Field | Description |
+|---|---|
+| `asset` | The asset that failed. |
+| `class` | Why it failed: `transient`, `infra`, `missing_connection`, `connection`, `permission`, `provider_limits`, `user_code`, `data_not_ready`, `asset_timeout`, or `unknown`. |
+| `code` | A more specific code within the class, such as `bq_retryable`, `rate_limit`, `connection_missing`, `sql_error`, or `sensor_timeout`. Empty when the class is `unknown`. |
+| `source` | What reported the error: `google_api`, `bigquery`, `postgres`, `secrets`, or `bruin`. |
+| `reason` | The error reason from Google APIs such as BigQuery, e.g. `jobBackendError` or `accessDenied`. |
+| `http_status` | The HTTP status of a Google API error. |
+| `sqlstate` | The SQLSTATE of a Postgres error. |
+| `connection` | The connection that is missing or couldn't be read. |
+| `error_type` | For `unknown` failures, the Go type of the underlying error. |
+
+Fields without a value are left out.
 
 ## Metadata Push
 

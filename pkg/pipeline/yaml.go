@@ -343,7 +343,7 @@ type customCheck struct {
 	Name          string        `yaml:"name"`
 	Description   string        `yaml:"description"`
 	Query         string        `yaml:"query"`
-	Value         int64         `yaml:"value"`
+	Value         CheckNumber   `yaml:"value"`
 	Count         *int64        `yaml:"count"`
 	Blocking      *bool         `yaml:"blocking"`
 	Retries       *int          `yaml:"retries,omitempty"`
@@ -520,6 +520,7 @@ type taskDefinition struct {
 	Meta                  map[string]string `yaml:"meta"`
 	Metadata              map[string]string `yaml:"metadata"`
 	Retries               *int              `yaml:"retries"`
+	SmartRetries          *bool             `yaml:"smart_retries"`
 	Timeout               DurationSeconds   `yaml:"timeout"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
@@ -747,6 +748,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Meta:              definition.Meta,
 		Metadata:          definition.Metadata,
 		Retries:           definition.Retries,
+		SmartRetries:      definition.SmartRetries,
 		Timeout:           definition.Timeout,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),

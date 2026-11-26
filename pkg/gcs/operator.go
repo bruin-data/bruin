@@ -237,7 +237,7 @@ func (s *ObjectSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 			return ctx.Err()
 		case <-timeout.C:
 			pokeTimer.Stop()
-			return fmt.Errorf("sensor timed out after %s", timeoutDuration)
+			return &helpers.SensorTimeoutError{Timeout: timeoutDuration}
 		case <-pokeTimer.C:
 			if printerExists {
 				fmt.Fprintln(printer, "Info: GCS object not found, waiting for", pokeInterval, "seconds")

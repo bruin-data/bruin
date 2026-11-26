@@ -37,6 +37,8 @@ To use the login across projects:
 bruin cloud login --global
 ```
 
+The global login is saved in `~/.config/bruin/cloud.yml` (or `$XDG_CONFIG_HOME/bruin/cloud.yml`), readable only by your user. Logins saved by older Bruin versions kept the token in the operating system's credential store; Bruin moves such a token into `cloud.yml` the next time it is used and removes it from the credential store, so you are asked for credential-store access at most once.
+
 If you already have a login, select **Use existing login**, **Sign in again**, or **Cancel**.
 
 To renew access or choose different permissions:
@@ -122,4 +124,4 @@ Without an interactive terminal, specify `--repo` or `--global`; add `--reauth` 
 - **Browser did not open:** rerun with `--no-browser`, then open the printed URL on the same computer.
 - **Access expired or permissions are insufficient:** sign in again with `--reauth` and choose the access you need.
 - **No Git repository found:** run from a Git repository, or use `--global`. Existing Bruin project files are not required for repository login.
-- **Global credential store unavailable:** unlock your operating system's credential store and retry, or use `--repo` from your project.
+- **OS credential store unavailable:** this only affects a global login saved by an older Bruin version. Unlock your operating system's credential store and retry so Bruin can move the token into `cloud.yml`, or sign in again with `bruin cloud login --global --reauth`.

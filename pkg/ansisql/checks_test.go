@@ -318,6 +318,7 @@ func TestCustomCheck(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func(n *mockQuerierWithResult)
+		value   pipeline.CheckNumber // defaults to 5
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
@@ -341,6 +342,29 @@ func TestCustomCheck(t *testing.T) {
 			wantErr: checkError("custom check 'check1' has returned 10 instead of the expected 5"),
 		},
 		{
+			name:    "integers above 2^53 are compared exactly",
+			setup:   setupFunc([][]interface{}{{int64(9007199254740993)}}, nil),
+			value:   "9007199254740992",
+			wantErr: checkError("custom check 'check1' has returned 9007199254740993 instead of the expected 9007199254740992"),
+		},
+		{
+			name:    "decimal result is not rounded to the expected integer",
+			setup:   setupFunc([][]interface{}{{5.5}}, nil),
+			wantErr: checkError("custom check 'check1' has returned 5.5 instead of the expected 5"),
+		},
+		{
+			name:    "decimal expected value is not rounded to the result",
+			setup:   setupFunc([][]interface{}{{"100.99"}}, nil),
+			value:   "100.50",
+			wantErr: checkError("custom check 'check1' has returned 100.99 instead of the expected 100.50"),
+		},
+		{
+			name:    "large decimal result matches the expected value",
+			setup:   setupFunc([][]interface{}{{3014136.99}}, nil),
+			value:   "3014136.99",
+			wantErr: assert.NoError,
+		},
+		{
 			name:    "no null values found, test passed",
 			setup:   setupFunc([][]interface{}{{5}}, nil),
 			wantErr: assert.NoError,
@@ -357,6 +381,11 @@ func TestCustomCheck(t *testing.T) {
 
 			q := new(mockQuerierWithResult)
 			tt.setup(q)
+
+			value := tt.value
+			if value == "" {
+				value = "5"
+			}
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
@@ -377,7 +406,7 @@ func TestCustomCheck(t *testing.T) {
 				},
 				Check: &pipeline.CustomCheck{
 					Name:  "check1",
-					Value: 5,
+					Value: value,
 					Query: checkQuery,
 				},
 			}
@@ -393,7 +422,8 @@ func TestCustomCheckCount(t *testing.T) {
 
 	checkQuery := "SELECT {{ 1+2 }}"
 	rendered := "SELECT 3"
-	wrappedQuery := &query.Query{Query: fmt.Sprintf("SELECT count(*) FROM (%s) AS t", rendered)}
+	// Oracle rejects AS before a table alias, so the wrapper must not use it.
+	wrappedQuery := &query.Query{Query: fmt.Sprintf("SELECT count(*) FROM (%s) t", rendered)}
 
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {

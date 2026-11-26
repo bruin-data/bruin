@@ -1050,6 +1050,7 @@ func (c DuneConnection) GetName() string {
 type OdooConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
@@ -1059,6 +1060,35 @@ type OdooConnection struct {
 }
 
 func (c OdooConnection) GetName() string {
+	return c.Name
+}
+
+type BreezyHRConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	CompanyID          string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
+}
+
+func (c BreezyHRConnection) GetName() string {
+	return c.Name
+}
+
+type PrivatusConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string   `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	SiteIDs            []string `yaml:"site_ids,omitempty" json:"site_ids,omitempty" mapstructure:"site_ids"`
+}
+
+func (c PrivatusConnection) GetName() string {
+	return c.Name
+}
+
+type PeeringDBConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c PeeringDBConnection) GetName() string {
 	return c.Name
 }
 
@@ -2073,6 +2103,24 @@ type ADLSConnection struct {
 }
 
 func (c ADLSConnection) GetName() string {
+	return c.Name
+}
+
+type AzureBlobConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	AccountName        string `yaml:"account_name,omitempty" json:"account_name,omitempty" mapstructure:"account_name"`
+	ConnectionString   string `yaml:"connection_string,omitempty" json:"connection_string,omitempty" mapstructure:"connection_string" sensitive:"true"`
+	AccountKey         string `yaml:"account_key,omitempty" json:"account_key,omitempty" mapstructure:"account_key" sensitive:"true"`
+	SASToken           string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token" sensitive:"true"`
+	TenantID           string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	ClientID           string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret       string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" sensitive:"true"`
+	ContainerName      string `yaml:"container_name,omitempty" json:"container_name,omitempty" mapstructure:"container_name"`
+	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+}
+
+func (c AzureBlobConnection) GetName() string {
 	return c.Name
 }
 

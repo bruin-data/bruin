@@ -517,6 +517,51 @@
         "region"
       ]
     },
+    "AzureBlobConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "account_name": {
+          "type": "string"
+        },
+        "connection_string": {
+          "type": "string"
+        },
+        "account_key": {
+          "type": "string"
+        },
+        "sas_token": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "container_name": {
+          "type": "string"
+        },
+        "path_to_file": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "BallDontLieConnection": {
       "properties": {
         "name": {
@@ -591,6 +636,29 @@
         "name",
         "api_key",
         "endpoint"
+      ]
+    },
+    "BreezyHRConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "company_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "company_id"
       ]
     },
     "BruinCloudConnection": {
@@ -995,6 +1063,12 @@
         "adls": {
           "items": {
             "$ref": "#/$defs/ADLSConnection"
+          },
+          "type": "array"
+        },
+        "azure_blob": {
+          "items": {
+            "$ref": "#/$defs/AzureBlobConnection"
           },
           "type": "array"
         },
@@ -1937,6 +2011,24 @@
         "odoo": {
           "items": {
             "$ref": "#/$defs/OdooConnection"
+          },
+          "type": "array"
+        },
+        "privatus": {
+          "items": {
+            "$ref": "#/$defs/PrivatusConnection"
+          },
+          "type": "array"
+        },
+        "peeringdb": {
+          "items": {
+            "$ref": "#/$defs/PeeringDBConnection"
+          },
+          "type": "array"
+        },
+        "breezyhr": {
+          "items": {
+            "$ref": "#/$defs/BreezyHRConnection"
           },
           "type": "array"
         }
@@ -4231,6 +4323,9 @@
         "host": {
           "type": "string"
         },
+        "port": {
+          "type": "integer"
+        },
         "api_key": {
           "type": "string"
         },
@@ -4446,6 +4541,25 @@
         "name",
         "client_id",
         "client_secret"
+      ]
+    },
+    "PeeringDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "PersonioConnection": {
@@ -4800,6 +4914,31 @@
         },
         "api_key": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "PrivatusConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "site_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,

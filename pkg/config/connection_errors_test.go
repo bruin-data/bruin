@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,4 +60,33 @@ func TestNewConnectionNotFoundError_ReturnsTypedError(t *testing.T) {
 	var typedErr *MissingConnectionError
 	require.ErrorAs(t, err, &typedErr)
 	require.Equal(t, "connection 'warehouse' not found in secrets backend 'aws-secrets-manager'", err.Error())
+}
+
+type lookupErrors map[string]error
+
+func (l lookupErrors) LookupError(name string) error { return l[name] }
+
+func TestNewConnectionNotFoundError_SaysWhenTheSecretsBackendCouldNotBeRead(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New(`failed to read secret 'bq-prod' from Vault: Get "https://vault.internal/v1/kv/data/bq-prod": context deadline exceeded`)
+	invalid := errors.New("failed to configure connection 'pg-prod': cannot parse `postgres://user:hunter2@db`")
+	ctx := context.WithValue(t.Context(), SecretsBackendContextKey, "vault")
+	ctx = context.WithValue(ctx, ConnectionLookupErrorsContextKey, ConnectionLookupErrors(lookupErrors{
+		"bq-prod": &SecretsBackendUnavailableError{Err: cause},
+		"pg-prod": invalid,
+	}))
+
+	err := NewConnectionNotFoundError(ctx, "", "bq-prod")
+	require.Equal(t, "connection 'bq-prod' could not be read from secrets backend 'vault': the secrets backend is unavailable", err.Error())
+	require.ErrorIs(t, err, cause)
+
+	invalidErr := NewConnectionNotFoundError(ctx, "source", "pg-prod")
+	require.Equal(t, "source connection 'pg-prod' read from secrets backend 'vault' is not a valid connection", invalidErr.Error())
+	require.NotContains(t, invalidErr.Error(), "hunter2", "the cause isn't shown")
+	require.ErrorIs(t, invalidErr, invalid)
+
+	missing := NewConnectionNotFoundError(ctx, "", "other")
+	require.Equal(t, "connection 'other' not found in secrets backend 'vault'", missing.Error())
+	require.NoError(t, missing.Unwrap())
 }

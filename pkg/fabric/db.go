@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -486,6 +487,15 @@ WHERE t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 	}
 
 	return summary, nil
+}
+
+// RelationExists reports whether a table, view or any other object is named
+// tableName in the warehouse, so an incremental asset can create its table on
+// the first run. Like the materialized statements, OBJECT_ID compares names
+// with the warehouse's collation, which is case-sensitive by default. See
+// mssql.ObjectExists for how the name is resolved.
+func (db *DB) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	return mssql.ObjectExists(ctx, db.conn, tableName)
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {

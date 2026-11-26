@@ -115,3 +115,24 @@ func TestMaterializer_RenderFullRefreshStillRendersCreateReplace(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, queries)
 }
+
+func TestMaterializer_RenderFirstRunChecksOwnStrategy(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "sales.orders",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyMerge,
+		},
+		Columns: []pipeline.Column{{Name: "id", Type: "INT"}},
+	}
+
+	_, err := NewMaterializer(false).Render(asset.FirstRun(), "SELECT 1 AS id")
+	require.ErrorContains(t, err, "requires the `primary_key` field")
+
+	asset.Columns[0].PrimaryKey = true
+	queries, err := NewMaterializer(false).Render(asset.FirstRun(), "SELECT 1 AS id")
+	require.NoError(t, err)
+	require.Contains(t, queries[0], "CREATE TABLE")
+}

@@ -298,7 +298,7 @@ func TestValidateAssetAcceptsQualityChecks(t *testing.T) {
 	a.Parameters["destination"] = "duckdb"
 	a.Columns[0].Checks = []pipeline.ColumnCheck{{Name: "not_null"}, {Name: "unique"}}
 	a.Columns[1].Checks = []pipeline.ColumnCheck{{Name: "accepted_values", Value: pipeline.ColumnCheckValue{StringArray: &[]string{"billing", "technical"}}}}
-	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select count(*) > 0 from analytics.classified", Value: 1}}
+	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select count(*) > 0 from analytics.classified", Value: "1"}}
 	require.NoError(t, ValidateAsset(a))
 }
 
@@ -337,7 +337,7 @@ func TestValidateQualityCheckPlatform(t *testing.T) {
 	t.Parallel()
 	a := testAsset()
 	require.NoError(t, ValidateQualityCheckPlatform(a, "mysql"), "assets without checks are not restricted")
-	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: 1}}
+	a.CustomChecks = []pipeline.CustomCheck{{Name: "has rows", Query: "select 1", Value: "1"}}
 	require.NoError(t, ValidateQualityCheckPlatform(a, "duckdb"))
 	require.NoError(t, ValidateQualityCheckPlatform(a, "google_cloud_platform"))
 	for _, connectionType := range []string{"trino", "motherduck", "google_sheets", "dynamodb", "elasticsearch", "hubspot"} {

@@ -33,6 +33,18 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+	if asset.IsFirstRun() {
+		// A first run builds the table with create+replace; render the asset's own
+		// strategy too, so a setting it is missing fails now and not on the next run.
+		ownFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]
+		if !ok {
+			return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+		}
+		if _, err := ownFunc(asset, query); err != nil {
+			return []string{}, err
+		}
+	}
+
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
 		return matFunc(asset, query)
 	}

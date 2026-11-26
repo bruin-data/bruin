@@ -271,7 +271,7 @@ func TestCustomCheck(t *testing.T) {
 				},
 				Check: &pipeline.CustomCheck{
 					Name:  "check1",
-					Value: 5,
+					Value: "5",
 					Query: expectedQueryString,
 				},
 			}
@@ -380,7 +380,7 @@ SELECT 1`,
 		},
 		Check: &pipeline.CustomCheck{
 			Name:  "row_count",
-			Value: 1,
+			Value: "1",
 			Query: "SELECT 1",
 		},
 	}

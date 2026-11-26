@@ -193,6 +193,9 @@ var defaultMapping = map[string]string{
 	"mysql":                 "mysql-default",
 	"notion":                "notion-default",
 	"odoo":                  "odoo-default",
+	"breezyhr":              "breezyhr-default",
+	"privatus":              "privatus-default",
+	"peeringdb":             "peeringdb-default",
 	"hana":                  "hana-default",
 	"shopify":               "shopify-default",
 	"gorgias":               "gorgias-default",
@@ -254,6 +257,7 @@ var defaultMapping = map[string]string{
 	"elasticsearch":         "elasticsearch-default",
 	"vertica":               "vertica-default",
 	"adls":                  "adls-default",
+	"azure_blob":            "azure_blob-default",
 	"allium":                "allium-default",
 	"anthropic":             "anthropic-default",
 	"apifootball":           "apifootball-default",
@@ -706,6 +710,28 @@ func (m Materialization) IsSCD2() bool {
 	return m.Strategy == MaterializationStrategySCD2ByColumn || m.Strategy == MaterializationStrategySCD2ByTime
 }
 
+// LoadsExistingTable reports whether the materialization writes into a table
+// that has to exist already, instead of creating or replacing it. Only these
+// assets need their table created on the first run.
+func (m Materialization) LoadsExistingTable() bool {
+	if m.Type != MaterializationTypeTable {
+		return false
+	}
+
+	switch m.Strategy {
+	case MaterializationStrategyAppend,
+		MaterializationStrategyMerge,
+		MaterializationStrategyDeleteInsert,
+		MaterializationStrategyTimeInterval,
+		MaterializationStrategyTruncateInsert,
+		MaterializationStrategySCD2ByColumn,
+		MaterializationStrategySCD2ByTime:
+		return true
+	default:
+		return false
+	}
+}
+
 func (m Materialization) IsIceberg() bool {
 	return m.TableFormat == MaterializationTableFormatIceberg
 }
@@ -1144,7 +1170,11 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 
 	type Alias struct {
 		Key      string `yaml:"key"`
-		InjectAs string `yaml:"inject_as"`
+		InjectAs string `yaml:"inject_as,omitempty"`
+	}
+
+	if s.InjectedKey == s.SecretKey {
+		s.InjectedKey = ""
 	}
 
 	return Alias{
@@ -1153,11 +1183,65 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 	}, nil
 }
 
+// CheckNumber is a custom check value kept as written, so decimals and integers above 2^53 compare exactly.
+type CheckNumber string //nolint:recvcheck
+
+func (n CheckNumber) String() string {
+	if n == "" {
+		return "0"
+	}
+	return string(n)
+}
+
+func (n CheckNumber) IsZero() bool {
+	f, err := strconv.ParseFloat(n.String(), 64)
+	return err == nil && f == 0
+}
+
+func (n CheckNumber) MarshalJSON() ([]byte, error) {
+	return []byte(n.String()), nil
+}
+
+func (n *CheckNumber) UnmarshalJSON(data []byte) error {
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err != nil {
+		return errors.Wrap(err, "custom check value must be a number")
+	}
+	*n = CheckNumber(num)
+	return nil
+}
+
+func (n CheckNumber) MarshalYAML() (interface{}, error) {
+	tag := "!!float"
+	if _, err := strconv.ParseInt(n.String(), 10, 64); err == nil {
+		tag = "!!int"
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: n.String()}, nil
+}
+
+func (n *CheckNumber) UnmarshalYAML(node *yaml.Node) error {
+	var i int64
+	if node.ShortTag() == "!!int" && node.Decode(&i) == nil {
+		*n = CheckNumber(strconv.FormatInt(i, 10))
+		return nil
+	}
+	if _, err := strconv.ParseFloat(node.Value, 64); err == nil {
+		*n = CheckNumber(node.Value)
+		return nil
+	}
+	var f float64
+	if err := node.Decode(&f); err != nil {
+		return errors.Errorf("custom check value must be a number, got '%s'", node.Value)
+	}
+	*n = CheckNumber(strconv.FormatFloat(f, 'f', -1, 64))
+	return nil
+}
+
 type CustomCheck struct {
 	ID            string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name          string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description   string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value         int64           `json:"value" yaml:"value" mapstructure:"value"`
+	Value         CheckNumber     `json:"value" yaml:"value" mapstructure:"value"`
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
@@ -1452,6 +1536,7 @@ type Asset struct { //nolint:recvcheck
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries      *bool              `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	Timeout           DurationSeconds    `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
@@ -1459,6 +1544,9 @@ type Asset struct { //nolint:recvcheck
 
 	upstream   []*Asset
 	downstream []*Asset
+
+	// firstRun marks a copy made by FirstRun for an incremental asset whose table does not exist yet.
+	firstRun bool
 }
 
 // IsEnabled returns the asset's resolved enabled value. It panics if enabled
@@ -1492,13 +1580,32 @@ func (a *Asset) FullRefreshRequested(runFullRefresh bool) bool {
 }
 
 // FullRefreshEnabled applies the asset-level full-refresh restriction to the
-// effective request from FullRefreshRequested.
+// effective request from FullRefreshRequested. A FirstRun copy always reports a
+// full refresh, because its table has to be created from the query.
 func (a *Asset) FullRefreshEnabled(runFullRefresh bool) bool {
+	if a.IsFirstRun() {
+		return true
+	}
 	if !a.FullRefreshRequested(runFullRefresh) {
 		return false
 	}
 
 	return a == nil || a.RefreshRestricted == nil || !*a.RefreshRestricted
+}
+
+// FirstRun returns a copy of the asset to run when its table does not exist yet.
+// The copy reports a full refresh, so the materialization creates the table from
+// the query instead of loading into it, the `full_refresh` template variable is
+// true, and refresh_restricted does not apply: there is no data to protect.
+func (a *Asset) FirstRun() *Asset {
+	firstRun := *a
+	firstRun.firstRun = true
+	return &firstRun
+}
+
+// IsFirstRun reports whether the asset is a FirstRun copy.
+func (a *Asset) IsFirstRun() bool {
+	return a != nil && a.firstRun
 }
 
 func (a *Asset) EnabledValue() (bool, error) {
@@ -2388,6 +2495,7 @@ type Pipeline struct {
 	Catchup            CatchupMode            `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries       *bool                  `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
@@ -2474,6 +2582,7 @@ type DefaultValues struct {
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries      *bool                  `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	Timeout           DurationSeconds        `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
@@ -2521,6 +2630,7 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 		IntervalModifiers: asset.IntervalModifiers,
 		RerunCooldown:     asset.RerunCooldown,
 		Retries:           asset.Retries,
+		SmartRetries:      asset.SmartRetries,
 		Timeout:           asset.Timeout,
 		RefreshRestricted: asset.RefreshRestricted,
 		Notifications:     asset.Notifications,
@@ -2699,6 +2809,7 @@ var ConnectionlessIngestrSources = map[string]string{
 	"chess.com":         "chess://",
 	"frankfurter.dev":   "frankfurter://",
 	"stat.ripe.net":     "ripestat://",
+	"peeringdb.com":     "peeringdb://",
 	"finance.yahoo.com": "yfinance://",
 }
 
@@ -3551,6 +3662,9 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if asset.Retries == nil && defaults.Retries != nil {
 		asset.Retries = cloneIntPtr(defaults.Retries)
 	}
+	if asset.SmartRetries == nil && defaults.SmartRetries != nil {
+		asset.SmartRetries = cloneBoolPtr(defaults.SmartRetries)
+	}
 	if asset.Timeout == 0 {
 		asset.Timeout = defaults.Timeout
 	}
@@ -4002,7 +4116,7 @@ func findCustomCheckIndex(checks []CustomCheck, name string) int {
 func mergeCustomCheckDefault(target *CustomCheck, defaults CustomCheck) {
 	applyStringDefault(&target.Name, defaults.Name)
 	applyStringDefault(&target.Description, defaults.Description)
-	if target.Value == 0 && defaults.Value != 0 {
+	if target.Value.IsZero() && !defaults.Value.IsZero() {
 		target.Value = defaults.Value
 	}
 	if target.Count == nil {

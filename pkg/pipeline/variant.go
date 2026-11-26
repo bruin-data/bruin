@@ -312,6 +312,7 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 		IntervalModifiers: dv.IntervalModifiers,
 		RerunCooldown:     dv.RerunCooldown,
 		Retries:           dv.Retries,
+		SmartRetries:      dv.SmartRetries,
 		Timeout:           dv.Timeout,
 		RefreshRestricted: dv.RefreshRestricted,
 		Notifications:     dv.Notifications,
@@ -354,6 +355,7 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 	dv.IntervalModifiers = asset.IntervalModifiers
 	dv.RerunCooldown = asset.RerunCooldown
 	dv.Retries = asset.Retries
+	dv.SmartRetries = asset.SmartRetries
 	dv.Timeout = asset.Timeout
 	dv.RefreshRestricted = asset.RefreshRestricted
 	dv.Notifications = asset.Notifications

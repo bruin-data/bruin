@@ -7,6 +7,8 @@ import (
 	"io"
 	"math"
 	"net"
+	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,7 +23,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/snowflakedb/gosnowflake"
+	"github.com/snowflakedb/gosnowflake/v2"
 )
 
 const (
@@ -226,10 +228,7 @@ func (db *DB) selectOnce(ctx context.Context, query *query.Query, requestID *gos
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
@@ -301,10 +300,7 @@ func (db *DB) selectOnlyLastResultOnce(ctx context.Context, query *query.Query, 
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
@@ -389,10 +385,7 @@ func (db *DB) isValidOnce(ctx context.Context, query *query.Query, requestID *go
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	rows, err := db.conn.QueryContext(ctx, query.ToExplainQuery())
 	// Try to print the query ID once the function returns
@@ -496,10 +489,7 @@ func (db *DB) streamWithSchemaOnce(ctx context.Context, queryObj *query.Query, h
 	qidChan := make(chan string, 1)
 	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
-	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create snowflake context")
-	}
+	ctx = gosnowflake.WithMultiStatement(ctx, 0)
 
 	// Convert query object to string and execute it
 	queryString := queryObj.String()
@@ -678,6 +668,95 @@ func (db *DB) EnsureIcebergTable(ctx context.Context, asset *pipeline.Asset) err
 		fix = "drop it yourself to recreate it as an Iceberg table"
 	}
 	return errors.Errorf("'%s' already exists as %s; %s", fqn, existing, fix)
+}
+
+var (
+	// unquotedIdentifier matches the names Snowflake accepts without quotes and stores upper-cased.
+	unquotedIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
+	// missingNamespace matches the error for a database or schema that does not exist or that the role can't see.
+	missingNamespace = regexp.MustCompile(`(?i)\b(database|schema) '[^']*' does not exist or not authorized`)
+)
+
+// RelationExists reports whether a table, view or any other relation named tableName exists, so an
+// incremental asset can create its table on the first run.
+//
+// The materializations write the asset name unquoted, so Snowflake upper-cases each part and fills a
+// missing database and schema from the session, which uses the connection's database and schema.
+// Both lookups below pass the same unquoted parts to Snowflake, so they resolve the name exactly
+// like the materialization does. Names that would need quoting return an error instead.
+//
+// SHOW OBJECTS needs no warehouse, so it answers the runs where the table exists. It returns at most
+// 10,000 objects even with a filter and does not document every kind of table, so it is only
+// trusted when it lists the name. Otherwise INFORMATION_SCHEMA.TABLES, which has every kind of
+// table and view, confirms that the name is missing. That query runs on the connection's warehouse.
+//
+// Both lookups only see objects the role has a privilege on, and Snowflake reports a database or
+// schema the role can't see as missing. That is safe: a role without any privilege on an object can
+// neither load into it nor replace it, so the create fails instead of replacing anything.
+func (db *DB) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 3 {
+		return false, fmt.Errorf("table name must be in format `table`, `schema.table` or `database.schema.table`, %q given", tableName)
+	}
+	for _, part := range parts {
+		if !unquotedIdentifier.MatchString(part) {
+			return false, fmt.Errorf("%q in table name %q is not an unquoted Snowflake identifier", part, tableName)
+		}
+	}
+
+	table := parts[len(parts)-1]
+	// The parts are unquoted, so Snowflake stores and resolves them in upper case. A quoted
+	// lower-case object such as "orders" is a different table, so names are compared exactly
+	// against the upper-cased parts.
+	target := strings.ToUpper(table)
+	// `IN SCHEMA` without a name is the session's schema. LIKE ignores case, and `_` matches any
+	// character, so the listed names are compared again below.
+	showQuery := strings.TrimSpace(fmt.Sprintf("SHOW TERSE OBJECTS LIKE '%s' IN SCHEMA %s", table, strings.Join(parts[:len(parts)-1], ".")))
+	listed, err := db.SelectWithSchema(ctx, &query.Query{Query: showQuery})
+	switch {
+	case err != nil && missingNamespace.MatchString(err.Error()):
+		return false, nil
+	case err != nil:
+		// The error text for a missing schema differs between Snowflake versions
+		// and editions, so any other failure is settled by the lookup below,
+		// which returns no rows for a missing schema.
+	default:
+		nameColumn := slices.IndexFunc(listed.Columns, func(column string) bool { return strings.EqualFold(column, "name") })
+		if nameColumn >= 0 {
+			for _, row := range listed.Rows {
+				if name, ok := row[nameColumn].(string); ok && name == target {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	from := "INFORMATION_SCHEMA.TABLES"
+	schemaFilter := "TABLE_SCHEMA = CURRENT_SCHEMA()"
+	switch len(parts) {
+	case 2:
+		schemaFilter = fmt.Sprintf("TABLE_SCHEMA = '%s'", strings.ToUpper(parts[0]))
+	case 3:
+		from = parts[0] + ".INFORMATION_SCHEMA.TABLES"
+		schemaFilter = fmt.Sprintf("TABLE_SCHEMA = '%s'", strings.ToUpper(parts[1]))
+	}
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s AND TABLE_NAME = '%s'", from, schemaFilter, target)
+	rows, err := db.Select(ctx, &query.Query{Query: countQuery})
+	if err != nil {
+		if missingNamespace.MatchString(err.Error()) {
+			return false, nil
+		}
+		return false, errors.Wrap(err, "failed to look the table up in INFORMATION_SCHEMA.TABLES")
+	}
+	if len(rows) != 1 || len(rows[0]) != 1 {
+		return false, errors.New("unexpected result from INFORMATION_SCHEMA.TABLES")
+	}
+	count, err := parseSnowflakeInt64(rows[0][0], "table count")
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {

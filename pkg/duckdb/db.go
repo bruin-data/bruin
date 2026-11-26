@@ -292,6 +292,17 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return result, nil
 }
 
+// IsValid binds the query with EXPLAIN, which checks syntax, tables, and columns without running it.
+// A script with several statements is reported valid unchecked: EXPLAIN covers only its first
+// statement, DuckDB would run the rest, and later statements may depend on earlier ones (USE, SET).
+func (c *Client) IsValid(ctx context.Context, q *query.Query) (bool, error) {
+	if statements, err := splitStatements(q.String()); err == nil && len(statements) > 1 {
+		return true, nil
+	}
+	_, err := c.DryRunQuery(ctx, q)
+	return err == nil, err
+}
+
 func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
 	explainQuery := &query.Query{Query: "EXPLAIN " + q.String()}
 	explainResult, err := c.SelectWithSchema(ctx, explainQuery)
@@ -832,6 +843,56 @@ ORDER BY table_name;
 	}
 
 	return tables, nil
+}
+
+// RelationExists reports whether a table or view named tableName exists, so an
+// incremental asset can create its table on the first run. DuckDB compares
+// identifiers case-insensitively. A one-part name resolves through the search
+// path, and a two-part name to either schema.table in the current database or
+// database.table, so every relation the name could resolve to counts.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	parts := strings.Split(tableName, ".")
+	for _, part := range parts {
+		if strings.TrimSpace(part) == "" {
+			return false, fmt.Errorf("table name %q contains an empty component", tableName)
+		}
+	}
+
+	var scope string
+	args := []any{parts[len(parts)-1]}
+	switch len(parts) {
+	case 1:
+		// An unqualified name resolves through the search path, so only the
+		// schemas on it count. Their catalog is not compared, which can only
+		// report more relations as existing.
+		scope = "lower(table_schema) IN (SELECT lower(unnest(current_schemas(true))))"
+	case 2:
+		scope = "((lower(table_catalog) = lower(current_database()) AND lower(table_schema) = lower(?)) OR lower(table_catalog) = lower(?))"
+		args = append(args, parts[0], parts[0])
+	case 3:
+		scope = "lower(table_catalog) = lower(?) AND lower(table_schema) = lower(?)"
+		args = append(args, parts[0], parts[1])
+	default:
+		return false, fmt.Errorf("table name must be in format `table`, `schema.table`, or `catalog.schema.table`, %q given", tableName)
+	}
+
+	rows, err := c.connection.QueryContext(ctx, "SELECT COUNT(*) FROM information_schema.tables WHERE lower(table_name) = lower(?) AND "+scope, args...)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+	defer rows.Close()
+
+	var count int64
+	if rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	return count > 0, nil
 }
 
 func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {

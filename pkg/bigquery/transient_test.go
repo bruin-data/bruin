@@ -1,0 +1,276 @@
+package bigquery
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"maps"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"cloud.google.com/go/bigquery"
+	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	bigquery2 "google.golang.org/api/bigquery/v2"
+	"google.golang.org/api/googleapi"
+	"google.golang.org/api/option"
+)
+
+const jobBackendErrorMessage = "The job encountered an error during execution. Retrying the job may solve the problem."
+
+func TestHasTransientReason(t *testing.T) {
+	t.Parallel()
+
+	withReason := func(code int, reason string) error {
+		return &googleapi.Error{Code: code, Message: "message", Errors: []googleapi.ErrorItem{{Reason: reason}}}
+	}
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"job failed inside BigQuery":    {err: withReason(400, "jobBackendError"), want: true},
+		"job internal error":            {err: withReason(400, "jobInternalError"), want: true},
+		"rate limit":                    {err: withReason(403, "rateLimitExceeded"), want: true},
+		"server error":                  {err: &googleapi.Error{Code: 503}, want: true},
+		"too many requests":             {err: &googleapi.Error{Code: 429}, want: true},
+		"wrapped":                       {err: fmt.Errorf("query failed: %w", withReason(500, "backendError")), want: true},
+		"job status error":              {err: &bigquery.Error{Reason: "jobInternalError"}, want: true},
+		"invalid query":                 {err: withReason(400, "invalidQuery"), want: false},
+		"missing table":                 {err: withReason(404, "notFound"), want: false},
+		"no access":                     {err: withReason(403, "accessDenied"), want: false},
+		"quota":                         {err: withReason(403, "quotaExceeded"), want: false},
+		"not implemented":               {err: &googleapi.Error{Code: 501}, want: false},
+		"job status error, not retried": {err: &bigquery.Error{Reason: "invalidQuery"}, want: false},
+		"plain error":                   {err: errors.New("boom"), want: false},
+	}
+	for name, tt := range tests {
+		assert.Equal(t, tt.want, hasTransientReason(tt.err), name)
+	}
+}
+
+func TestQueryError(t *testing.T) {
+	t.Parallel()
+
+	transient := queryError(&googleapi.Error{Code: 400, Message: jobBackendErrorMessage, Errors: []googleapi.ErrorItem{{Reason: "jobBackendError"}}})
+	require.EqualError(t, transient, jobBackendErrorMessage, "reads like formatError's output")
+	assert.True(t, isTransient(transient))
+
+	invalid := queryError(&googleapi.Error{Code: 400, Message: "Syntax error", Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}}})
+	require.EqualError(t, invalid, "Syntax error")
+	assert.False(t, isTransient(invalid))
+
+	serverErr := &googleapi.Error{Code: 503, Message: "unavailable"}
+	var apiErr *googleapi.Error
+	require.ErrorAs(t, queryError(serverErr), &apiErr, "errors kept as googleapi errors stay reachable")
+	assert.Same(t, serverErr, apiErr)
+}
+
+// fakeSensorBigQuery answers each query job with the next of the given getQueryResults answers:
+// an error reason, "0" for a result of 0, or "" for a result of 1.
+func fakeSensorBigQuery(t *testing.T, answers ...string) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var jobs atomic.Int32
+	write := func(w http.ResponseWriter, status int, body any) {
+		w.WriteHeader(status)
+		assert.NoError(t, json.NewEncoder(w).Encode(body))
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/projects/"+testProjectID+"/jobs"):
+			n := jobs.Add(1)
+			write(w, http.StatusOK, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{JobId: fmt.Sprintf("job-%d", n), ProjectId: testProjectID, Location: "US"},
+				Configuration: &bigquery2.JobConfiguration{Query: &bigquery2.JobConfigurationQuery{
+					DestinationTable: &bigquery2.TableReference{ProjectId: testProjectID, DatasetId: "anon"},
+				}},
+				Status: &bigquery2.JobStatus{State: "DONE"},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/projects/"+testProjectID+"/queries/job-"):
+			var n int
+			if _, err := fmt.Sscanf(r.URL.Path, "/projects/"+testProjectID+"/queries/job-%d", &n); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			value := "1"
+			if reason := answers[n-1]; reason == "0" {
+				value = "0"
+			} else if reason != "" {
+				write(w, http.StatusBadRequest, map[string]any{"error": googleapi.Error{
+					Code: http.StatusBadRequest, Message: jobBackendErrorMessage, Errors: []googleapi.ErrorItem{{Reason: reason, Message: jobBackendErrorMessage}},
+				}})
+				return
+			}
+			write(w, http.StatusOK, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{JobId: fmt.Sprintf("job-%d", n), ProjectId: testProjectID},
+				JobComplete:  true,
+				Schema:       &bigquery2.TableSchema{Fields: []*bigquery2.TableFieldSchema{{Name: "ok", Type: "INTEGER"}}},
+				Rows:         []*bigquery2.TableRow{{F: []*bigquery2.TableCell{{V: value}}}},
+				TotalRows:    1,
+			})
+		default:
+			http.Error(w, "unexpected request: "+r.Method+" "+r.URL.Path, http.StatusInternalServerError)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server, &jobs
+}
+
+func runQuerySensor(t *testing.T, server *httptest.Server, sensorMode string) (string, error) {
+	t.Helper()
+	return runQuerySensorWith(t.Context(), t, server, sensorMode, pipeline.ParameterMap{"poke_interval": "0"})
+}
+
+func runQuerySensorWith(ctx context.Context, t *testing.T, server *httptest.Server, sensorMode string, params pipeline.ParameterMap) (string, error) {
+	t.Helper()
+	client, err := bigquery.NewClient(
+		ctx, testProjectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{ProjectID: testProjectID, TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"})}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	conns := &mockConnectionGetter{}
+	conns.On("GetConnection", "bq").Return(&Client{client: client})
+	extractor := &mockExtractor{}
+	extractor.On("ExtractQueriesFromString", "select 1").Return([]*query.Query{{Query: "select 1"}}, nil)
+	asset := &pipeline.Asset{
+		Name:       "sensor",
+		Type:       pipeline.AssetTypeBigqueryQuerySensor,
+		Connection: "bq",
+		Parameters: pipeline.ParameterMap{"query": "select 1"},
+	}
+	maps.Copy(asset.Parameters, params)
+
+	var out bytes.Buffer
+	ctx = context.WithValue(ctx, executor.KeyPrinter, &out)
+	err = NewQuerySensor(conns, extractor, sensorMode).RunTask(ctx, &pipeline.Pipeline{}, asset)
+	return out.String(), err
+}
+
+func TestQuerySensor_PokesAgainAfterTransientError(t *testing.T) {
+	t.Parallel()
+
+	server, jobs := fakeSensorBigQuery(t, "jobBackendError", "")
+	out, err := runQuerySensor(t, server, "wait")
+
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), jobs.Load())
+	assert.Contains(t, out, "Sensor query failed with a transient BigQuery error, trying again in 0 seconds (retry 1 of 10): "+jobBackendErrorMessage)
+}
+
+func TestQuerySensor_FailsOnOtherErrors(t *testing.T) {
+	t.Parallel()
+
+	server, jobs := fakeSensorBigQuery(t, "invalidQuery", "")
+	_, err := runQuerySensor(t, server, "wait")
+
+	require.EqualError(t, err, jobBackendErrorMessage)
+	assert.Equal(t, int32(1), jobs.Load())
+}
+
+func TestQuerySensor_OnceFailsOnTransientError(t *testing.T) {
+	t.Parallel()
+
+	server, jobs := fakeSensorBigQuery(t, "jobBackendError", "")
+	_, err := runQuerySensor(t, server, "once")
+
+	require.EqualError(t, err, jobBackendErrorMessage)
+	assert.Equal(t, int32(1), jobs.Load())
+}
+
+// A long poke interval doesn't hold a sensor past its timeout, or a cancelled task.
+func TestQuerySensor_TransientErrorWaitEndsEarly(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sensor timeout", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, "jobBackendError")
+		start := time.Now()
+		_, err := runQuerySensorWith(t.Context(), t, server, "wait", pipeline.ParameterMap{"poke_interval": "3600", "timeout": "200ms"})
+
+		require.EqualError(t, err, "Sensor timed out after 200ms")
+		assert.Less(t, time.Since(start), 30*time.Second)
+		assert.Equal(t, int32(1), jobs.Load())
+	})
+
+	t.Run("task context ends", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, "jobBackendError")
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+		start := time.Now()
+		_, err := runQuerySensorWith(ctx, t, server, "wait", pipeline.ParameterMap{"poke_interval": "3600"})
+
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, time.Since(start), 30*time.Second)
+		assert.Equal(t, int32(1), jobs.Load())
+	})
+}
+
+// A sensor polls again after up to 10 transient errors in a row, and fails on the 11th; a poll
+// that gets through starts the count over.
+func TestQuerySensor_TransientErrorRetryLimit(t *testing.T) {
+	t.Parallel()
+
+	repeat := func(answer string, n int) []string {
+		answers := make([]string, n)
+		for i := range answers {
+			answers[i] = answer
+		}
+		return answers
+	}
+
+	t.Run("gives up after 10 retries in a row", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, repeat("jobBackendError", 11)...)
+		out, err := runQuerySensor(t, server, "wait")
+
+		require.EqualError(t, err, jobBackendErrorMessage)
+		assert.Equal(t, int32(11), jobs.Load())
+		assert.Contains(t, out, "failed with a transient BigQuery error 11 times in a row, giving up")
+	})
+
+	t.Run("10 in a row are fine", func(t *testing.T) {
+		t.Parallel()
+		server, jobs := fakeSensorBigQuery(t, append(repeat("jobBackendError", 10), "")...)
+		_, err := runQuerySensor(t, server, "wait")
+
+		require.NoError(t, err)
+		assert.Equal(t, int32(11), jobs.Load())
+	})
+
+	t.Run("a successful poll starts the count over", func(t *testing.T) {
+		t.Parallel()
+		answers := append(repeat("jobBackendError", 10), "0")
+		answers = append(answers, repeat("jobBackendError", 10)...)
+		server, jobs := fakeSensorBigQuery(t, append(answers, "")...)
+		_, err := runQuerySensor(t, server, "wait")
+
+		require.NoError(t, err)
+		assert.Equal(t, int32(22), jobs.Load())
+	})
+}
+
+func TestFormatErrorKeepsTheGoogleError(t *testing.T) {
+	t.Parallel()
+
+	apiErr := &googleapi.Error{Code: 400, Message: "Syntax error at [1:1]", Errors: []googleapi.ErrorItem{{Reason: "invalidQuery"}}}
+	formatted := formatError(fmt.Errorf("query failed: %w", apiErr))
+
+	require.EqualError(t, formatted, "Syntax error at [1:1]", "shows only BigQuery's message")
+	var got *googleapi.Error
+	require.ErrorAs(t, formatted, &got)
+	assert.Equal(t, "invalidQuery", got.Errors[0].Reason)
+}

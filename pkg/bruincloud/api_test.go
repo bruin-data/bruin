@@ -861,8 +861,10 @@ func TestUpdateConnectionSet(t *testing.T) {
 
 		var body map[string]any
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		conns, _ := body["connections"].([]any)
-		assert.Len(t, conns, 1)
+		assert.Equal(t, []any{
+			map[string]any{"type": "postgres", "name": "pg", "config": map[string]any{"password": "secret"}},
+			map[string]any{"type": "mssql", "name": "ms"},
+		}, body["connections"])
 
 		w.WriteHeader(http.StatusOK)
 		writeJSON(t, w, map[string]any{"success": true})
@@ -870,7 +872,7 @@ func TestUpdateConnectionSet(t *testing.T) {
 
 	err := client.UpdateConnectionSet(t.Context(), 9, []ConnectionSetInput{
 		{Type: "postgres", Name: "pg", Config: map[string]any{"password": "secret"}},
-	}, false)
+	}, []ConnectionSetRetain{{Type: "mssql", Name: "ms"}}, false)
 	require.NoError(t, err)
 }
 
@@ -1574,6 +1576,7 @@ func TestListDashboards(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/dashboards", r.URL.Path)
+		assert.Empty(t, r.URL.RawQuery)
 		w.WriteHeader(http.StatusOK)
 		// Match the API's snake_case shape exactly, so the tag mapping is covered.
 		writeJSON(t, w, map[string]any{
@@ -1583,12 +1586,36 @@ func TestListDashboards(t *testing.T) {
 		})
 	})
 
-	dashboards, err := client.ListDashboards(t.Context())
+	dashboards, err := client.ListDashboards(t.Context(), false)
 	require.NoError(t, err)
 	require.Len(t, dashboards, 1)
 	assert.Equal(t, "Revenue", *dashboards[0].Title)
 	require.NotNil(t, dashboards[0].UpdatedAt)
 	assert.Equal(t, "2026-07-06T10:00:00+00:00", *dashboards[0].UpdatedAt)
+}
+
+func TestListDashboardsAll(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/dashboards", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("all"))
+		writeJSON(t, w, map[string]any{"dashboards": []map[string]any{}})
+	})
+
+	_, err := client.ListDashboards(t.Context(), true)
+	require.NoError(t, err)
+}
+
+func TestListDashboardFoldersAll(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/dashboard-folders", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("all"))
+		writeJSON(t, w, map[string]any{"folders": []DashboardFolder{}})
+	})
+
+	_, err := client.ListDashboardFolders(t.Context(), true)
+	require.NoError(t, err)
 }
 
 func TestGetDashboard(t *testing.T) {
@@ -1722,7 +1749,7 @@ func TestListDashboardFolders(t *testing.T) {
 		}})
 	})
 
-	folders, err := client.ListDashboardFolders(t.Context())
+	folders, err := client.ListDashboardFolders(t.Context(), false)
 	require.NoError(t, err)
 	require.Len(t, folders, 2)
 	assert.Equal(t, DashboardFolder{ID: 1, Name: "Finance", DashboardCount: 2}, folders[0])
@@ -2093,6 +2120,34 @@ func TestListAuditLogs(t *testing.T) {
 	assert.Equal(t, "alice@example.com", logs[0].UserIdentifier)
 }
 
+func TestListTeamRolesAndMembers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		w.WriteHeader(http.StatusOK)
+		switch r.URL.Path {
+		case "/team/roles":
+			_, _ = w.Write([]byte(`{"roles":[{"key":"custom-3","name":"On-call","description":"Copied from Catalog User.","custom":true,"permissions":["pipeline:list","pipeline:run:re-run"]}]}`))
+		case "/team/members":
+			_, _ = w.Write([]byte(`{"members":[{"id":7,"name":"Alex","email":"alex@example.com","role":"custom-3","role_name":"On-call","owner":false,"bruin_employee":false,"expires_at":null}]}`))
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	})
+
+	roles, err := client.ListTeamRoles(t.Context())
+	require.NoError(t, err)
+	require.Len(t, roles, 1)
+	assert.True(t, roles[0].Custom)
+	assert.Equal(t, []string{"pipeline:list", "pipeline:run:re-run"}, roles[0].Permissions)
+
+	members, err := client.ListTeamMembers(t.Context())
+	require.NoError(t, err)
+	require.Len(t, members, 1)
+	assert.Equal(t, "On-call", *members[0].RoleName)
+	assert.Nil(t, members[0].ExpiresAt)
+}
+
 func TestListRunStates(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -2345,4 +2400,55 @@ func TestDeleteSemanticLayer(t *testing.T) {
 	})
 
 	require.NoError(t, client.DeleteSemanticLayer(t.Context(), 9))
+}
+
+func TestListAgentQueries(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/queries", r.URL.Path)
+		assert.Equal(t, "3", r.URL.Query().Get("agent_id"))
+		assert.Equal(t, "2026-11-01", r.URL.Query().Get("since"))
+		assert.Equal(t, "90", r.URL.Query().Get("before"))
+		assert.False(t, r.URL.Query().Has("thread_id"))
+		// Match the API's snake_case shape exactly, so the tag mapping is covered.
+		writeJSON(t, w, map[string]any{
+			"queries": []map[string]any{{
+				"message_pair_id": 80,
+				"agent":           map[string]any{"id": 3, "name": "Sales"},
+				"thread":          map[string]any{"id": 7, "title": "Findings: Improvements", "type": "scheduled_execution"},
+				"scheduled_run":   map[string]any{"id": 5, "title": "Findings: Improvements", "kind": "scout"},
+				"started_by":      nil,
+				"query":           "select 1",
+				"connection":      "warehouse",
+				"success":         true,
+				"rows":            [][]any{{1}},
+				"row_count":       1,
+			}},
+			"next_before": 80,
+		})
+	})
+
+	page, err := client.ListAgentQueries(t.Context(), ListAgentQueriesOptions{AgentID: 3, Since: "2026-11-01", Before: 90})
+	require.NoError(t, err)
+	require.Len(t, page.Queries, 1)
+	q := page.Queries[0]
+	assert.Equal(t, AgentQueryRef{ID: 3, Name: "Sales"}, q.Agent)
+	assert.Equal(t, "scheduled_execution", q.Thread.Type)
+	require.NotNil(t, q.ScheduledRun)
+	assert.Equal(t, "scout", q.ScheduledRun.Kind)
+	assert.Nil(t, q.StartedBy)
+	require.NotNil(t, page.NextBefore)
+	assert.Equal(t, 80, *page.NextBefore)
+}
+
+func TestListAgentQueriesKeepsLargeIntegers(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"queries":[{"agent":{"id":3,"name":"Sales"},"thread":{"id":7,"type":"chat"},"query":"select id","rows":[[9007199254740993]]}],"next_before":null}`))
+	})
+
+	page, err := client.ListAgentQueries(t.Context(), ListAgentQueriesOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, json.Number("9007199254740993"), page.Queries[0].Rows[0][0])
 }

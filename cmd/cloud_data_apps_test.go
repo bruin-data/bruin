@@ -51,6 +51,8 @@ func fakeDataAppAPI(t *testing.T, responses map[string]string) *[]dataAppRequest
 			switch resp[:3] {
 			case "201":
 				status = http.StatusCreated
+			case "403":
+				status = http.StatusForbidden
 			case "409":
 				status = http.StatusConflict
 			case "422":

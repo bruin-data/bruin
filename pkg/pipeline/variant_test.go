@@ -445,6 +445,10 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Notifications.Webhook[].Connection": true,
 		"Pipeline.Notifications.Email[].Recipients[]": true,
 
+		// Custom check values are numbers kept as text for exact comparison, not templates.
+		"Pipeline.Assets[].CustomChecks[].Value":      true,
+		"Pipeline.DefaultValues.CustomChecks[].Value": true,
+
 		// Asset internals + file metadata — never user-templated.
 		"Pipeline.Assets[].ID":                     true,
 		"Pipeline.Assets[].Type":                   true,

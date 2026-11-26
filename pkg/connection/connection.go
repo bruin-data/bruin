@@ -27,10 +27,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/attio"
+	"github.com/bruin-data/bruin/pkg/azureblob"
 	"github.com/bruin-data/bruin/pkg/balldontlie"
 	"github.com/bruin-data/bruin/pkg/bamboohr"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/braze"
+	"github.com/bruin-data/bruin/pkg/breezyhr"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cassandra"
 	"github.com/bruin-data/bruin/pkg/chargebee"
@@ -113,6 +115,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/paddle"
 	"github.com/bruin-data/bruin/pkg/payrails"
+	"github.com/bruin-data/bruin/pkg/peeringdb"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/phantombuster"
 	"github.com/bruin-data/bruin/pkg/pinterest"
@@ -123,6 +126,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/posthog"
 	"github.com/bruin-data/bruin/pkg/primer"
+	"github.com/bruin-data/bruin/pkg/privatus"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/rabbitmq"
@@ -180,6 +184,7 @@ type Manager struct {
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
 	ADLS                 map[string]*adls.Client
+	AzureBlob            map[string]*azureblob.Client
 	Fabric               map[string]*fabric.DB
 	OneLake              map[string]*onelake.Client
 	Mongo                map[string]*mongo.DB
@@ -321,6 +326,9 @@ type Manager struct {
 	Spark                map[string]*spark.Client
 	Dune                 map[string]*dune.Client
 	Odoo                 map[string]*odoo.Client
+	Privatus             map[string]*privatus.Client
+	PeeringDB            map[string]*peeringdb.Client
+	BreezyHR             map[string]*breezyhr.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	CleverTap            map[string]*clevertap.Client
@@ -656,6 +664,38 @@ func (m *Manager) AddADLSConnectionFromConfig(connection *config.ADLSConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.ADLS[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAzureBlobConnectionFromConfig(connection *config.AzureBlobConnection) error {
+	m.mutex.Lock()
+	if m.AzureBlob == nil {
+		m.AzureBlob = make(map[string]*azureblob.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := azureblob.NewClient(azureblob.Config{
+		AccountName:      connection.AccountName,
+		ConnectionString: connection.ConnectionString,
+		AccountKey:       connection.AccountKey,
+		SASToken:         connection.SASToken,
+		TenantID:         connection.TenantID,
+		ClientID:         connection.ClientID,
+		ClientSecret:     connection.ClientSecret,
+		ContainerName:    connection.ContainerName,
+		PathToFile:       connection.PathToFile,
+		Layout:           connection.Layout,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AzureBlob[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4263,6 +4303,7 @@ func (m *Manager) AddOdooConnectionFromConfig(connection *config.OdooConnection)
 
 	client, err := odoo.NewClient(&odoo.Config{
 		Host:     connection.Host,
+		Port:     connection.Port,
 		APIKey:   connection.APIKey,
 		Database: connection.Database,
 		Username: connection.Username,
@@ -4277,6 +4318,77 @@ func (m *Manager) AddOdooConnectionFromConfig(connection *config.OdooConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Odoo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddBreezyHRConnectionFromConfig(connection *config.BreezyHRConnection) error {
+	m.mutex.Lock()
+	if m.BreezyHR == nil {
+		m.BreezyHR = make(map[string]*breezyhr.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := breezyhr.NewClient(&breezyhr.Config{
+		APIKey:    connection.APIKey,
+		CompanyID: connection.CompanyID,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.BreezyHR[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddPeeringDBConnectionFromConfig(connection *config.PeeringDBConnection) error {
+	m.mutex.Lock()
+	if m.PeeringDB == nil {
+		m.PeeringDB = make(map[string]*peeringdb.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := peeringdb.NewClient(&peeringdb.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.PeeringDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddPrivatusConnectionFromConfig(connection *config.PrivatusConnection) error {
+	m.mutex.Lock()
+	if m.Privatus == nil {
+		m.Privatus = make(map[string]*privatus.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := privatus.NewClient(&privatus.Config{
+		APIKey:  connection.APIKey,
+		SiteIDs: connection.SiteIDs,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Privatus[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -4661,6 +4773,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ADLS, connectionManager.AddADLSConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AzureBlob, connectionManager.AddAzureBlobConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fabric, connectionManager.AddFabricConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.OneLake, connectionManager.AddOneLakeConnectionFromConfig, &wg, &errList, &mu)
@@ -4821,6 +4934,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.BallDontLie, connectionManager.AddBallDontLieConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Odoo, connectionManager.AddOdooConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Privatus, connectionManager.AddPrivatusConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.PeeringDB, connectionManager.AddPeeringDBConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.BreezyHR, connectionManager.AddBreezyHRConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

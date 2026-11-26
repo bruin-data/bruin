@@ -141,6 +141,24 @@ func (c *APIClient) ListTeams(ctx context.Context) ([]Team, error) {
 	return resp.Teams, err
 }
 
+// ListTeamRoles returns the roles that can be given in the team, with their permissions.
+func (c *APIClient) ListTeamRoles(ctx context.Context) ([]TeamRole, error) {
+	var resp struct {
+		Roles []TeamRole `json:"roles"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/team/roles", nil, &resp)
+	return resp.Roles, err
+}
+
+// ListTeamMembers returns everyone in the team with their role. It needs a personal API token.
+func (c *APIClient) ListTeamMembers(ctx context.Context) ([]TeamMember, error) {
+	var resp struct {
+		Members []TeamMember `json:"members"`
+	}
+	err := c.doRequest(ctx, http.MethodGet, "/team/members", nil, &resp)
+	return resp.Members, err
+}
+
 // --- Projects ---
 
 func (c *APIClient) ListProjects(ctx context.Context) ([]Project, error) {
@@ -798,6 +816,39 @@ func (c *APIClient) ListAgentThreads(ctx context.Context, agentID int, limit, of
 	return resp.Threads, err
 }
 
+// ListAgentQueries pages through every query the team's agents ran that the
+// token can read, newest message first.
+func (c *APIClient) ListAgentQueries(ctx context.Context, opts ListAgentQueriesOptions) (*AgentQueriesPage, error) {
+	params := url.Values{}
+	for key, value := range map[string]int{"agent_id": opts.AgentID, "thread_id": opts.ThreadID, "limit": opts.Limit, "before": opts.Before} {
+		if value > 0 {
+			params.Set(key, strconv.Itoa(value))
+		}
+	}
+	for key, value := range map[string]string{"since": opts.Since, "until": opts.Until} {
+		if value != "" {
+			params.Set(key, value)
+		}
+	}
+	path := "/queries"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+	var raw json.RawMessage
+	if err := c.doRequest(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return nil, err
+	}
+
+	// Decode row cells as json.Number so integers beyond 2^53 keep full precision.
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var page AgentQueriesPage
+	if err := dec.Decode(&page); err != nil {
+		return nil, fmt.Errorf("failed to parse queries: %w", err)
+	}
+	return &page, nil
+}
+
 // UpdateAgentThread renames a thread (title) and/or archives it (archived); the
 // server also unpins an archived thread.
 func (c *APIClient) UpdateAgentThread(ctx context.Context, agentID, threadID int, fields map[string]any) (*AgentThread, error) {
@@ -930,11 +981,18 @@ func (c *APIClient) ListConnectionSetConnections(ctx context.Context, setID int)
 }
 
 // ConnectionSetInput is one connection in a create/update payload: a name, its
-// type, and its full credentials (the API requires full config, never partial).
+// type, and its full credentials (the API never merges a partial config).
 type ConnectionSetInput struct {
 	Type   string         `json:"type"`
 	Name   string         `json:"name"`
 	Config map[string]any `json:"config"`
+}
+
+// ConnectionSetRetain names a connection already in the set. It carries no
+// config key, which tells the API to keep the stored credentials.
+type ConnectionSetRetain struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
 }
 
 func (c *APIClient) CreateConnectionSet(ctx context.Context, name string, connections []ConnectionSetInput, skipValidation bool) (*ConnectionSet, error) {
@@ -950,9 +1008,16 @@ func (c *APIClient) CreateConnectionSet(ctx context.Context, name string, connec
 	return &result, nil
 }
 
-func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connections []ConnectionSetInput, skipValidation bool) error {
+func (c *APIClient) UpdateConnectionSet(ctx context.Context, setID int, connections []ConnectionSetInput, retained []ConnectionSetRetain, skipValidation bool) error {
+	all := make([]any, 0, len(connections)+len(retained))
+	for _, connection := range connections {
+		all = append(all, connection)
+	}
+	for _, connection := range retained {
+		all = append(all, connection)
+	}
 	body := map[string]any{
-		"connections":     connections,
+		"connections":     all,
 		"skip_validation": skipValidation,
 	}
 	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/connection-sets/%d", setID), body, nil)
@@ -1030,22 +1095,33 @@ func (c *APIClient) SetSkillAgents(ctx context.Context, skillID int, agentIDs []
 
 // --- Dashboards ---
 
-func (c *APIClient) ListDashboards(ctx context.Context) ([]Dashboard, error) {
+// ListDashboards lists the dashboards the caller can view. An agent's run sees
+// only its agent's dashboards unless all is set; then it sees every dashboard
+// the person it runs for can view.
+func (c *APIClient) ListDashboards(ctx context.Context, all bool) ([]Dashboard, error) {
 	var resp struct {
 		Dashboards []Dashboard `json:"dashboards"`
 	}
-	err := c.doRequest(ctx, http.MethodGet, "/dashboards", nil, &resp)
+	err := c.doRequest(ctx, http.MethodGet, "/dashboards"+allQuery(all), nil, &resp)
 	return resp.Dashboards, err
 }
 
 // ListDashboardFolders returns the team's dashboard folders, including empty
 // ones (folders with no dashboards, which never surface in the dashboard list).
-func (c *APIClient) ListDashboardFolders(ctx context.Context) ([]DashboardFolder, error) {
+// all counts the same dashboards ListDashboards(all) lists.
+func (c *APIClient) ListDashboardFolders(ctx context.Context, all bool) ([]DashboardFolder, error) {
 	var resp struct {
 		Folders []DashboardFolder `json:"folders"`
 	}
-	err := c.doRequest(ctx, http.MethodGet, "/dashboard-folders", nil, &resp)
+	err := c.doRequest(ctx, http.MethodGet, "/dashboard-folders"+allQuery(all), nil, &resp)
 	return resp.Folders, err
+}
+
+func allQuery(all bool) string {
+	if all {
+		return "?all=1"
+	}
+	return ""
 }
 
 // GetDashboard returns a single dashboard. state selects which definition to

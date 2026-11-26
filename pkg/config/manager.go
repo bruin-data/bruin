@@ -34,6 +34,7 @@ type Connections struct {
 	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql,omitempty" mapstructure:"mssql"`
 	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
 	ADLS                []ADLSConnection                `yaml:"adls,omitempty" json:"adls,omitempty" mapstructure:"adls"`
+	AzureBlob           []AzureBlobConnection           `yaml:"azure_blob,omitempty" json:"azure_blob,omitempty" mapstructure:"azure_blob"`
 	Synapse             []SynapseConnection             `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
 	Fabric              []FabricConnection              `yaml:"fabric,omitempty" json:"fabric,omitempty" mapstructure:"fabric"`
 	OneLake             []OneLakeConnection             `yaml:"onelake,omitempty" json:"onelake,omitempty" mapstructure:"onelake"`
@@ -191,6 +192,9 @@ type Connections struct {
 	Typeform            []TypeformConnection            `yaml:"typeform,omitempty" json:"typeform,omitempty" mapstructure:"typeform"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	Odoo                []OdooConnection                `yaml:"odoo,omitempty" json:"odoo,omitempty" mapstructure:"odoo"`
+	Privatus            []PrivatusConnection            `yaml:"privatus,omitempty" json:"privatus,omitempty" mapstructure:"privatus"`
+	PeeringDB           []PeeringDBConnection           `yaml:"peeringdb,omitempty" json:"peeringdb,omitempty" mapstructure:"peeringdb"`
+	BreezyHR            []BreezyHRConnection            `yaml:"breezyhr,omitempty" json:"breezyhr,omitempty" mapstructure:"breezyhr"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -321,6 +325,9 @@ const (
 	SecretsBackendContextKey  EnvContextKey = "secrets_backend"
 	EnvironmentNameContextKey EnvContextKey = "environment_name"
 	ConfigFilePathContextKey  EnvContextKey = "config_file_path"
+	// ConnectionLookupErrorsContextKey holds a ConnectionLookupErrors, so a connection reported
+	// missing can say that its secrets backend couldn't be read instead.
+	ConnectionLookupErrorsContextKey EnvContextKey = "connection_lookup_errors"
 )
 
 type Config struct {
@@ -938,6 +945,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ADLS = append(env.Connections.ADLS, conn)
+	case "azure_blob":
+		var conn AzureBlobConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AzureBlob = append(env.Connections.AzureBlob, conn)
 	case "synapse":
 		var conn SynapseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1994,6 +2008,27 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Odoo = append(env.Connections.Odoo, conn)
+	case "privatus":
+		var conn PrivatusConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Privatus = append(env.Connections.Privatus, conn)
+	case "peeringdb":
+		var conn PeeringDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.PeeringDB = append(env.Connections.PeeringDB, conn)
+	case "breezyhr":
+		var conn BreezyHRConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.BreezyHR = append(env.Connections.BreezyHR, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -2088,6 +2123,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Databricks = removeConnection(env.Connections.Databricks, connectionName)
 	case "adls":
 		env.Connections.ADLS = removeConnection(env.Connections.ADLS, connectionName)
+	case "azure_blob":
+		env.Connections.AzureBlob = removeConnection(env.Connections.AzureBlob, connectionName)
 	case "mongo":
 		env.Connections.Mongo = removeConnection(env.Connections.Mongo, connectionName)
 	case "cassandra":
@@ -2402,6 +2439,12 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Dune = removeConnection(env.Connections.Dune, connectionName)
 	case "odoo":
 		env.Connections.Odoo = removeConnection(env.Connections.Odoo, connectionName)
+	case "privatus":
+		env.Connections.Privatus = removeConnection(env.Connections.Privatus, connectionName)
+	case "peeringdb":
+		env.Connections.PeeringDB = removeConnection(env.Connections.PeeringDB, connectionName)
+	case "breezyhr":
+		env.Connections.BreezyHR = removeConnection(env.Connections.BreezyHR, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -2513,6 +2556,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.MsSQL, source.MsSQL)
 	mergeConnectionList(&c.Databricks, source.Databricks)
 	mergeConnectionList(&c.ADLS, source.ADLS)
+	mergeConnectionList(&c.AzureBlob, source.AzureBlob)
 	mergeConnectionList(&c.Synapse, source.Synapse)
 	mergeConnectionList(&c.Fabric, source.Fabric)
 	mergeConnectionList(&c.OneLake, source.OneLake)
@@ -2670,6 +2714,9 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Typeform, source.Typeform)
 	mergeConnectionList(&c.Dune, source.Dune)
 	mergeConnectionList(&c.Odoo, source.Odoo)
+	mergeConnectionList(&c.Privatus, source.Privatus)
+	mergeConnectionList(&c.PeeringDB, source.PeeringDB)
+	mergeConnectionList(&c.BreezyHR, source.BreezyHR)
 	c.buildConnectionKeyMap()
 	return nil
 }
