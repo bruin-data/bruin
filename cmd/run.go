@@ -2389,7 +2389,7 @@ func SetupExecutors(
 		}, parser)
 		oracleMetadataPushOperator := postgres.NewMetadataPushOperator(conn) // using Postgres Metadata Push for Oracle if suitable, or skipping it
 
-		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMain] = oracleOperator
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(oracleOperator, conn)
 		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
 		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
@@ -2528,7 +2528,7 @@ func SetupExecutors(
 		verticaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		verticaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
-		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeMain] = verticaOperator
+		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(verticaOperator, conn)
 		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
 		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2726,7 +2726,7 @@ func SetupExecutors(
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		clickHouseTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
-		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeMain] = clickHouseOperator
+		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(clickHouseOperator, conn)
 		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
 		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2829,7 +2829,7 @@ func SetupExecutors(
 		mysqlQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		mysqlTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
-		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeMain] = mysqlOperator
+		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(mysqlOperator, conn)
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2858,7 +2858,7 @@ func SetupExecutors(
 		dorisTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		dorisSeedOperator := doris.NewSeedOperator(conn, renderer)
 
-		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeMain] = dorisOperator
+		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(dorisOperator, conn)
 		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeColumnCheck] = dorisCheckRunner
 		mainExecutors[pipeline.AssetTypeDorisQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2891,7 +2891,7 @@ func SetupExecutors(
 		starRocksTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		starRocksSeedOperator := starrocks.NewSeedOperator(conn, renderer)
 
-		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeMain] = starRocksOperator
+		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(starRocksOperator, conn)
 		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeColumnCheck] = starRocksCheckRunner
 		mainExecutors[pipeline.AssetTypeStarRocksQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 

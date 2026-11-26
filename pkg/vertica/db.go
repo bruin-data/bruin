@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -382,6 +383,59 @@ ORDER BY 1, 2`
 func (db *DB) Limit(query string, limit int64) string {
 	query = strings.TrimRight(query, "; \n\t")
 	return fmt.Sprintf("SELECT * FROM (\n%s\n) t LIMIT %d", query, limit)
+}
+
+// RelationExists reports whether a table, view or system table named tableName
+// exists, so an incremental asset can create its table on the first run.
+// Vertica compares identifiers case-insensitively. The materializer writes the
+// name unquoted, so `schema.table` resolves in that schema, while `table`
+// resolves through the session's search_path; a one-part name therefore counts
+// in every schema, since any of them can be on the search_path.
+func (db *DB) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 2 {
+		return false, fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+	}
+	for _, part := range parts {
+		if !isUnquotedIdentifier(part) {
+			return false, fmt.Errorf("cannot check whether table '%s' exists: only unquoted names made of letters, digits, '_' and '$' are supported", tableName)
+		}
+	}
+
+	q := `SELECT COUNT(*) FROM (
+SELECT table_schema, table_name FROM v_catalog.tables
+UNION ALL
+SELECT table_schema, table_name FROM v_catalog.views
+UNION ALL
+SELECT table_schema, table_name FROM v_catalog.system_tables
+) relations
+WHERE LOWER(table_name) = LOWER(?)`
+	args := []any{parts[len(parts)-1]}
+	if len(parts) == 2 {
+		q += " AND LOWER(table_schema) = LOWER(?)"
+		args = append(args, parts[0])
+	}
+
+	var count int64
+	if err := db.conn.QueryRowContext(ctx, q, args...).Scan(&count); err != nil {
+		return false, errors.Wrapf(err, "failed to check whether table '%s' exists", tableName)
+	}
+
+	return count > 0, nil
+}
+
+// isUnquotedIdentifier reports whether name only has characters that Vertica
+// accepts in an unquoted identifier, so it can be looked up literally.
+func isUnquotedIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r != '_' && r != '$' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {

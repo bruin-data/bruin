@@ -27,6 +27,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 
 	strategy := mat.Strategy
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+	if err := m.checkFirstRunStrategy(asset, query); err != nil {
+		return []string{}, err
+	}
 	if asset.FullRefreshEnabled(m.fullRefresh) && mat.Type == pipeline.MaterializationTypeTable {
 		if strategy == pipeline.MaterializationStrategySCD2ByTime || strategy == pipeline.MaterializationStrategySCD2ByColumn {
 			if m.cluster != "" {
@@ -50,6 +53,28 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+}
+
+// checkFirstRunStrategy renders a first run's own strategy and returns its
+// error. A first run builds the table like a full refresh, so without this a
+// setting the strategy needs, or a strategy the cluster cannot run, would only
+// fail on the next run.
+func (m *Materializer) checkFirstRunStrategy(asset *pipeline.Asset, query string) error {
+	if !asset.IsFirstRun() {
+		return nil
+	}
+
+	mat := asset.Materialization
+	ownFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]
+	if !ok {
+		return fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+	}
+	if m.cluster != "" {
+		_, err := buildClusterQuery(asset, query, mat.Strategy, m.cluster, ownFunc)
+		return err
+	}
+	_, err := ownFunc(asset, query)
+	return err
 }
 
 // RenderWithCleanup returns the normal materialization statements together

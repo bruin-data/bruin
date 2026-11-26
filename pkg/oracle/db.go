@@ -199,6 +199,36 @@ func (db *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (
 	return result, nil
 }
 
+// relationTypes are the objects an INSERT, MERGE or DELETE can write through.
+// A materialized view also has a TABLE entry under its name.
+const relationTypes = "'TABLE', 'VIEW', 'MATERIALIZED VIEW', 'SYNONYM'"
+
+// RelationExists reports whether a table, view, materialized view or synonym
+// named tableName exists, so an incremental asset can create its table on the
+// first run. The materializer writes the name unquoted, so Oracle folds it to
+// upper case: `schema.table` resolves in that schema, and `table` in the
+// session's current schema or, failing that, through a public synonym.
+func (db *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	if !validIdentifierRe.MatchString(tableName) {
+		return false, fmt.Errorf("cannot check whether table '%s' exists: only unquoted table or schema.table names are supported", tableName)
+	}
+
+	q := "SELECT COUNT(*) FROM all_objects WHERE object_name = UPPER(:1) AND object_type IN (" + relationTypes + ") " +
+		"AND (owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') OR (owner = 'PUBLIC' AND object_type = 'SYNONYM'))"
+	args := []any{tableName}
+	if schema, table, qualified := strings.Cut(tableName, "."); qualified {
+		q = "SELECT COUNT(*) FROM all_objects WHERE object_name = UPPER(:1) AND owner = UPPER(:2) AND object_type IN (" + relationTypes + ")"
+		args = []any{table, schema}
+	}
+
+	var count int64
+	if err := db.conn.QueryRowContext(ctx, q, args...).Scan(&count); err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	return count > 0, nil
+}
+
 func (db *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	excludedOwners := `'SYS', 'SYSTEM', 'OUTLN', 'DIP', 'ORACLE_OCM', 'APPQOSSYS', 'DBSNMP', 'CTXSYS', 'XDB', 'ANONYMOUS', 'EXFSYS', 'MDDATA', 'DBSFWUSER', 'REMOTE_SCHEDULER_AGENT', 'SI_INFORMTN_SCHEMA', 'ORDDATA', 'ORDSYS', 'MDSYS', 'OLAPSYS', 'WMSYS', 'APEX_040000', 'APEX_PUBLIC_USER', 'FLOWS_FILES', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR', 'HR', 'OE', 'PM', 'IX', 'SH', 'BI', 'SCOTT', 'DVSYS', 'LBACSYS', 'OJVMSYS', 'VECSYS', 'AUDSYS', 'GSMADMIN_INTERNAL', 'DGPDB_INT', 'DVF', 'GGSHAREDCAP', 'GGSYS', 'GSMCATUSER', 'GSMUSER', 'SYS$UMF', 'SYSBACKUP', 'SYSDG', 'SYSKM', 'SYSRAC', 'XS$NULL', 'PDBADMIN'`
 
