@@ -14,6 +14,27 @@ type Team struct {
 	CompanyPrefix string `json:"company_prefix"`
 }
 
+// TeamRole is a role that can be given in the team: built-in, or custom when the team has them on.
+type TeamRole struct {
+	Key         string   `json:"key"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Custom      bool     `json:"custom"`
+	Permissions []string `json:"permissions"`
+}
+
+// TeamMember is someone in the team and the role they have.
+type TeamMember struct {
+	ID            int     `json:"id"`
+	Name          string  `json:"name"`
+	Email         string  `json:"email"`
+	Role          *string `json:"role"`
+	RoleName      *string `json:"role_name"`
+	Owner         bool    `json:"owner"`
+	BruinEmployee bool    `json:"bruin_employee"`
+	ExpiresAt     *string `json:"expires_at"`
+}
+
 // Project represents a Bruin Cloud project.
 type Project struct {
 	ID       string          `json:"id"`
@@ -653,4 +674,59 @@ type DataAppSaveResult struct {
 	Version   string           `json:"version"`
 	Warnings  []string         `json:"warnings,omitempty"`
 	Guide     *DataAppGuideRef `json:"guide,omitempty"`
+}
+
+// AgentQuery is one query an agent ran, from the agents' own query log (kept
+// for 30 days), labeled with where it ran. Rows holds up to 50 result rows;
+// RowCount is the full count.
+type AgentQuery struct {
+	MessagePairID    int                 `json:"message_pair_id"`
+	MessageCreatedAt string              `json:"message_created_at"`
+	Agent            AgentQueryRef       `json:"agent"`
+	Thread           AgentQueryThread    `json:"thread"`
+	ScheduledRun     *AgentQuerySchedule `json:"scheduled_run"`
+	StartedBy        *AgentQueryRef      `json:"started_by"`
+	Query            string              `json:"query"`
+	Connection       string              `json:"connection"`
+	Description      *string             `json:"description"`
+	Success          bool                `json:"success"`
+	Error            *string             `json:"error"`
+	Timestamp        string              `json:"timestamp"`
+	Columns          []string            `json:"columns"`
+	Rows             [][]any             `json:"rows"`
+	RowCount         *int                `json:"row_count"`
+}
+
+type AgentQueryRef struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type AgentQueryThread struct {
+	ID    int     `json:"id"`
+	Title *string `json:"title"`
+	Type  string  `json:"type"`
+}
+
+// AgentQuerySchedule is the scout or routine whose run made the query.
+type AgentQuerySchedule struct {
+	ID    int     `json:"id"`
+	Title *string `json:"title"`
+	Kind  string  `json:"kind"`
+}
+
+// AgentQueriesPage is one page of the query log; pass NextBefore as Before for
+// the next one.
+type AgentQueriesPage struct {
+	Queries    []AgentQuery `json:"queries"`
+	NextBefore *int         `json:"next_before"`
+}
+
+type ListAgentQueriesOptions struct {
+	AgentID  int
+	ThreadID int
+	Since    string
+	Until    string
+	Limit    int
+	Before   int
 }

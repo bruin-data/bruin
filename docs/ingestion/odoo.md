@@ -34,6 +34,7 @@ To connect to Odoo, you need to add a configuration item to the connections sect
 
 - `name`: The name to identify this Odoo connection.
 - `host`: The address of your Odoo server, such as `mycompany.odoo.com` or `erp.example.com:8069`. Do not include `https://`; use `scheme` instead.
+- `port`: (Optional) The port of your Odoo server, between 1 and 65535. Leave it out to use the default port for the scheme, or a port already given in `host`. If `host` has a path, the port goes before it: `host: erp.example.com/odoo` with `port: 8443` connects to `erp.example.com:8443/odoo`. Setting a port in both `host` and `port` is an error.
 - `api_key`: An API key of the Odoo user to read as. On servers without API keys, the user's password works here too.
 - `database`: (Optional) The Odoo database name. Required on Odoo 18 and older. On Odoo 19 and newer it is only needed when one server hosts several databases.
 - `username`: (Optional) The login of the Odoo user. Required on Odoo 18 and older.
@@ -47,7 +48,8 @@ For a self-hosted Odoo 18 server without TLS:
     connections:
       odoo:
         - name: "odoo-local"
-          host: "localhost:8069"
+          host: "localhost"
+          port: 8069
           api_key: "key_123"
           database: "odoo"
           username: "admin"

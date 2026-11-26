@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -1587,13 +1588,15 @@ func TestScheduler_RestoreStateKeepsSucceededEarlierAcrossRetries(t *testing.T) 
 		state, err = ReadState(fs, dir)
 		require.NoError(t, err)
 
-		got := make(map[string]PipelineAssetState)
+		got := make(map[string]string)
 		for _, asset := range state.State {
-			got[asset.Name] = *asset
+			got[asset.Name] = fmt.Sprintf("%s succeeded_earlier=%t", asset.Status, asset.SucceededEarlier)
 		}
-		assert.Equal(t, PipelineAssetState{Name: "raw", Status: Skipped.String(), SucceededEarlier: true}, got["raw"], "round %d", i)
-		assert.Equal(t, PipelineAssetState{Name: "stg", Status: stgStatus.String()}, got["stg"], "round %d", i)
-		assert.Equal(t, PipelineAssetState{Name: "unselected", Status: Skipped.String()}, got["unselected"], "round %d", i)
+		assert.Equal(t, map[string]string{
+			"raw":        "skipped succeeded_earlier=true",
+			"stg":        stgStatus.String() + " succeeded_earlier=false",
+			"unselected": "skipped succeeded_earlier=false",
+		}, got, "round %d", i)
 	}
 }
 
@@ -1658,6 +1661,57 @@ func TestScheduler_SavePipelineStateBackfill(t *testing.T) {
 		require.Equal(t, start, state.Parameters.StartDate)
 		require.Equal(t, end, state.Parameters.EndDate)
 	})
+}
+
+func TestScheduler_SavePipelineStateRecordsTaskResults(t *testing.T) {
+	t.Parallel()
+
+	items := &pipeline.Asset{
+		Name:         "main.items",
+		Type:         "duckdb.sql",
+		Columns:      []pipeline.Column{{Name: "id", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}}},
+		CustomChecks: []pipeline.CustomCheck{{Name: "row_count", Query: "SELECT 1", Value: "1"}},
+	}
+	downstream := &pipeline.Asset{
+		Name:      "main.downstream",
+		Type:      "duckdb.sql",
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "main.items"}},
+	}
+	s := NewScheduler(zap.NewNop().Sugar(), &pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{downstream, items}}, "run_d")
+	s.MaskError = func(msg string) string { return strings.ReplaceAll(msg, "secret", "****") }
+
+	for _, task := range s.GetTaskInstances() {
+		switch {
+		case task.GetAsset() == downstream:
+			task.MarkAs(UpstreamFailed)
+		case task.GetType() == TaskInstanceTypeColumnCheck:
+			task.MarkAs(Failed)
+			s.recordError(&TaskExecutionResult{Instance: task, Error: errors.New("column 'id' has 1 null values, password secret")})
+		default:
+			task.MarkAs(Succeeded)
+		}
+	}
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, s.SavePipelineState(fs, []string{"bruin", "run"}, &RunConfig{}, "", 0, "run_d", "logs/runs"))
+	state, err := ReadState(fs, "logs/runs")
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]map[string]int{
+		"main":        {"succeeded": 1, "upstream_failed": 1},
+		"column_test": {"failed": 1},
+		"custom_test": {"succeeded": 1},
+	}, state.Summary)
+	assert.ElementsMatch(t, []*PipelineAssetState{
+		{Name: "main.downstream", Status: "failed", Tasks: []*PipelineTaskState{
+			{Type: "main", Status: "upstream_failed"},
+		}},
+		{Name: "main.items", Status: "failed", Tasks: []*PipelineTaskState{
+			{Type: "main", Status: "succeeded"},
+			{Type: "column_test", Name: "id.not_null", Status: "failed", Error: "column 'id' has 1 null values, password ****"},
+			{Type: "custom_test", Name: "row_count", Status: "succeeded"},
+		}},
+	}, state.State)
 }
 
 func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {

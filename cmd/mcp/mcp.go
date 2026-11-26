@@ -36,13 +36,13 @@ type JSONRPCError struct {
 	Message string `json:"message"`
 }
 
-// This will be a long-running process that communicates with Cursor IDE via stdin/stdout.
-// using the Model Context Protocol (JSON-RPC).
+// This will be a long-running process that communicates with an AI agent (Cursor, Claude Code, Codex, etc.)
+// via stdin/stdout using the Model Context Protocol (JSON-RPC).
 func MCPCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "mcp",
-		Usage:       "Start MCP server for Cursor IDE integration",
-		Description: "Runs a Model Context Protocol server to provide Bruin context to Cursor IDE",
+		Usage:       "Start the Bruin MCP server for AI agents",
+		Description: "Runs a Model Context Protocol server over stdio to provide Bruin context to AI agents such as Cursor, Claude Code, and Codex",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "debug",
@@ -149,6 +149,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					{
 						"name":        "bruin_get_overview",
 						"description": "Get information about Bruin's features and capabilities",
+						"annotations": readOnlyToolAnnotations(),
 						"inputSchema": map[string]interface{}{
 							"type":       "object",
 							"properties": map[string]interface{}{},
@@ -157,6 +158,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					{
 						"name":        "bruin_get_docs_tree",
 						"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.",
+						"annotations": readOnlyToolAnnotations(),
 						"inputSchema": map[string]interface{}{
 							"type":       "object",
 							"properties": map[string]interface{}{},
@@ -165,6 +167,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					{
 						"name":        "bruin_get_doc_content",
 						"description": "Get the contents of a specific documentation file from Bruin CLI docs. Use bruin_get_docs_tree first to see all available directories and files. You can access files in subdirectories (e.g., 'ingestion/shopify', 'platforms/bigquery', 'commands/run') or root-level files (e.g., 'overview', 'index'). The .md extension is optional.",
+						"annotations": readOnlyToolAnnotations(),
 						"inputSchema": map[string]interface{}{
 							"type": "object",
 							"properties": map[string]interface{}{
@@ -191,6 +194,18 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				Message: "Method not found: " + req.Method,
 			},
 		}
+	}
+}
+
+// readOnlyToolAnnotations marks a tool as safe to call without user approval.
+// Some clients, e.g. Codex, require approval for unannotated tools and reject the
+// call outright when running non-interactively.
+func readOnlyToolAnnotations() map[string]interface{} {
+	return map[string]interface{}{
+		"readOnlyHint":    true,
+		"destructiveHint": false,
+		"idempotentHint":  true,
+		"openWorldHint":   false,
 	}
 }
 

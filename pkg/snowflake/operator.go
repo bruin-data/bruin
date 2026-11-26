@@ -303,7 +303,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	for {
 		select {
 		case <-timeout:
-			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+			return &helpers.SensorTimeoutError{Timeout: sensorTimeout}
 		default:
 			res, err := conn.SelectOnlyLastResult(ctx, qry[0])
 			if err != nil {

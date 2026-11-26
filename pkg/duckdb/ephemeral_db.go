@@ -34,7 +34,7 @@ type EphemeralConnection struct {
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	ensure := EnsureADBCDriverInstalled
-	if cfg, ok := c.(Config); ok && cfg.HasQuack() {
+	if cfg, ok := c.(Config); ok && cfg.usesDuckDB2Driver() {
 		ensure = EnsureQuackADBCDriverInstalled
 	}
 	if err := ensure(context.Background()); err != nil {
@@ -297,9 +297,9 @@ func (e *EphemeralConnection) createADBC(ctx context.Context) (adbc.Database, ad
 }
 
 // driverPath returns the manifest for the driver this connection needs: Quack
-// connections use their own DuckDB 2.0+ driver, everything else the default one.
+// connections and DuckDB 2.0 files use the 2.0 driver, everything else the default one.
 func (e *EphemeralConnection) driverPath() (string, error) {
-	if cfg, ok := e.config.(Config); ok && cfg.HasQuack() {
+	if cfg, ok := e.config.(Config); ok && cfg.usesDuckDB2Driver() {
 		dir, err := QuackADBCDriverDir()
 		if err != nil {
 			return "", err
@@ -488,22 +488,17 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 	}
 	defer cleanup()
 
-	stmt, err := conn.NewStatement()
-	if err != nil {
-		return nil, err
+	// DuckDB points errors in a multi-statement script at the wrong line, so run the
+	// statements one by one on this session, which keeps their transactions intact.
+	sqlStr = inlineQueryArgs(sqlStr, arguments)
+	statements, err := splitStatements(sqlStr)
+	if err != nil || len(statements) < 2 {
+		statements = []string{sqlStr}
 	}
-	defer stmt.Close()
-
-	if err := stmt.SetSqlQuery(inlineQueryArgs(sqlStr, arguments)); err != nil {
-		return nil, transactionError(err)
-	}
-
-	reader, _, err := stmt.ExecuteQuery(ctx)
-	if err != nil {
-		return nil, transactionError(err)
-	}
-	if reader != nil {
-		reader.Release()
+	for _, statement := range statements {
+		if err := execADBCStatement(ctx, conn, statement); err != nil {
+			return nil, transactionError(err)
+		}
 	}
 
 	return driver.RowsAffected(0), nil

@@ -308,6 +308,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.Retries = &retries
 
 			continue
+		case "smart_retries":
+			smartRetries, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse smart_retries value '%s'", value)
+			}
+			task.SmartRetries = &smartRetries
+
+			continue
 		case "timeout":
 			timeout, err := time.ParseDuration(value)
 			if err != nil {

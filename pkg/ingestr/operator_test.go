@@ -742,6 +742,19 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "ripestat://", "--source-table", "as-overview?resource=AS3333", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "public peeringdb source via domain name (no connection defined)",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: pipeline.ParameterMap{
+					"source_connection": "peeringdb.com",
+					"source_table":      "networks",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "peeringdb://", "--source-table", "networks", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
 			name: "public yfinance source via domain name (no connection defined)",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",

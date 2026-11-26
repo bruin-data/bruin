@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/pkg/errors"
 	_ "github.com/trinodb/trino-go-client/trino"
 )
@@ -146,6 +147,53 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 
 	return result, nil
+}
+
+// RelationExists reports whether a table, view or materialized view named
+// tableName exists, so an incremental asset can create its table on the first
+// run. The name resolves like the materializer's quoted name does: a one-part
+// name lives in the connection's catalog and schema, and a two-part name in the
+// connection's catalog. Trino folds identifiers to lower case, quoted or not, so
+// the name is looked up both as written and in lower case. A missing schema
+// leaves information_schema empty, which reports false.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	capability, ok := tablename.For("trino")
+	if !ok {
+		return false, errors.New("trino table-name capability not found")
+	}
+	name, err := capability.Parse(tableName, tablename.Defaults{Catalog: c.config.Catalog, Schema: c.config.Schema})
+	if err != nil {
+		return false, err
+	}
+	// A quoted name part would be looked up with its quotes as literal text and
+	// never match, so it cannot be checked.
+	if strings.ContainsAny(tableName, "\"`") {
+		return false, fmt.Errorf("cannot check table '%s': quoted names are not supported", tableName)
+	}
+	if name.Catalog == "" {
+		return false, fmt.Errorf("cannot resolve table '%s': the connection has no catalog", tableName)
+	}
+	if name.Schema == "" {
+		return false, fmt.Errorf("cannot resolve table '%s': the connection has no schema", tableName)
+	}
+
+	// Equality filters let Trino look the table up directly instead of listing
+	// every table in the catalog.
+	existsQuery := fmt.Sprintf(
+		"SELECT count(*) FROM %s.information_schema.tables WHERE table_schema IN (?, ?) AND table_name IN (?, ?)",
+		quoteTrinoIdentifier(name.Catalog),
+	)
+	var count int64
+	err = c.connection.QueryRowContext(ctx, existsQuery, name.Schema, strings.ToLower(name.Schema), name.Table, strings.ToLower(name.Table)).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	return count > 0, nil
+}
+
+func quoteTrinoIdentifier(identifier string) string {
+	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
 }
 
 func toTrinoString(value any) (string, bool) {

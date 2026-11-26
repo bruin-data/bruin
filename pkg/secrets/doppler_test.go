@@ -196,3 +196,20 @@ func TestDopplerClient_GetSecret_DetailsNotAMap(t *testing.T) {
 	deets := c.GetConnectionDetails("test-connection")
 	require.Nil(t, deets)
 }
+
+// A Doppler outage mustn't look like a missing secret: Python and R assets report a secret that
+// GetConnectionDetails didn't return as missing unless the client says why.
+func TestDopplerClient_LookupError_TellsAnOutageFromAMissingSecret(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockDopplerHTTPClient{err: &config.SecretsBackendUnavailableError{Err: errors.New("doppler API returned status 503")}}
+	c := &DopplerClient{client: mock, logger: &mockLogger{}, cacheConnections: map[string]any{}, cacheConnectionsDetails: map[string]any{}}
+
+	require.Nil(t, c.GetConnectionDetails("pg"))
+	var unavailable *config.SecretsBackendUnavailableError
+	require.ErrorAs(t, c.LookupError("pg"), &unavailable)
+
+	mock.err = newSecretNotFoundError("secret '%s' not found in Doppler", "other")
+	require.Nil(t, c.GetConnection("other"))
+	require.NoError(t, c.LookupError("other"), "the secret doesn't exist")
+}

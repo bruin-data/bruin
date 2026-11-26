@@ -505,6 +505,7 @@ func validateSemanticModel(ctx context.Context, catalog *semanticCommandCatalog,
 		dialect = resolved.Dialect
 		entry.Connection = resolved.Name
 	}
+	engine.Dialect = dialect
 	checks, err := engine.CompileChecks(semantic.CompileChecksOptions{Dialect: dialect})
 	if err != nil {
 		return fail(err)
@@ -620,6 +621,7 @@ func runSemanticChecks(ctx context.Context, catalog *semanticCommandCatalog) *se
 			continue
 		}
 
+		engine.Dialect = resolved.Dialect
 		checks, err := engine.CompileChecks(semantic.CompileChecksOptions{Dialect: resolved.Dialect})
 		if err != nil {
 			report.Errors = append(report.Errors, err.Error())

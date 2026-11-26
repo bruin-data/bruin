@@ -1,11 +1,14 @@
 package secrets
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type recordingLogger struct {
@@ -40,4 +43,12 @@ func TestLogLookupFailure(t *testing.T) {
 		wrapped := errors.Wrap(newSecretNotFoundError("missing"), "fetch manager")
 		assert.True(t, isSecretNotFound(wrapped))
 	})
+}
+
+func TestSecretNotFoundMatchesErrConnectionNotFound(t *testing.T) {
+	t.Parallel()
+
+	err := fmt.Errorf("failed to resolve connection 'pg': %w", newSecretNotFoundError("secret '%s' not found in Vault", "pg"))
+	require.ErrorIs(t, err, config.ErrConnectionNotFound)
+	require.NotErrorIs(t, errors.New("secret 'pg' not found in Vault"), config.ErrConnectionNotFound)
 }

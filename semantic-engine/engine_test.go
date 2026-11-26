@@ -24,6 +24,8 @@ func expectNotContains(t *testing.T, got, unwanted string) {
 	}
 }
 
+const paidFilter = "status = 'paid'"
+
 func minimalEngine(t *testing.T, m *Model) *Engine {
 	t.Helper()
 	e, err := NewEngine(m)
@@ -64,6 +66,11 @@ func richTestModel() *Model {
 			{Name: "completed_revenue", Expression: "sum(amount)", Filter: "status = 'completed'"},
 			{Name: "completed_count", Expression: "count(*)", Filter: "status = 'completed'"},
 			{Name: "completed_distinct_orders", Expression: "count(distinct order_id)", Filter: "status = 'completed'"},
+			{Name: "all_completed", Expression: "bool_and(is_paid)", Filter: "status = 'completed'"},
+			{Name: "oreilly_revenue", Expression: "sum(CASE WHEN category = $$O'Reilly$$ THEN amount ELSE 0 END)", Filter: "status = 'completed'"},
+			// Viewer values end up in literals like these; their text is never SQL.
+			{Name: "quoted_revenue", Expression: "sum(CASE WHEN category = 'Pro Max (2024), sum(x' THEN amount END) -- note", Filter: "status = 'completed'"},
+			{Name: "distinct_paren", Expression: "count(distinct(order_id));", Filter: "status = 'completed'"},
 			{Name: "profit", Expression: "{revenue} - {cost}"},
 			{Name: "avg_order_value", Expression: "{revenue} / {order_count}"},
 			{Name: "profit_margin", Expression: "{profit} / {revenue}"},
@@ -378,6 +385,7 @@ func TestSourceRelation_QuotesUnsafeAliases(t *testing.T) {
 		want  string
 	}{
 		{alias: "orders", want: "(select 1 as id\n) AS orders"},
+		{alias: "day", want: "(select 1 as id\n) AS day"},
 		{alias: "order-items", want: "(select 1 as id\n) AS \"order-items\""},
 		{alias: "sales model", want: "(select 1 as id\n) AS \"sales model\""},
 		{alias: "order", want: "(select 1 as id\n) AS \"order\""},
@@ -753,6 +761,26 @@ func TestGenerateSQL_Cases(t *testing.T) {
 			name:  "count distinct with filter preserves DISTINCT",
 			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"completed_distinct_orders"}},
 			must:  []string{"count(DISTINCT CASE WHEN status = 'completed' THEN order_id ELSE NULL END) AS completed_distinct_orders"},
+		},
+		{
+			name:  "filter works with any aggregate function",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"all_completed"}},
+			must:  []string{"bool_and(CASE WHEN status = 'completed' THEN is_paid ELSE NULL END) AS all_completed"},
+		},
+		{
+			name:  "filter keeps dollar-quoted strings intact",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"oreilly_revenue"}},
+			must:  []string{"sum(CASE WHEN status = 'completed' THEN CASE WHEN category = $$O'Reilly$$ THEN amount ELSE 0 END ELSE NULL END) AS oreilly_revenue"},
+		},
+		{
+			name:  "filter ignores parentheses, commas, aggregates, and comments in quoted text",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"quoted_revenue"}},
+			must:  []string{"sum(CASE WHEN status = 'completed' THEN CASE WHEN category = 'Pro Max (2024), sum(x' THEN amount END ELSE NULL END) AS quoted_revenue"},
+		},
+		{
+			name:  "filter keeps DISTINCT written as a call",
+			query: Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"distinct_paren"}},
+			must:  []string{"count(DISTINCT CASE WHEN status = 'completed' THEN (order_id) ELSE NULL END) AS distinct_paren"},
 		},
 
 		// --- derived metrics ---
@@ -1245,6 +1273,35 @@ func TestGenerateSQL_QueryErrors(t *testing.T) {
 
 // --- model-level validation errors ---
 
+// A filter can only go inside one aggregate call; anything else must be a
+// derived metric over a filtered base metric.
+func TestNewEngine_FilteredMetricMustBeOneAggregate(t *testing.T) {
+	t.Parallel()
+
+	for _, expr := range []string{
+		"round(sum(x), 2)",
+		"sum(x) - sum(y)",
+		"x * 2",
+		"sum(x) OVER ()",
+		"count(*) FILTER (WHERE x > 0)",
+		"string_agg(x, ', ')",
+		"corr(x, y)",
+		"array_agg(x ORDER BY y)",
+		"array_agg(x IGNORE NULLS)",
+		"count()",
+		"sum(CASE WHEN r = '(' THEN x END",
+	} {
+		_, err := NewEngine(&Model{
+			Name:    "m",
+			Source:  Source{Table: "t"},
+			Metrics: []Metric{{Name: "bad", Expression: expr, Filter: paidFilter}},
+		})
+		if err == nil || !strings.Contains(err.Error(), `metric "bad": a metric with filter must be one aggregate call with one argument`) {
+			t.Errorf("%s: want single aggregate error, got %v", expr, err)
+		}
+	}
+}
+
 func TestNewEngine_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
@@ -1330,6 +1387,18 @@ func TestNewEngine_ValidationErrors(t *testing.T) {
 				},
 			},
 			want: "duplicate name: shared",
+		},
+		{
+			name: "filter on derived metric",
+			model: Model{
+				Name:   "m",
+				Source: Source{Table: "t"},
+				Metrics: []Metric{
+					{Name: "revenue", Expression: "sum(x)"},
+					{Name: "bad", Expression: "round({revenue}, 2)", Filter: paidFilter},
+				},
+			},
+			want: `metric "bad": filter is not supported on derived metrics`,
 		},
 		{
 			name: "metric without expression",
@@ -1971,6 +2040,45 @@ func TestJoinGraphJoinsReachableDimension(t *testing.T) {
 	expectContains(t, sql, "FROM (SELECT * FROM orders) base")
 	expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.customer_id")
 	expectContains(t, sql, "GROUP BY 1")
+}
+
+func TestJoinGraphKeepsDatePartsBare(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins:  []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		Dimensions: []Dimension{{Name: "created_at", Type: "time", Granularities: map[string]string{
+			"day":  "timestamp_trunc(created_at, DAY)",
+			"week": "date_trunc(created_at, WEEK(MONDAY))",
+		}}, {Name: "dow", Type: "number", Expression: "extract(DOW FROM created_at)"}, {Name: "day", Type: "number"}},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "region", Type: "string"}},
+	}
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{
+			{Name: "created_at", Granularity: "day"}, {Name: "created_at", Granularity: "week"}, {Name: "dow"}, {Name: "day"},
+		},
+		Metrics: []string{"revenue"},
+		Filters: []Filter{{Expression: "{customers.region} = 'EU'"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "timestamp_trunc(base.created_at, DAY)")
+	expectContains(t, sql, "date_trunc(base.created_at, WEEK(MONDAY))")
+	expectContains(t, sql, "extract(DOW FROM base.created_at)")
+	expectContains(t, sql, "base.day AS day")
 }
 
 func TestJoinGraphRejectsMissingTargetKeyAndPrimaryKey(t *testing.T) {
@@ -2737,4 +2845,115 @@ func TestGenerateGrandTotalSQLHelperDoesNotHideJoinedDimension(t *testing.T) {
 	expectContains(t, sql, "LEFT JOIN")
 	expectContains(t, sql, "WHERE customers.country = 'US'")
 	expectContains(t, sql, "COUNT(*) AS __grand_total_row_count_")
+}
+
+// Quoted text and comments are never SQL: viewer values rendered into
+// literals stay inside them, and SQL after them still expands.
+func TestQuotedTextIsNeverSQL(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		dialect, expr, filter, where string
+		want                         []string
+	}{
+		{
+			"", "count(CASE WHEN note = '{rev}' THEN 1 END)", "", "note <> '{rev}'",
+			[]string{"count(CASE WHEN note = '{rev}' THEN 1 END) AS x", "WHERE note <> '{rev}'"},
+		},
+		{
+			"bigquery", `sum(CASE WHEN note = 'O\'Brien), sum(1' THEN amount END)`, paidFilter, "",
+			[]string{`sum(CASE WHEN status = 'paid' THEN CASE WHEN note = 'O\'Brien), sum(1' THEN amount END ELSE NULL END) AS x`},
+		},
+		{
+			"bigquery", `count(CASE WHEN note = 'O\'Brien' THEN 1 END) / {rev}`, "", `note <> 'O\'Brien' AND sum(amount) > 0`,
+			[]string{`count(CASE WHEN note = 'O\'Brien' THEN 1 END) / NULLIF(sum(amount), 0) AS x`, `HAVING note <> 'O\'Brien' AND sum(amount) > 0`},
+		},
+		{
+			"postgres", `count(CASE WHEN p = 'C:\' AND note = '{zzz}' THEN 1 END)`, paidFilter, "",
+			[]string{`note = '{zzz}' THEN 1 END ELSE NULL END) AS x`},
+		},
+		{
+			"postgres", `CASE WHEN p = 'C:\' THEN {rev} END`, "", "",
+			[]string{`CASE WHEN p = 'C:\' THEN sum(amount) END AS x`},
+		},
+		{
+			"", "sum(\n  amount -- gross\n)", "status = 'paid' -- only paid", "",
+			[]string{"sum(CASE WHEN status = 'paid' -- only paid\n THEN amount -- gross\n ELSE NULL END) AS x"},
+		},
+		{
+			"", "sum(amt$usd$x)", paidFilter, "a$b$c = 1 AND {note} = 'x'",
+			[]string{"sum(CASE WHEN status = 'paid' THEN amt$usd$x ELSE NULL END) AS x", "a$b$c = 1 AND note = 'x'"},
+		},
+		{
+			"", "max(a$b$c) + {rev}", "", "",
+			[]string{"max(a$b$c) + sum(amount) AS x"},
+		},
+	}
+	for _, tc := range cases {
+		engine := minimalEngine(t, &Model{
+			Name:       "m",
+			Source:     Source{Table: "t"},
+			Dimensions: []Dimension{{Name: "note", Type: "string"}},
+			Metrics:    []Metric{{Name: "rev", Expression: "sum(amount)"}, {Name: "x", Expression: tc.expr, Filter: tc.filter}},
+		})
+		engine.Dialect = tc.dialect
+		q := &Query{Metrics: []string{"x"}}
+		if tc.where != "" {
+			q.Filters = []Filter{{Expression: tc.where}}
+		}
+		sql, err := engine.GenerateSQL(q)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.expr, err)
+		}
+		for _, want := range tc.want {
+			expectContains(t, sql, want)
+		}
+	}
+}
+
+// A ref hidden at load (no dialect) can reveal a cycle once Dialect is set.
+func TestGenerateSQL_CycleRevealedByDialect(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, &Model{
+		Name:       "m",
+		Source:     Source{Table: "t"},
+		Dimensions: []Dimension{{Name: "d", Type: "time"}},
+		Metrics: []Metric{
+			{Name: "x", Expression: `CASE WHEN p = 'C:\' THEN {x} END`},
+			{Name: "w", Expression: "{x}", Window: &Window{Type: "running_total", OrderBy: "d"}},
+		},
+	})
+	engine.Dialect = "duckdb"
+	_, err := engine.GenerateSQL(&Query{Metrics: []string{"w"}, Dimensions: []DimensionRef{{Name: "d"}}})
+	if err == nil || !strings.Contains(err.Error(), "circular dependency") {
+		t.Fatalf("want circular dependency error, got %v", err)
+	}
+}
+
+func TestFilterValueBackslashStaysInString(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, &Model{
+		Name:       "m",
+		Source:     Source{Table: "t"},
+		Dimensions: []Dimension{{Name: "note", Type: "string"}},
+		Metrics:    []Metric{{Name: "n", Expression: "count(*)"}},
+	})
+	for dialect, want := range map[string]string{
+		"snowflake": `note = '\\'' OR 1=1 --'`,
+		"":          `note = '\'' OR 1=1 --'`,
+		"duckdb":    `note = '\'' OR 1=1 --'`,
+		"bigquery":  `note = "\\' OR 1=1 --"`,
+	} {
+		engine.Dialect = dialect
+		sql, err := engine.GenerateSQL(&Query{
+			Metrics: []string{"n"},
+			Filters: []Filter{{Dimension: "note", Operator: "equals", Value: `\' OR 1=1 --`}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectContains(t, sql, want)
+	}
 }

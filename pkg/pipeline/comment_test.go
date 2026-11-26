@@ -159,7 +159,7 @@ func Test_createTaskFromFile(t *testing.T) {
 						ID:    "480f365424205654f7108f2d0ddf6418faed97652bba106ba4080a967a50e5cf",
 						Name:  "check1",
 						Query: "select * from table1",
-						Value: 16,
+						Value: "16",
 					},
 				},
 				Hooks: pipeline.Hooks{
@@ -322,14 +322,14 @@ func Test_createTaskFromFile(t *testing.T) {
 						ID:       "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
 						Name:     "check1",
 						Query:    "select 5",
-						Value:    16,
+						Value:    "16",
 						Blocking: pipeline.DefaultTrueBool{Value: &falseValue},
 					},
 					{
 						ID:    "cc1040bd694dcb5fae26300d2c0f721e4c4304cb16b9dce3b4ddcaa44498b940",
 						Name:  "check2",
 						Query: "select 5",
-						Value: 16,
+						Value: "16",
 					},
 				},
 				Hooks: pipeline.Hooks{
@@ -451,4 +451,21 @@ func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 		_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())(file)
 		require.NoError(b, err)
 	}
+}
+
+func TestCreateTaskFromFileComments_smartRetries(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	content := "-- @bruin.name: analytics.events\n-- @bruin.type: sf.sql\n-- @bruin.smart_retries: true\n\nSELECT 1\n"
+	require.NoError(t, afero.WriteFile(fs, "events.sql", []byte(content), 0o644))
+
+	task, err := pipeline.CreateTaskFromFileComments(fs)("events.sql")
+	require.NoError(t, err)
+	require.NotNil(t, task.SmartRetries)
+	assert.True(t, *task.SmartRetries)
+
+	require.NoError(t, afero.WriteFile(fs, "bad.sql", []byte("-- @bruin.name: analytics.bad\n-- @bruin.smart_retries: maybe\n\nSELECT 1\n"), 0o644))
+	_, err = pipeline.CreateTaskFromFileComments(fs)("bad.sql")
+	require.ErrorContains(t, err, "bad.sql", "a value that isn't a boolean fails the asset")
 }

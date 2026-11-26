@@ -133,6 +133,62 @@ func CastResultToInteger(res [][]interface{}, tolerant bool) (int64, error) {
 	return 0, errors.Errorf("unexpected result from query during, cannot cast result to integer: %v", res)
 }
 
+// CompareCheckResult compares a single-value query result to a custom check value written as text.
+// Integers compare as int64 so values above 2^53 stay exact; anything with decimals compares as float64.
+func CompareCheckResult(res [][]interface{}, expected string) (actual string, equal bool, err error) {
+	if want, parseErr := strconv.ParseInt(expected, 10, 64); parseErr == nil && !hasFraction(res) {
+		got, err := CastResultToInteger(res, false)
+		if err != nil {
+			return "", false, err
+		}
+		return strconv.FormatInt(got, 10), got == want, nil
+	}
+
+	want, err := strconv.ParseFloat(expected, 64)
+	if err != nil {
+		return "", false, errors.Errorf("expected value '%s' is not a number", expected)
+	}
+	got, err := castResultToFloat(res)
+	if err != nil {
+		return "", false, err
+	}
+	return strconv.FormatFloat(got, 'f', -1, 64), got == want, nil
+}
+
+func hasFraction(res [][]interface{}) bool {
+	if len(res) != 1 || len(res[0]) != 1 {
+		return false
+	}
+	switch v := res[0][0].(type) {
+	case float64, float32:
+		return true
+	case string:
+		_, intErr := strconv.ParseInt(v, 10, 64)
+		_, floatErr := strconv.ParseFloat(v, 64)
+		return intErr != nil && floatErr == nil
+	}
+	return false
+}
+
+func castResultToFloat(res [][]interface{}) (float64, error) {
+	if len(res) == 1 && len(res[0]) == 1 {
+		switch v := res[0][0].(type) {
+		case float64:
+			return v, nil
+		case float32:
+			// Round-trip through text so 100.99 stays 100.99 instead of 100.98999786.
+			return strconv.ParseFloat(strconv.FormatFloat(float64(v), 'g', -1, 32), 64)
+		case string:
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				return f, nil
+			}
+		}
+	}
+
+	i, err := CastResultToInteger(res, false)
+	return float64(i), err
+}
+
 func WriteJSONToFile(fs afero.Fs, data interface{}, filename string) error {
 	file, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -264,6 +320,15 @@ func GetPokeInterval(ctx context.Context, t *pipeline.Asset) int64 {
 }
 
 const DefaultSensorTimeout = 24 * time.Hour
+
+// SensorTimeoutError reports that a sensor's condition wasn't met before its timeout.
+type SensorTimeoutError struct {
+	Timeout time.Duration
+}
+
+func (e *SensorTimeoutError) Error() string {
+	return fmt.Sprintf("Sensor timed out after %s", e.Timeout)
+}
 
 // ParseSensorDuration parses a single-unit duration string using the same
 // suffix syntax as pipeline interval_modifiers (s, m, h, d, ms, ns).

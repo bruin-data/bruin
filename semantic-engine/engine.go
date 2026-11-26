@@ -22,11 +22,87 @@ func maskTemplateDelimiters(expr string) string {
 }
 
 // containsAggregateOutsideRefs reports whether expr contains an aggregate
-// function call that is not inside a {ref} placeholder.
-func containsAggregateOutsideRefs(expr string) bool {
-	stripped := refPattern.ReplaceAllString(maskTemplateDelimiters(expr), "")
+// function call that is not inside a {ref} placeholder or quoted text.
+func (e *Engine) containsAggregateOutsideRefs(expr string) bool {
+	stripped := refPattern.ReplaceAllString(e.maskSQL(expr), "")
 	return aggregateFuncPattern.MatchString(stripped)
 }
+
+var dollarQuoteTag = regexp.MustCompile(`^\$([A-Za-z_][A-Za-z0-9_]*)?\$`)
+
+// maskSQL blanks quoted text, comments, and {{ }} template delimiters in expr,
+// keeping byte offsets, so parentheses and {refs} found in it are SQL.
+// backslashEscapes says whether a backslash escapes a quote in '...' strings.
+func maskSQL(expr string, backslashEscapes bool) string {
+	s := maskTemplateDelimiters(expr)
+	b := []byte(s)
+	for i := 0; i < len(s); {
+		var end int
+		switch {
+		case s[i] == '\'' || s[i] == '"' || s[i] == '`':
+			end = scanQuoted(s, i, s[i], backslashEscapes)
+		case strings.HasPrefix(s[i:], "--"):
+			end = spanEnd(s, i+2, "\n")
+		case strings.HasPrefix(s[i:], "/*"):
+			end = spanEnd(s, i+2, "*/")
+		case s[i] == '$' && (i == 0 || !isIdentifierPart(s[i-1]) && s[i-1] != '$') && dollarQuoteTag.MatchString(s[i:]):
+			tag := dollarQuoteTag.FindString(s[i:])
+			end = spanEnd(s, i+len(tag), tag)
+		default:
+			i++
+			continue
+		}
+		for k := i; k < end; k++ {
+			b[k] = ' '
+		}
+		i = end
+	}
+	return string(b)
+}
+
+// spanEnd returns the index after the first closer at or after from, or len(s).
+func spanEnd(s string, from int, closer string) int {
+	if j := strings.Index(s[from:], closer); j >= 0 {
+		return from + j + len(closer)
+	}
+	return len(s)
+}
+
+// maskSQLAnyDialect blanks text that either backslash reading treats as quoted.
+// One reading is the dialect's, so text a viewer typed is always blanked.
+func maskSQLAnyDialect(expr string) string {
+	a, b := []byte(maskSQL(expr, true)), maskSQL(expr, false)
+	for i := range a {
+		if b[i] == ' ' {
+			a[i] = ' '
+		}
+	}
+	return string(a)
+}
+
+// maskSQL masks expr for finding {refs} and aggregates. Without a dialect, as
+// when a model loads, text either reading quotes is blanked, so a viewer value
+// can never add a ref; with one, the dialect's own reading is used.
+func (e *Engine) maskSQL(expr string) string {
+	if e.Dialect == "" {
+		return maskSQLAnyDialect(expr)
+	}
+	return maskSQL(expr, backslashEscapes(e.Dialect))
+}
+
+func derivedFilterError(name string) error {
+	return fmt.Errorf("metric %q: filter is not supported on derived metrics; put it on the base metrics it references", name)
+}
+
+// standardStringDialects read a backslash in '...' as an ordinary character.
+var standardStringDialects = map[string]bool{
+	"postgres": true, "duckdb": true, "redshift": true, "sqlite": true, "mssql": true,
+	"tsql": true, "fabric": true, "oracle": true, "trino": true, "athena": true,
+}
+
+// backslashEscapes is false only for dialects known to treat a backslash as
+// text; elsewhere it is true, which keeps DAC's \' escaped values in quotes.
+func backslashEscapes(dialect string) bool { return !standardStringDialects[dialect] }
 
 // Engine generates SQL from a Model and a Query.
 type Engine struct {
@@ -128,6 +204,17 @@ func (e *Engine) validate() error {
 			return fmt.Errorf("duplicate name: %s", m.Name)
 		}
 		names[m.Name] = true
+		if m.Filter != "" && e.isDerived(&m) {
+			return derivedFilterError(m.Name)
+		}
+		// The dialect is not known yet, so accept either reading of backslashes;
+		// SQL generation checks again with the dialect's rules.
+		if m.Filter != "" {
+			_, errEsc := applyMetricFilter(m.Expression, "true", true)
+			if _, err := applyMetricFilter(m.Expression, "true", false); err != nil && errEsc != nil {
+				return fmt.Errorf("metric %q: %w", m.Name, err)
+			}
+		}
 	}
 	for _, s := range e.model.Segments {
 		if s.Name == "" {
@@ -177,7 +264,7 @@ func (e *Engine) validate() error {
 	}
 
 	for _, m := range e.model.Metrics {
-		if isDerived(&m) && !isWindow(&m) {
+		if e.isDerived(&m) && !isWindow(&m) {
 			if err := e.validateRefs(m.Name, map[string]bool{}); err != nil {
 				return fmt.Errorf("metric %q: %w", m.Name, err)
 			}
@@ -235,8 +322,8 @@ func (e *Engine) ValidateNote(id string) error {
 // isMixedExpression reports whether a metric expression contains both {refs}
 // and a raw aggregation function call. Such metrics work in simple queries but
 // cannot be hoisted into the inner subquery of a window-wrapped query.
-func isMixedExpression(m *Metric) bool {
-	return isDerived(m) && containsAggregateOutsideRefs(m.Expression)
+func (e *Engine) isMixedExpression(m *Metric) bool {
+	return e.isDerived(m) && e.containsAggregateOutsideRefs(m.Expression)
 }
 
 // findMixedAggregationDep walks the {ref} chain of a window metric and returns
@@ -255,10 +342,10 @@ func (e *Engine) findMixedAggregationDep(rootName string) (string, bool) {
 		if m == nil {
 			return "", false
 		}
-		if name != rootName && isMixedExpression(m) {
+		if name != rootName && e.isMixedExpression(m) {
 			return name, true
 		}
-		for _, ref := range extractRefs(m.Expression) {
+		for _, ref := range e.extractRefs(m.Expression) {
 			if dep, ok := walk(ref); ok {
 				return dep, true
 			}
@@ -269,7 +356,7 @@ func (e *Engine) findMixedAggregationDep(rootName string) (string, bool) {
 }
 
 func (e *Engine) validateWindowMetric(m *Metric) error {
-	refs := extractRefs(m.Expression)
+	refs := e.extractRefs(m.Expression)
 	if len(refs) != 1 || strings.TrimSpace(m.Expression) != "{"+refs[0]+"}" {
 		return fmt.Errorf("window metric %q: expression must be exactly a single {ref}, got %q", m.Name, m.Expression)
 	}
@@ -314,7 +401,7 @@ func (e *Engine) validateRefs(name string, visited map[string]bool) error {
 	if m == nil {
 		return fmt.Errorf("metric not found: %s", name)
 	}
-	for _, ref := range extractRefs(m.Expression) {
+	for _, ref := range e.extractRefs(m.Expression) {
 		if e.metrics[ref] == nil {
 			return fmt.Errorf("references unknown metric {%s}", ref)
 		}
@@ -601,27 +688,34 @@ func (e *Engine) expandSimple(name string, visited map[string]bool, plan *queryP
 	if m == nil {
 		return "", fmt.Errorf("metric not found: %s", name)
 	}
+	if m.Filter != "" && e.isDerived(m) {
+		return "", derivedFilterError(name)
+	}
 
 	if isWindow(m) {
 		return "", fmt.Errorf("window metric %q in simple query path", name)
 	}
 
-	if !isDerived(m) {
+	if !e.isDerived(m) {
 		expr := m.Expression
 		if plan != nil && plan.hasJoins() {
-			expr = qualifySQLIdentifiers(expr, "base")
+			expr = qualifySQLIdentifiers(expr, "base", backslashEscapes(e.Dialect))
 		}
 		if m.Filter != "" {
 			expandedFilter, _, err := e.expandFilterExpr(m.Filter, plan)
 			if err != nil {
 				return "", err
 			}
-			return applyMetricFilter(expr, expandedFilter), nil
+			filtered, err := applyMetricFilter(expr, expandedFilter, backslashEscapes(e.Dialect))
+			if err != nil {
+				return "", fmt.Errorf("metric %q: %w", name, err)
+			}
+			return filtered, nil
 		}
 		return expr, nil
 	}
 
-	return expandRefs(m.Expression, func(refName string) (string, error) {
+	return e.expandRefs(m.Expression, func(refName string) (string, error) {
 		expanded, err := e.expandSimple(refName, copyVisited(visited), plan)
 		if err != nil {
 			return "", err
@@ -712,8 +806,11 @@ func (e *Engine) expandOuter(name string, visited map[string]bool) (string, erro
 	if m == nil {
 		return "", fmt.Errorf("metric not found: %s", name)
 	}
+	if m.Filter != "" && e.isDerived(m) {
+		return "", derivedFilterError(name)
+	}
 
-	if !isDerived(m) && !isWindow(m) {
+	if !e.isDerived(m) && !isWindow(m) {
 		return "base." + name, nil
 	}
 
@@ -721,7 +818,7 @@ func (e *Engine) expandOuter(name string, visited map[string]bool) (string, erro
 		return e.windowSQL(m), nil
 	}
 
-	return expandRefs(m.Expression, func(refName string) (string, error) {
+	return e.expandRefs(m.Expression, func(refName string) (string, error) {
 		expanded, err := e.expandOuter(refName, copyVisited(visited))
 		if err != nil {
 			return "", err
@@ -734,7 +831,7 @@ func (e *Engine) expandOuter(name string, visited map[string]bool) (string, erro
 }
 
 func (e *Engine) windowSQL(m *Metric) string {
-	refs := extractRefs(m.Expression)
+	refs := e.extractRefs(m.Expression)
 	if len(refs) == 0 {
 		return m.Expression
 	}
@@ -775,8 +872,8 @@ func (e *Engine) windowSQL(m *Metric) string {
 	}
 }
 
-func expandRefs(expr string, resolve func(string) (string, error)) (string, error) {
-	masked := maskTemplateDelimiters(expr)
+func (e *Engine) expandRefs(expr string, resolve func(string) (string, error)) (string, error) {
+	masked := e.maskSQL(expr)
 	indices := refPattern.FindAllStringSubmatchIndex(masked, -1)
 	if len(indices) == 0 {
 		return expr, nil
@@ -812,33 +909,69 @@ func expandRefs(expr string, resolve func(string) (string, error)) (string, erro
 	return b.String(), nil
 }
 
-func applyMetricFilter(expr, filter string) string {
-	expr = strings.TrimSpace(expr)
-	parenIdx := strings.Index(expr, "(")
-	if parenIdx == -1 {
-		return expr
+var distinctPrefix = regexp.MustCompile(`(?i)^DISTINCT\b`)
+
+// aggregateModifierPattern matches clauses inside an aggregate's parentheses
+// that cannot go inside the CASE, such as array_agg(x ORDER BY y).
+var aggregateModifierPattern = regexp.MustCompile(`(?i)\b(ORDER\s+BY|IGNORE\s+NULLS|RESPECT\s+NULLS|SEPARATOR|LIMIT)\b`)
+
+// applyMetricFilter puts filter inside a metric that is one aggregate call
+// with one argument, such as sum(x). Like Cube and Looker, other shapes are
+// rejected: filter a base metric and wrap it in a derived metric instead.
+func applyMetricFilter(expr, filter string, backslashEscapes bool) (string, error) {
+	shapeErr := fmt.Errorf("a metric with filter must be one aggregate call with one argument, such as sum(amount), got %q; to round or combine it, reference it from a derived metric such as round({metric}, 2)", expr)
+	masked := maskSQL(expr, backslashEscapes)
+	end := len(strings.TrimRight(masked, " \t\r\n;"))
+	start := end - len(strings.TrimLeft(masked[:end], " \t\r\n"))
+	open := strings.IndexByte(masked[start:end], '(') + start
+	if open <= start || findMatchingParen(masked, open) != end-1 {
+		return "", shapeErr
+	}
+	name := strings.TrimSpace(expr[start:open])
+	inner, maskedInner := expr[open+1:end-1], masked[open+1:end-1]
+	top := topLevelSQL(maskedInner)
+	if !plainColumnPattern.MatchString(name) || aggregateFuncPattern.MatchString(maskedInner) || strings.Contains(top, ",") || aggregateModifierPattern.MatchString(top) {
+		return "", shapeErr
 	}
 
-	funcName := strings.TrimSpace(expr[:parenIdx])
-	closeIdx := findMatchingParen(expr, parenIdx)
-	if closeIdx == -1 {
-		return expr
+	arg, distinct := strings.TrimSpace(inner), ""
+	if distinctPrefix.MatchString(arg) {
+		arg, distinct = strings.TrimSpace(arg[len("DISTINCT"):]), "DISTINCT "
 	}
-
-	inner := expr[parenIdx+1 : closeIdx]
-	innerTrim := strings.TrimSpace(inner)
-
-	if innerTrim == "*" {
-		return fmt.Sprintf("%s(CASE WHEN %s THEN 1 ELSE NULL END)", funcName, filter)
+	if arg == "*" {
+		arg = "1"
 	}
-
-	upperInner := strings.ToUpper(innerTrim)
-	if strings.HasPrefix(upperInner, "DISTINCT ") {
-		arg := strings.TrimSpace(innerTrim[len("DISTINCT "):])
-		return fmt.Sprintf("%s(DISTINCT CASE WHEN %s THEN %s ELSE NULL END)", funcName, filter, arg)
+	if arg == "" {
+		return "", shapeErr
 	}
+	return fmt.Sprintf("%s(%sCASE WHEN %s THEN %s ELSE NULL END)", name, distinct, endLineComment(filter), endLineComment(arg)), nil
+}
 
-	return fmt.Sprintf("%s(CASE WHEN %s THEN %s ELSE NULL END)", funcName, filter, inner)
+// topLevelSQL blanks everything inside parentheses in masked SQL.
+func topLevelSQL(masked string) string {
+	b := []byte(masked)
+	depth := 0
+	for i, c := range b {
+		switch {
+		case c == '(':
+			depth++
+			b[i] = ' '
+		case c == ')':
+			depth--
+			b[i] = ' '
+		case depth > 0:
+			b[i] = ' '
+		}
+	}
+	return string(b)
+}
+
+// endLineComment ends a trailing -- comment so the SQL after it still runs.
+func endLineComment(s string) string {
+	if strings.Contains(s, "--") {
+		return s + "\n"
+	}
+	return s
 }
 
 func findMatchingParen(s string, openIdx int) int {
@@ -905,11 +1038,11 @@ func (e *Engine) buildWhereHaving(q *Query, plan *queryPlan) (where, having stri
 }
 
 func (e *Engine) expandFilterExpr(expr string, plan *queryPlan) (string, bool, error) {
-	masked := maskTemplateDelimiters(expr)
-	hasAggregate := containsAggregateOutsideRefs(expr)
+	masked := e.maskSQL(expr)
+	hasAggregate := e.containsAggregateOutsideRefs(expr)
 	if !refPattern.MatchString(masked) {
 		if plan != nil && plan.hasJoins() {
-			expr = qualifySQLIdentifiers(expr, "base")
+			expr = qualifySQLIdentifiers(expr, "base", backslashEscapes(e.Dialect))
 		}
 		return expr, hasAggregate, nil
 	}
@@ -917,13 +1050,13 @@ func (e *Engine) expandFilterExpr(expr string, plan *queryPlan) (string, bool, e
 	hasMetricRef := false
 	var expandErr error
 
-	result := refPattern.ReplaceAllStringFunc(masked, func(match string) string {
+	expand := func(match string) string {
 		refName := match[1 : len(match)-1]
 
 		if dim, ok := e.dims[refName]; ok {
 			expr := e.dimExpr(dim, "")
 			if plan != nil && plan.hasJoins() {
-				expr = qualifySQLIdentifiers(expr, "base")
+				expr = qualifySQLIdentifiers(expr, "base", backslashEscapes(e.Dialect))
 			}
 			return expr
 		}
@@ -950,10 +1083,18 @@ func (e *Engine) expandFilterExpr(expr string, plan *queryPlan) (string, bool, e
 
 		expandErr = fmt.Errorf("unknown reference {%s} in filter", refName)
 		return match
-	})
+	}
 
-	result = strings.NewReplacer("@@", "{{", "##", "}}").Replace(result)
-	return result, hasMetricRef || hasAggregate, expandErr
+	// Refs are found in the masked text, so a {name} inside quotes stays text.
+	var b strings.Builder
+	prev := 0
+	for _, loc := range refPattern.FindAllStringIndex(masked, -1) {
+		b.WriteString(expr[prev:loc[0]])
+		b.WriteString(expand(expr[loc[0]:loc[1]]))
+		prev = loc[1]
+	}
+	b.WriteString(expr[prev:])
+	return b.String(), hasMetricRef || hasAggregate, expandErr
 }
 
 func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) string {
@@ -1135,6 +1276,9 @@ func formatValue(v interface{}, dialect ...string) string {
 			// GoogleSQL accepts double-quoted strings and Go's escape sequences.
 			return strconv.Quote(val)
 		}
+		if len(dialect) > 0 && dialect[0] != "" && backslashEscapes(dialect[0]) {
+			val = strings.ReplaceAll(val, `\`, `\\`)
+		}
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
 	case int:
 		return strconv.Itoa(val)
@@ -1186,7 +1330,7 @@ func (e *Engine) needsWindowWrap(metricNames []string) bool {
 		if isWindow(m) {
 			return true
 		}
-		for _, ref := range extractRefs(m.Expression) {
+		for _, ref := range e.extractRefs(m.Expression) {
 			if check(ref) {
 				return true
 			}
@@ -1204,19 +1348,24 @@ func (e *Engine) needsWindowWrap(metricNames []string) bool {
 func (e *Engine) collectInnerMetrics(metricNames []string) []string {
 	include := map[string]bool{}
 	visited := map[string]bool{}
+	depsSeen := map[string]bool{}
 	var collectDeps func(string)
 	var collectForQuery func(string)
 
 	collectDeps = func(name string) {
+		if depsSeen[name] {
+			return
+		}
+		depsSeen[name] = true
 		m := e.metrics[name]
 		if m == nil || isWindow(m) {
 			return
 		}
-		if !isDerived(m) {
+		if !e.isDerived(m) {
 			include[name] = true
 			return
 		}
-		for _, ref := range extractRefs(m.Expression) {
+		for _, ref := range e.extractRefs(m.Expression) {
 			collectDeps(ref)
 		}
 	}
@@ -1232,7 +1381,7 @@ func (e *Engine) collectInnerMetrics(metricNames []string) []string {
 			return
 		}
 		if isWindow(m) {
-			for _, ref := range extractRefs(m.Expression) {
+			for _, ref := range e.extractRefs(m.Expression) {
 				if refMetric := e.metrics[ref]; refMetric != nil && !isWindow(refMetric) {
 					include[ref] = true
 				}
@@ -1240,11 +1389,11 @@ func (e *Engine) collectInnerMetrics(metricNames []string) []string {
 			}
 			return
 		}
-		if !isDerived(m) {
+		if !e.isDerived(m) {
 			include[name] = true
 			return
 		}
-		for _, ref := range extractRefs(m.Expression) {
+		for _, ref := range e.extractRefs(m.Expression) {
 			collectForQuery(ref)
 		}
 	}
@@ -1300,7 +1449,7 @@ func (e *Engine) collectInnerDimensions(q *Query) []DimensionRef {
 				seen[m.Window.OrderBy] = true
 			}
 		}
-		for _, ref := range extractRefs(m.Expression) {
+		for _, ref := range e.extractRefs(m.Expression) {
 			collect(ref)
 		}
 	}
@@ -1330,7 +1479,7 @@ func (e *Engine) validateMetricFiltersForWrapped(name string, visited map[string
 			return fmt.Errorf("metric %q filter cannot reference aggregates in wrapped queries", name)
 		}
 	}
-	for _, ref := range extractRefs(m.Expression) {
+	for _, ref := range e.extractRefs(m.Expression) {
 		if err := e.validateMetricFiltersForWrapped(ref, copyVisited(visited)); err != nil {
 			return err
 		}
@@ -1369,11 +1518,11 @@ func containsOperator(s string) bool {
 	return false
 }
 
-func isDerived(m *Metric) bool { return refPattern.MatchString(maskTemplateDelimiters(m.Expression)) }
-func isWindow(m *Metric) bool  { return m.Window != nil }
+func (e *Engine) isDerived(m *Metric) bool { return refPattern.MatchString(e.maskSQL(m.Expression)) }
+func isWindow(m *Metric) bool              { return m.Window != nil }
 
-func extractRefs(expr string) []string {
-	matches := refPattern.FindAllStringSubmatch(maskTemplateDelimiters(expr), -1)
+func (e *Engine) extractRefs(expr string) []string {
+	matches := refPattern.FindAllStringSubmatch(e.maskSQL(expr), -1)
 	refs := make([]string, len(matches))
 	for i, m := range matches {
 		refs[i] = m[1]

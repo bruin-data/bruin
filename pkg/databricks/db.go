@@ -3,6 +3,7 @@ package databricks
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -417,6 +418,198 @@ ORDER BY t.table_schema, t.table_name;
 	})
 
 	return summary, nil
+}
+
+var (
+	// plainIdentifier matches the asset name components that Databricks reads
+	// without backticks.
+	plainIdentifier = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+	// likeSafeName matches names that mean the same in a SHOW ... LIKE pattern,
+	// whether the pattern is read as a regular expression or as SQL LIKE (where
+	// `_` matches any character, which only widens the listing).
+	likeSafeName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+)
+
+// relationName is an asset name split into the identifiers it refers to. The
+// catalog is empty for a two-part name, which resolves against the session's
+// current catalog.
+type relationName struct {
+	catalog string
+	schema  string
+	table   string
+}
+
+func (r relationName) schemaRef() string {
+	if r.catalog == "" {
+		return quoteIdentifier(r.schema)
+	}
+	return quoteIdentifier(r.catalog) + "." + quoteIdentifier(r.schema)
+}
+
+func quoteIdentifier(identifier string) string {
+	return "`" + strings.ReplaceAll(identifier, "`", "``") + "`"
+}
+
+// parseRelationName splits an asset name the way the materializer's SQL reads
+// it: the last component is the table, the one before it the schema, and the
+// first of three the catalog. Components are plain identifiers or quoted with
+// backticks; anything else is an error rather than a guess.
+func parseRelationName(name string) (relationName, error) {
+	cb, ok := tablename.For("databricks")
+	if !ok {
+		return relationName{}, errors.New("databricks table-name capability not found")
+	}
+	if err := cb.CheckName(name); err != nil {
+		return relationName{}, err
+	}
+
+	parts := strings.Split(name, ".")
+	identifiers := make([]string, len(parts))
+	for i, part := range parts {
+		identifier, err := parseIdentifier(part)
+		if err != nil {
+			return relationName{}, fmt.Errorf("cannot resolve table name %q: %w", name, err)
+		}
+		identifiers[i] = identifier
+	}
+
+	n := len(identifiers)
+	relation := relationName{schema: identifiers[n-2], table: identifiers[n-1]}
+	if n == 3 {
+		relation.catalog = identifiers[0]
+	}
+
+	return relation, nil
+}
+
+func parseIdentifier(part string) (string, error) {
+	part = strings.TrimSpace(part)
+	if len(part) >= 2 && strings.HasPrefix(part, "`") && strings.HasSuffix(part, "`") {
+		quoted := part[1 : len(part)-1]
+		if quoted == "" || strings.Contains(strings.ReplaceAll(quoted, "``", ""), "`") {
+			return "", fmt.Errorf("invalid quoted identifier %s", part)
+		}
+		// A path such as delta.`/mnt/table` names a table by its location, which
+		// SHOW TABLES does not list.
+		if strings.Contains(quoted, "/") {
+			return "", fmt.Errorf("path-based table %s cannot be checked", part)
+		}
+		return strings.ReplaceAll(quoted, "``", "`"), nil
+	}
+
+	if !plainIdentifier.MatchString(part) {
+		return "", fmt.Errorf("identifier %q has to be quoted with backticks", part)
+	}
+
+	return part, nil
+}
+
+// RelationExists reports whether a table, view or any other relation exists
+// under tableName, so an incremental asset can create its table on the first
+// run.
+//
+// The materializer writes to the asset name as written, so a two-part name
+// resolves against the session's current catalog: the connection's catalog, or
+// the workspace default when it has none. The lookup runs the unqualified name
+// on the same connection to resolve it the same way. Databricks compares
+// identifiers case-insensitively, and so does the lookup.
+//
+// SHOW TABLES lists tables, views, materialized views and streaming tables, in
+// Unity Catalog and in hive_metastore. It fails when the schema or its catalog
+// does not exist, but also on any other error, so a missing schema or catalog
+// is only reported when SHOW SCHEMAS or SHOW CATALOGS succeeds without it. All
+// three are metadata commands that run on the connection's SQL warehouse or
+// cluster.
+func (db *DB) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	relation, err := parseRelationName(tableName)
+	if err != nil {
+		return false, err
+	}
+
+	exists, tablesErr := db.listingContains(ctx, "SHOW TABLES IN "+relation.schemaRef(), relation.table, "tableName")
+	if tablesErr == nil {
+		return exists, nil
+	}
+	tablesErr = fmt.Errorf("failed to list the tables in %s: %w", relation.schemaRef(), tablesErr)
+
+	showSchemas := "SHOW SCHEMAS"
+	if relation.catalog != "" {
+		showSchemas += " IN " + quoteIdentifier(relation.catalog)
+	}
+	schemaExists, err := db.listingContains(ctx, showSchemas, relation.schema, "")
+	if err == nil {
+		if schemaExists {
+			return false, tablesErr
+		}
+		return false, nil
+	}
+	// spark_catalog is an alias of the session catalog that SHOW CATALOGS does
+	// not have to list, so it never counts as a missing catalog.
+	if relation.catalog == "" || strings.EqualFold(relation.catalog, "spark_catalog") {
+		return false, tablesErr
+	}
+
+	catalogExists, err := db.listingContains(ctx, "SHOW CATALOGS", relation.catalog, "")
+	if err != nil || catalogExists {
+		return false, tablesErr
+	}
+
+	return false, nil
+}
+
+// listingContains runs a SHOW statement and reports whether it lists name,
+// compared case-insensitively. column is the output column that holds the
+// names; when it is empty or missing from the output, every column is
+// compared, which can only report a name that is not there.
+func (db *DB) listingContains(ctx context.Context, statement, name, column string) (bool, error) {
+	if likeSafeName.MatchString(name) {
+		// LIKE only narrows the listing down; names are compared exactly below.
+		// Databricks stores identifiers in lower case.
+		statement += " LIKE '" + strings.ToLower(name) + "'"
+	}
+
+	result, err := db.SelectWithSchema(ctx, &query.Query{Query: statement})
+	if err != nil {
+		return false, err
+	}
+
+	nameColumn := -1
+	for i, c := range result.Columns {
+		if column != "" && strings.EqualFold(c, column) {
+			nameColumn = i
+			break
+		}
+	}
+
+	for _, row := range result.Rows {
+		hasName := false
+		for i, cell := range row {
+			if nameColumn >= 0 && i != nameColumn {
+				continue
+			}
+
+			var value string
+			switch v := cell.(type) {
+			case string:
+				value = v
+			case []byte:
+				value = string(v)
+			default:
+				continue
+			}
+
+			hasName = true
+			if strings.EqualFold(value, name) {
+				return true, nil
+			}
+		}
+
+		if !hasName {
+			return false, fmt.Errorf("unexpected output from %s: %v", statement, row)
+		}
+	}
+
+	return false, nil
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {

@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -203,6 +204,9 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		return issues, nil
 	}
 	valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
+	if tableNotBuiltYet(err, p, asset, renderWith(extractor)) {
+		return issues, nil
+	}
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -362,6 +366,10 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 				return
 			}
 			valid, err := valll.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
+			if tableNotBuiltYet(err, p, task, renderWith(extractor)) {
+				q.Logger.Debugf("skipping query validation for asset '%s', it reads a table that has not been built yet", task.Name)
+				return
+			}
 			if err != nil {
 				mu.Lock()
 				issues = append(issues, &Issue{
@@ -387,6 +395,63 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 	q.Logger.Debugf("Workers finished for task '%s'", task.Name)
 	done <- issues
 	q.Logger.Debugf("Pushed issues to the done channel for task '%s'", task.Name)
+}
+
+// missingTableError matches DuckDB's error for a table that does not exist.
+var missingTableError = regexp.MustCompile(`Table with name (.+?) does not exist`)
+
+// tableNotBuiltYet reports whether err is about a missing table that the pipeline creates before
+// this asset runs, as opposed to a misspelled name: another asset that builds it on the same
+// connection, or a pre-hook of this asset that creates it.
+// render resolves the Jinja in a hook with the asset's context, as a run does.
+func tableNotBuiltYet(err error, p *pipeline.Pipeline, asset *pipeline.Asset, render func(string) (string, error)) bool {
+	if err == nil {
+		return false
+	}
+	match := missingTableError.FindStringSubmatch(err.Error())
+	if match == nil {
+		return false
+	}
+	missing := strings.ToLower(strings.Trim(match[1], `"`))
+	createsMissing := regexp.MustCompile(`(?is)\bcreate\b[^;]*\b` + regexp.QuoteMeta(missing) + `\b`)
+	for _, hook := range asset.Hooks.Pre {
+		hookQuery, renderErr := render(hook.Query)
+		if renderErr != nil {
+			hookQuery = hook.Query
+		}
+		if createsMissing.MatchString(hookQuery) {
+			return true
+		}
+	}
+	connName, connErr := p.GetConnectionNameForAsset(asset)
+	if connErr != nil {
+		return false
+	}
+	for _, builder := range p.Assets {
+		name := strings.ToLower(builder.Name)
+		if name != missing && !strings.HasSuffix(name, "."+missing) {
+			continue
+		}
+		// Source assets describe tables that already exist; they do not build them.
+		if strings.HasSuffix(string(builder.Type), ".source") {
+			continue
+		}
+		if builderConn, err := p.GetConnectionNameForAsset(builder); err == nil && builderConn == connName {
+			return true
+		}
+	}
+	return false
+}
+
+// renderWith renders text through an asset's query extractor, which applies its Jinja context.
+func renderWith(extractor query.QueryExtractor) func(string) (string, error) {
+	return func(text string) (string, error) {
+		queries, err := extractor.ExtractQueriesFromString(text)
+		if err != nil || len(queries) == 0 {
+			return text, err
+		}
+		return queries[0].Query, nil
+	}
 }
 
 func (q *QueryValidatorRule) bufferSize() int {

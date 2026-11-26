@@ -334,7 +334,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	cmd := Cloud(&isDebug)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "cloud", cmd.Name)
-	assert.Len(t, cmd.Commands, 24)
+	assert.Len(t, cmd.Commands, 25)
 
 	subNames := make([]string, len(cmd.Commands))
 	for i, sub := range cmd.Commands {
@@ -346,6 +346,7 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "act-as")
 	assert.Contains(t, subNames, "teams")
 	assert.Contains(t, subNames, "cost")
+	assert.Contains(t, subNames, "queries")
 	assert.Contains(t, subNames, "data-apps")
 	assert.Contains(t, subNames, "projects")
 	assert.Contains(t, subNames, "pipelines")
@@ -364,6 +365,18 @@ func TestCloudCommand_Help(t *testing.T) {
 	assert.Contains(t, subNames, "skills")
 	assert.Contains(t, subNames, "audit-logs")
 	assert.Contains(t, subNames, "config")
+}
+
+func TestCloudTeamsCommand_Subcommands(t *testing.T) {
+	t.Parallel()
+	cmd := CloudTeams()
+	require.NotNil(t, cmd)
+
+	subNames := make([]string, len(cmd.Commands))
+	for i, sub := range cmd.Commands {
+		subNames[i] = sub.Name
+	}
+	assert.Equal(t, []string{"list", "roles", "members"}, subNames)
 }
 
 func TestCloudSkillsCommand_Help(t *testing.T) {
@@ -2143,4 +2156,86 @@ func TestCloudConnectionSetsCostLimit_PrintsOnlyChangedLimits(t *testing.T) { //
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(output, &got))
 	assert.Equal(t, map[string]any{"id": 7.0, "connection": "", "max_query_cost": 1.0}, got)
+}
+
+func TestConnectionsToRetain(t *testing.T) {
+	t.Parallel()
+
+	kept := bruincloud.ConnectionSetRetain{Type: "clickhouse", Name: "events_db"}
+	existing := []bruincloud.Connection{
+		{Type: "postgres", Name: "my_pg"},
+		{Type: kept.Type, Name: kept.Name},
+	}
+	inputs := []bruincloud.ConnectionSetInput{
+		{Type: "postgres", Name: "my_pg", Config: map[string]any{"password": "new"}},
+		{Type: "snowflake", Name: "sf", Config: map[string]any{"account": "acme"}},
+	}
+
+	assert.Equal(t, []bruincloud.ConnectionSetRetain{kept}, connectionsToRetain(existing, inputs))
+}
+
+func TestCloudConnectionSetsUpdateCommand(t *testing.T) { //nolint:paralleltest // sets process environment
+	configFile := filepath.Join(t.TempDir(), ".bruin.yml")
+	require.NoError(t, os.WriteFile(configFile, []byte(`default_environment: default
+environments:
+  default:
+    connections:
+      postgres:
+        - name: app_db
+          host: localhost
+          port: 5432
+          username: u
+          password: secret
+          database: d
+`), 0o600))
+
+	tests := []struct {
+		name     string
+		replace  bool
+		wantRead bool
+		wantSent []string
+	}{
+		{name: "keeps the set's other connections", wantRead: true, wantSent: []string{"app_db", "lake"}},
+		{name: "replace sends only the named ones", replace: true, wantSent: []string{"app_db"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			read := false
+			var body struct {
+				Connections []map[string]any `json:"connections"`
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/connection-sets/7/connections":
+					read = true
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte(`{"connections":[{"type":"postgres","name":"app_db"},{"type":"snowflake","name":"lake"}]}`))
+				case r.Method == http.MethodPut && r.URL.Path == "/connection-sets/7":
+					assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte(`{"success":true}`))
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			t.Cleanup(server.Close)
+			t.Setenv("BRUIN_CLOUD_BASE_URL", server.URL)
+
+			args := []string{"update", "--api-key", "test-key", "--set-id", "7", "--connection", "app_db", "--config-file", configFile, "--skip-validation"}
+			if tt.replace {
+				args = append(args, "--replace")
+			}
+			require.NoError(t, cloudConnectionSetsUpdate().Run(t.Context(), args))
+
+			assert.Equal(t, tt.wantRead, read)
+			sent := make([]string, 0, len(body.Connections))
+			for _, connection := range body.Connections {
+				name, _ := connection["name"].(string)
+				sent = append(sent, name)
+				_, hasConfig := connection["config"]
+				assert.Equal(t, name == "app_db", hasConfig)
+			}
+			assert.Equal(t, tt.wantSent, sent)
+		})
+	}
 }

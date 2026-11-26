@@ -1,1 +1,1 @@
-{{ some_macro() }}
+{% macro some_macro() %}1{% endmacro %}

@@ -1050,6 +1050,7 @@ func (c DuneConnection) GetName() string {
 type OdooConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	Host               string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port               int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
 	Database           string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Username           string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
@@ -1059,6 +1060,35 @@ type OdooConnection struct {
 }
 
 func (c OdooConnection) GetName() string {
+	return c.Name
+}
+
+type BreezyHRConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	CompanyID          string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
+}
+
+func (c BreezyHRConnection) GetName() string {
+	return c.Name
+}
+
+type PrivatusConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string   `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+	SiteIDs            []string `yaml:"site_ids,omitempty" json:"site_ids,omitempty" mapstructure:"site_ids"`
+}
+
+func (c PrivatusConnection) GetName() string {
+	return c.Name
+}
+
+type PeeringDBConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c PeeringDBConnection) GetName() string {
 	return c.Name
 }
 

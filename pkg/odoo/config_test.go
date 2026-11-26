@@ -78,6 +78,67 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			want: "odoo://mycompany.odoo.com?api=auto&api_key=key_123",
 		},
 		{
+			name: "port",
+			config: Config{
+				Host:   "erp.example.com",
+				Port:   8443,
+				APIKey: "key_123",
+			},
+			want: "odoo://erp.example.com:8443?api_key=key_123",
+		},
+		{
+			name: "port goes before the path prefix",
+			config: Config{
+				Host:   "erp.example.com/odoo/",
+				Port:   8443,
+				APIKey: "key_123",
+			},
+			want: "odoo://erp.example.com:8443/odoo?api_key=key_123",
+		},
+		{
+			name: "port with an IPv6 host",
+			config: Config{
+				Host:   "::1",
+				Port:   8069,
+				APIKey: "key_123",
+			},
+			want: "odoo://[::1]:8069?api_key=key_123",
+		},
+		{
+			name: "port with a bracketed IPv6 host and path prefix",
+			config: Config{
+				Host:   "[2001:db8::1]/odoo",
+				Port:   8069,
+				APIKey: "key_123",
+			},
+			want: "odoo://[2001:db8::1]:8069/odoo?api_key=key_123",
+		},
+		{
+			name: "bracketed IPv6 host with its own port",
+			config: Config{
+				Host:   "[2001:db8::1]:8069",
+				APIKey: "key_123",
+			},
+			want: "odoo://[2001:db8::1]:8069?api_key=key_123",
+		},
+		{
+			name: "port in host with path prefix",
+			config: Config{
+				Host:   "erp.example.com:8069/odoo",
+				APIKey: "key_123",
+			},
+			want: "odoo://erp.example.com:8069/odoo?api_key=key_123",
+		},
+		{
+			name: "highest port",
+			config: Config{
+				Host:   "erp.example.com",
+				Port:   65535,
+				APIKey: "key_123",
+			},
+			want: "odoo://erp.example.com:65535?api_key=key_123",
+		},
+		{
 			name:    "missing host",
 			config:  Config{APIKey: "key_123"},
 			wantErr: "odoo: host must be provided",
@@ -127,6 +188,36 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			config:  Config{Host: "mycompany.odoo.com", APIKey: "key_123", PageSize: 5001},
 			wantErr: "odoo: page_size must be between 1 and 5000, got 5001",
 		},
+		{
+			name:    "port in both host and port",
+			config:  Config{Host: "erp.example.com:8069", Port: 8443, APIKey: "key_123"},
+			wantErr: `odoo: host "erp.example.com:8069" already includes a port; set the port in either host or port, not both`,
+		},
+		{
+			name:    "port in both host with path prefix and port",
+			config:  Config{Host: "erp.example.com:8069/odoo", Port: 8443, APIKey: "key_123"},
+			wantErr: `odoo: host "erp.example.com:8069/odoo" already includes a port; set the port in either host or port, not both`,
+		},
+		{
+			name:    "port in both bracketed IPv6 host and port",
+			config:  Config{Host: "[::1]:8069", Port: 8443, APIKey: "key_123"},
+			wantErr: `odoo: host "[::1]:8069" already includes a port; set the port in either host or port, not both`,
+		},
+		{
+			name:    "malformed bracketed IPv6 host with port",
+			config:  Config{Host: "[::1", Port: 8443, APIKey: "key_123"},
+			wantErr: `odoo: host "[::1" is not a valid bracketed IPv6 address`,
+		},
+		{
+			name:    "negative port",
+			config:  Config{Host: "erp.example.com", Port: -1, APIKey: "key_123"},
+			wantErr: "odoo: port must be between 1 and 65535, got -1",
+		},
+		{
+			name:    "port above the maximum",
+			config:  Config{Host: "erp.example.com", Port: 65536, APIKey: "key_123"},
+			wantErr: "odoo: port must be between 1 and 65535, got 65536",
+		},
 	}
 
 	for _, tt := range tests {
@@ -172,6 +263,23 @@ func TestConfig_GetIngestrURI_RoundTrip(t *testing.T) {
 	assert.False(t, q.Has("scheme"))
 	assert.False(t, q.Has("api"))
 	assert.False(t, q.Has("page_size"))
+}
+
+// TestConfig_GetIngestrURI_PortRoundTrip checks that a separate port lands in the authority, where ingestr
+// reads it as part of the server address.
+func TestConfig_GetIngestrURI_PortRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	c := Config{Host: "erp.example.com/odoo", Port: 8443, APIKey: "key_123"}
+
+	uri, err := c.GetIngestrURI()
+	require.NoError(t, err)
+
+	parsed, err := url.Parse(uri)
+	require.NoError(t, err)
+	assert.Equal(t, "erp.example.com:8443", parsed.Host)
+	assert.Equal(t, "8443", parsed.Port())
+	assert.Equal(t, "/odoo", parsed.Path)
 }
 
 // TestConfig_GetIngestrURI_APIKeyIsMasked checks that the api_key in the URI is redacted by the masker
