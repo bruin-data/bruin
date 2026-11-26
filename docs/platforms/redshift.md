@@ -190,7 +190,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `rs.source`
 
-Defines Redshift source assets for documenting existing tables and views in your Redshift data warehouse. These assets are no-op (they don't execute), but are useful for:
+Defines Redshift source assets for documenting existing tables and views in your Redshift data warehouse. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing Redshift tables and views
 - Adding column descriptions and metadata

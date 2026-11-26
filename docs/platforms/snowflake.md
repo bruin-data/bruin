@@ -701,7 +701,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `sf.source`
 
-Defines Snowflake source assets for documenting existing tables and views in your Snowflake database. These assets are no-op (they don't execute), but are useful for:
+Defines Snowflake source assets for documenting existing tables and views in your Snowflake database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing Snowflake tables and views
 - Adding column descriptions and metadata

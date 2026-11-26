@@ -223,7 +223,7 @@ parameters:
 
 ### `athena.source`
 
-Defines Athena source assets for documenting existing tables and views in your Athena database. These assets are no-op (they don't execute), but are useful for:
+Defines Athena source assets for documenting existing tables and views in your Athena database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing Athena tables and views
 - Adding column descriptions and metadata
