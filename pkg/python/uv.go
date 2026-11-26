@@ -576,7 +576,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 	if logBuffer != nil {
 		// Successful loads hide ingestr's output, but its warnings must still reach the user.
-		for _, line := range executor.WarningLines(logBuffer.data) {
+		for _, line := range logBuffer.warnings {
 			_, _ = output.Write([]byte(">> " + line + "\n"))
 		}
 	}
@@ -678,6 +678,7 @@ type tailBuffer struct {
 	data      []byte
 	maxBytes  int
 	truncated bool
+	warnings  []string // kept in full, since the tail can drop early warnings
 }
 
 func newTailBuffer(maxBytes int) *tailBuffer {
@@ -687,6 +688,7 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.warnings = append(t.warnings, executor.WarningLines(p)...)
 	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)

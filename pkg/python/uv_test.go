@@ -811,6 +811,19 @@ func TestTailBuffer(t *testing.T) {
 	}
 }
 
+func TestTailBufferKeepsWarningsItDropsFromTheTail(t *testing.T) {
+	t.Parallel()
+	tb := newTailBuffer(16)
+	for _, w := range []string{">> Warning: skipped 3 rows\n", ">> aaaaaaa\n", ">> bbbbbbb\n", ">> WARNING: late\n"} {
+		_, _ = tb.Write([]byte(w))
+	}
+
+	var out bytes.Buffer
+	tb.flushTo(&out)
+	require.NotContains(t, out.String(), "skipped 3 rows")
+	assert.Equal(t, []string{"Warning: skipped 3 rows", "WARNING: late"}, tb.warnings)
+}
+
 func TestTailBufferNeverPrintsPartOfASecret(t *testing.T) {
 	t.Parallel()
 	const secret = "SECRETabcdefghij0123456789"
