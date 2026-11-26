@@ -2,6 +2,7 @@ package duck
 
 import (
 	"context"
+	"io"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -10,12 +11,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/schemaevolution"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
+	IsFullRefresh() bool
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
@@ -65,22 +68,27 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
-
 	if len(queries) == 0 {
 		return nil
 	}
-
 	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 
 	q := queries[0]
+	rawQuery := q.String()
 	writer := ctx.Value(executor.KeyPrinter)
-	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
-	if err != nil {
+	if err := o.materializer.LogIfFullRefreshAndDDL(writer, t); err != nil {
 		return err
 	}
-	materialized, err := o.materializer.Render(t, q.String())
+
+	fullRefresh := t.FullRefreshEnabled(o.materializer.IsFullRefresh())
+	shouldEvolve := schemaevolution.ShouldEvolve(t, fullRefresh)
+	if shouldEvolve {
+		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(duckDBSQLDialect, rawQuery)
+	}
+
+	materialized, err := o.renderMaterializedSQL(t, rawQuery, shouldEvolve)
 	if err != nil {
 		return err
 	}
@@ -91,15 +99,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		if err != nil {
 			return errors.Wrap(err, "cannot re-extract/render materialized query for time_interval strategy")
 		}
-
 		if len(renderedQueries) == 0 {
 			return errors.New("rendered queries unexpectedly empty")
 		}
-
 		q.Query = renderedQueries[0].Query
 	}
 
-	materializedQueries := []string{q.Query}
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
@@ -120,48 +125,125 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
-		err = conn.CreateSchemaIfNotExist(ctx, t)
-		if err != nil {
+		if err := conn.CreateSchemaIfNotExist(ctx, t); err != nil {
 			return err
 		}
 	}
 
 	defer conn.Close()
 
-	var lastQuery *query.Query
-	for _, queryString := range materializedQueries {
-		queryObj := &query.Query{Query: queryString}
-
-		if o.devEnv != nil {
-			queryObj, err = o.devEnv.Modify(ctx, p, t, queryObj)
-			if err != nil {
-				return err
-			}
-		}
-
-		ansisql.LogQueryIfVerbose(ctx, writer, queryObj.Query)
-
-		err = conn.RunQueryWithoutResult(ctx, queryObj)
+	queryObj := &query.Query{Query: q.Query}
+	if o.devEnv != nil {
+		queryObj, err = o.devEnv.Modify(ctx, p, t, queryObj)
 		if err != nil {
 			return err
 		}
-		lastQuery = queryObj
+	}
+
+	if shouldEvolve {
+		printer, _ := writer.(io.Writer)
+		executedMain, err := o.runWithSchemaEvolution(ctx, p, t, conn, rawQuery, queryObj.Query, fullRefresh, printer)
+		if err != nil {
+			return err
+		}
+		queryObj.Query = executedMain
+	} else {
+		ansisql.LogQueryIfVerbose(ctx, writer, queryObj.Query)
+		if err := conn.RunQueryWithoutResult(ctx, queryObj); err != nil {
+			return err
+		}
 	}
 
 	if o.devEnv == nil {
 		return nil
 	}
 
-	if lastQuery == nil {
-		return nil
-	}
-
-	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, lastQuery)
-	if err != nil {
+	if err := o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, queryObj); err != nil {
 		return errors.Wrap(err, "cannot register asset for schema cache")
 	}
 
 	return nil
+}
+
+func (o BasicOperator) renderMaterializedSQL(asset *pipeline.Asset, rawQuery string, withoutHooks bool) (string, error) {
+	if withoutHooks && !asset.Hooks.IsZero() {
+		noHooksAsset := *asset
+		noHooksAsset.Hooks = pipeline.Hooks{}
+		return o.materializer.Render(&noHooksAsset, rawQuery)
+	}
+	return o.materializer.Render(asset, rawQuery)
+}
+
+func (o BasicOperator) runWithSchemaEvolution(
+	ctx context.Context,
+	p *pipeline.Pipeline,
+	asset *pipeline.Asset,
+	conn DuckDBClient,
+	rawQuery string,
+	mainSQL string,
+	fullRefresh bool,
+	printer io.Writer,
+) (string, error) {
+	inspectQuery := rawQuery
+	if o.devEnv != nil && !schemaevolution.UsesDeclaredSchemaOnly(asset.Materialization.Strategy) {
+		modifiedInspect, err := o.devEnv.Modify(ctx, p, asset, &query.Query{Query: rawQuery})
+		if err != nil {
+			return "", err
+		}
+		inspectQuery = modifiedInspect.Query
+	}
+
+	effectiveHooks := asset.Hooks
+	if !asset.Hooks.IsZero() && o.devEnv != nil {
+		var err error
+		effectiveHooks, err = o.modifyHooksForDevEnv(ctx, p, asset, asset.Hooks)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	plan, executedMain, err := executeWithDuckDBSchemaEvolution(ctx, duckDBEvolutionRequest{
+		Conn:         conn,
+		Hooks:        effectiveHooks,
+		Asset:        asset,
+		InspectQuery: inspectQuery,
+		MainSQL:      mainSQL,
+		FullRefresh:  fullRefresh,
+		Writer:       printer,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	schemaevolution.LogPlan(printer, asset.Name, plan)
+	return executedMain, nil
+}
+
+func (o BasicOperator) modifyHooksForDevEnv(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset, hooks pipeline.Hooks) (pipeline.Hooks, error) {
+	modifySlice := func(in []pipeline.Hook) ([]pipeline.Hook, error) {
+		out := make([]pipeline.Hook, len(in))
+		for i, h := range in {
+			q, err := o.devEnv.Modify(ctx, p, t, &query.Query{Query: h.Query})
+			if err != nil {
+				return nil, err
+			}
+			out[i] = pipeline.Hook{Query: q.Query}
+		}
+		return out, nil
+	}
+	pre, err := modifySlice(hooks.Pre)
+	if err != nil {
+		return pipeline.Hooks{}, err
+	}
+	post, err := modifySlice(hooks.Post)
+	if err != nil {
+		return pipeline.Hooks{}, err
+	}
+	return pipeline.Hooks{
+		ApplicableTypes: hooks.ApplicableTypes,
+		Pre:             pre,
+		Post:            post,
+	}, nil
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {

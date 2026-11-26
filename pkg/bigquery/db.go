@@ -566,6 +566,9 @@ func (d *Client) shouldEnforceSoftQueryLimits(ctx context.Context) bool {
 
 func (d *Client) queryForExecution(ctx context.Context, queryString string) *bigquery.Query {
 	bqQuery := d.client.Query(queryString)
+	if sessionID := sessionIDFromContext(ctx); sessionID != "" {
+		bqQuery.ConnectionProperties = append(bqQuery.ConnectionProperties, &bigquery.ConnectionProperty{Key: sessionIDProperty, Value: sessionID})
+	}
 	if d.config != nil {
 		if limit := d.config.bytesBilledLimit(); limit != nil {
 			bqQuery.MaxBytesBilled = *limit

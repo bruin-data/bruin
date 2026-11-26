@@ -1521,3 +1521,72 @@ func TestColumnMetadataDDL(t *testing.T) {
 	assert.Contains(t, render, "COLLATE")
 	assert.Contains(t, render, "REFERENCES")
 }
+
+func TestMaterializer_SchemaEvolutionInsertByName(t *testing.T) {
+	t.Parallel()
+	enabled := true
+	se := &pipeline.SchemaEvolution{Enabled: &enabled}
+
+	t.Run("append uses BY NAME", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Name:            "demo.events",
+			SchemaEvolution: se,
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyAppend,
+			},
+		}
+		got, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id")
+		require.NoError(t, err)
+		assert.Equal(t, "INSERT INTO demo.events BY NAME SELECT 1 AS id", got)
+	})
+
+	t.Run("truncate+insert uses BY NAME", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Name:            "demo.events",
+			SchemaEvolution: se,
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyTruncateInsert,
+			},
+		}
+		got, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id;")
+		require.NoError(t, err)
+		assert.Equal(t, "BEGIN TRANSACTION;\nTRUNCATE TABLE demo.events;\nINSERT INTO demo.events BY NAME SELECT 1 AS id;\nCOMMIT;", got)
+	})
+
+	t.Run("delete+insert uses BY NAME", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Name:            "demo.events",
+			SchemaEvolution: se,
+			Materialization: pipeline.Materialization{
+				Type:           pipeline.MaterializationTypeTable,
+				Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+				IncrementalKey: "id",
+			},
+		}
+		got, err := NewMaterializer(false).Render(asset, "SELECT 1 AS id")
+		require.NoError(t, err)
+		assert.Contains(t, got, "INSERT INTO demo.events BY NAME SELECT * FROM __bruin_tmp_")
+	})
+
+	t.Run("time_interval uses BY NAME", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Name:            "demo.events",
+			SchemaEvolution: se,
+			Materialization: pipeline.Materialization{
+				Type:            pipeline.MaterializationTypeTable,
+				Strategy:        pipeline.MaterializationStrategyTimeInterval,
+				IncrementalKey:  "dt",
+				TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+			},
+		}
+		got, err := NewMaterializer(false).Render(asset, "SELECT DATE '2026-01-01' AS dt")
+		require.NoError(t, err)
+		assert.Contains(t, got, "INSERT INTO demo.events BY NAME SELECT DATE '2026-01-01' AS dt")
+	})
+}

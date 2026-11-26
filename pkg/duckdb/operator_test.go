@@ -38,6 +38,10 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, erro
 	return res.Get(0).(string), res.Error(1)
 }
 
+func (m *mockMaterializer) IsFullRefresh() bool {
+	return false
+}
+
 func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
 	return nil
 }

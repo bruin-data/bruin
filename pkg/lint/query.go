@@ -12,10 +12,15 @@ import (
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/schemaevolution"
 )
 
 type queryValidator interface {
 	IsValid(ctx context.Context, query *query.Query) (bool, error)
+}
+
+type schemaEvolutionValidator interface {
+	ValidateSchemaEvolution(ctx context.Context, asset *pipeline.Asset, rawQuery string, hoister pipeline.DeclareHoister) error
 }
 
 type connectionManager interface {
@@ -34,6 +39,7 @@ type materializer interface {
 type QueryValidatorRule struct {
 	Identifier   string
 	Fast         bool
+	FullRefresh  bool
 	TaskType     pipeline.AssetType
 	Connections  connectionManager
 	Extractor    queryExtractor
@@ -61,22 +67,47 @@ func (q *QueryValidatorRule) GetSeverity() ValidatorSeverity {
 	return ValidatorSeverityCritical
 }
 
-func (q *QueryValidatorRule) wrapRenderedHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset, sql string) (string, error) {
+// renderHooks renders the asset's hook templates with the asset's Jinja context. Without a
+// hook renderer, hooks are not validated and an empty Hooks value is returned.
+func (q *QueryValidatorRule) renderHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) (pipeline.Hooks, error) {
 	if q.HookRenderer == nil || asset.Hooks.IsZero() {
-		return sql, nil
+		return pipeline.Hooks{}, nil
 	}
 
 	assetRenderer, err := q.HookRenderer.CloneForAsset(ctx, p, asset)
 	if err != nil {
-		return "", fmt.Errorf("failed to create hook renderer: %w", err)
+		return pipeline.Hooks{}, fmt.Errorf("failed to create hook renderer: %w", err)
 	}
 
-	renderedHooks, err := pipeline.ResolveHookTemplatesToNew(asset.Hooks, assetRenderer)
+	return pipeline.ResolveHookTemplatesToNew(asset.Hooks, assetRenderer)
+}
+
+func (q *QueryValidatorRule) wrapRenderedHooks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset, sql string) (string, error) {
+	renderedHooks, err := q.renderHooks(ctx, p, asset)
 	if err != nil {
 		return "", err
 	}
+	if renderedHooks.IsZero() {
+		return sql, nil
+	}
 
 	return pipeline.WrapHooks(sql, renderedHooks, q.HookHoister, asset.Type), nil
+}
+
+// schemaEvolutionIssue validates a schema-evolution-enabled asset with its hooks rendered, so
+// engines that check hooks together with the query (BigQuery) see the same hooks a run would.
+// It returns the issue description, or "" when the asset is valid.
+func (q *QueryValidatorRule) schemaEvolutionIssue(ctx context.Context, p *pipeline.Pipeline, validator schemaEvolutionValidator, asset *pipeline.Asset, rawQuery, failurePrefix string) string {
+	hooks, err := q.renderHooks(ctx, p, asset)
+	if err != nil {
+		return fmt.Sprintf("Failed to render hooks: %s", err)
+	}
+	withHooks := *asset
+	withHooks.Hooks = hooks
+	if err := validator.ValidateSchemaEvolution(query.WithQueryType(ctx, query.QueryTypeDryRun), &withHooks, rawQuery, q.HookHoister); err != nil {
+		return failurePrefix + err.Error()
+	}
+	return ""
 }
 
 // withRenderedIncrementalPredicate returns a copy of the asset whose
@@ -151,6 +182,35 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	}
 
 	foundQuery := queries[0]
+	rawQuery := foundQuery.Query
+
+	assetConnectionName, err := p.GetConnectionNameForAsset(asset)
+	if err != nil {
+		q.Logger.Debugf("failed to get connection name for asset '%s'", asset.Name)
+		return issues, nil //nolint:nilerr
+	}
+
+	q.Logger.Debugw("The connection will be used for asset", "asset", asset.Name, "connection", assetConnectionName)
+
+	var validator any
+	if q.Connections != nil {
+		validator = q.Connections.GetConnection(assetConnectionName)
+	}
+	if schemaevolution.ShouldEvolve(asset, asset.FullRefreshEnabled(q.FullRefresh)) {
+		if evoVal, ok := validator.(schemaEvolutionValidator); ok {
+			materializedAsset, predErr := q.withRenderedIncrementalPredicate(ctx, p, asset)
+			if predErr != nil {
+				return append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Failed to materialize query: %s", predErr),
+				}), nil
+			}
+			if desc := q.schemaEvolutionIssue(ctx, p, evoVal, materializedAsset, rawQuery, "Failed to validate query: "); desc != "" {
+				issues = append(issues, &Issue{Task: asset, Description: desc})
+			}
+			return issues, nil
+		}
+	}
 
 	if q.Materializer != nil {
 		materializedAsset, err := q.withRenderedIncrementalPredicate(ctx, p, asset)
@@ -181,15 +241,6 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	}
 	foundQuery.Query = queryWithHooks
 
-	assetConnectionName, err := p.GetConnectionNameForAsset(asset)
-	if err != nil {
-		q.Logger.Debugf("failed to get connection name for asset '%s'", asset.Name)
-		return issues, nil //nolint:nilerr
-	}
-
-	q.Logger.Debugw("The connection will be used for asset", "asset", asset.Name, "connection", assetConnectionName)
-
-	validator := q.Connections.GetConnection(assetConnectionName)
 	if validator == nil {
 		q.Logger.Debugf("failed to get connection instance for asset '%s'", asset.Name)
 		return issues, nil //nolint:nilerr
@@ -317,6 +368,30 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 
 			q.Logger.Debugw("Checking if a query is valid", "path", task.ExecutableFile.Path)
 			start := time.Now()
+			rawQuery := foundQuery.Query
+
+			assetConnectionName, err := p.GetConnectionNameForAsset(task)
+			if err != nil {
+				q.Logger.Debugf("failed to get connection name for asset '%s'", task.Name)
+				return
+			}
+
+			q.Logger.Debugw("The connection will be used for asset", "asset", task.Name, "connection", assetConnectionName)
+
+			var validator any
+			if q.Connections != nil {
+				validator = q.Connections.GetConnection(assetConnectionName)
+			}
+			if schemaevolution.ShouldEvolve(task, task.FullRefreshEnabled(q.FullRefresh)) {
+				if evoVal, ok := validator.(schemaEvolutionValidator); ok {
+					if desc := q.schemaEvolutionIssue(ctx, p, evoVal, materializedTask, rawQuery, "Invalid query found: "); desc != "" {
+						mu.Lock()
+						issues = append(issues, &Issue{Task: task, Description: desc})
+						mu.Unlock()
+					}
+					return
+				}
+			}
 
 			if q.Materializer != nil {
 				materialized, err := q.Materializer.Render(q.assetForRender(p, materializedTask), foundQuery.Query)
@@ -341,15 +416,6 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 			}
 			foundQuery.Query = queryWithHooks
 
-			assetConnectionName, err := p.GetConnectionNameForAsset(task)
-			if err != nil {
-				q.Logger.Debugf("failed to get connection name for asset '%s'", task.Name)
-				return
-			}
-
-			q.Logger.Debugw("The connection will be used for asset", "asset", task.Name, "connection", assetConnectionName)
-
-			validator := q.Connections.GetConnection(assetConnectionName)
 			if validator == nil {
 				q.Logger.Debugf("failed to get connection instance for asset '%s'", task.Name)
 				return

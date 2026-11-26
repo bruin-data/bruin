@@ -425,6 +425,25 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 				continue
 			}
 		}
+
+		if strings.HasPrefix(key, "schema_evolution.") {
+			seKeys := strings.Split(key, ".")
+			if len(seKeys) != 2 {
+				continue
+			}
+
+			if strings.EqualFold(seKeys[1], "enabled") {
+				enabled, err := strconv.ParseBool(value)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to parse %s value '%s'", key, value)
+				}
+				if task.SchemaEvolution == nil {
+					task.SchemaEvolution = &SchemaEvolution{}
+				}
+				task.SchemaEvolution.Enabled = &enabled
+				continue
+			}
+		}
 	}
 
 	task.ID = hash(task.Name)

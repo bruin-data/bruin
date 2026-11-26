@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/schemaevolution"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
@@ -30,6 +31,11 @@ type materializer interface {
 type devEnv interface {
 	Modify(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) (*query.Query, error)
 	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
+}
+
+// hookWrapper is implemented by materializers that add asset hooks around the rendered query.
+type hookWrapper interface {
+	WrapHooks(asset *pipeline.Asset, materialized string) string
 }
 
 type queryLimitChecker interface {
@@ -103,19 +109,69 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("asset '%s' is an Iceberg table but has no storage URI, set bigquery.storage_uri on the asset or storage_uri on the '%s' connection", t.Name, connName)
 	}
 
-	materialized, err := o.materializer.Render(renderAsset, q.String())
-	if err != nil {
-		return err
-	}
+	rawQuery := q.String()
 	writer := ctx.Value(executor.KeyPrinter)
-	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
-	if err != nil {
+	if err := o.materializer.LogIfFullRefreshAndDDL(writer, t); err != nil {
 		return err
 	}
-	q.Query = materialized
+
+	fullRefresh := t.FullRefreshEnabled(o.materializer.IsFullRefresh())
+	shouldEvolve := schemaevolution.ShouldEvolve(t, fullRefresh)
+
+	if shouldEvolve {
+		// Render the main statement without hooks so only its INSERT gets the column list. It is
+		// rendered before anything runs so a materialization error leaves the warehouse untouched.
+		rawQuery = schemaevolution.StripTrailingSemicolonsAndComments(bigQuerySQLDialect, rawQuery)
+		mainAsset := *renderAsset
+		mainAsset.Hooks = pipeline.Hooks{}
+		materialized, err := o.materializer.Render(&mainAsset, rawQuery)
+		if err != nil {
+			return err
+		}
+
+		if t.Materialization.Type != pipeline.MaterializationTypeNone {
+			if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
+				return err
+			}
+		}
+		// Pre-hooks run first in a BigQuery session, and every later job of this run joins it,
+		// so schema inspection and the main query see the variables and temp tables they create.
+		var endSession func()
+		ctx, renderAsset, endSession, err = o.runPreHooksInSession(ctx, p, t, renderAsset, conn)
+		if err != nil {
+			return err
+		}
+		defer endSession()
+
+		printer, _ := writer.(io.Writer)
+		plan, err := o.prepareAndApplySchemaEvolution(ctx, p, t, renderAsset, conn, rawQuery, fullRefresh, printer)
+		if err != nil {
+			return err
+		}
+
+		if plan.TableExists && len(plan.IncomingColumns) > 0 {
+			materialized = schemaevolution.InjectInsertColumnList(
+				bigQuerySQLDialect,
+				materialized,
+				t.Name,
+				schemaevolution.QuoteBacktickIdentifier,
+				plan.IncomingColumns,
+			)
+		}
+		if wrapper, ok := o.materializer.(hookWrapper); ok {
+			materialized = wrapper.WrapHooks(renderAsset, materialized)
+		}
+		q.Query = materialized
+	} else {
+		materialized, err := o.materializer.Render(renderAsset, rawQuery)
+		if err != nil {
+			return err
+		}
+		q.Query = materialized
+	}
 
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
+		renderedQueries, err := extractor.ExtractQueriesFromString(q.Query)
 		if err != nil {
 			return errors.Wrap(err, "cannot re-extract/render materialized query for time_interval strategy")
 		}
@@ -147,13 +203,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
 	}
 
-	if t.Materialization.Type != pipeline.MaterializationTypeNone {
+	if !shouldEvolve && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 			return err
 		}
 	}
 
-	if t.FullRefreshEnabled(o.materializer.IsFullRefresh()) {
+	if fullRefresh {
 		err = conn.DropTableOnMismatch(ctx, t.Name, t)
 		if err != nil {
 			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)

@@ -125,6 +125,12 @@ func (m HookWrapperMaterializer) Render(asset *Asset, query string) (string, err
 	return WrapHooks(materialized, asset.Hooks, m.Hoister, asset.Type), nil
 }
 
+// WrapHooks wraps an already materialized query with the asset's hooks, for callers that
+// rewrite the main statement before the hooks are added.
+func (m HookWrapperMaterializer) WrapHooks(asset *Asset, materialized string) string {
+	return WrapHooks(materialized, asset.Hooks, m.Hoister, asset.Type)
+}
+
 func (m HookWrapperMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
 	if m.Mat == nil {
 		return errors.New("hook wrapper materializer requires a base materializer")

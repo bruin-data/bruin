@@ -388,6 +388,25 @@ bigquery:
 
 Enabling a required partition filter or a positive partition expiration requires a partitioned table. Partition expiration is not supported for integer-range partitions, and required partition filters have additional restrictions for incremental materializations. See [BigQuery table options](../platforms/bigquery.md#bigquery-table-options) for details.
 
+## `schema_evolution`
+
+Controls automatic backwards-compatible schema evolution for SQL table assets. When enabled, Bruin compares the existing table schema against the incoming schema before writing, applies lossless `ALTER TABLE` additions and type widenings, and targets columns by name so omitted historical columns are preserved. Incompatible type changes fail before modifying the table.
+
+```yaml
+schema_evolution:
+  enabled: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | Boolean | `false` | Enables automatic backwards-compatible schema evolution for the asset. |
+
+Currently supported for `duckdb.sql` and `bq.sql` assets with `materialization.type: table` using in-place strategies (`append`, `delete+insert`, `truncate+insert`, `time_interval`, `merge`, `scd2_by_column`, `scd2_by_time`, `datavault_*`, and `ddl`). It has no effect on `create+replace` tables or during `--full-refresh` (except for `ddl`).
+
+See [Schema Evolution for SQL Assets](../schema-evolution/sql.md) for strategy rules, platform widening matrices (BigQuery, DuckDB, and DuckLake), and design tradeoffs, or [Schema Evolution Overview](../schema-evolution/overview.md) for how SQL schema evolution compares with `ingestr` assets.
+
+- **Type:** `Object`
+
 ## `hooks`
 
 Hooks let you run SQL snippets before and/or after the main asset query. This is useful for setup or cleanup (loading extensions, attaching databases, or writing run logs, etc.).
