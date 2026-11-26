@@ -590,16 +590,22 @@ func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, total bo
 	if err := e.validateQuery(points, plan); err != nil {
 		return "", "", err
 	}
+	if e.needsWindowWrap(metrics) {
+		return "", "", errors.New("window metrics are not supported in series")
+	}
 	x = plan.dimensionBinding(by).outputAlias
 	for _, d := range dims {
 		if d != by && plan.dimensionBinding(d).outputAlias == x {
 			return "", "", fmt.Errorf("%s and dimension %s both return column %s", by.Name, d.Name, x)
 		}
 	}
+	if slices.Contains(metrics, x) {
+		return "", "", fmt.Errorf("%s and metric %s both return column %s", by.Name, x, x)
+	}
 	if sql, err = e.totalSQL(q, metrics, dims, total); err != nil {
 		return "", "", err
 	}
-	return sql + " WHERE " + x + " IS NOT NULL", x, nil
+	return "SELECT * FROM (" + sql + ") points WHERE " + x + " IS NOT NULL", x, nil
 }
 
 // Series is one list column for AddSeriesSQL.
@@ -609,14 +615,11 @@ type Series struct {
 	Limit  int          `json:"limit,omitempty"` // last N points; 0 keeps all
 }
 
-// listDialects build {x, y} points; limit: ARRAY_AGG takes LIMIT.
-var listDialects = map[string]struct {
-	point string
-	limit bool
-}{
-	"bigquery":              {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", true},
-	"google_cloud_platform": {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", true},
-	"duckdb":                {"{'x': %s, 'y': CAST(%s AS DOUBLE)}", false},
+// listDialects build {x, y} points newest first, and keep the first N of a list.
+var listDialects = map[string]struct{ point, limit string }{
+	"bigquery":              {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", "ARRAY_AGG(%s ORDER BY %s DESC LIMIT %d)"},
+	"google_cloud_platform": {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", "ARRAY_AGG(%s ORDER BY %s DESC LIMIT %d)"},
+	"duckdb":                {"{'x': %s, 'y': CAST(%s AS DOUBLE)}", "ARRAY_AGG(%s ORDER BY %s DESC)[1:%d]"},
 }
 
 // AddSeriesSQL joins each series' points, newest first, into sql (q's detail or,
@@ -624,7 +627,11 @@ var listDialects = map[string]struct {
 // can't; callers then run GenerateSeriesSQL.
 func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool) (string, bool, error) {
 	dialect, ok := listDialects[e.Dialect]
-	if !ok || slices.ContainsFunc(series, func(s Series) bool { return slices.Contains(q.Dimensions, s.By) }) {
+	// Drivers may not read a DECIMAL x inside a list, so a number x isn't merged.
+	if !ok || slices.ContainsFunc(series, func(s Series) bool {
+		b, err := e.resolveDimension(s.By)
+		return slices.Contains(q.Dimensions, s.By) || err != nil || b.dimension.Type == "number"
+	}) {
 		return "", false, nil
 	}
 	plan, err := e.planQuery(q)
@@ -640,7 +647,7 @@ func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool)
 			}
 			keys = append(keys, key)
 		}
-		// The join may not keep the rows' order, so repeat q's sort.
+		// The join may not keep the rows' order, so repeat q's sort and tie-breakers.
 		for _, s := range q.Sort {
 			name := s.Name
 			if binding := plan.sortBinding(s.Name); binding != nil {
@@ -651,8 +658,13 @@ func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool)
 			}
 			order = append(order, "__rows."+name+" "+cmp.Or(strings.ToUpper(s.Direction), "ASC"))
 		}
+		if len(order) > 0 && q.Limit > 0 {
+			for _, key := range keys {
+				order = append(order, "__rows."+key+" ASC")
+			}
+		}
 	}
-	cols, joins := []string{"__rows.*"}, ""
+	cols, joins := []string{"__rows.*"}, []string{}
 	var groups []DimensionRef
 	for _, s := range series {
 		if !slices.Contains(groups, s.By) {
@@ -676,12 +688,13 @@ func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool)
 			if s.By != by {
 				continue
 			}
-			limit := ""
-			if s.Limit > 0 && dialect.limit {
-				limit = fmt.Sprintf(" LIMIT %d", s.Limit)
+			point := fmt.Sprintf(dialect.point, x, s.Metric)
+			list := fmt.Sprintf("ARRAY_AGG(%s ORDER BY %s DESC)", point, x)
+			if s.Limit > 0 {
+				list = fmt.Sprintf(dialect.limit, point, x, s.Limit)
 			}
 			col := fmt.Sprintf("__series_%d", i)
-			selects = append(selects, fmt.Sprintf("ARRAY_AGG(%s ORDER BY %s DESC%s) AS %s", fmt.Sprintf(dialect.point, x, s.Metric), x, limit, col))
+			selects = append(selects, list+" AS "+col)
 			cols = append(cols, name+"."+col)
 		}
 		groupBy, conditions := "", []string{"TRUE"}
@@ -692,9 +705,9 @@ func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool)
 				conditions = append(conditions, fmt.Sprintf("(__rows.%[1]s = %[2]s.%[1]s OR (__rows.%[1]s IS NULL AND %[2]s.%[1]s IS NULL))", key, name))
 			}
 		}
-		joins += fmt.Sprintf(" LEFT JOIN (SELECT %s FROM (%s) __points%s) %s ON %s", strings.Join(selects, ", "), points, groupBy, name, strings.Join(conditions, " AND "))
+		joins = append(joins, fmt.Sprintf(" LEFT JOIN (SELECT %s FROM (%s) __points%s) %s ON %s", strings.Join(selects, ", "), points, groupBy, name, strings.Join(conditions, " AND ")))
 	}
-	sql = "SELECT " + strings.Join(cols, ", ") + " FROM (" + sql + ") __rows" + joins
+	sql = "SELECT " + strings.Join(cols, ", ") + " FROM (" + sql + ") __rows" + strings.Join(joins, "")
 	if len(order) > 0 {
 		sql += " ORDER BY " + strings.Join(order, ", ")
 	}

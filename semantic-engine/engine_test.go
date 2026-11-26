@@ -2976,7 +2976,7 @@ func TestGenerateSeriesSQL(t *testing.T) {
 	// A HAVING filter picks the table's rows; applied per day it would drop points.
 	expectContains(t, rows, "GROUP BY 1, 2")
 	expectContains(t, rows, "WHERE status = 'completed'")
-	expectContains(t, rows, ") grand_total WHERE order_date IS NOT NULL ORDER BY order_date")
+	expectContains(t, rows, ") grand_total) points WHERE order_date IS NOT NULL ORDER BY order_date")
 	for _, unwanted := range []string{"HAVING", "> 100", "LIMIT", "INNER JOIN"} {
 		expectNotContains(t, rows, unwanted)
 	}
@@ -2993,6 +2993,10 @@ func TestGenerateSeriesSQL(t *testing.T) {
 	weekly := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue"}}
 	if _, err := e.GenerateSeriesSQL(weekly, day, []string{"revenue"}, false); err == nil || !strings.Contains(err.Error(), "both return column order_date") {
 		t.Fatalf("expected a column clash, got %v", err)
+	}
+	// Window metrics would be NULL at every point.
+	if _, err := e.GenerateSeriesSQL(q, day, []string{"running_revenue"}, false); err == nil || !strings.Contains(err.Error(), "window metrics") {
+		t.Fatalf("expected a window metric error, got %v", err)
 	}
 }
 
@@ -3046,7 +3050,7 @@ func TestAddSeriesSQL(t *testing.T) {
 		"ARRAY_AGG(STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y) ORDER BY order_date DESC) AS __series_1",
 		"GROUP BY country) __series_join_0",
 		"(__rows.country = __series_join_0.country OR (__rows.country IS NULL AND __series_join_0.country IS NULL))",
-		"ORDER BY __rows.revenue DESC",
+		"ORDER BY __rows.revenue DESC, __rows.country ASC",
 	} {
 		expectContains(t, sql, want)
 	}
@@ -3066,8 +3070,21 @@ func TestAddSeriesSQL(t *testing.T) {
 	if _, ok, _ := e.AddSeriesSQL(daily, detail, series, false); ok {
 		t.Fatal("merged a window")
 	}
+	e.Dialect = "duckdb"
+	if sql, ok, err = e.AddSeriesSQL(q, detail, series, false); err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	expectContains(t, sql, "ARRAY_AGG({'x': order_date, 'y': CAST(revenue AS DOUBLE)} ORDER BY order_date DESC)[1:30] AS __series_0")
 	e.Dialect = "snowflake"
 	if _, ok, _ := e.AddSeriesSQL(q, detail, series, false); ok {
 		t.Fatal("merged on a dialect without lists")
+	}
+	// A DECIMAL x inside a list may not reach the caller, so a number x isn't merged.
+	model := richTestModel()
+	model.Dimensions = append(model.Dimensions, Dimension{Name: "amount", Type: "number"})
+	numeric := minimalEngine(t, model)
+	numeric.Dialect = "duckdb"
+	if _, ok, _ := numeric.AddSeriesSQL(q, detail, []Series{{By: DimensionRef{Name: "amount"}, Metric: "revenue"}}, false); ok {
+		t.Fatal("merged a number x")
 	}
 }
