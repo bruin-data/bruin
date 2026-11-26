@@ -1440,8 +1440,8 @@ func Run(isDebug *bool) *cli.Command {
 					slices.Sort(succeeded)
 					msg := fmt.Sprintf("--continue skips %d asset(s) that succeeded in an earlier run: %s\n", len(succeeded), strings.Join(succeeded, ", "))
 					warningPrinter.Print(msg)
-					// The TUI sends regular output only to the log file.
-					if realTerminal != nil {
+					// With a log file, the TUI sends regular output only to that file.
+					if realTerminal != nil && !runConfig.NoLogFile {
 						warningPrinter.Fprint(realTerminal, msg)
 					}
 				}
