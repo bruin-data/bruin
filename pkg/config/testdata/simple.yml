@@ -220,6 +220,9 @@ environments:
         - name: "breezyhr-1"
           api_key: "breezyhr-api-key-123"
           company_id: "abc123"
+      brevo:
+        - name: "brevo-1"
+          api_key: "brevo-api-key-123"
       peeringdb:
         - name: "peeringdb-1"
           api_key: "peeringdb-api-key-123"

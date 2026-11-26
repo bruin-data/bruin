@@ -661,6 +661,25 @@
         "company_id"
       ]
     },
+    "BrevoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "max_concurrent_assets": {
+          "type": "integer"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "BruinCloudConnection": {
       "properties": {
         "name": {
@@ -2029,6 +2048,12 @@
         "breezyhr": {
           "items": {
             "$ref": "#/$defs/BreezyHRConnection"
+          },
+          "type": "array"
+        },
+        "brevo": {
+          "items": {
+            "$ref": "#/$defs/BrevoConnection"
           },
           "type": "array"
         }
