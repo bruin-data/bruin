@@ -2270,7 +2270,7 @@ func SetupExecutors(
 			Hoister: hoister,
 		}, parser)
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
-		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(trinoOperator, conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2308,7 +2308,7 @@ func SetupExecutors(
 		}
 		sailOperator := sail.NewBasicOperator(conn, sailFileExtractor, fullRefresh, hoister, parser)
 		sailCheckRunner := sail.NewColumnCheckOperator(conn)
-		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeMain] = sailOperator
+		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(sailOperator, conn)
 		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeColumnCheck] = sailCheckRunner
 		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2332,7 +2332,7 @@ func SetupExecutors(
 		sparkTableSensor := spark.NewTableSensor(conn, sensorMode)
 		sparkSeedOperator := spark.NewSeedOperator(conn, renderer)
 
-		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeMain] = sparkOperator
+		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(sparkOperator, conn)
 		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeColumnCheck] = sparkCheckRunner
 		mainExecutors[pipeline.AssetTypeSparkQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
@@ -2368,7 +2368,7 @@ func SetupExecutors(
 		fabricSparkCheckRunner := spark.NewColumnCheckOperator(fabricSparkConnections)
 		fabricSparkCustomCheckRunner := ansisql.NewCustomCheckOperator(fabricSparkConnections, renderer)
 
-		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeMain] = fabricSparkOperator
+		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(fabricSparkOperator, fabricSparkConnections)
 		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeColumnCheck] = fabricSparkCheckRunner
 		mainExecutors[pipeline.AssetTypeFabricSparkQuery][scheduler.TaskInstanceTypeCustomCheck] = fabricSparkCustomCheckRunner
 
@@ -2658,7 +2658,7 @@ func SetupExecutors(
 		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		athenaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 
-		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = athenaOperator
+		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = autocreate.Wrap(athenaOperator, conn)
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 

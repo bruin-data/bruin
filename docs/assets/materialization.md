@@ -1641,7 +1641,7 @@ Later runs find the table and load it with the asset's strategy.
 - Like a full refresh, the first run loads what the query returns for the run's interval. If the query filters on `start_date` and `end_date`, widen the filter when `full_refresh` is set to load the full history.
 - `full_refresh_restricted` does not stop the first run, because there is no table to protect.
 - A view or any other object with the asset's name counts as existing, so Bruin runs the strategy against it as usual. To turn a view into an incremental table, run the asset once with `--full-refresh`.
-- Assets with [pre hooks](./definition-schema.md#hooks) are not created automatically, because a hook such as `USE` or `SET search_path` can move the table to a schema Bruin did not check. Bruin prints a note instead; run them once with `--full-refresh`.
+- Assets with [pre hooks](./definition-schema.md#hooks) are not created automatically, because a hook such as `USE` or `SET search_path` can move the table to a schema Bruin did not check. Bruin prints a note instead; run them once with `--full-refresh`. The same goes for Spark assets with a one- or two-part name whose SQL runs `SET`, `RESET` or `USE`, which can switch the catalog.
 - If Bruin cannot check whether the table exists, for example because the connection cannot read the platform's metadata, it prints a warning and runs the strategy as usual.
 - `bruin render` prints the incremental SQL. `bruin render --full-refresh` prints the SQL of a first run.
 
@@ -1660,8 +1660,8 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 | [DuckDB](../platforms/duckdb.md) / [MotherDuck](../platforms/motherduck.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [MySQL](../platforms/mysql.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [Databricks](../platforms/databricks.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| [Athena](../platforms/athena.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| [Spark](../platforms/spark.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| [Athena](../platforms/athena.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| [Spark](../platforms/spark.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [ClickHouse](../platforms/clickhouse.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [Oracle](../platforms/oracle.md) | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
 | [MSSQL](../platforms/mssql.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
@@ -1670,9 +1670,9 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 | [Fabric](../platforms/fabric.md) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | [Doris](../platforms/doris.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | [StarRocks](../platforms/starrocks.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| [Trino](../platforms/trino.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| [Trino](../platforms/trino.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | [Dremio](../platforms/dremio.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| [Sail](../platforms/sail.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| [Sail](../platforms/sail.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
 
 ### Platform notes
 
@@ -1699,6 +1699,7 @@ Other differences:
 
 - **Athena** materializations always create Iceberg tables. See [Athena](../platforms/athena.md).
 - **BigQuery** looks for the table on the [first run](#first-run) with the `tables.get` API, which is not billed. In a dataset with case-insensitive names, a table whose name differs only in case counts as existing.
+- **Fabric** Lakehouse assets (`fabric.spark_sql`) use the Spark materializations, so they follow the Spark row, including the first run.
 - **Oracle** builds `scd2_by_column` assets as a plain table on a full refresh, and closes records that left the source only when the source returns at least one row.
 - **Snowflake** checks for an incremental asset's table with `SHOW OBJECTS`, which needs no warehouse. If the table is not listed, Bruin confirms that it is missing in `INFORMATION_SCHEMA.TABLES` before the [first run](#first-run). That query runs on the connection's warehouse, even when the asset sets a [`warehouse`](../platforms/snowflake.md#overriding-the-warehouse-per-asset) parameter.
 - **Redshift** compares table names case-insensitively when it checks for a missing table on the [first run](#first-run). It does not check `database.schema.table` names outside the connection's database; those assets always load incrementally.

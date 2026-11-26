@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/tablename"
 	"github.com/jmoiron/sqlx"
@@ -432,6 +433,61 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	)
 
 	return strings.TrimSpace(query), nil
+}
+
+// RelationExists reports whether a table or view named tableName exists, so an
+// incremental asset can create its table on the first run. The materializer
+// writes the name unquoted, so a one-part name lives in the connection's
+// database, which the driver sends as the query's database and which defaults
+// to "default", and a three-part name is catalog.database.table. The Glue Data
+// Catalog stores names in lower case, so the name is looked up both as written
+// and in lower case. A missing database leaves information_schema empty, which
+// reports false.
+func (db *DB) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	cb, ok := tablename.For("athena")
+	if !ok {
+		return false, errors.New("athena table-name capability not found")
+	}
+	database := db.config.Database
+	if database == "" {
+		database = drv.DefaultDBName
+	}
+	tn, err := cb.Parse(tableName, tablename.Defaults{Schema: database})
+	if err != nil {
+		return false, err
+	}
+	// A quoted name part would be looked up with its quotes as literal text and
+	// never match, so it cannot be checked.
+	if strings.ContainsAny(tableName, "\"`") {
+		return false, fmt.Errorf("cannot check table '%s': quoted names are not supported", tableName)
+	}
+
+	infoSchema := "information_schema"
+	if tn.Catalog != "" {
+		infoSchema = quoteAthenaIdentifier(tn.Catalog) + ".information_schema"
+	}
+
+	// Equality filters let Athena look the table up in the catalog directly
+	// instead of listing every table it holds.
+	existsQuery := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s.tables WHERE table_schema IN (%s, %s) AND table_name IN (%s, %s)",
+		infoSchema,
+		quoteAthenaStringLiteral(tn.Schema),
+		quoteAthenaStringLiteral(strings.ToLower(tn.Schema)),
+		quoteAthenaStringLiteral(tn.Table),
+		quoteAthenaStringLiteral(strings.ToLower(tn.Table)),
+	)
+	result, err := db.Select(ctx, &query.Query{Query: existsQuery})
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	count, err := helpers.CastResultToInteger(result, false)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	return count > 0, nil
 }
 
 func quoteAthenaStringLiteral(value string) string {
