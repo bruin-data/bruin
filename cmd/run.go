@@ -1395,13 +1395,18 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				var succeeded []string
 				for _, asset := range pipelineState.State {
-					if asset.Status == scheduler.Succeeded.String() {
+					if asset.Status == scheduler.Succeeded.String() || asset.SucceededEarlier {
 						succeeded = append(succeeded, asset.Name)
 					}
 				}
 				if len(succeeded) > 0 {
 					slices.Sort(succeeded)
-					warningPrinter.Printf("--continue skips %d asset(s) that succeeded in the previous run: %s\n", len(succeeded), strings.Join(succeeded, ", "))
+					msg := fmt.Sprintf("--continue skips %d asset(s) that succeeded in an earlier run: %s\n", len(succeeded), strings.Join(succeeded, ", "))
+					warningPrinter.Print(msg)
+					// The TUI sends regular output only to the log file.
+					if realTerminal != nil {
+						warningPrinter.Fprint(realTerminal, msg)
+					}
 				}
 				if err := SkipDisabledAssets(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
 					errorPrinter.Printf("Failed to skip disabled assets: %v\n", err)
