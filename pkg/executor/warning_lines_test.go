@@ -7,6 +7,8 @@ import (
 )
 
 func TestWarningLines(t *testing.T) {
+	t.Parallel()
+
 	output := ">> loading rows\n>> WARNING: source returned 0 rows\n>> swarm of 10 rows loaded\n>> UserWarning: column dropped\nWarning: full refresh is restricted\n"
 
 	assert.Equal(t, []string{
