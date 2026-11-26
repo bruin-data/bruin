@@ -1664,10 +1664,10 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 | [Spark](../platforms/spark.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [ClickHouse](../platforms/clickhouse.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | [Oracle](../platforms/oracle.md) | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| [MSSQL](../platforms/mssql.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| [Synapse](../platforms/synapse.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| [MSSQL](../platforms/mssql.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| [Synapse](../platforms/synapse.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | Vertica | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| [Fabric](../platforms/fabric.md) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| [Fabric](../platforms/fabric.md) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | [Doris](../platforms/doris.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | [StarRocks](../platforms/starrocks.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | [Trino](../platforms/trino.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |

@@ -530,6 +530,52 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 	return summary, nil
 }
 
+// RelationExists reports whether a table, view, synonym or any other object is
+// named tableName, so an incremental asset can create its table on the first
+// run. See ObjectExists for how the name is resolved.
+func (db *DB) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	return ObjectExists(ctx, db.conn, tableName)
+}
+
+// objectExistsQuery returns the query ObjectExists runs. It checks the name as
+// written and with every part quoted, because the materializers emit it both
+// ways. The names are escaped string literals rather than query arguments: the
+// "mssql" driver behind SQL Server and Synapse connections only counts `?`
+// placeholders, while the drivers behind Fabric connections only take `@p1`.
+func objectExistsQuery(name string) string {
+	return fmt.Sprintf(
+		"SELECT CASE WHEN OBJECT_ID(%s) IS NULL AND OBJECT_ID(%s) IS NULL THEN 0 ELSE 1 END",
+		sqlStringLiteral(name),
+		sqlStringLiteral(QuoteIdentifier(name)),
+	)
+}
+
+// ObjectExists reports whether OBJECT_ID finds a schema-scoped object named
+// name on conn. OBJECT_ID resolves a one-, two- or three-part name the way a
+// statement does: a bare name in the user's default schema and then in dbo,
+// the session's database unless the name has one, and identifiers compared
+// with the database's collation. It returns NULL when the object, its schema or
+// its database is missing, and when the user cannot see the object, in which
+// case a statement cannot drop or replace it either.
+func ObjectExists(ctx context.Context, conn *sqlx.DB, name string) (bool, error) {
+	parts := strings.Split(name, ".")
+	if len(parts) > 3 {
+		return false, fmt.Errorf("table name must be in format `table`, `schema.table`, or `database.schema.table`, %q given", name)
+	}
+	for _, part := range parts {
+		if strings.TrimSpace(part) == "" {
+			return false, fmt.Errorf("table name %q contains an empty component", name)
+		}
+	}
+
+	var exists int
+	if err := conn.QueryRowContext(ctx, objectExistsQuery(name)).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", name, err)
+	}
+
+	return exists == 1, nil
+}
+
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	cb, ok := tablename.For("mssql")
 	if !ok {
