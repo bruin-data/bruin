@@ -172,3 +172,27 @@ func TestMaterializer_RenderFullRefreshStillRendersCreateReplace(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, queries)
 }
+
+func TestMaterializer_RenderFirstRunChecksOwnStrategy(t *testing.T) {
+	t.Parallel()
+
+	merge := &pipeline.Asset{
+		Name: "analytics.orders",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyMerge,
+		},
+		Columns: []pipeline.Column{{Name: "id", Type: "Int64", PrimaryKey: true}},
+		ClickHouse: pipeline.ClickHouseConfig{
+			Engine: "ReplicatedMergeTree",
+		},
+	}
+
+	queries, err := NewMaterializer(false).Render(merge.FirstRun(), "SELECT 1 AS id")
+	require.NoError(t, err)
+	require.NotEmpty(t, queries)
+
+	// merge cannot run on a cluster, so the first run fails like every later run would.
+	_, err = NewMaterializer(false, "main").Render(merge.FirstRun(), "SELECT 1 AS id")
+	require.ErrorContains(t, err, "is not supported with cluster")
+}

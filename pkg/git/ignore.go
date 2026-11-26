@@ -21,7 +21,7 @@ func EnsureGivenPatternIsInGitignore(fs afero.Fs, repoRoot string, pattern strin
 
 	if !exists {
 		// Create a new .gitignore file if it doesn't exist
-		if err = afero.WriteFile(fs, gitignorePath, []byte(pattern), 0o644); err != nil {
+		if err = afero.WriteFile(fs, gitignorePath, []byte(pattern+"\n"), 0o644); err != nil {
 			return err
 		}
 		return nil
@@ -46,6 +46,21 @@ func EnsureGivenPatternIsInGitignore(fs afero.Fs, repoRoot string, pattern strin
 		}
 	}
 
-	_, err = file.Write([]byte("\n" + pattern))
+	// Start a new line only if the file doesn't end with one, and always end ours.
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	last := []byte{'\n'}
+	if info.Size() > 0 {
+		if _, err = file.ReadAt(last, info.Size()-1); err != nil {
+			return err
+		}
+	}
+	entry := pattern + "\n"
+	if last[0] != '\n' {
+		entry = "\n" + entry
+	}
+	_, err = file.Write([]byte(entry))
 	return err
 }

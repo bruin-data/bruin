@@ -762,7 +762,7 @@ Strategies fall into four groups:
 - **Data Vault** (`datavault_hub`, `datavault_link`, `datavault_satellite`) load a Raw Data Vault.
 
 > [!IMPORTANT]
-> Incremental and SCD2 strategies write into an existing table. On the platforms marked in the [platform support](#platform-support) table, Bruin creates the table from the query on the [first run](#first-run). Elsewhere, do the first run with `--full-refresh`, then let later runs load the table incrementally. The Data Vault strategies, ClickHouse SCD2, and StarRocks `merge` always create their target.
+> Incremental and SCD2 strategies write into an existing table. When the table does not exist yet, Bruin creates it from the query on the [first run](#first-run), on every platform except Dremio. On Dremio, do the first run with `--full-refresh`. The Data Vault strategies always create their target.
 
 ### Full rebuilds
 
@@ -825,7 +825,7 @@ FROM raw.users
 **Good to know:**
 
 - `TRUNCATE` is usually faster than `DELETE` for removing every row, and no `incremental_key` is needed.
-- The table must already exist. Bruin creates it on the [first run](#first-run) where supported; elsewhere, create it with `--full-refresh`.
+- The table must already exist. Bruin creates it on the [first run](#first-run).
 - Bruin wraps both statements in a transaction where the platform allows it. On BigQuery, a failed insert rolls the truncate back, and readers never see the table empty. On engines where `TRUNCATE` commits implicitly, such as MySQL, Redshift, and Oracle, a failed insert can still leave the table empty.
 - Doris and StarRocks do not truncate. They build a new table from the query and swap it in, so the original table object and its layout are not kept.
 
@@ -1195,7 +1195,7 @@ Both strategies:
 - Set `_valid_until` to `9999-12-31` for current versions: midnight on BigQuery, PostgreSQL, Redshift, Databricks, and Spark, and `23:59:59` elsewhere.
 - Close the current version of records that disappeared from the source.
 - Reserve the names `_valid_from`, `_valid_until`, and `_is_current`. Using them in `columns` is a validation error.
-- Create the table on the [first run](#first-run) where supported. Elsewhere, except on ClickHouse, they need a first run with `--full-refresh`.
+- Create the table on the [first run](#first-run).
 - Are supported on BigQuery, Snowflake, PostgreSQL (17 or later), Redshift, MySQL, DuckDB, ClickHouse, Databricks, Athena, and Spark. Oracle supports `scd2_by_time` only.
 
 Unless you set `partition_by` or `cluster_by`, Bruin picks a layout for the SCD2 table:
@@ -1640,6 +1640,8 @@ Later runs find the table and load it with the asset's strategy.
 
 - Like a full refresh, the first run loads what the query returns for the run's interval. If the query filters on `start_date` and `end_date`, widen the filter when `full_refresh` is set to load the full history.
 - `full_refresh_restricted` does not stop the first run, because there is no table to protect.
+- Overlapping runs of the same asset on one machine, such as the partitions of a backfill, wait for each other, so only one of them creates the table. Runs on different machines are not coordinated, so do not start the first run of an asset on several machines at once.
+- The asset still has to be valid for its own strategy. A strategy the platform does not support, or a missing setting such as `merge` without a primary key, fails the first run the same way it would fail later runs.
 - A view or any other object with the asset's name counts as existing, so Bruin runs the strategy against it as usual. To turn a view into an incremental table, run the asset once with `--full-refresh`.
 - Assets with [pre hooks](./definition-schema.md#hooks) are not created automatically, because a hook such as `USE` or `SET search_path` can move the table to a schema Bruin did not check. Bruin prints a note instead; run them once with `--full-refresh`. The same goes for Spark assets with a one- or two-part name whose SQL runs `SET`, `RESET` or `USE`, which can switch the catalog.
 - If Bruin cannot check whether the table exists, for example because the connection cannot read the platform's metadata, it prints a warning and runs the strategy as usual.
@@ -1658,18 +1660,18 @@ Every platform below supports views and the `create+replace`, `truncate+insert`,
 | [PostgreSQL](../platforms/postgres.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [Redshift](../platforms/redshift.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [DuckDB](../platforms/duckdb.md) / [MotherDuck](../platforms/motherduck.md) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [MySQL](../platforms/mysql.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| [MySQL](../platforms/mysql.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [Databricks](../platforms/databricks.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [Athena](../platforms/athena.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | [Spark](../platforms/spark.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| [ClickHouse](../platforms/clickhouse.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| [Oracle](../platforms/oracle.md) | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| [ClickHouse](../platforms/clickhouse.md) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| [Oracle](../platforms/oracle.md) | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ |
 | [MSSQL](../platforms/mssql.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | [Synapse](../platforms/synapse.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
-| Vertica | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Vertica | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | [Fabric](../platforms/fabric.md) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| [Doris](../platforms/doris.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| [StarRocks](../platforms/starrocks.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| [Doris](../platforms/doris.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| [StarRocks](../platforms/starrocks.md) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | [Trino](../platforms/trino.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | [Dremio](../platforms/dremio.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | [Sail](../platforms/sail.md) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
@@ -1695,14 +1697,21 @@ For `delete+insert`:
 - **Doris and StarRocks** build a new table from the remaining and new rows and swap it in. The new table does not keep your partitioning or distribution.
 - **Trino, Dremio, Sail, Spark, and Oracle** run the asset query twice instead of staging it in a temporary table. **Databricks** stages it in a temporary view, which is evaluated again by both the delete and the insert.
 
+On the [first run](#first-run):
+
+- **BigQuery** looks for the table with the `tables.get` API, which is not billed. In a dataset with case-insensitive names, a table whose name differs only in case counts as existing.
+- **Snowflake** looks for the table with `SHOW OBJECTS`, which needs no warehouse. If the table is not listed, Bruin confirms that it is missing in `INFORMATION_SCHEMA.TABLES`. That query runs on the connection's warehouse, even when the asset sets a [`warehouse`](../platforms/snowflake.md#overriding-the-warehouse-per-asset) parameter.
+- **Redshift** compares table names case-insensitively. It does not check `database.schema.table` names outside the connection's database; those assets always load incrementally.
+- **ClickHouse** with a `cluster` checks every replica for the table, and creates it the way a cluster full refresh does, which needs a `Replicated*MergeTree` engine.
+- **Vertica** counts a one-part asset name as existing when any schema has a relation with that name, because Vertica resolves the name through the `search_path`. Use a `schema.table` name to have Bruin create the table.
+- **Doris and StarRocks** check for the table only when the session is in the `internal` (Doris) or `default_catalog` (StarRocks) catalog. In other catalogs, Bruin runs the strategy as usual, so do the first run with `--full-refresh`.
+- **Vitess and PlanetScale** connections are not checked; do the first run with `--full-refresh`.
+
 Other differences:
 
 - **Athena** materializations always create Iceberg tables. See [Athena](../platforms/athena.md).
-- **BigQuery** looks for the table on the [first run](#first-run) with the `tables.get` API, which is not billed. In a dataset with case-insensitive names, a table whose name differs only in case counts as existing.
 - **Fabric** Lakehouse assets (`fabric.spark_sql`) use the Spark materializations, so they follow the Spark row, including the first run.
 - **Oracle** builds `scd2_by_column` assets as a plain table on a full refresh, and closes records that left the source only when the source returns at least one row.
-- **Snowflake** checks for an incremental asset's table with `SHOW OBJECTS`, which needs no warehouse. If the table is not listed, Bruin confirms that it is missing in `INFORMATION_SCHEMA.TABLES` before the [first run](#first-run). That query runs on the connection's warehouse, even when the asset sets a [`warehouse`](../platforms/snowflake.md#overriding-the-warehouse-per-asset) parameter.
-- **Redshift** compares table names case-insensitively when it checks for a missing table on the [first run](#first-run). It does not check `database.schema.table` names outside the connection's database; those assets always load incrementally.
 
 ### ClickHouse table options
 
