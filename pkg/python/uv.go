@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -574,6 +575,15 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 		return errors.Wrap(err, "failed to load the data into the destination")
 	}
+	if logBuffer != nil {
+		// Successful loads hide ingestr's output, but its warnings must still reach the user.
+		for _, line := range logBuffer.warnings {
+			_, _ = output.Write([]byte(">> " + line + "\n"))
+		}
+		if logBuffer.omittedWarnings > 0 {
+			_, _ = fmt.Fprintf(output, "[%d more ingestr warnings omitted; set show_ingestr_logs: \"true\" to see all]\n", logBuffer.omittedWarnings)
+		}
+	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
 
@@ -672,6 +682,10 @@ type tailBuffer struct {
 	data      []byte
 	maxBytes  int
 	truncated bool
+	// Warnings are kept apart from the tail, which can drop early ones, under their own maxBytes cap.
+	warnings        []string
+	warningBytes    int
+	omittedWarnings int
 }
 
 func newTailBuffer(maxBytes int) *tailBuffer {
@@ -681,6 +695,14 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	for _, line := range warningLines(p) {
+		if t.omittedWarnings > 0 || t.warningBytes+len(line) > t.maxBytes {
+			t.omittedWarnings++
+			continue
+		}
+		t.warnings = append(t.warnings, line)
+		t.warningBytes += len(line)
+	}
 	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)
@@ -694,6 +716,21 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 		t.truncated = true
 	}
 	return len(p), nil
+}
+
+// Matches "WARNING:", "[warn]", "UserWarning:" and similar, but not words like "swarm".
+var warningLinePattern = regexp.MustCompile(`(?i)\bwarn|warning\b`)
+
+// warningLines returns the lines of output that look like warnings, without the ">> " prefix.
+func warningLines(p []byte) []string {
+	var lines []string
+	for _, line := range strings.Split(string(p), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, ">> "))
+		if line != "" && warningLinePattern.MatchString(line) {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }
 
 // nextLineStart moves a cut that lands mid-line to the start of the next line,
