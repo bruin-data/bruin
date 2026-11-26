@@ -811,6 +811,19 @@ func TestTailBuffer(t *testing.T) {
 	}
 }
 
+func TestWarningLines(t *testing.T) {
+	t.Parallel()
+
+	output := ">> loading rows\n>> WARNING: source returned 0 rows\n>> swarm of 10 rows loaded\n>> UserWarning: column dropped\n>> [CSV] Warning: Row 3: skipping row\n"
+
+	assert.Equal(t, []string{
+		"WARNING: source returned 0 rows",
+		"UserWarning: column dropped",
+		"[CSV] Warning: Row 3: skipping row",
+	}, warningLines([]byte(output)))
+	assert.Empty(t, warningLines([]byte(">> all good\n")))
+}
+
 func TestTailBufferKeepsWarningsItDropsFromTheTail(t *testing.T) {
 	t.Parallel()
 	tb := newTailBuffer(16)

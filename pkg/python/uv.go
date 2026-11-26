@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -688,7 +689,7 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.warnings = append(t.warnings, executor.WarningLines(p)...)
+	t.warnings = append(t.warnings, warningLines(p)...)
 	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)
@@ -702,6 +703,21 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 		t.truncated = true
 	}
 	return len(p), nil
+}
+
+// Matches "WARNING:", "[warn]", "UserWarning:" and similar, but not words like "swarm".
+var warningLinePattern = regexp.MustCompile(`(?i)\bwarn|warning\b`)
+
+// warningLines returns the lines of output that look like warnings, without the ">> " prefix.
+func warningLines(p []byte) []string {
+	var lines []string
+	for _, line := range strings.Split(string(p), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, ">> "))
+		if line != "" && warningLinePattern.MatchString(line) {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }
 
 // nextLineStart moves a cut that lands mid-line to the start of the next line,

@@ -1564,12 +1564,6 @@ func Run(isDebug *bool) *cli.Command {
 				formatOpts.OnTaskEnd = func(inst scheduler.TaskInstance, err error, dur time.Duration) {
 					tui.OnTaskEnded(inst, err, dur)
 				}
-				// Asset output only goes to the log file in TUI mode, so surface its warnings live.
-				formatOpts.OnTaskOutput = func(p []byte) {
-					for _, line := range executor.WarningLines(p) {
-						tui.PrintAbove(masker.Mask(line))
-					}
-				}
 
 				ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
 				if err != nil {
