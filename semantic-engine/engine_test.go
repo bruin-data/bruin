@@ -3009,6 +3009,24 @@ func TestGenerateSeriesSQL(t *testing.T) {
 	}
 	expectNotContains(t, window, "ROW_NUMBER")
 	expectNotContains(t, window, "INNER JOIN")
+	// A window metric keys the shown rows by its order_date too, so joining them
+	// would drop the earlier days.
+	running := &Query{Dimensions: []DimensionRef{{Name: "category"}}, Metrics: []string{"running_revenue"}, Limit: 10}
+	history, err := e.GenerateSeriesSQL(running, day, []string{"order_count"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectNotContains(t, history, "INNER JOIN")
+	expectContains(t, history, "ROW_NUMBER() OVER (PARTITION BY category ORDER BY order_date DESC)")
+	// The helper rank column steps around a field with the same name.
+	ranked := richTestModel()
+	ranked.Metrics = append(ranked.Metrics, Metric{Name: "__series_rank", Expression: "count(*)"})
+	named, err := minimalEngine(t, ranked).GenerateSeriesSQL(q, day, []string{"__series_rank"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, named, "AS __series_rank_ FROM (")
+	expectContains(t, named, "WHERE __series_rank_ <= 30")
 	// The total row's points cover only the rows the table shows.
 	total, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 0, true)
 	if err != nil {

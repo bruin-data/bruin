@@ -572,10 +572,15 @@ func (e *Engine) totalSQL(q *Query, metrics []string, dims []DimensionRef, restr
 // GenerateSeriesSQL returns metrics per q's dimensions and by (by alone with
 // total), ordered by by: one point per row and x, such as for a sparkline. It
 // covers only the rows q returns and, with limit > 0, each row's last limit
-// points. A by among q's dimensions keeps every point, since each row needs the
-// ones before its own x.
+// points. A by among the dimensions that key q's rows keeps every point, since
+// each row needs the ones before its own x.
 func (e *Engine) GenerateSeriesSQL(q *Query, by DimensionRef, metrics []string, limit int, total bool) (string, error) {
-	sql, x, err := e.seriesSQL(q, by, metrics, limit, !slices.Contains(q.Dimensions, by), total)
+	keys := q.Dimensions
+	if e.needsWindowWrap(q.Metrics) {
+		keys = e.collectInnerDimensions(q) // as totalSQL keys the shown rows
+	}
+	restrict := !slices.ContainsFunc(keys, func(d DimensionRef) bool { return d.Name == by.Name })
+	sql, x, err := e.seriesSQL(q, by, metrics, limit, restrict, total)
 	if err != nil {
 		return "", err
 	}
@@ -626,8 +631,13 @@ func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, limit in
 	if len(keys) > 0 {
 		partition = "PARTITION BY " + strings.Join(keys, ", ") + " "
 	}
-	return fmt.Sprintf("SELECT %s FROM (SELECT points.*, ROW_NUMBER() OVER (%sORDER BY %s DESC) AS __series_rank FROM (%s) points WHERE %s IS NOT NULL) ranked WHERE __series_rank <= %d",
-		strings.Join(append(cols, metrics...), ", "), partition, x, sql, x, limit), x, nil
+	cols = append(cols, metrics...)
+	rank := "__series_rank"
+	for slices.ContainsFunc(cols, func(c string) bool { return strings.EqualFold(c, rank) }) {
+		rank += "_"
+	}
+	return fmt.Sprintf("SELECT %s FROM (SELECT points.*, ROW_NUMBER() OVER (%sORDER BY %s DESC) AS %s FROM (%s) points WHERE %s IS NOT NULL) ranked WHERE %s <= %d",
+		strings.Join(cols, ", "), partition, x, rank, sql, x, rank, limit), x, nil
 }
 
 // Series is one list column for AddSeriesSQL.
