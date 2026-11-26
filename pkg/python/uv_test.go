@@ -826,7 +826,7 @@ func TestWarningLines(t *testing.T) {
 
 func TestTailBufferKeepsWarningsItDropsFromTheTail(t *testing.T) {
 	t.Parallel()
-	tb := newTailBuffer(16)
+	tb := newTailBuffer(40)
 	for _, w := range []string{">> Warning: skipped 3 rows\n", ">> aaaaaaa\n", ">> bbbbbbb\n", ">> WARNING: late\n"} {
 		_, _ = tb.Write([]byte(w))
 	}
@@ -835,6 +835,17 @@ func TestTailBufferKeepsWarningsItDropsFromTheTail(t *testing.T) {
 	tb.flushTo(&out)
 	require.NotContains(t, out.String(), "skipped 3 rows")
 	assert.Equal(t, []string{"Warning: skipped 3 rows", "WARNING: late"}, tb.warnings)
+}
+
+func TestTailBufferCapsWarningsAndCountsTheRest(t *testing.T) {
+	t.Parallel()
+	tb := newTailBuffer(20)
+	for _, w := range []string{">> Warning: one\n", ">> Warning: two\n", ">> Warning: three\n", ">> Warning: 4\n"} {
+		_, _ = tb.Write([]byte(w))
+	}
+
+	assert.Equal(t, []string{"Warning: one"}, tb.warnings)
+	assert.Equal(t, 3, tb.omittedWarnings)
 }
 
 func TestTailBufferNeverPrintsPartOfASecret(t *testing.T) {

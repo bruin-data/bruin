@@ -580,6 +580,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		for _, line := range logBuffer.warnings {
 			_, _ = output.Write([]byte(">> " + line + "\n"))
 		}
+		if logBuffer.omittedWarnings > 0 {
+			_, _ = fmt.Fprintf(output, "[%d more ingestr warnings omitted; set show_ingestr_logs: \"true\" to see all]\n", logBuffer.omittedWarnings)
+		}
 	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
@@ -679,7 +682,10 @@ type tailBuffer struct {
 	data      []byte
 	maxBytes  int
 	truncated bool
-	warnings  []string // kept in full, since the tail can drop early warnings
+	// Warnings are kept apart from the tail, which can drop early ones, under their own maxBytes cap.
+	warnings        []string
+	warningBytes    int
+	omittedWarnings int
 }
 
 func newTailBuffer(maxBytes int) *tailBuffer {
@@ -689,7 +695,14 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 func (t *tailBuffer) Write(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.warnings = append(t.warnings, warningLines(p)...)
+	for _, line := range warningLines(p) {
+		if t.omittedWarnings > 0 || t.warningBytes+len(line) > t.maxBytes {
+			t.omittedWarnings++
+			continue
+		}
+		t.warnings = append(t.warnings, line)
+		t.warningBytes += len(line)
+	}
 	if len(p) > t.maxBytes {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[nextLineStart(p, len(p)-t.maxBytes):]...)
