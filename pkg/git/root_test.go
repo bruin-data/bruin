@@ -129,6 +129,37 @@ func TestChangedFilesFromBase(t *testing.T) {
 		assert.Equal(t, []string{"new.txt"}, files)
 	})
 
+	t.Run("returns non-ASCII file names unquoted", func(t *testing.T) {
+		t.Parallel()
+		repoDir := setupTempGitRepo(t)
+
+		// core.quotePath is on by default, set it here so a global config does not change the test.
+		for _, args := range [][]string{
+			{"git", "config", "core.quotePath", "true"},
+			{"git", "checkout", "-b", "feature"},
+		} {
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Dir = repoDir
+			require.NoError(t, cmd.Run(), "failed to run: %v", args)
+		}
+
+		require.NoError(t, os.MkdirAll(filepath.Join(repoDir, "assets"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "assets", "müşteri.sql"), []byte("select 1"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "assets", `say "hi".sql`), []byte("select 2"), 0o644))
+		for _, args := range [][]string{
+			{"git", "add", "-A"},
+			{"git", "commit", "-m", "add assets"},
+		} {
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Dir = repoDir
+			require.NoError(t, cmd.Run(), "failed to run: %v", args)
+		}
+
+		files, err := ChangedFilesFromBase(repoDir, "main")
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"assets/müşteri.sql", `assets/say "hi".sql`}, files)
+	})
+
 	t.Run("returns error for invalid base branch", func(t *testing.T) {
 		t.Parallel()
 		repoDir := setupTempGitRepo(t)
