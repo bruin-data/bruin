@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +60,7 @@ type FormattingOptions struct {
 	LogOnlyWriter     io.Writer                                          // in TUI mode, worker output goes here (log file) instead of os.Stdout
 	OnTaskStart       func(scheduler.TaskInstance)                       // called when worker begins executing a task
 	OnTaskEnd         func(scheduler.TaskInstance, error, time.Duration) // called when worker finishes a task
+	OnTaskOutput      func([]byte)                                       // called with each unformatted chunk of task output
 
 	// InteractivePythonLogs passes child process stdout/stderr through verbatim
 	// (preserving carriage returns, without the timestamp/task-name/">> " prefix)
@@ -192,6 +195,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			DoNotLogTimestamp: w.formatOpts.DoNotLogTimestamp,
 			DoNotLogTaskName:  w.formatOpts.DoNotLogTaskName,
 			Passthrough:       w.formatOpts.InteractivePythonLogs,
+			onOutput:          w.formatOpts.OnTaskOutput,
 		}
 
 		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
@@ -255,6 +259,7 @@ type workerWriter struct {
 	DoNotLogTimestamp bool
 	DoNotLogTaskName  bool
 	Passthrough       bool
+	onOutput          func([]byte)
 }
 
 // IsPassthrough reports whether this writer forwards child output verbatim.
@@ -265,6 +270,9 @@ func (w *workerWriter) IsPassthrough() bool {
 }
 
 func (w *workerWriter) Write(p []byte) (int, error) {
+	if w.onOutput != nil {
+		w.onOutput(p)
+	}
 	if w.Passthrough {
 		return w.w.Write(p)
 	}
@@ -291,4 +299,19 @@ func (w *workerWriter) Write(p []byte) (int, error) {
 		return n, io.ErrShortWrite
 	}
 	return len(p), nil
+}
+
+// Matches "WARNING:", "[warn]", "UserWarning:" and similar, but not words like "swarm".
+var warningLinePattern = regexp.MustCompile(`(?i)\bwarn|warning\b`)
+
+// WarningLines returns the lines of task output that look like warnings, without the ">> " prefix.
+func WarningLines(p []byte) []string {
+	var lines []string
+	for _, line := range strings.Split(string(p), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, ">> "))
+		if line != "" && warningLinePattern.MatchString(line) {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }

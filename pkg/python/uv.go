@@ -574,6 +574,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 		return errors.Wrap(err, "failed to load the data into the destination")
 	}
+	if logBuffer != nil {
+		// Successful loads hide ingestr's output, but its warnings must still reach the user.
+		for _, line := range executor.WarningLines(logBuffer.data) {
+			_, _ = output.Write([]byte(">> " + line + "\n"))
+		}
+	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
 

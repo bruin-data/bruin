@@ -212,10 +212,28 @@ func (t *TUIRenderer) renderLoop() {
 	}
 }
 
-func (t *TUIRenderer) render() {
+// PrintAbove writes a line above the live progress block, so it stays in the terminal's scrollback.
+func (t *TUIRenderer) PrintAbove(line string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	if t.stopped {
+		fmt.Fprintln(t.terminal, line)
+		return
+	}
+	t.clearLastRender()
+	fmt.Fprintln(t.terminal, line)
+	t.lastLines = 0
+	t.renderLocked()
+}
+
+func (t *TUIRenderer) render() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.renderLocked()
+}
+
+func (t *TUIRenderer) renderLocked() {
 	t.frame++
 
 	width, height := t.getTerminalSize()
