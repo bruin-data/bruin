@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -423,7 +424,12 @@ func (e *Engine) GenerateSQL(q *Query) (string, error) {
 // totals. Window metrics and their dependents return NULL. The input query and
 // engine are not modified.
 func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
-	if len(q.Metrics) == 0 {
+	return e.totalSQL(q, q.Metrics, nil, true)
+}
+
+// totalSQL computes metrics over q's rows grouped by dims; restrict keeps only the rows q shows.
+func (e *Engine) totalSQL(q *Query, metrics []string, dims []DimensionRef, restrict bool) (string, error) {
+	if len(metrics) == 0 {
 		return "", errors.New("grand totals require at least one metric")
 	}
 	plan, err := e.planQuery(q)
@@ -435,7 +441,7 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	}
 
 	grandTotal := *q
-	grandTotal.Dimensions, grandTotal.Sort, grandTotal.Limit = nil, nil, 0
+	grandTotal.Dimensions, grandTotal.Sort, grandTotal.Limit = dims, nil, 0
 	grandTotal.Filters = nil
 	for _, filter := range q.Filters {
 		if filter.Expression != "" {
@@ -461,7 +467,7 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	}
 	grandTotalEngine := *e
 	grandTotalEngine.metrics = maps.Clone(e.metrics)
-	for _, name := range q.Metrics {
+	for _, name := range metrics {
 		if e.needsWindowWrap([]string{name}) {
 			metric := *e.metrics[name]
 			// An aggregate NULL also returns one row for window-only queries.
@@ -480,19 +486,22 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	}
 	grandTotalEngine.metrics[rowCount] = &Metric{Name: rowCount, Expression: "COUNT(*)"}
 	// Compute each metric once; the outer projection repeats it by name.
-	grandTotal.Metrics = nil
-	for _, name := range q.Metrics {
-		if !slices.Contains(grandTotal.Metrics, name) {
-			grandTotal.Metrics = append(grandTotal.Metrics, name)
+	unique := func(names []string) []string {
+		var out []string
+		for _, name := range names {
+			if !slices.Contains(out, name) {
+				out = append(out, name)
+			}
 		}
+		return out
 	}
-	grandTotal.Metrics = append(grandTotal.Metrics, rowCount)
+	grandTotal.Metrics = append(unique(metrics), rowCount)
 	// Replan without excluded filters so HAVING-only joins cannot affect totals.
 	// When a limit or aggregate filter can hide rows, join to the rows the
 	// detail query returns. Window queries return one row per combination of
 	// their inner dimensions, so those key the rows.
 	shown := *q
-	shown.Metrics = grandTotal.Metrics[:len(grandTotal.Metrics)-1] // without rowCount; SQL Server rejects repeated derived-table columns
+	shown.Metrics = unique(q.Metrics) // SQL Server rejects repeated derived-table columns
 	if e.needsWindowWrap(q.Metrics) {
 		shown.Dimensions = e.collectInnerDimensions(q)
 	}
@@ -508,15 +517,20 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	if shown.Limit == 0 {
 		shown.Sort = nil
 	}
-	restrict := len(grandTotal.Filters) < len(q.Filters) || len(grandTotal.Segments) < len(q.Segments) || (len(shown.Dimensions) > 0 && q.Limit > 0)
+	restrict = restrict && (len(grandTotal.Filters) < len(q.Filters) || len(grandTotal.Segments) < len(q.Segments) || (len(shown.Dimensions) > 0 && q.Limit > 0))
 	planned := grandTotal
 	if restrict {
-		planned.Dimensions = shown.Dimensions
+		planned.Dimensions = append(slices.Clone(shown.Dimensions), dims...)
 	}
 	totalPlan, err := grandTotalEngine.planQuery(&planned)
 	if err != nil {
 		return "", err
 	}
+	var cols []string
+	for _, d := range dims {
+		cols = append(cols, totalPlan.dimensionBinding(d).outputAlias)
+	}
+	cols = append(cols, metrics...)
 	if restrict {
 		shownSQL, columns, err := e.GenerateSQLWithColumns(&shown)
 		if err != nil {
@@ -528,7 +542,7 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 		for i, d := range shown.Dimensions {
 			if names[strings.ToLower(columns[i].Name)] {
 				// Two dimensions share a column, so the shown rows can't be matched.
-				return "SELECT NULL AS " + strings.Join(q.Metrics, ", NULL AS "), nil
+				return "SELECT NULL AS " + strings.Join(cols, ", NULL AS "), nil
 			}
 			names[strings.ToLower(columns[i].Name)] = true
 			key := fmt.Sprintf("__grand_total_shown_%d", i)
@@ -547,7 +561,144 @@ func (e *Engine) GenerateGrandTotalSQL(q *Query) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "SELECT " + strings.Join(q.Metrics, ", ") + " FROM (" + sql + ") grand_total", nil
+	return "SELECT " + strings.Join(cols, ", ") + " FROM (" + sql + ") grand_total", nil
+}
+
+// GenerateSeriesSQL returns metrics per q's dimensions and by (by alone with
+// total), ordered by by: one point per row and x, such as for a sparkline.
+func (e *Engine) GenerateSeriesSQL(q *Query, by DimensionRef, metrics []string, total bool) (string, error) {
+	sql, x, err := e.seriesSQL(q, by, metrics, total)
+	if err != nil {
+		return "", err
+	}
+	return sql + " ORDER BY " + x, nil
+}
+
+func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, total bool) (sql, x string, err error) {
+	dims := []DimensionRef{by}
+	if !total {
+		dims = q.Dimensions
+		if !slices.Contains(dims, by) {
+			dims = append(slices.Clone(dims), by)
+		}
+	}
+	points := &Query{Dimensions: dims, Metrics: metrics}
+	plan, err := e.planQuery(points)
+	if err != nil {
+		return "", "", err
+	}
+	if err := e.validateQuery(points, plan); err != nil {
+		return "", "", err
+	}
+	x = plan.dimensionBinding(by).outputAlias
+	for _, d := range dims {
+		if d != by && plan.dimensionBinding(d).outputAlias == x {
+			return "", "", fmt.Errorf("%s and dimension %s both return column %s", by.Name, d.Name, x)
+		}
+	}
+	if sql, err = e.totalSQL(q, metrics, dims, total); err != nil {
+		return "", "", err
+	}
+	return sql + " WHERE " + x + " IS NOT NULL", x, nil
+}
+
+// Series is one list column for AddSeriesSQL.
+type Series struct {
+	By     DimensionRef `json:"by"`              // x
+	Metric string       `json:"metric"`          // y
+	Limit  int          `json:"limit,omitempty"` // last N points; 0 keeps all
+}
+
+// listDialects build {x, y} points; limit: ARRAY_AGG takes LIMIT.
+var listDialects = map[string]struct {
+	point string
+	limit bool
+}{
+	"bigquery":              {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", true},
+	"google_cloud_platform": {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", true},
+	"duckdb":                {"{'x': %s, 'y': CAST(%s AS DOUBLE)}", false},
+}
+
+// AddSeriesSQL joins each series' points, newest first, into sql (q's detail or,
+// with total, grand-total SQL) as column __series_<i>. ok is false when it
+// can't; callers then run GenerateSeriesSQL.
+func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool) (string, bool, error) {
+	dialect, ok := listDialects[e.Dialect]
+	if !ok || slices.ContainsFunc(series, func(s Series) bool { return slices.Contains(q.Dimensions, s.By) }) {
+		return "", false, nil
+	}
+	plan, err := e.planQuery(q)
+	if err != nil {
+		return "", false, err
+	}
+	var keys, order []string
+	if !total {
+		for _, d := range q.Dimensions {
+			key := plan.dimensionBinding(d).outputAlias
+			if slices.Contains(keys, key) {
+				return "", false, nil
+			}
+			keys = append(keys, key)
+		}
+		// The join may not keep the rows' order, so repeat q's sort.
+		for _, s := range q.Sort {
+			name := s.Name
+			if binding := plan.sortBinding(s.Name); binding != nil {
+				name = binding.outputAlias
+			}
+			if !slices.Contains(keys, name) && !slices.Contains(q.Metrics, name) {
+				return "", false, nil
+			}
+			order = append(order, "__rows."+name+" "+cmp.Or(strings.ToUpper(s.Direction), "ASC"))
+		}
+	}
+	cols, joins := []string{"__rows.*"}, ""
+	var groups []DimensionRef
+	for _, s := range series {
+		if !slices.Contains(groups, s.By) {
+			groups = append(groups, s.By)
+		}
+	}
+	for g, by := range groups {
+		var metrics []string
+		for _, s := range series {
+			if s.By == by && !slices.Contains(metrics, s.Metric) {
+				metrics = append(metrics, s.Metric)
+			}
+		}
+		points, x, err := e.seriesSQL(q, by, metrics, total)
+		if err != nil {
+			return "", false, err
+		}
+		name := fmt.Sprintf("__series_join_%d", g)
+		selects := slices.Clone(keys)
+		for i, s := range series {
+			if s.By != by {
+				continue
+			}
+			limit := ""
+			if s.Limit > 0 && dialect.limit {
+				limit = fmt.Sprintf(" LIMIT %d", s.Limit)
+			}
+			col := fmt.Sprintf("__series_%d", i)
+			selects = append(selects, fmt.Sprintf("ARRAY_AGG(%s ORDER BY %s DESC%s) AS %s", fmt.Sprintf(dialect.point, x, s.Metric), x, limit, col))
+			cols = append(cols, name+"."+col)
+		}
+		groupBy, conditions := "", []string{"TRUE"}
+		if len(keys) > 0 {
+			// Not IS NOT DISTINCT FROM: BigQuery can't hash-join on it.
+			groupBy, conditions = " GROUP BY "+strings.Join(keys, ", "), nil
+			for _, key := range keys {
+				conditions = append(conditions, fmt.Sprintf("(__rows.%[1]s = %[2]s.%[1]s OR (__rows.%[1]s IS NULL AND %[2]s.%[1]s IS NULL))", key, name))
+			}
+		}
+		joins += fmt.Sprintf(" LEFT JOIN (SELECT %s FROM (%s) __points%s) %s ON %s", strings.Join(selects, ", "), points, groupBy, name, strings.Join(conditions, " AND "))
+	}
+	sql = "SELECT " + strings.Join(cols, ", ") + " FROM (" + sql + ") __rows" + joins
+	if len(order) > 0 {
+		sql += " ORDER BY " + strings.Join(order, ", ")
+	}
+	return sql, true, nil
 }
 
 // GenerateSQLWithColumns compiles the query and also returns the result set's
