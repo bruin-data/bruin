@@ -1393,6 +1393,16 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				var succeeded []string
+				for _, asset := range pipelineState.State {
+					if asset.Status == scheduler.Succeeded.String() {
+						succeeded = append(succeeded, asset.Name)
+					}
+				}
+				if len(succeeded) > 0 {
+					slices.Sort(succeeded)
+					warningPrinter.Printf("--continue skips %d asset(s) that succeeded in the previous run: %s\n", len(succeeded), strings.Join(succeeded, ", "))
+				}
 				if err := SkipDisabledAssets(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
 					errorPrinter.Printf("Failed to skip disabled assets: %v\n", err)
 					return cli.Exit("", 1)
