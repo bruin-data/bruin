@@ -1551,6 +1551,55 @@ func TestScheduler_RestoreState(t *testing.T) {
 	assert.Equal(t, expectedState.Cmdline, pipelineState.Cmdline, "Cmdline should match")
 }
 
+func TestScheduler_RestoreStateKeepsSucceededEarlierAcrossRetries(t *testing.T) {
+	t.Parallel()
+
+	foundPipeline := &pipeline.Pipeline{
+		Name: "test",
+		Assets: []*pipeline.Asset{
+			{Name: "raw", Type: "bq.sql"},
+			{Name: "stg", Type: "bq.sql", Upstreams: []pipeline.Upstream{{Type: "asset", Value: "raw"}}},
+			{Name: "unselected", Type: "bq.sql"},
+		},
+	}
+	fs := afero.NewMemMapFs()
+	state := &PipelineState{
+		CompatibilityHash: foundPipeline.GetCompatibilityHash(),
+		State: []*PipelineAssetState{
+			{Name: "raw", Status: Succeeded.String()},
+			{Name: "stg", Status: Failed.String()},
+			{Name: "unselected", Status: Skipped.String()},
+		},
+	}
+
+	// Each round is one `bruin run --continue` whose stg run ends with the given status.
+	for i, stgStatus := range []TaskInstanceStatus{Failed, Failed, Succeeded} {
+		s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "run")
+		require.NoError(t, s.RestoreState(state))
+		for _, task := range s.taskInstances {
+			if task.GetAsset().Name == "stg" {
+				task.MarkAs(stgStatus)
+			}
+		}
+
+		dir := fmt.Sprintf("logs/runs/%d", i)
+		require.NoError(t, s.SavePipelineState(fs, nil, &RunConfig{}, "", 0, "run", dir))
+		var err error
+		state, err = ReadState(fs, dir)
+		require.NoError(t, err)
+
+		got := make(map[string]string)
+		for _, asset := range state.State {
+			got[asset.Name] = fmt.Sprintf("%s succeeded_earlier=%t", asset.Status, asset.SucceededEarlier)
+		}
+		assert.Equal(t, map[string]string{
+			"raw":        "skipped succeeded_earlier=true",
+			"stg":        stgStatus.String() + " succeeded_earlier=false",
+			"unselected": "skipped succeeded_earlier=false",
+		}, got, "round %d", i)
+	}
+}
+
 func TestScheduler_SavePipelineStateBackfill(t *testing.T) {
 	t.Parallel()
 

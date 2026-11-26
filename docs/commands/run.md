@@ -129,7 +129,7 @@ When `--backfill-id` is set, the `run_id` is composed as `<backfill-id>__<start-
 
 ### Continue from the last failed asset
 
-If you want to continue from the last failed asset, you can use the `--continue` flag. This will run the pipeline/asset from the last failed asset. Bruin will automatically retrieve all the flags used in the last run.
+If you want to continue from the last failed asset, you can use the `--continue` flag. This will run the pipeline/asset from the last failed asset. Bruin will automatically retrieve all the flags used in the last run. The skipped assets are printed in a warning.
 
 ```bash
 bruin run --continue 

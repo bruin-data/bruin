@@ -161,6 +161,8 @@ type PipelineAssetState struct {
 	Name   string               `json:"name"`
 	Status string               `json:"status"`
 	Tasks  []*PipelineTaskState `json:"tasks,omitempty"`
+	// SucceededEarlier marks an asset --continue skipped because an earlier run succeeded it.
+	SucceededEarlier bool `json:"succeeded_earlier,omitempty"`
 }
 
 // PipelineTaskState is the outcome of one of an asset's tasks: the asset itself or one of its checks.
@@ -351,6 +353,9 @@ type Scheduler struct {
 
 	runID          string
 	onStatusChange func(StatusChangeEvent)
+
+	// succeededEarlier holds the assets RestoreState skipped because an earlier run succeeded them.
+	succeededEarlier map[string]bool
 
 	taskErrors map[TaskInstance]error
 	// MaskError redacts credentials from the failure reasons written to the run state.
@@ -1201,9 +1206,10 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfi
 	for key, status := range dict {
 		result := GetStatusForTask(status)
 		state = append(state, &PipelineAssetState{
-			Name:   key,
-			Status: result.String(),
-			Tasks:  tasks[key],
+			Name:             key,
+			Status:           result.String(),
+			Tasks:            tasks[key],
+			SucceededEarlier: result == Skipped && s.succeededEarlier[key],
 		})
 	}
 
@@ -1253,8 +1259,12 @@ func (s *Scheduler) RestoreState(state *PipelineState) error {
 		return errors.New("the pipeline has changed since the last run; please rerun the pipeline")
 	}
 	stateMap := make(map[string]string)
+	s.succeededEarlier = make(map[string]bool)
 	for _, state := range state.State {
 		stateMap[state.Name] = state.Status
+		if state.Status == Succeeded.String() || state.SucceededEarlier {
+			s.succeededEarlier[state.Name] = true
+		}
 	}
 
 	for _, task := range s.taskInstances {
