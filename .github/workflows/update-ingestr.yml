@@ -9,20 +9,21 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: update-ingestr-version
-  cancel-in-progress: false
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
-  update:
-    # GitHub's maintained image supplies the authenticated release verifier.
-    runs-on: ubuntu-latest
+  check:
+    # Compare the pin before checkout. A matching release ends the run here.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      new: ${{ steps.check.outputs.new }}
+      version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-
       - name: Check for latest ingestr release
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -31,7 +32,8 @@ jobs:
               test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" != "$v1"
           }
 
-          latest=$(curl -fsSL "https://api.github.com/repos/bruin-data/ingestr/releases/latest" | jq -er '.tag_name')
+          # Authenticated lookup. Unauthenticated calls from hosted runners are rate limited.
+          latest=$(gh api repos/bruin-data/ingestr/releases/latest --jq .tag_name)
           latest=${latest#v}
           # Discovery is not trusted verification. Validate before passing the
           # value to later steps; the generator authenticates this exact tag.
@@ -39,7 +41,7 @@ jobs:
             echo "Expected a stable ingestr release tag" >&2
             exit 1
           fi
-          current=$(sed -nE 's/^[[:space:]]*IngestrVersionV1[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' pkg/python/uv.go)
+          current=$(gh api -H "Accept: application/vnd.github.raw" "repos/${GITHUB_REPOSITORY}/contents/pkg/python/uv.go?ref=${GITHUB_SHA}" | sed -nE 's/^[[:space:]]*IngestrVersionV1[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p')
 
           if [[ -z "$current" ]]; then
             echo "Could not find IngestrVersionV1 in pkg/python/uv.go" >&2
@@ -56,13 +58,22 @@ jobs:
               echo "new=false" >> "$GITHUB_OUTPUT"
           fi
 
+  update:
+    needs: check
+    if: needs.check.outputs.new == 'true'
+    # GitHub's maintained image supplies the authenticated release verifier.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
       - name: Update ingestr version in code
-        if: steps.check.outputs.new == 'true'
         run: |
           set -euo pipefail
           
           # Update the version using sed with a more robust pattern
-          sed -i -E 's/(IngestrVersionV1[[:space:]]*=[[:space:]]*)"[^"]+"/\1"${{ steps.check.outputs.version }}"/' pkg/python/uv.go
+          sed -i -E 's/(IngestrVersionV1[[:space:]]*=[[:space:]]*)"[^"]+"/\1"${{ needs.check.outputs.version }}"/' pkg/python/uv.go
           
           # Verify the change was made
           echo "Updated version in pkg/python/uv.go:"
@@ -80,25 +91,22 @@ jobs:
           echo "Changes staged successfully"
 
       - name: Verify candidate ingestr release
-        if: steps.check.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/generate_ingestr_hashes.py
 
       - name: Check PostgreSQL CDC capability parity
-        if: steps.check.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
-          python3 scripts/check_ingestr_cdc_parity.py --version "${{ steps.check.outputs.version }}"
+          python3 scripts/check_ingestr_cdc_parity.py --version "${{ needs.check.outputs.version }}"
 
       - name: Create or update Pull Request
         id: create-pr
-        if: steps.check.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.check.outputs.version }}
+          VERSION: ${{ needs.check.outputs.version }}
           BASE_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
