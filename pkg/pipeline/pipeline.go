@@ -1494,54 +1494,89 @@ func (r *RoutingConfig) Clone() *RoutingConfig {
 	return &clone
 }
 
+// SmartRetriesConfig configures smart retries: Bruin Cloud retrying an asset based on why it
+// failed, instead of always up to `retries` times. It is an object so that more settings can be
+// added later; a setting that isn't set is inherited, like the object itself.
+type SmartRetriesConfig struct {
+	Enabled *bool `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
+}
+
+func (c *SmartRetriesConfig) IsZero() bool {
+	return c == nil || c.Enabled == nil
+}
+
+func (c *SmartRetriesConfig) Clone() *SmartRetriesConfig {
+	if c == nil {
+		return nil
+	}
+
+	return &SmartRetriesConfig{Enabled: cloneBoolPtr(c.Enabled)}
+}
+
+// mergeSmartRetriesDefaults fills the settings an asset doesn't set from the pipeline defaults.
+func mergeSmartRetriesDefaults(asset *Asset, defaults *SmartRetriesConfig) {
+	if defaults.IsZero() {
+		return
+	}
+	if asset.SmartRetries == nil {
+		asset.SmartRetries = defaults.Clone()
+		return
+	}
+	if asset.SmartRetries.Enabled == nil {
+		merged := asset.SmartRetries.Clone()
+		merged.Enabled = cloneBoolPtr(defaults.Enabled)
+		asset.SmartRetries = merged
+	}
+}
+
 // Asset is the in-memory representation of one asset within a pipeline. When
 // adding a new exported string-valued field, extend renderAssetStrings in
 // pkg/pipeline/variant.go so variant materialization renders it. Asset bodies
 // (ExecutableFile.Content) are intentionally left for run-time Jinja and are
 // excluded from the visitor — see the allowlist in TestVariantVisitorCoversStringFields.
 type Asset struct { //nolint:recvcheck
-	ID                string             `json:"id" yaml:"-" mapstructure:"-"`
-	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
-	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Enabled           *TemplatedBool     `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
-	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	StartDate         string             `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
-	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
-	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
-	Domains           EmptyStringArray   `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
-	Meta              EmptyStringMap     `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
-	Materialization   Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
-	Upstreams         []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
-	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
-	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
-	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
-	Tier              int                `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
-	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
-	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
-	Parameters        ParameterMap       `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
-	Secrets           []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
-	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
-	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
-	CustomChecks      []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
-	UnitTests         []UnitTest         `json:"unit_tests,omitempty" yaml:"unit_tests,omitempty" mapstructure:"unit_tests"`
-	Hooks             Hooks              `json:"hooks,omitempty" yaml:"hooks,omitempty" mapstructure:"hooks"`
-	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
-	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
-	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
-	BigQuery          BigQueryConfig     `json:"bigquery" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
-	ClickHouse        ClickHouseConfig   `json:"clickhouse,omitzero" yaml:"clickhouse,omitempty" mapstructure:"clickhouse"`
-	Doris             DorisConfig        `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
-	StarRocks         StarRocksConfig    `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
-	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
-	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
-	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
-	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	SmartRetries      *bool              `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
-	Timeout           DurationSeconds    `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
-	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
-	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
-	Notifications     *Notifications     `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+	ID                string              `json:"id" yaml:"-" mapstructure:"-"`
+	URI               string              `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
+	Name              string              `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type              AssetType           `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Enabled           *TemplatedBool      `json:"enabled,omitempty" yaml:"enabled,omitempty" mapstructure:"enabled"`
+	Description       string              `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	StartDate         string              `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
+	Connection        string              `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
+	Tags              EmptyStringArray    `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains           EmptyStringArray    `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta              EmptyStringMap      `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
+	Materialization   Materialization     `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Upstreams         []Upstream          `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
+	Image             string              `json:"image" yaml:"image,omitempty" mapstructure:"image"`
+	Instance          string              `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner             string              `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int                 `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
+	ExecutableFile    ExecutableFile      `json:"executable_file" yaml:"-" mapstructure:"-"`
+	DefinitionFile    TaskDefinitionFile  `json:"definition_file" yaml:"-" mapstructure:"-"`
+	Parameters        ParameterMap        `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Secrets           []SecretMapping     `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Extends           []string            `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
+	Columns           []Column            `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks      []CustomCheck       `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	UnitTests         []UnitTest          `json:"unit_tests,omitempty" yaml:"unit_tests,omitempty" mapstructure:"unit_tests"`
+	Hooks             Hooks               `json:"hooks,omitempty" yaml:"hooks,omitempty" mapstructure:"hooks"`
+	Metadata          EmptyStringMap      `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Snowflake         SnowflakeConfig     `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena            AthenaConfig        `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	BigQuery          BigQueryConfig      `json:"bigquery" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
+	ClickHouse        ClickHouseConfig    `json:"clickhouse,omitzero" yaml:"clickhouse,omitempty" mapstructure:"clickhouse"`
+	Doris             DorisConfig         `json:"doris,omitzero" yaml:"doris,omitempty" mapstructure:"doris"`
+	StarRocks         StarRocksConfig     `json:"starrocks,omitzero" yaml:"starrocks,omitempty" mapstructure:"starrocks"`
+	Routing           *RoutingConfig      `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
+	IntervalModifiers IntervalModifiers   `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
+	RerunCooldown     *int                `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int                `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	SmartRetries      *SmartRetriesConfig `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
+	Timeout           DurationSeconds     `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
+	RetriesDelay      *int                `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
+	RefreshRestricted *bool               `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	Notifications     *Notifications      `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 
 	upstream   []*Asset
 	downstream []*Asset
@@ -2496,7 +2531,7 @@ type Pipeline struct {
 	Catchup            CatchupMode            `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	SmartRetries       *bool                  `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
+	SmartRetries       *SmartRetriesConfig    `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
@@ -2583,7 +2618,7 @@ type DefaultValues struct {
 	IntervalModifiers IntervalModifiers      `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	Retries           *int                   `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
-	SmartRetries      *bool                  `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
+	SmartRetries      *SmartRetriesConfig    `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	Timeout           DurationSeconds        `json:"timeout,omitempty" yaml:"timeout,omitempty" mapstructure:"timeout"`
 	RefreshRestricted *bool                  `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications         `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
@@ -3663,9 +3698,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if asset.Retries == nil && defaults.Retries != nil {
 		asset.Retries = cloneIntPtr(defaults.Retries)
 	}
-	if asset.SmartRetries == nil && defaults.SmartRetries != nil {
-		asset.SmartRetries = cloneBoolPtr(defaults.SmartRetries)
-	}
+	mergeSmartRetriesDefaults(asset, defaults.SmartRetries)
 	if asset.Timeout == 0 {
 		asset.Timeout = defaults.Timeout
 	}

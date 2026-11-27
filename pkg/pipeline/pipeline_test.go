@@ -1903,16 +1903,21 @@ func TestPipeline_SmartRetries(t *testing.T) {
 	t.Parallel()
 
 	var p pipeline.Pipeline
-	require.NoError(t, yaml.Unmarshal([]byte("name: test\nsmart_retries: true\ndefault:\n  smart_retries: false\n"), &p))
+	require.NoError(t, yaml.Unmarshal([]byte("name: test\nsmart_retries:\n  enabled: true\ndefault:\n  smart_retries:\n    enabled: false\n"), &p))
 	require.NotNil(t, p.SmartRetries)
-	assert.True(t, *p.SmartRetries)
+	require.NotNil(t, p.SmartRetries.Enabled)
+	assert.True(t, *p.SmartRetries.Enabled)
 	require.NotNil(t, p.DefaultValues)
 	require.NotNil(t, p.DefaultValues.SmartRetries)
-	assert.False(t, *p.DefaultValues.SmartRetries)
+	require.NotNil(t, p.DefaultValues.SmartRetries.Enabled)
+	assert.False(t, *p.DefaultValues.SmartRetries.Enabled)
 
 	var unset pipeline.Pipeline
 	require.NoError(t, yaml.Unmarshal([]byte("name: test\n"), &unset))
 	assert.Nil(t, unset.SmartRetries)
+
+	var bare pipeline.Pipeline
+	require.ErrorContains(t, yaml.Unmarshal([]byte("name: test\nsmart_retries: true\n"), &bare), "cannot unmarshal !!bool `true` into pipeline.SmartRetriesConfig")
 
 	// The pipeline and its assets carry it in the JSON the orchestrator reads, only when set.
 	encoded, err := json.Marshal(&pipeline.Pipeline{Name: "test", SmartRetries: p.SmartRetries, Assets: []*pipeline.Asset{
@@ -1921,14 +1926,34 @@ func TestPipeline_SmartRetries(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	var decoded struct {
-		SmartRetries *bool `json:"smart_retries"`
+		SmartRetries map[string]any `json:"smart_retries"`
 		Assets       []map[string]any
 	}
 	require.NoError(t, json.Unmarshal(encoded, &decoded))
-	require.NotNil(t, decoded.SmartRetries)
-	assert.True(t, *decoded.SmartRetries)
-	assert.Equal(t, true, decoded.Assets[0]["smart_retries"])
+	assert.Equal(t, map[string]any{"enabled": true}, decoded.SmartRetries)
+	assert.Equal(t, map[string]any{"enabled": true}, decoded.Assets[0]["smart_retries"])
 	assert.NotContains(t, decoded.Assets[1], "smart_retries")
+}
+
+func TestBuilder_SetupDefaultsFromPipelineMergesSmartRetries(t *testing.T) {
+	t.Parallel()
+
+	on, off := true, false
+	builder := pipeline.NewBuilder(pipeline.BuilderConfig{}, nil, nil, afero.NewMemMapFs(), nil, nil)
+	defaults := &pipeline.Pipeline{DefaultValues: &pipeline.DefaultValues{SmartRetries: &pipeline.SmartRetriesConfig{Enabled: &on}}}
+
+	unset, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{Name: "unset"}, defaults)
+	require.NoError(t, err)
+	assert.Equal(t, &pipeline.SmartRetriesConfig{Enabled: &on}, unset.SmartRetries)
+
+	empty, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{Name: "empty", SmartRetries: &pipeline.SmartRetriesConfig{}}, defaults)
+	require.NoError(t, err)
+	assert.Equal(t, &pipeline.SmartRetriesConfig{Enabled: &on}, empty.SmartRetries, "settings the asset leaves out come from the defaults")
+
+	own, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{Name: "own", SmartRetries: &pipeline.SmartRetriesConfig{Enabled: &off}}, defaults)
+	require.NoError(t, err)
+	assert.Equal(t, &pipeline.SmartRetriesConfig{Enabled: &off}, own.SmartRetries)
+	assert.True(t, *defaults.DefaultValues.SmartRetries.Enabled, "the defaults aren't changed")
 }
 
 func TestPipeline_MaxActiveSteps(t *testing.T) {
@@ -3393,7 +3418,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 		},
 		RerunCooldown:     &rerunCooldown,
 		Retries:           &retries,
-		SmartRetries:      &trueValue,
+		SmartRetries:      &pipeline.SmartRetriesConfig{Enabled: &trueValue},
 		RefreshRestricted: &falseValue,
 		Notifications: &pipeline.Notifications{
 			Slack: []pipeline.SlackNotification{{Channel: "#default"}},
@@ -3450,7 +3475,7 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "default-gateway"}, got.Routing)
 	assert.Equal(t, &rerunCooldown, got.RerunCooldown)
 	assert.Equal(t, &retries, got.Retries)
-	assert.Equal(t, &trueValue, got.SmartRetries)
+	assert.Equal(t, &pipeline.SmartRetriesConfig{Enabled: &trueValue}, got.SmartRetries)
 	assert.Equal(t, &falseValue, got.RefreshRestricted)
 	assert.Len(t, got.Columns, 2)
 	assert.Equal(t, "asset column", got.Columns[0].Description)

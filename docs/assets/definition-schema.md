@@ -304,12 +304,17 @@ The asset-level value is, in turn, the default for the asset's [quality checks](
 Let Bruin Cloud retry the asset based on why it failed, instead of always retrying up to `retries` times. If not specified, the asset inherits the pipeline-level [`smart_retries`](../pipelines/definition.md#smart-retries).
 
 ```yaml
-smart_retries: true
+smart_retries:
+  enabled: true
 ```
+
+In a SQL or Python asset's comment header, use `@bruin.smart_retries.enabled: true`.
 
 See [Smart Retries](../pipelines/definition.md#smart-retries) for how failures are retried. Only Bruin Cloud uses this setting; the CLI doesn't retry failed assets.
 
-- **Type:** `Boolean`
+- **Type:** `Object`
+- **Fields:**
+  - `enabled` (`Boolean`): turns smart retries on or off for the asset.
 
 -->
 
