@@ -349,12 +349,10 @@ default:
 
 With smart retries enabled, Bruin Cloud reads why each failed attempt failed, and retries it as follows:
 
-| Failure | What happens |
-|---------|--------------|
-| **Temporary**: a timeout, a rate limit, a dropped connection, or a service error from the database or API | Retried right away, or after [`rerun_cooldown`](#rerun-cooldown) if it's set. Up to 100 times in a run, and these retries don't use the asset's `retries`. |
-| **Out of memory** | Retried on the next larger instance, using one of the asset's `retries`. The larger instance is used for that run only and stays within your team's allowed instances. If the asset already runs on the largest one, it's retried on the same instance. |
-| **One a retry doesn't fix**: a SQL error, a missing connection, missing permissions, an invalid configuration, a dataset in another location, a service account that no longer exists, or billing or plan limits at the provider (such as billing not enabled, payment required, or an ended trial) | Not retried, even with `retries` left. Fix the cause and rerun the asset. |
-| **Anything else** | Retried up to `retries` times, as without smart retries. |
+- **Temporary failures**, such as a timeout, a rate limit, a dropped connection, or a service error from the database or API: retried right away, or after [`rerun_cooldown`](#rerun-cooldown) if it's set. Up to 100 times in a run, and these retries don't use the asset's `retries`.
+- **Out of memory:** retried on the next larger instance, using one of the asset's `retries`. The larger instance is used for that run only and stays within your team's allowed instances. If the asset already runs on the largest one, it's retried on the same instance.
+- **Failures a retry doesn't fix**, such as a SQL error, a missing connection, missing permissions, an invalid configuration, a dataset in another location, a service account that no longer exists, or billing or plan limits at the provider (billing not enabled, payment required, an ended trial): not retried, even with `retries` left. Fix the cause and rerun the asset.
+- **Anything else:** retried up to `retries` times, as without smart retries.
 
 A few rules apply whatever the failure:
 
@@ -363,7 +361,7 @@ A few rules apply whatever the failure:
 - Rerunning a run starts over: retries, the temporary-failure count and the instance size reset. An asset you rerun on its own isn't retried automatically, as without smart retries.
 - Quality checks aren't affected; they're retried up to their own [`retries`](../quality/overview.md#retries).
 
-In Bruin Cloud, an asset that uses smart retries shows a **Smart retries** badge in its details, and a banner explains what smart retries did, such as retrying temporary failures or not retrying a SQL error.
+In Bruin Cloud, an asset that uses smart retries shows a **Smart retries** badge on its page and its runs, a pipeline that turns them on under `default:` shows it on the pipeline page, and a banner on the run explains what smart retries did, such as retrying temporary failures or not retrying a SQL error.
 
 - **Type:** `Object`
 - **Fields:**
