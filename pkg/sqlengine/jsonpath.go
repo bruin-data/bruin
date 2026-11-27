@@ -7,23 +7,19 @@ import (
 	"sync"
 )
 
-// Port of sqlglot/jsonpath.py.
-
-// jsonPathTokenizer mirrors an instance of a JSONPathTokenizer class: the resolved tokenizer
-// settings plus the class-level VAR_TOKENS used by the JSON path parser.
+// jsonPathTokenizer is a dialect's JSON path tokenizer: the resolved tokenizer settings plus the
+// VAR_TOKENS that the JSON path parser reads as key text.
 type jsonPathTokenizer struct {
 	*TokenizerSettings
 	cfg        *tokenizerConfig
 	VAR_TOKENS TokenSet
 }
 
-// baseJSONPathTokenizerSettings mirrors the class attributes of sqlglot.jsonpath.JSONPathTokenizer
-// (including the ones inherited from tokens.Tokenizer and those derived by __init_subclass__).
 func baseJSONPathTokenizerSettings() *TokenizerSettings {
 	return &TokenizerSettings{
 		BIT_STRINGS:  nil,
 		BYTE_STRINGS: nil,
-		// "BYTE_STRING_ESCAPES" is not in the class __dict__, so it is copied from STRING_ESCAPES.
+		// BYTE_STRING_ESCAPES is not set separately, so it copies STRING_ESCAPES.
 		BYTE_STRING_ESCAPES:        []string{"\\"},
 		COMMANDS:                   newTokenSet(TK_COMMAND, TK_EXECUTE, TK_FETCH, TK_RENAME, TK_SHOW),
 		COMMAND_PREFIX_TOKENS:      newTokenSet(TK_SEMICOLON, TK_BEGIN),
@@ -80,11 +76,11 @@ func baseJSONPathTokenizerSettings() *TokenizerSettings {
 	}
 }
 
-// newJSONPathTokenizerSettings resolves the JSONPathTokenizer class of a dialect (the Dialect
-// metaclass inherits it from the first base class unless the dialect defines its own):
+// newJSONPathTokenizerSettings returns the JSON path tokenizer settings and VAR_TOKENS of a
+// dialect. Dialects without a variant of their own use the defaults; the variants are:
 //
 //   - BigQuery:   VAR_TOKENS = {VAR, DASH, NUMBER}
-//   - Hive:       VAR_TOKENS = {VAR, DASH} (inherited by Spark2, Spark, Databricks)
+//   - Hive:       VAR_TOKENS = {VAR, DASH} (also used by Spark2, Spark, Databricks)
 //   - Databricks: Hive's, plus IDENTIFIERS = ["`", '"']
 //   - Snowflake:  SINGLE_TOKENS without "$"
 func newJSONPathTokenizerSettings(d *Dialect) (*TokenizerSettings, TokenSet) {
@@ -105,10 +101,8 @@ func newJSONPathTokenizerSettings(d *Dialect) (*TokenizerSettings, TokenSet) {
 	return s, varTokens
 }
 
-// jsonPathTokenizers caches the resolved JSONPathTokenizer per dialect name.
 var jsonPathTokenizers sync.Map
 
-// jsonpathTokenizer mirrors Dialect.jsonpath_tokenizer().
 func (d *Dialect) jsonpathTokenizer() *jsonPathTokenizer {
 	if v, ok := jsonPathTokenizers.Load(d.Name); ok {
 		return v.(*jsonPathTokenizer)
@@ -119,20 +113,18 @@ func (d *Dialect) jsonpathTokenizer() *jsonPathTokenizer {
 	return v.(*jsonPathTokenizer)
 }
 
-// tokenize mirrors JSONPathTokenizer.tokenize.
 func (jt *jsonPathTokenizer) tokenize(path string) ([]*Token, error) {
 	return newTokenizerCore(jt.cfg).tokenize(path)
 }
 
-// jsonPathIndexError mirrors the Python IndexError that jsonpath.parse can raise for
-// truncated filters/scripts such as "$[?".
+// jsonPathIndexError is returned for truncated filters or scripts such as "$[?". Its message keeps
+// its historical wording ("list index out of range").
 type jsonPathIndexError struct{}
 
 func (jsonPathIndexError) Error() string { return "list index out of range" }
 
-// parseJSONPath mirrors sqlglot.jsonpath.parse: it takes in a JSON path string and parses it
-// into a JSONPath expression. Errors are *ParseError, *TokenError, *ValueError (int() failures)
-// or jsonPathIndexError.
+// parseJSONPath parses a JSON path string into a JSONPath expression. Errors are *ParseError,
+// *TokenError, *ValueError (invalid integers) or jsonPathIndexError.
 func parseJSONPath(path string, d *Dialect) (result *Expr, err error) {
 	if d == nil {
 		d = prototype("")
@@ -162,7 +154,7 @@ func parseJSONPath(path string, d *Dialect) (result *Expr, err error) {
 	size := len(tokens)
 	i := 0
 
-	// curr mirrors _curr(); ok=false means None.
+	// curr returns the current token type; ok is false past the last token.
 	curr := func() (TokenType, bool) {
 		if i < size {
 			return tokens[i].Type, true
@@ -281,14 +273,15 @@ func parseJSONPath(path string, d *Dialect) (result *Expr, err error) {
 			for match(TK_COMMA) != nil {
 				literal = parseSlice()
 
-				if truthy(literal) {
+				// falsey members such as 0 and "" are kept; only a missing one is skipped
+				if _, isStr := literal.(string); isStr || !jsonPathIsFalse(literal) {
 					indexes = append(indexes, literal)
 				}
 			}
 
 			if len(indexes) == 1 {
-				le, isExpr := literal.(*Expr)
-				if _, ok := literal.(string); ok {
+				le, isExpr := indexes[0].(*Expr)
+				if _, ok := indexes[0].(string); ok {
 					node = New(KJSONPathKey, "this", indexes[0])
 				} else if isExpr && le.IsA(KJSONPathPart) && le.IsA(KJSONPathScript, KJSONPathFilter) {
 					node = New(KJSONPathSelector, "this", indexes[0])
@@ -372,28 +365,29 @@ func parseJSONPath(path string, d *Dialect) (result *Expr, err error) {
 	return New(KJSONPath, "expressions", expressions), nil
 }
 
-// jsonPathIsFalse mirrors `value is False`.
+// jsonPathIsFalse reports whether v is the boolean false, which parseLiteral returns when there
+// is no literal.
 func jsonPathIsFalse(v any) bool {
 	b, ok := v.(bool)
 	return ok && !b
 }
 
-// jsonPathPyInt mirrors Python's int(text) for the numbers produced by the JSON path parser.
+// jsonPathPyInt parses an integer read by the JSON path parser, panicking with a ValueError when
+// the text is not a base-10 integer or does not fit in an int.
 func jsonPathPyInt(text string) int {
 	if !isPyInt(text) {
 		panic(&ValueError{Msg: "invalid literal for int() with base 10: " + pyRepr(text)})
 	}
 	n, err := strconv.Atoi(strings.ReplaceAll(pyStrip(text), "_", ""))
 	if err != nil {
-		// Python ints are unbounded; Go ints are not.
 		panic(&ValueError{Msg: "int too large to convert: " + pyRepr(text)})
 	}
 	return n
 }
 
-// newJSONPathUnion builds JSONPathUnion(expressions=indexes). The Python list may mix str, int and
-// JSONPathPart values: it is stored as []*Expr or []string when homogeneous, and as []any
-// otherwise (in which case the parents of the expression items are set like Expr._set_parent).
+// newJSONPathUnion builds a JSONPathUnion of indexes, which may mix strings, ints and JSONPathPart
+// expressions. They are stored as []*Expr or []string when homogeneous and as []any otherwise,
+// in which case the union is set as the parent of the expression items.
 func newJSONPathUnion(indexes []any) *Expr {
 	allExprs, allStrings := true, true
 	for _, x := range indexes {
@@ -430,8 +424,8 @@ func newJSONPathUnion(indexes []any) *Expr {
 	return u
 }
 
-// jsonPathUnionItems returns the items of a JSONPathUnion's expressions list (str, int or
-// JSONPathPart values), whatever their Go representation (see newJSONPathUnion).
+// jsonPathUnionItems returns the items of a JSONPathUnion's expressions list (strings, ints or
+// JSONPathPart expressions), whatever their Go representation (see newJSONPathUnion).
 func jsonPathUnionItems(e *Expr) []any {
 	switch v := e.Arg("expressions").(type) {
 	case []*Expr:
@@ -452,7 +446,8 @@ func jsonPathUnionItems(e *Expr) []any {
 	return nil
 }
 
-// jsonPathFormat mirrors f"{value}" for the values stored in JSONPathPart arguments.
+// jsonPathFormat formats a JSONPathPart argument value: nil as None, booleans as True/False and
+// expressions as default-dialect SQL.
 func jsonPathFormat(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -475,12 +470,10 @@ func jsonPathFormat(v any) string {
 	return fmt.Sprint(v)
 }
 
-// JSON_PATH_PART_TRANSFORMS mirrors sqlglot.jsonpath.JSON_PATH_PART_TRANSFORMS.
 var JSON_PATH_PART_TRANSFORMS = map[Kind]GenFunc{
 	KJSONPathFilter: func(g *Generator, e *Expr) string { return "?" + jsonPathFormat(e.Arg("this")) },
 	KJSONPathKey:    func(g *Generator, e *Expr) string { return g.jsonpathkeySQL(e) },
 	KJSONPathRecursive: func(g *Generator, e *Expr) string {
-		// f"..{e.this or ''}"
 		this := e.Arg("this")
 		if !truthy(this) {
 			return ".."
@@ -522,10 +515,8 @@ var allJSONPathPartKinds = []Kind{
 	KJSONPathSelector, KJSONPathSlice, KJSONPathSubscript, KJSONPathUnion, KJSONPathWildcard,
 }
 
-// ALL_JSON_PATH_PARTS mirrors sqlglot.jsonpath.ALL_JSON_PATH_PARTS.
 var ALL_JSON_PATH_PARTS = newKindSet(allJSONPathPartKinds...)
 
-// toJSONPath mirrors Dialect.to_json_path (dispatching to dialect overrides).
 func (d *Dialect) toJSONPath(path *Expr) *Expr {
 	if d.hooks != nil && d.hooks.toJSONPath != nil {
 		return d.hooks.toJSONPath(d, path)
@@ -533,7 +524,8 @@ func (d *Dialect) toJSONPath(path *Expr) *Expr {
 	return d.baseToJSONPath(path)
 }
 
-// baseToJSONPath mirrors Dialect.to_json_path.
+// baseToJSONPath parses a literal path into a JSONPath expression (a number n becomes [n]).
+// Other expressions, and literals that fail to parse, are returned as is.
 func (d *Dialect) baseToJSONPath(path *Expr) *Expr {
 	if path.IsA(KLiteral) {
 		pathText := path.Name()
@@ -544,18 +536,18 @@ func (d *Dialect) baseToJSONPath(path *Expr) *Expr {
 		if err == nil {
 			return parsed
 		}
-		if _, ok := err.(*ParseError); !ok {
-			// Only ParseError is caught; anything else propagates.
+		switch err.(type) {
+		case *ParseError, *TokenError:
+			// A literal that is not a JSON path stays as is
+		default:
 			panic(err)
 		}
-		// sqlglot logs "Invalid JSON path syntax" here when STRICT_JSON_PATH_SYNTAX is set
-		// and the path does not start with "lax"/"strict"; logging is dropped.
+		// No "Invalid JSON path syntax" warning is logged, even with STRICT_JSON_PATH_SYNTAX.
 	}
 
 	return path
 }
 
-// setupDuckDBToJSONPath installs DuckDB.to_json_path.
 func setupDuckDBToJSONPath(d *Dialect) {
 	d.hooks.toJSONPath = func(d *Dialect, path *Expr) *Expr {
 		if path.IsA(KLiteral) {

@@ -1,8 +1,8 @@
 package sqlengine
 
-// dialectCustomizers holds per-dialect customization functions (ports of the dialect's
-// Parser/Generator/Dialect class bodies). They run after the parent's settings were cloned
-// and the generated data tables for the dialect were installed.
+// dialectCustomizers holds per-dialect customization functions (the dialect's parser,
+// generator and dialect overrides). They run after the parent's settings were cloned and the
+// generated data tables for the dialect were installed.
 var dialectCustomizers = map[string]func(d *Dialect){}
 
 func registerCustomizer(name string, fn func(d *Dialect)) { dialectCustomizers[name] = fn }
@@ -19,7 +19,7 @@ type dialectSpec struct {
 func init() {
 	specs := []dialectSpec{
 		{"", "Dialect", "", nil, dialectSettings_base, tokenizerSettings_base, parserSettings_base, generatorSettings_base},
-		{"athena", "Athena", "", nil, dialectSettings_athena, tokenizerSettings_athena, parserSettings_athena, generatorSettings_athena},
+		{"athena", "Athena", "trino", []string{"trino", "presto"}, dialectSettings_athena, tokenizerSettings_athena, parserSettings_athena, generatorSettings_athena},
 		{"bigquery", "BigQuery", "", nil, dialectSettings_bigquery, tokenizerSettings_bigquery, parserSettings_bigquery, generatorSettings_bigquery},
 		{"clickhouse", "ClickHouse", "", nil, dialectSettings_clickhouse, tokenizerSettings_clickhouse, parserSettings_clickhouse, generatorSettings_clickhouse},
 		{"hive", "Hive", "", nil, dialectSettings_hive, tokenizerSettings_hive, parserSettings_hive, generatorSettings_hive},
@@ -55,8 +55,8 @@ func init() {
 }
 
 // setupDialectSettings builds the parser/generator settings of a dialect by cloning its
-// parent's (Python class inheritance), installing the generated data tables and applying
-// the dialect's customizer. Called with dialectMu held.
+// parent's (so a child dialect inherits everything it does not override), installing the
+// generated data tables and applying the dialect's customizer. Called with dialectMu held.
 func setupDialectSettings(d *Dialect, sp dialectSpec) {
 	if sp.name == "" {
 		d.P = newBaseParserSettings()

@@ -4,16 +4,12 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/parsers/bigquery.py (module-level builders and BigQueryParser).
-
-// _build_contains_substring.
 func bigqueryBuildContainsSubstring(args []*Expr, _ *Dialect) *Expr {
 	this := New(KLower, "this", seqGet(args, 0))
 	expr := New(KLower, "this", seqGet(args, 1))
 	return New(KContains, "this", this, "expression", expr, "json_scope", seqGet(args, 2))
 }
 
-// _build_date.
 func bigqueryBuildDate(args []*Expr, _ *Dialect) *Expr {
 	exprType := KDate
 	if len(args) == 3 {
@@ -22,7 +18,7 @@ func bigqueryBuildDate(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(exprType, args)
 }
 
-// build_date_diff.
+// bigqueryBuildDateDiff maps a WEEK unit to WEEK(SUNDAY), BigQuery's default week start.
 func bigqueryBuildDateDiff(exprType Kind) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		expr := New(
@@ -42,7 +38,6 @@ func bigqueryBuildDateDiff(exprType Kind) FuncBuilder {
 	}
 }
 
-// _build_datetime.
 func bigqueryBuildDatetime(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 1 {
 		return FromArgList(KTsOrDsToDatetime, args)
@@ -53,11 +48,10 @@ func bigqueryBuildDatetime(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(KTimestampFromParts, args)
 }
 
-// _build_extract_json_with_default_path.
 func bigqueryBuildExtractJSONWithDefaultPath(exprType Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		if len(args) == 1 {
-			// args.append(...) mutates the caller's list: report it for arity validation
+			// The default path counts as a passed argument: record it for arity validation.
 			args = append(args, LiteralString("$"))
 			return WithValidateArgs(buildExtractJSONWithPath(exprType)(args, d), args)
 		}
@@ -65,7 +59,6 @@ func bigqueryBuildExtractJSONWithDefaultPath(exprType Kind) FuncBuilder {
 	}
 }
 
-// _build_format_time.
 func bigqueryBuildFormatTime(exprType Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		formattedTime := buildFormattedTime(KTimeToStr, "", nil)(
@@ -76,7 +69,6 @@ func bigqueryBuildFormatTime(exprType Kind) FuncBuilder {
 	}
 }
 
-// _build_json_strip_nulls.
 func bigqueryBuildJSONStripNulls(args []*Expr, _ *Dialect) *Expr {
 	expression := New(KJSONStripNulls, "this", seqGet(args, 0))
 	for _, a := range argsFrom(args, 1) {
@@ -89,7 +81,7 @@ func bigqueryBuildJSONStripNulls(args []*Expr, _ *Dialect) *Expr {
 	return expression
 }
 
-// _build_levenshtein.
+// bigqueryBuildLevenshtein takes max_dist from the value of EDIT_DISTANCE's named third argument.
 func bigqueryBuildLevenshtein(args []*Expr, _ *Dialect) *Expr {
 	maxDist := seqGet(args, 2)
 	var md *Expr
@@ -104,14 +96,12 @@ func bigqueryBuildLevenshtein(args []*Expr, _ *Dialect) *Expr {
 	)
 }
 
-// _build_parse_date.
 func bigqueryBuildParseDate(args []*Expr, d *Dialect) *Expr {
 	this := buildFormattedTime(KStrToDate, "", nil)([]*Expr{seqGet(args, 1), seqGet(args, 0)}, d)
 	this.Set("default_year", LiteralInt(1970))
 	return this
 }
 
-// _build_parse_timestamp.
 func bigqueryBuildParseTimestamp(args []*Expr, d *Dialect) *Expr {
 	this := buildFormattedTime(KStrToTime, "", nil)([]*Expr{seqGet(args, 1), seqGet(args, 0)}, d)
 	this.Set("zone", seqGet(args, 2))
@@ -119,18 +109,16 @@ func bigqueryBuildParseTimestamp(args []*Expr, d *Dialect) *Expr {
 	return this
 }
 
-// _build_parse_datetime.
 func bigqueryBuildParseDatetime(args []*Expr, d *Dialect) *Expr {
 	this := buildFormattedTime(KParseDatetime, "", nil)([]*Expr{seqGet(args, 1), seqGet(args, 0)}, d)
 	this.Set("default_year", LiteralInt(1970))
 	return this
 }
 
-// _build_regexp_extract. defaultGroup nil means None.
-func bigqueryBuildRegexpExtract(exprType Kind, defaultGroup func() *Expr /*=None*/) FuncBuilder {
+func bigqueryBuildRegexpExtract(exprType Kind, defaultGroup func() *Expr) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
-		// group = re.compile(args[1].name).groups == 1 (False on re.error)
-		n, ok := bigqueryPyRegexGroups(args[1].Name())
+		// A pattern that is not a string or fails to compile counts as having no single group.
+		n, ok := regexpCaptureGroupCount(seqGet(args, 1))
 		group := ok && n == 1
 
 		var groupArg *Expr
@@ -154,229 +142,6 @@ func bigqueryBuildRegexpExtract(exprType Kind, defaultGroup func() *Expr /*=None
 	}
 }
 
-// bigqueryPyRegexGroups approximates `re.compile(pattern).groups` of Python's re module: it
-// returns the number of capturing groups, or ok=false where Python raises re.error (bad escapes,
-// unbalanced parentheses, unterminated sets, unknown (?...) extensions, misplaced global flags,
-// invalid group references and nothing-to-repeat/multiple-repeat errors).
-func bigqueryPyRegexGroups(pattern string) (int, bool) {
-	rs := []rune(pattern)
-	n := len(rs)
-	groups := 0       // capturing groups opened so far
-	closedGroups := 0 // capturing groups closed so far (for backreference validation)
-	names := map[string]bool{}
-	var stack []bool // per open paren: is it a capturing group?
-	isASCIILetter := func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }
-	isDigit := func(r rune) bool { return r >= '0' && r <= '9' }
-	const validEscapes = "abBdDfnrsStvwWZAxuUN"
-	const validClassEscapes = "abdDfnrsStvwWxuUN"
-	const flagChars = "aiLmsux-"
-	// canRepeat reports whether a repeat operator is allowed at this point (i.e. there is an item).
-	canRepeat := false
-	lastWasRepeat := false
-	for i := 0; i < n; i++ {
-		c := rs[i]
-		wasRepeat := lastWasRepeat
-		lastWasRepeat = false
-		switch c {
-		case '\\':
-			if i+1 >= n {
-				return 0, false // bad escape (end of pattern)
-			}
-			i++
-			e := rs[i]
-			if isASCIILetter(e) && !strings.ContainsRune(validEscapes, e) {
-				return 0, false // bad escape
-			}
-			if e >= '1' && e <= '9' {
-				num := int(e - '0')
-				if i+1 < n && isDigit(rs[i+1]) {
-					num = num*10 + int(rs[i+1]-'0')
-					i++
-				}
-				if num > closedGroups {
-					return 0, false // invalid group reference
-				}
-			}
-			canRepeat = !(e == 'b' || e == 'B' || e == 'A' || e == 'Z')
-		case '[':
-			i++
-			if i < n && rs[i] == '^' {
-				i++
-			}
-			if i < n && rs[i] == ']' {
-				i++
-			}
-			closed := false
-			for ; i < n; i++ {
-				if rs[i] == '\\' {
-					if i+1 >= n {
-						return 0, false
-					}
-					i++
-					if isASCIILetter(rs[i]) && !strings.ContainsRune(validClassEscapes, rs[i]) {
-						return 0, false
-					}
-					continue
-				}
-				if rs[i] == ']' {
-					closed = true
-					break
-				}
-			}
-			if !closed {
-				return 0, false // unterminated character set
-			}
-			canRepeat = true
-		case '(':
-			capturing := true
-			if i+1 < n && rs[i+1] == '?' {
-				capturing = false
-				if i+2 >= n {
-					return 0, false // unexpected end of pattern
-				}
-				switch x := rs[i+2]; {
-				case x == ':' || x == '=' || x == '!' || x == '>':
-					i += 2
-				case x == '(':
-					// conditional (?(id)yes|no): skip the condition
-					j := i + 3
-					for j < n && rs[j] != ')' {
-						j++
-					}
-					if j >= n {
-						return 0, false
-					}
-					i = j
-				case x == '#':
-					// comment group: skip to the closing parenthesis
-					j := i + 3
-					for j < n && rs[j] != ')' {
-						j++
-					}
-					if j >= n {
-						return 0, false // missing ), unterminated comment
-					}
-					i = j
-					continue
-				case x == '<':
-					if i+3 >= n || (rs[i+3] != '=' && rs[i+3] != '!') {
-						return 0, false // unknown extension ?<x
-					}
-					i += 3
-				case x == 'P':
-					if i+3 < n && rs[i+3] == '<' {
-						j := i + 4
-						for j < n && rs[j] != '>' {
-							j++
-						}
-						if j >= n || j == i+4 {
-							return 0, false // missing >, unterminated name / missing group name
-						}
-						names[string(rs[i+4:j])] = true
-						capturing = true
-						i = j
-					} else if i+3 < n && rs[i+3] == '=' {
-						j := i + 4
-						for j < n && rs[j] != ')' {
-							j++
-						}
-						if j >= n || !names[string(rs[i+4:j])] {
-							return 0, false // unknown group name
-						}
-						i = j
-						canRepeat = true
-						continue
-					} else {
-						return 0, false // unknown extension ?P
-					}
-				case strings.ContainsRune(flagChars, x):
-					j := i + 2
-					for j < n && strings.ContainsRune(flagChars, rs[j]) {
-						j++
-					}
-					if j >= n {
-						return 0, false // missing -, : or )
-					}
-					if rs[j] == ')' {
-						// global flags must be at the start of the expression
-						if i != 0 {
-							return 0, false
-						}
-						i = j
-						canRepeat = false
-						continue
-					}
-					if rs[j] != ':' {
-						return 0, false // missing :
-					}
-					i = j
-				default:
-					return 0, false // unknown extension
-				}
-			}
-			if capturing {
-				groups++
-			}
-			stack = append(stack, capturing)
-			canRepeat = false
-		case ')':
-			if len(stack) == 0 {
-				return 0, false // unbalanced parenthesis
-			}
-			if stack[len(stack)-1] {
-				closedGroups++
-			}
-			stack = stack[:len(stack)-1]
-			canRepeat = true
-		case '|':
-			canRepeat = false
-		case '*', '+', '?':
-			if wasRepeat {
-				if c == '*' {
-					return 0, false // multiple repeat
-				}
-				// lazy (`*?`) / possessive (`*+`) modifiers
-				canRepeat = false
-				continue
-			}
-			if !canRepeat {
-				return 0, false // nothing to repeat
-			}
-			lastWasRepeat = true
-			canRepeat = false
-		case '{':
-			// {m}, {m,}, {,n}, {m,n} is a repeat; anything else is a literal "{"
-			j := i + 1
-			for j < n && (isDigit(rs[j]) || rs[j] == ',') {
-				j++
-			}
-			body := string(rs[i+1 : min(j, n)])
-			if j < n && rs[j] == '}' && body != "" && body != "," && strings.Count(body, ",") <= 1 {
-				if wasRepeat {
-					return 0, false // multiple repeat
-				}
-				if !canRepeat {
-					return 0, false // nothing to repeat
-				}
-				i = j
-				lastWasRepeat = true
-				canRepeat = false
-				continue
-			}
-			canRepeat = true
-		case '^', '$':
-			canRepeat = false
-		default:
-			canRepeat = true
-		}
-	}
-	if len(stack) != 0 {
-		return 0, false // missing ), unterminated subpattern
-	}
-	return groups, true
-}
-
-// _build_time.
 func bigqueryBuildTime(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 1 {
 		return New(KTsOrDsToTime, "this", args[0])
@@ -387,14 +152,12 @@ func bigqueryBuildTime(args []*Expr, _ *Dialect) *Expr {
 	return FromArgList(KTimeFromParts, args)
 }
 
-// _build_timestamp.
 func bigqueryBuildTimestamp(args []*Expr, _ *Dialect) *Expr {
 	timestamp := FromArgList(KTimestamp, args)
 	timestamp.Set("with_tz", true)
 	return timestamp
 }
 
-// _build_to_hex.
 func bigqueryBuildToHex(args []*Expr, _ *Dialect) *Expr {
 	arg := seqGet(args, 0)
 	if arg.IsA(KMD5Digest) {
@@ -403,11 +166,9 @@ func bigqueryBuildToHex(args []*Expr, _ *Dialect) *Expr {
 	return New(KLowerHex, "this", arg)
 }
 
-// _DOMAIN_DOT: placeholder; cannot occur in a SQL identifier.
+// bigqueryDomainDot masks dots in a domain-scoped project ID; it cannot occur in a SQL identifier.
 const bigqueryDomainDot = "\x00"
 
-// bigquerySplitNumWords mirrors helper.split_num_words(value, sep, min_num_words) (fill_from_start=True).
-// nil entries are Python None.
 func bigquerySplitNumWords(value, sep string, minNumWords int) []*string {
 	words := strings.Split(value, sep)
 	var out []*string
@@ -420,13 +181,10 @@ func bigquerySplitNumWords(value, sep string, minNumWords int) []*string {
 	return out
 }
 
-// _split_qualified_name.
 func bigquerySplitQualifiedName(name string, minNumWords int) []*string {
-	// A dotted reference (e.g. `project.dataset.table`) is split into a fixed number of parts,
-	// the first of which is the project. Domain-scoped (legacy) project IDs have the form
-	// `domain.com:project-id`, where the dots belong to the domain, not the path - and a project
-	// ID itself can't contain dots, so every such dot precedes the colon. Mask those, then let
-	// `split_num_words` split and pad as usual, to avoid corrupting the project ID.
+	// Domain-scoped (legacy) project IDs look like `domain.com:project-id`: the dots before the
+	// colon belong to the domain, not the path (a project ID itself can't contain dots). Mask
+	// them so splitting doesn't corrupt the project ID.
 	colon := strings.Index(name, ":")
 	if colon != -1 && strings.Contains(name[:colon], ".") {
 		name = strings.ReplaceAll(name[:colon], ".", bigqueryDomainDot) + name[colon:]
@@ -443,7 +201,6 @@ func bigquerySplitQualifiedName(name string, minNumWords int) []*string {
 	return bigquerySplitNumWords(name, ".", minNumWords)
 }
 
-// bigqueryQuotedIdentifiers mirrors `(exp.to_identifier(p, quoted=True) for p in parts)`.
 func bigqueryQuotedIdentifiers(parts []*string) []*Expr {
 	out := make([]*Expr, len(parts))
 	for i, p := range parts {
@@ -464,7 +221,6 @@ func bigqueryJoinPartNames(parts []*Expr) string {
 
 var bigqueryMakeIntervalKwargs = []string{"year", "month", "day", "hour", "minute", "second"}
 
-// BRACKET_OFFSETS.
 var bigqueryBracketOffsets = map[string]struct {
 	offset int
 	safe   bool
@@ -475,18 +231,9 @@ var bigqueryBracketOffsets = map[string]struct {
 	"SAFE_ORDINAL": {1, true},
 }
 
-// bigqueryNoKwargs wraps a PROPERTY_PARSERS entry defined as `lambda self: ...` in BigQueryParser.
-func bigqueryNoKwargs(fn func(p *Parser) any) propertyParseFn {
-	return func(p *Parser, kw propKwargs) any {
-		checkPropKwargs(kw, "BigQueryParser.<lambda>")
-		return fn(p)
-	}
-}
-
 func customizeBigQueryParser(d *Dialect) {
 	P := d.P
 
-	// FUNCTIONS
 	delete(P.FUNCTIONS, "SEARCH")
 	P.FUNCTIONS["APPROX_TOP_COUNT"] = fromArgList(KApproxTopK)
 	P.FUNCTIONS["BIT_AND"] = fromArgList(KBitwiseAndAgg)
@@ -569,10 +316,10 @@ func customizeBigQueryParser(d *Dialect) {
 	P.FUNCTIONS["TIMESTAMP_ADD"] = buildDateDeltaWithInterval(KTimestampAdd, "")
 	P.FUNCTIONS["TIMESTAMP_SUB"] = buildDateDeltaWithInterval(KTimestampSub, "")
 	P.FUNCTIONS["TIMESTAMP_MICROS"] = func(args []*Expr, _ *Dialect) *Expr {
-		return New(KUnixToTime, "this", seqGet(args, 0), "scale", LiteralInt(6)) // UnixToTime.MICROS
+		return New(KUnixToTime, "this", seqGet(args, 0), "scale", LiteralInt(6)) // microseconds
 	}
 	P.FUNCTIONS["TIMESTAMP_MILLIS"] = func(args []*Expr, _ *Dialect) *Expr {
-		return New(KUnixToTime, "this", seqGet(args, 0), "scale", LiteralInt(3)) // UnixToTime.MILLIS
+		return New(KUnixToTime, "this", seqGet(args, 0), "scale", LiteralInt(3)) // milliseconds
 	}
 	P.FUNCTIONS["TIMESTAMP_SECONDS"] = func(args []*Expr, _ *Dialect) *Expr {
 		return New(KUnixToTime, "this", seqGet(args, 0))
@@ -589,7 +336,6 @@ func customizeBigQueryParser(d *Dialect) {
 		return New(KWeekStart, "this", VarOf(seqGet(args, 0)))
 	}
 
-	// FUNCTION_PARSERS
 	delete(P.FUNCTION_PARSERS, "TRIM")
 	P.FUNCTION_PARSERS["ARRAY"] = func(p *Parser) *Expr {
 		return p.expression(New(KArray, "expressions", []*Expr{p.parseStatement()}, "struct_name_inheritance", true))
@@ -613,42 +359,34 @@ func customizeBigQueryParser(d *Dialect) {
 	P.FUNCTION_PARSERS["VECTOR_SEARCH"] = func(p *Parser) *Expr { return bigqueryParseVectorSearch(p) }
 	P.FUNCTION_PARSERS["FORECAST"] = func(p *Parser) *Expr { return bigqueryParseForecast(p) }
 
-	// PROPERTY_PARSERS
-	P.PROPERTY_PARSERS["NOT DETERMINISTIC"] = bigqueryNoKwargs(func(p *Parser) any {
-		return anyExpr(p.expression(New(KStabilityProperty, "this", LiteralString("VOLATILE"))))
-	})
-	P.PROPERTY_PARSERS["OPTIONS"] = bigqueryNoKwargs(func(p *Parser) any { return p.parseWithProperty() })
+	P.PROPERTY_PARSERS["OPTIONS"] = noKwargs(func(p *Parser) any { return p.parseWithProperty() })
 
-	// CONSTRAINT_PARSERS
 	P.CONSTRAINT_PARSERS["OPTIONS"] = func(p *Parser) *Expr {
 		return New(KProperties, "expressions", p.parseWithProperty())
 	}
 
-	// RANGE_PARSERS
 	delete(P.RANGE_PARSERS, TK_OVERLAPS)
 
-	// STATEMENT_PARSERS
 	P.STATEMENT_PARSERS[TK_ELSE] = func(p *Parser) *Expr { return p.parseAsCommand(p.prev) }
 	P.STATEMENT_PARSERS[TK_END] = func(p *Parser) *Expr { return p.parseAsCommand(p.prev) }
 	P.STATEMENT_PARSERS[TK_FOR] = func(p *Parser) *Expr { return bigqueryParseForIn(p) }
 	P.STATEMENT_PARSERS[TK_EXPORT] = func(p *Parser) *Expr { return bigqueryParseExportData(p) }
 	P.STATEMENT_PARSERS[TK_DECLARE] = func(p *Parser) *Expr { return p.parseDeclare() }
 
-	// Method overrides
 	P.h.parseTablePart = bigqueryParseTablePart
 	P.h.parseTableParts = bigqueryParseTableParts
 	P.h.parseColumn = bigqueryParseColumn
 	P.h.parseClusterProperty = bigqueryParseClusterProperty
+	P.h.parseProperty = bigqueryParseProperty
 	P.h.parseJsonObject = bigqueryParseJsonObject
 	P.h.parseBracket = bigqueryParseBracket
 	P.h.parseUnnest = bigqueryParseUnnest
 	P.h.parseColumnOps = bigqueryParseColumnOps
 }
 
-// _parse_for_in.
 func bigqueryParseForIn(p *Parser) *Expr {
 	index := p.index
-	this := p.parseRange(nil)
+	this := p.parseRange(nil, false)
 	p.matchTextSeq("DO")
 	if p.match(TK_COMMAND) {
 		p.retreat(index)
@@ -657,7 +395,18 @@ func bigqueryParseForIn(p *Parser) *Expr {
 	return p.expression(New(KForIn, "this", this, "expression", p.parseStatement()))
 }
 
-// _parse_table_part.
+// bigqueryParseProperty parses NOT DETERMINISTIC as a VOLATILE stability property; NOT and
+// DETERMINISTIC are separate tokens, so a bare NOT stays an operator elsewhere.
+func bigqueryParseProperty(p *Parser) any {
+	if p.matchTextSeq("NOT", "DETERMINISTIC") {
+		return anyExpr(p.expression(New(KStabilityProperty, "this", LiteralString("VOLATILE"))))
+	}
+
+	return p.baseParseProperty()
+}
+
+// bigqueryParseTablePart parses one table name part, joining dashed names (my-project) and
+// number-led parts into a single identifier.
 func bigqueryParseTablePart(p *Parser, schema bool) *Expr {
 	this := p.baseParseTablePart(schema)
 	if this == nil {
@@ -696,7 +445,6 @@ func bigqueryParseTablePart(p *Parser, schema bool) *Expr {
 	return this
 }
 
-// _parse_table_parts.
 func bigqueryParseTableParts(p *Parser, schema bool, isDbReference bool, wildcard bool, fast bool) *Expr {
 	table := p.baseParseTableParts(schema, isDbReference, true, fast)
 
@@ -753,22 +501,15 @@ func bigqueryParseTableParts(p *Parser, schema bool, isDbReference bool, wildcar
 		table.Meta()["quoted_table"] = true
 	}
 
-	// The `INFORMATION_SCHEMA` views in BigQuery need to be qualified by a region or
-	// dataset, so if the project identifier is omitted we need to fix the ast so that
-	// the `INFORMATION_SCHEMA.X` bit is represented as a single (quoted) Identifier.
-	// Otherwise, we wouldn't correctly qualify a `Table` node that references these
-	// views, because it would seem like the "catalog" part is set, when it'd actually
-	// be the region/dataset. Merging the two identifiers into a single one is done to
-	// avoid producing a 4-part Table reference, which would cause issues in the schema
-	// module, when there are 3-part table names mixed with information schema views.
-	//
+	// BigQuery INFORMATION_SCHEMA views are qualified by a region or dataset, so without a project
+	// the "catalog" part would really be the region/dataset. Fold `INFORMATION_SCHEMA.X` into one
+	// quoted identifier so such tables qualify correctly and don't become 4-part references, which
+	// break the schema module when mixed with 3-part names.
 	// See: https://cloud.google.com/bigquery/docs/information-schema-intro#syntax
 	tableParts := table.Parts()
 	if len(tableParts) > 1 && pyUpper(tableParts[len(tableParts)-2].Name()) == "INFORMATION_SCHEMA" {
-		// We need to alias the table here to avoid breaking existing qualified columns.
-		// This is expected to be safe, because if there's an actual alias coming up in
-		// the token stream, it will overwrite this one. If there isn't one, we are only
-		// exposing the name that can be used to reference the view explicitly (a no-op).
+		// Alias the table so existing qualified columns keep working. An explicit alias later in the
+		// token stream overwrites this one; otherwise it only exposes the view's own name.
 		aliasID := alias
 		if aliasID == nil {
 			aliasID = tableParts[len(tableParts)-1]
@@ -787,12 +528,12 @@ func bigqueryParseTableParts(p *Parser, schema bool, isDbReference bool, wildcar
 		table.Set("this", newThis)
 		table.Set("db", seqGet(tableParts, -3))
 		table.Set("catalog", seqGet(tableParts, -4))
+		table.Meta()["quoted_table"] = true
 	}
 
 	return table
 }
 
-// _parse_column.
 func bigqueryParseColumn(p *Parser) *Expr {
 	column := p.baseParseColumn()
 	if column.IsA(KColumn) {
@@ -821,7 +562,6 @@ func bigqueryParseColumn(p *Parser) *Expr {
 	return column
 }
 
-// _parse_cluster_property.
 func bigqueryParseClusterProperty(p *Parser) *Expr {
 	return p.expression(New(
 		KClusterProperty,
@@ -829,12 +569,11 @@ func bigqueryParseClusterProperty(p *Parser) *Expr {
 	))
 }
 
-// _parse_json_object.
 func bigqueryParseJsonObject(p *Parser, agg bool) *Expr {
 	jsonObject := p.baseParseJsonObject(false)
 	arrayKVPair := seqGet(jsonObject.Expressions(), 0)
 
-	// Converts BQ's "signature 2" of JSON_OBJECT into SQLGlot's canonical representation
+	// Converts BQ's "signature 2" of JSON_OBJECT into the canonical key/value representation
 	// https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object_signature2
 	if arrayKVPair != nil &&
 		arrayKVPair.This().IsA(KArray) &&
@@ -853,7 +592,6 @@ func bigqueryParseJsonObject(p *Parser, agg bool) *Expr {
 	return jsonObject
 }
 
-// _parse_bracket.
 func bigqueryParseBracket(p *Parser, this *Expr) *Expr {
 	bracket := p.baseParseBracket(this)
 
@@ -885,7 +623,6 @@ func bigqueryParseBracket(p *Parser, this *Expr) *Expr {
 	return bracket
 }
 
-// _parse_unnest.
 func bigqueryParseUnnest(p *Parser, withAlias bool) *Expr {
 	unnest := p.baseParseUnnest(withAlias)
 
@@ -916,7 +653,6 @@ func bigqueryParseUnnest(p *Parser, withAlias bool) *Expr {
 	return unnest
 }
 
-// _parse_make_interval.
 func bigqueryParseMakeInterval(p *Parser) *Expr {
 	expr := New(KMakeInterval)
 
@@ -941,7 +677,6 @@ func bigqueryParseMakeInterval(p *Parser) *Expr {
 	return expr
 }
 
-// _parse_ml. kwargs are extra constructor keyword arguments.
 func bigqueryParseML(p *Parser, exprType Kind, kwargs ...any) *Expr {
 	p.matchTextSeq("MODEL")
 	this := p.parseTable(false, false, nil, false, false, false, false)
@@ -962,7 +697,6 @@ func bigqueryParseML(p *Parser, exprType Kind, kwargs ...any) *Expr {
 	return p.expression(New(exprType, kv...))
 }
 
-// _parse_generate.
 func bigqueryParseGenerate(p *Parser, exprType Kind, kwargs ...any) *Expr {
 	p.matchTextSeq("MODEL")
 	this := p.parseTable(false, false, nil, false, false, false, false)
@@ -978,7 +712,7 @@ func bigqueryParseGenerate(p *Parser, exprType Kind, kwargs ...any) *Expr {
 		expression = p.parseBitwise()
 	}
 
-	// self._match(TokenType.COMMA) and self._parse_bitwise() -> False when unmatched
+	// false (not nil) when there is no comma.
 	var paramsStruct any = false
 	if p.match(TK_COMMA) {
 		paramsStruct = p.parseBitwise()
@@ -989,7 +723,6 @@ func bigqueryParseGenerate(p *Parser, exprType Kind, kwargs ...any) *Expr {
 	return p.expression(New(exprType, kv...))
 }
 
-// bigqueryTokenAt mirrors seq_get(self._tokens, i) (Python negative indexing included).
 func bigqueryTokenAt(p *Parser, i int) *Token {
 	if i < 0 {
 		i += len(p.tokens)
@@ -1000,7 +733,6 @@ func bigqueryTokenAt(p *Parser, i int) *Token {
 	return p.tokens[i]
 }
 
-// _parse_translate.
 func bigqueryParseTranslate(p *Parser) *Expr {
 	// Check if this is ML.TRANSLATE by looking at previous tokens
 	token := bigqueryTokenAt(p, p.index-4)
@@ -1011,7 +743,6 @@ func bigqueryParseTranslate(p *Parser) *Expr {
 	return FromArgList(KTranslate, p.parseFunctionArgs(false))
 }
 
-// _parse_forecast.
 func bigqueryParseForecast(p *Parser) *Expr {
 	// Check if this is ML.FORECAST by looking at previous tokens.
 	token := bigqueryTokenAt(p, p.index-4)
@@ -1041,7 +772,6 @@ func bigqueryParseForecast(p *Parser) *Expr {
 	return expr
 }
 
-// bigqueryPyStrExpr mirrors f"{expr}" for an optional expression (None -> "None").
 func bigqueryPyStrExpr(e *Expr) string {
 	if e == nil {
 		return "None"
@@ -1049,7 +779,6 @@ func bigqueryPyStrExpr(e *Expr) string {
 	return exprSQL(e)
 }
 
-// _parse_features_at_time.
 func bigqueryParseFeaturesAtTime(p *Parser) *Expr {
 	p.match(TK_TABLE)
 	this := p.parseTable(false, false, nil, false, false, false, false)
@@ -1059,8 +788,6 @@ func bigqueryParseFeaturesAtTime(p *Parser) *Expr {
 	for p.match(TK_COMMA) {
 		a := p.parseLambda(false)
 
-		// Get the LHS of the Kwarg and set the arg to that value, e.g
-		// "num_rows => 1" sets the expr's `num_rows` arg
 		if a != nil {
 			expr.Set(a.This().Name(), a)
 		}
@@ -1069,7 +796,6 @@ func bigqueryParseFeaturesAtTime(p *Parser) *Expr {
 	return expr
 }
 
-// _parse_vector_search.
 func bigqueryParseVectorSearch(p *Parser) *Expr {
 	p.match(TK_TABLE)
 	baseTable := p.parseTable(false, false, nil, false, false, false, false)
@@ -1105,11 +831,10 @@ func bigqueryParseVectorSearch(p *Parser) *Expr {
 	return expr
 }
 
-// _parse_export_data.
 func bigqueryParseExportData(p *Parser) *Expr {
 	p.matchTextSeq("DATA")
 
-	// self._match_text_seq(...) and self._parse_...() -> False when unmatched
+	// connection and this are false (not nil) when their keywords are absent.
 	var connection any = false
 	if p.matchTextSeq("WITH", "CONNECTION") {
 		connection = p.parseTableParts(false, false, false, false)
@@ -1128,7 +853,6 @@ func bigqueryParseExportData(p *Parser) *Expr {
 	))
 }
 
-// _parse_column_ops.
 func bigqueryParseColumnOps(p *Parser, this *Expr) *Expr {
 	funcIndex := p.index + 1
 	this = p.baseParseColumnOps(this)
@@ -1145,8 +869,8 @@ func bigqueryParseColumnOps(p *Parser, this *Expr) *Expr {
 		}
 
 		if hasFn {
-			// Retreat to try and parse a known function instead of an anonymous one,
-			// which is parsed by the base column ops parser due to anonymous_func=true
+			// Re-parse as a known function: the base column ops parser parses functions in anonymous
+			// mode.
 			p.retreat(funcIndex)
 			this = New(fn, "this", p.parseFunction(nil, false, true, true))
 		} else if prefix == "AI" || prefix == "ML" {

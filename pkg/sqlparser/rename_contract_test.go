@@ -57,13 +57,13 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 		{"qualified columns collapse to leaf", "postgres", "SELECT prod.raw.orders.amount, raw.orders.id FROM prod.raw.orders", map[string]string{"prod.raw.orders": "fixture"}, "SELECT orders.amount, orders.id FROM fixture AS orders"},
 		{"cte references are not exempt", "postgres", "WITH orders AS (SELECT * FROM raw.orders) SELECT * FROM orders", map[string]string{"orders": "fixture"}, "WITH orders AS (SELECT * FROM fixture AS orders) SELECT * FROM fixture AS orders"},
 		// BigQuery quoted paths currently lose the destination schema. This is
-		// deliberately not repaired by normalizing the expected SQL through SQLGlot.
+		// deliberately not repaired by normalizing the expected SQL through the engine.
 		{"quoted three part path quirk", "bigquery", "SELECT * FROM `proj.raw.orders`", map[string]string{"proj.raw.orders": "dev.backup"}, "SELECT * FROM `proj.backup` AS orders"},
 		{"quoted spaces", "postgres", `SELECT * FROM "raw"."Order Details" o`, map[string]string{"raw.Order Details": "dev.Order Copy"}, `SELECT * FROM dev."Order Copy" AS o`},
 		{"generated alias is not quoted", "tsql", "SELECT * FROM [db].[dbo].[Order Details] WITH (NOLOCK)", map[string]string{"db.dbo.Order Details": "fixture"}, "SELECT * FROM [fixture] AS Order Details WITH (NOLOCK)"},
 		{"write targets", "postgres", "INSERT INTO output SELECT * FROM input; DELETE FROM output WHERE id=1", map[string]string{"output": "new_output", "input": "fixture"}, "INSERT INTO new_output AS output SELECT * FROM fixture AS input; DELETE FROM new_output AS output WHERE id = 1"},
 		{"literals and comments untouched", "postgres", "SELECT 'orders' AS s /* orders */ FROM orders", map[string]string{"orders": "fixture"}, "SELECT 'orders' AS s /* orders */ FROM fixture AS orders"},
-		// Go's JSON encoder sorts map keys; mappings are then applied sequentially,
+		// Mapping keys are sorted; mappings are then applied sequentially,
 		// so a -> b -> c is a cascade, not a simultaneous replacement.
 		{"cascading mappings", "postgres", "SELECT * FROM a JOIN b ON a.id=b.id", map[string]string{"a": "b", "b": "c"}, "SELECT * FROM c AS a JOIN c AS b ON a.id = b.id"},
 		{"lexical order masks longest match", "postgres", "SELECT * FROM z.s.t", map[string]string{"t": "leaf", "z.s.t": "catalog"}, "SELECT * FROM leaf AS t"},
@@ -91,7 +91,7 @@ func TestRenameTablesContractPlatformFeatures(t *testing.T) {
 		{"array", "starrocks", "SELECT ARRAY_LENGTH(tags) AS n FROM metrics", map[string]string{"metrics": "fixture"}, "SELECT ARRAY_LENGTH(tags) AS n FROM fixture AS metrics"},
 		// RenameTables preserves inferred case for T-SQL, but not Fabric (where
 		// ExtractSelect, a different operation, has the case-preservation hook).
-		{"inferred column case", "fabric", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS mixedcase FROM fixture AS orders) SELECT * FROM a"},
+		{"inferred column case", "fabric", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS MixedCase FROM fixture AS orders) SELECT * FROM a"},
 		{"inferred column case", "tsql", "WITH a AS (SELECT MixedCase FROM dbo.orders) SELECT * FROM a", map[string]string{"dbo.orders": "fixture"}, "WITH a AS (SELECT MixedCase AS MixedCase FROM fixture AS orders) SELECT * FROM a"},
 		{"explicit alias case is kept", "tsql", "SELECT MixedCase AS mixedcase FROM dbo.t", map[string]string{}, "SELECT MixedCase AS mixedcase FROM dbo.t"},
 		{"explicit alias case is kept in derived table", "tsql", "WITH a AS (SELECT LEASE_CYCLE AS lease_cycle, MixedCase FROM t) SELECT * FROM a", map[string]string{}, "WITH a AS (SELECT LEASE_CYCLE AS lease_cycle, MixedCase AS MixedCase FROM t) SELECT * FROM a"},

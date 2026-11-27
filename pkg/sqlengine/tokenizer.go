@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-// Token mirrors sqlglot.tokens.Token. Positions are in Unicode code points, like Python.
+// Token is a lexical token of SQL text. Positions are offsets in Unicode code points.
 type Token struct {
 	Type     TokenType
 	Line     int32
@@ -18,7 +18,8 @@ type Token struct {
 	Comments []string
 }
 
-// String mirrors Token.__repr__ (comments rendered as a Python list repr).
+// String formats the token for debugging, e.g. <Token token_type: TokenType.VAR, text: x, ...>,
+// with the comments quoted.
 func (t *Token) String() string {
 	cs := make([]string, len(t.Comments))
 	for i, c := range t.Comments {
@@ -38,12 +39,12 @@ func (t TokenType) Name() string {
 
 func (t TokenType) String() string { return "TokenType." + t.Name() }
 
-// TokenError mirrors sqlglot.errors.TokenError.
+// TokenError reports SQL that could not be tokenized.
 type TokenError struct{ Msg string }
 
 func (e *TokenError) Error() string { return e.Msg }
 
-// tokenizerConfig is the fully-resolved configuration of a tokenizer (TokenizerCore args).
+// tokenizerConfig is the fully-resolved configuration that a tokenizerCore reads.
 type tokenizerConfig struct {
 	singleTokens                     map[rune]TokenType
 	keywords                         map[string]TokenType
@@ -72,16 +73,27 @@ type tokenizerConfig struct {
 	numbersCanHaveDecimals           bool
 	identifiersCanStartWithDigit     bool
 	unescapedSequences               map[string]string
+	// numericEscapes maps the char after a backslash ('0' for octal) to the escape's base,
+	// minimum and maximum digit count and maximum value.
+	numericEscapes map[rune][4]int
+	// numericEscapesAreBytes makes byte-valued numeric escapes (octal, and hex up to 0xFF) raw
+	// bytes, so that consecutive ones decode together as UTF-8.
+	numericEscapesAreBytes   bool
+	dropUnknownEscapes       bool
+	loneSurrogateReplacement string
+	// byteStringsAreBytes stores byte string literals as bytes: each char of the text is a byte,
+	// so non-ASCII chars are kept as their UTF-8 bytes.
+	byteStringsAreBytes bool
 	// identEscapes holds, per identifier delimiter, IDENTIFIER_ESCAPES plus the delimiter.
 	identEscapes map[string]StrSet
 	// kwText interns the KEYWORDS keys (token texts of keyword tokens).
 	kwText map[string]string
-	// singleASCII mirrors singleTokens for ASCII runes (singleASCIIOk marks presence).
+	// singleASCII duplicates singleTokens for ASCII runes (singleASCIIOk marks presence).
 	singleASCII   [utf8.RuneSelf]TokenType
 	singleASCIIOk [utf8.RuneSelf]bool
 }
 
-// single mirrors `singleTokens[r]` (SINGLE_TOKENS lookup by character).
+// single looks up the SINGLE_TOKENS type of the character r.
 func (c *tokenizerConfig) single(r rune) (TokenType, bool) {
 	if r >= 0 && r < utf8.RuneSelf {
 		return c.singleASCII[r], c.singleASCIIOk[r]
@@ -115,6 +127,15 @@ func newTokenizerConfig(s *TokenizerSettings, d *DialectSettings) *tokenizerConf
 		heredocTagIsIdentifier:           s.HEREDOC_TAG_IS_IDENTIFIER,
 		heredocStringAlternative:         s.HEREDOC_STRING_ALTERNATIVE,
 		numbersCanHaveDecimals:           s.NUMBERS_CAN_HAVE_DECIMALS,
+		numericEscapesAreBytes:           s.NUMERIC_ESCAPES_ARE_BYTES,
+		dropUnknownEscapes:               s.DROP_UNKNOWN_ESCAPES,
+		loneSurrogateReplacement:         s.LONE_SURROGATE_REPLACEMENT,
+	}
+	if len(s.NUMERIC_ESCAPES) > 0 {
+		c.numericEscapes = map[rune][4]int{}
+		for k, v := range s.NUMERIC_ESCAPES {
+			c.numericEscapes[[]rune(k)[0]] = v
+		}
 	}
 	for k, v := range s.SINGLE_TOKENS {
 		r := []rune(k)
@@ -136,6 +157,7 @@ func newTokenizerConfig(s *TokenizerSettings, d *DialectSettings) *tokenizerConf
 		c.numbersCanBeUnderscoreSeparated = d.NUMBERS_CAN_BE_UNDERSCORE_SEPARATED
 		c.identifiersCanStartWithDigit = d.IDENTIFIERS_CAN_START_WITH_DIGIT
 		c.unescapedSequences = d.UNESCAPED_SEQUENCES
+		c.byteStringsAreBytes = d.BYTE_STRING_IS_BYTES_TYPE
 	}
 	c.keywordTrie = buildKeywordTrie(s)
 	c.identEscapes = map[string]StrSet{}
@@ -182,7 +204,7 @@ func buildKeywordTrie(s *TokenizerSettings) *trie {
 
 const noChar rune = -1
 
-// tokenizerCore mirrors sqlglot.tokenizer_core.TokenizerCore.
+// tokenizerCore holds the state of one tokenization run; cores are pooled.
 type tokenizerCore struct {
 	*tokenizerConfig
 	sql           []rune
@@ -249,7 +271,6 @@ func (t *tokenizerCore) reset() {
 	t.prevTokenLine = -1
 }
 
-// tokenize mirrors TokenizerCore.tokenize.
 func (t *tokenizerCore) tokenize(sql string) (tokens []*Token, err error) {
 	defer t.release()
 	t.reset()
@@ -430,10 +451,8 @@ func (t *tokenizerCore) advance(i int, alnum bool) {
 
 func (t *tokenizerCore) text() string { return t.span(t.start, t.current) }
 
-// add0 adds a token whose text is the current span.
 func (t *tokenizerCore) add0(tt TokenType) { t.push(tt, t.span(t.start, t.current)) }
 
-// addS adds a token with explicit text.
 func (t *tokenizerCore) addS(tt TokenType, text string) { t.push(tt, text) }
 
 // newToken allocates tokens in slabs.
@@ -670,7 +689,7 @@ func (t *tokenizerCore) keywordText(word []rune) (string, bool) {
 	return w, ok
 }
 
-// keywordType mirrors `KEYWORDS.get(text.upper())` for the source span [a, b).
+// keywordType looks up the KEYWORDS type of the uppercased source span [a, b).
 func (t *tokenizerCore) keywordType(a, b int) (TokenType, bool) {
 	var buf [64]byte
 	if b-a > len(buf) {
@@ -719,7 +738,7 @@ func (t *tokenizerCore) scanComment(commentStart string) bool {
 			}
 		}
 		txt := []rune(t.text())
-		// self._text[comment_start_size : -comment_end_size + 1]
+		// Strip the start delimiter and the part of the end delimiter scanned so far.
 		t.comments = append(t.comments, pySlice(txt, commentStartSize, -commentEndSize+1))
 		t.advance(commentEndSize-1, false)
 	} else {
@@ -748,7 +767,8 @@ func (t *tokenizerCore) comments2(start string) (string, bool) {
 	return v, ok
 }
 
-// pySlice mirrors Python slicing s[a:b] with clamping and negative indices.
+// pySlice returns string(s[a:b]) with bounds clamped to s and negative bounds counted from the
+// end.
 func pySlice(s []rune, a, b int) string {
 	n := len(s)
 	if a < 0 {
@@ -778,12 +798,8 @@ func pySlice(s []rune, a, b int) string {
 func (t *tokenizerCore) scanNumber() {
 	if t.char == '0' {
 		peek := asciiUpperRune(t.peek)
-		if peek == 'B' {
-			if t.hasBitStrings {
-				t.scanBits()
-			} else {
-				t.add0(TK_NUMBER)
-			}
+		if peek == 'B' && t.hasBitStrings {
+			t.scanBits()
 			return
 		} else if peek == 'X' {
 			if t.hasHexStrings {
@@ -822,10 +838,14 @@ func (t *tokenizerCore) scanNumber() {
 			} else {
 				break
 			}
-		} else if asciiUpperRune(t.peek) == 'E' && scientific == 0 {
+		} else if asciiUpperRune(t.peek) == 'E' && scientific == 0 &&
+			// an exponent starts with a digit, so in 1e_5 the number ends before e_5
+			!(t.numbersCanBeUnderscoreSeparated && t.current+1 < t.size && t.sql[t.current+1] == '_') {
 			scientific++
 			t.advance(1, false)
-		} else if t.peek == '_' && t.numbersCanBeUnderscoreSeparated {
+		} else if t.peek == '_' && t.numbersCanBeUnderscoreSeparated &&
+			// an underscore only separates two digits; anywhere else the number ends there
+			isDigitRune(t.char) && t.current+1 < t.size && isDigitRune(t.sql[t.current+1]) {
 			isUnderscoreSeparated = true
 			t.advance(1, false)
 		} else if t.peek != noChar && pyIsIdentifierRune(t.peek) {
@@ -904,7 +924,9 @@ func (t *tokenizerCore) extractValue() string {
 	return t.text()
 }
 
-// pyIntParse reports whether Python's int(s, base) would succeed.
+// pyIntParse reports whether s is an integer in base: optional surrounding whitespace and sign,
+// a 0b/0o/0x prefix matching the base (optional), then digits with single underscores allowed
+// between them.
 func pyIntParse(s string, base int) bool {
 	s = pyStrip(s)
 	if s == "" {
@@ -971,7 +993,7 @@ func (t *tokenizerCore) scanString(start string) bool {
 			if runeString(t.char) == end {
 				tag = ""
 			} else {
-				tag = t.extractString(end, nil, true, !t.heredocTagIsIdentifier)
+				tag = t.extractString(end, nil, true, !t.heredocTagIsIdentifier, false)
 			}
 			if tag != "" && t.heredocTagIsIdentifier && (t.end || pyIsDigit(tag) || strings.IndexFunc(tag, pyIsSpaceRune) >= 0) {
 				if !t.end {
@@ -992,7 +1014,9 @@ func (t *tokenizerCore) scanString(start string) bool {
 	if tokenType == TK_BYTE_STRING {
 		escapes = t.byteStringEscapes
 	}
-	text := t.extractString(end, escapes, tokenType == TK_RAW_STRING, true)
+	rawString := tokenType == TK_RAW_STRING || tokenType == TK_NATIONAL_RAW_STRING || tokenType == TK_HEREDOC_STRING
+	bytesLiteral := tokenType == TK_BYTE_STRING && t.byteStringsAreBytes
+	text := t.extractString(end, escapes, rawString, true, bytesLiteral)
 
 	if base != 0 && text != "" {
 		if !pyIntParse(text, base) {
@@ -1010,7 +1034,7 @@ func (t *tokenizerCore) scanIdentifier(identifierEnd string) {
 		escapes = t.identifierEscapes.Clone()
 		escapes[identifierEnd] = struct{}{}
 	}
-	text := t.extractString(identifierEnd, escapes, false, true)
+	text := t.extractString(identifierEnd, escapes, false, true, false)
 	t.addS(TK_IDENTIFIER, text)
 }
 
@@ -1036,7 +1060,9 @@ func (t *tokenizerCore) scanVar() {
 	t.add0(tt)
 }
 
-func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawString bool, raiseUnmatched bool) string {
+// extractString reads a string up to the delimiter, decoding its escape sequences. For a bytes
+// literal each char of the result is a byte, so non-ASCII chars are stored as their UTF-8 bytes.
+func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawString bool, raiseUnmatched bool, bytesLiteral bool) string {
 	var text strings.Builder
 	delim := []rune(delimiter)
 	delimSize := len(delim)
@@ -1082,17 +1108,44 @@ func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawStrin
 			} else {
 				t.peek = sql[t.current]
 			}
+			if bytesLiteral {
+				return utf8BytesAsChars(t.span(pos, endPos))
+			}
 			return t.span(pos, endPos)
 		}
 	}
 
 	for {
+		backslashEscape := !rawString && t.char == '\\' && escapes.Has("\\")
+
+		// Numeric escapes come first, since they may overlap fixed sequences (e.g. \000 vs \0)
+		if backslashEscape && len(t.numericEscapes) > 0 {
+			if decoded := t.scanNumericEscape(); decoded != "" {
+				text.WriteString(decoded)
+				continue
+			}
+		}
+
 		if !rawString && len(t.unescapedSequences) > 0 && t.peek != noChar && escapes.Has(runeString(t.char)) {
 			if seq, ok := t.unescapedSequences[runeString(t.char)+runeString(t.peek)]; ok {
 				t.advance(2, false)
 				text.WriteString(seq)
 				continue
 			}
+		}
+
+		// An escape that is not decoded drops its backslash where configured, unless the string
+		// is unterminated
+		if backslashEscape && t.dropUnknownEscapes && t.current+1 < t.size {
+			peek := t.peek
+			t.advance(1, false)
+			t.advance(1, false)
+			if bytesLiteral {
+				text.WriteString(utf8BytesAsChars(string(peek)))
+			} else {
+				text.WriteRune(peek)
+			}
+			continue
 		}
 
 		isValidCustomEscape := len(t.escapeFollowChars) > 0 && t.char == '\\' && !t.escapeFollowChars.Has(runeStr(t.peek))
@@ -1135,10 +1188,183 @@ func (t *tokenizerCore) extractString(delimiter string, escapes StrSet, rawStrin
 			}
 			current := t.current - 1
 			t.advance(1, true)
-			text.WriteString(t.span(current, t.current-1))
+			if bytesLiteral {
+				text.WriteString(utf8BytesAsChars(t.span(current, t.current-1)))
+			} else {
+				text.WriteString(t.span(current, t.current-1))
+			}
 		}
 	}
 	return text.String()
+}
+
+// utf8BytesAsChars returns s with each byte of its UTF-8 encoding as one char (U+0000 to U+00FF).
+func utf8BytesAsChars(s string) string {
+	ascii := true
+	for i := range len(s) {
+		if s[i] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return s
+	}
+	var b strings.Builder
+	for i := range len(s) {
+		b.WriteRune(rune(s[i]))
+	}
+	return b.String()
+}
+
+// readNumericEscape reads up to maxDigits digits of the given base from start, stopping before the
+// value exceeds maxValue. It returns the value and the end index, with -1 as the value when fewer
+// than minDigits were read.
+func (t *tokenizerCore) readNumericEscape(start, base, minDigits, maxDigits, maxValue int) (int, int) {
+	value, end := 0, start
+	limit := min(start+maxDigits, t.size)
+	for end < limit {
+		digit := hexDigitValue(t.sql[end])
+		if digit >= base || value*base+digit > maxValue {
+			break
+		}
+		value = value*base + digit
+		end++
+	}
+	if end-start < minDigits {
+		return -1, end
+	}
+	return value, end
+}
+
+// hexDigitValue returns the value of a hexadecimal digit, or 16 for any other char.
+func hexDigitValue(r rune) int {
+	switch {
+	case r >= '0' && r <= '9':
+		return int(r - '0')
+	case r >= 'a' && r <= 'f':
+		return int(r-'a') + 10
+	case r >= 'A' && r <= 'F':
+		return int(r-'A') + 10
+	}
+	return 16
+}
+
+// readByteEscape reads the numeric escape at pos (a backslash) when it encodes a byte (an octal
+// escape or a hex one of at most 0xFF), returning the byte and the end index; the byte is -1
+// otherwise.
+func (t *tokenizerCore) readByteEscape(pos int) (int, int) {
+	if pos+1 >= t.size {
+		return -1, pos
+	}
+	peek := t.sql[pos+1]
+	isOctal := peek >= '0' && peek <= '7'
+	key := peek
+	if isOctal {
+		key = '0'
+	}
+	spec, ok := t.numericEscapes[key]
+	if !ok || (spec[0] != 8 && spec[3] > 0xFF) {
+		return -1, pos
+	}
+	digitsStart := pos + 2
+	if isOctal {
+		digitsStart = pos + 1
+	}
+	value, end := t.readNumericEscape(digitsStart, spec[0], spec[1], spec[2], spec[3])
+	if value >= 0 {
+		value &= 0xFF
+	}
+	return value, end
+}
+
+// scanNumericEscape decodes the numeric escape (per numericEscapes) that starts at the current
+// char, a backslash, and moves past it. It returns "" when nothing is decoded: an escape with too
+// few digits, a lone UTF-16 surrogate (unless loneSurrogateReplacement is set) or an escape at
+// the end of the input, which is left to the unterminated string check. With
+// numericEscapesAreBytes, a byte escape that starts a valid UTF-8 sequence of byte escapes (e.g.
+// \xC3\xA9) decodes to that one character, any other byte above 0x7F stays that raw byte, and
+// octal values wrap around to a byte (\541 is \x61).
+func (t *tokenizerCore) scanNumericEscape() string {
+	start := t.current
+	peek := t.peek
+
+	// Octal escapes start with a digit (e.g. \101), the others with a letter (e.g. \u0041)
+	isOctal := peek >= '0' && peek <= '7'
+	key := peek
+	if isOctal {
+		key = '0'
+	}
+	spec, ok := t.numericEscapes[key]
+	if !ok {
+		return ""
+	}
+	base, minDigits, maxDigits, maxValue := spec[0], spec[1], spec[2], spec[3]
+	digitsStart := start + 1
+	if isOctal {
+		digitsStart = start
+	}
+	value, end := t.readNumericEscape(digitsStart, base, minDigits, maxDigits, maxValue)
+
+	isByte := t.numericEscapesAreBytes && (base == 8 || maxValue <= 0xFF)
+	if isByte && value >= 0 {
+		value &= 0xFF
+	}
+
+	// A UTF-16 surrogate is only valid as a high half (D800-DBFF) followed by an escaped low half
+	// (DC00-DFFF), e.g. \uD83D\uDE00 is U+1F600
+	if value >= 0xD800 && value <= 0xDFFF {
+		low, lowEnd := -1, end
+		if value <= 0xDBFF && end+1 < t.size && t.sql[end] == '\\' && t.sql[end+1] == peek {
+			low, lowEnd = t.readNumericEscape(end+2, base, minDigits, maxDigits, maxValue)
+		}
+
+		if low >= 0xDC00 && low <= 0xDFFF {
+			value = 0x10000 + ((value - 0xD800) << 10) + (low - 0xDC00)
+			end = lowEnd
+		} else if t.loneSurrogateReplacement != "" && end < t.size {
+			t.advance(end-start+1, false)
+			return t.loneSurrogateReplacement
+		} else {
+			value = -1
+		}
+	}
+
+	// Decode one UTF-8 character at a time. Only 0xC2..0xF4 can start a multi-byte character.
+	if isByte && value >= 0xC2 && value <= 0xF4 {
+		run := []byte{byte(value)}
+		runEnd := end
+		byteCount := 4
+		if value < 0xE0 {
+			byteCount = 2
+		} else if value < 0xF0 {
+			byteCount = 3
+		}
+		for len(run) < byteCount && runEnd < t.size && t.sql[runEnd] == '\\' {
+			b, bEnd := t.readByteEscape(runEnd)
+			if b < 0x80 || b > 0xBF {
+				break
+			}
+			run = append(run, byte(b))
+			runEnd = bEnd
+		}
+
+		if len(run) == byteCount && utf8.Valid(run) && runEnd < t.size {
+			t.advance(runEnd-start+1, false)
+			return string(run)
+		}
+	}
+
+	if value >= 0 && end < t.size {
+		t.advance(end-start+1, false)
+		if isByte && value > 0x7F {
+			// Not part of a UTF-8 character: keep the byte itself, which the generator writes
+			// back as a byte escape. Decoding it as the code point (\xFF as ÿ) changes the bytes.
+			return string([]byte{byte(value)})
+		}
+		return string(rune(value))
+	}
+	return ""
 }
 
 func (t *tokenizerCore) quotesHas(s string) bool {

@@ -1,10 +1,7 @@
 package sqlengine
 
-// Port of sqlglot/parser.py L3443-3797 (chunk B, part 1): DESCRIBE, multitable inserts, INSERT,
-// KILL, ON CONFLICT, RETURNING, row format / serde, LOAD, DELETE, UPDATE, USE, CACHE / UNCACHE.
-
-// chunkBAndE mirrors the Python idiom `cond and parse()`: returns False when cond is false,
-// otherwise the parsed expression (None when the parse method returns None).
+// chunkBAndE returns false when cond is false, otherwise the result of fn (nil when fn returns
+// nil); callers store the false as the argument value.
 func chunkBAndE(cond bool, fn func() *Expr) any {
 	if !cond {
 		return false
@@ -15,7 +12,7 @@ func chunkBAndE(cond bool, fn func() *Expr) any {
 	return nil
 }
 
-// chunkBKwargs mirrors an insertion-ordered kwargs dict (re-assigning a key keeps its position).
+// chunkBKwargs collects node arguments in insertion order; re-assigning a key keeps its position.
 type chunkBKwargs struct{ kv []any }
 
 func (k *chunkBKwargs) set(key string, v any) {
@@ -28,7 +25,6 @@ func (k *chunkBKwargs) set(key string, v any) {
 	k.kv = append(k.kv, key, v)
 }
 
-// _parse_describe (parser.py L3443).
 func (p *Parser) baseParseDescribe() *Expr {
 	var kind any
 	if p.matchSet(p.s.CREATABLES) {
@@ -74,9 +70,12 @@ func (p *Parser) baseParseDescribe() *Expr {
 	))
 }
 
-// _parse_multitable_inserts (parser.py L3474).
-func (p *Parser) parseMultitableInserts(comments []string) *Expr {
-	kind := upperText(p.prev)
+// parseMultitableInserts parses INSERT FIRST/ALL with its branches and source. kind is the
+// FIRST/ALL keyword, or "" to take it from the previous token.
+func (p *Parser) parseMultitableInserts(comments []string, kind string) *Expr {
+	if kind == "" {
+		kind = upperText(p.prev)
+	}
 	expressions := []*Expr{}
 
 	parseConditionalInsert := func() *Expr {
@@ -93,7 +92,7 @@ func (p *Parser) parseMultitableInserts(comments []string) *Expr {
 		}
 
 		insThis := p.parseTable(true, false, nil, false, false, false, false)
-		insExpression := p.parseDerivedTableValues()
+		insExpression := p.parseDerivedTableValues(false)
 		insert := p.expression(New(KInsert, "this", insThis, "expression", insExpression))
 		return p.expression(New(
 			KConditionalInsert,
@@ -116,7 +115,6 @@ func (p *Parser) parseMultitableInserts(comments []string) *Expr {
 	)
 }
 
-// _parse_insert (parser.py L3513).
 func (p *Parser) parseInsert() *Expr {
 	comments := []string{}
 	hint := p.parseHint()
@@ -139,11 +137,16 @@ func (p *Parser) parseInsert() *Expr {
 	} else {
 		if p.matchAny(TK_FIRST, TK_ALL) {
 			comments = append(comments, p.prevComments...)
-			return p.parseMultitableInserts(comments)
+			return p.parseMultitableInserts(comments, "")
+		}
+
+		// A conditional multitable insert without FIRST/ALL means ALL
+		if p.matchNoAdvance(TK_WHEN) {
+			return p.parseMultitableInserts(comments, "ALL")
 		}
 
 		if p.match(TK_OR) {
-			// alternative = self._match_texts(self.INSERT_ALTERNATIVES) and self._prev.text
+			// the alternative's text, or false (not nil) when OR is not followed by one
 			if p.matchTextSet(p.s.INSERT_ALTERNATIVES) {
 				alternative = p.prev.Text
 			} else {
@@ -164,16 +167,59 @@ func (p *Parser) parseInsert() *Expr {
 		}
 	}
 
+	// MySQL's INSERT ... SET is normalized into the INSERT ... (cols) VALUES (vals) variant
+	var setValues *Expr
+	if p.match(TK_SET) {
+		var columns, values []*Expr
+		p.parseCSV(func() *Expr {
+			target := p.parseColumn()
+			if target.IsA(KColumn) && p.match(TK_EQ) {
+				var value *Expr
+				if p.d.S.SUPPORTS_VALUES_DEFAULT && p.match(TK_DEFAULT) {
+					value = VarExpr(upperText(p.prev))
+				} else {
+					value = p.parseDisjunction()
+				}
+
+				if value != nil {
+					columns = append(columns, target.This())
+					values = append(values, value)
+					return value
+				}
+			}
+
+			p.raiseError("Expected column assignment in INSERT ... SET", nil)
+			return nil
+		}, TK_COMMA)
+
+		this = p.expression(New(KSchema, "this", this, "expressions", columns))
+		setValues = p.expression(New(
+			KValues,
+			"expressions", []*Expr{New(KTuple, "expressions", values)},
+			"alias", p.parseTableAlias(nil),
+		))
+	}
+
 	returning := p.parseReturning() // TSQL allows RETURNING before source
 
 	stored := chunkBAndE(p.matchTextSeq("STORED"), p.parseStored)
 	byName := p.matchTextSeq("BY", "NAME")
 	exists := p.parseExists(false)
-	where := chunkBAndE(p.matchPair(TK_REPLACE, TK_WHERE), p.parseDisjunction)
+	var where, using any
+	if p.match(TK_REPLACE) {
+		if p.match(TK_WHERE) {
+			where = p.parseDisjunction()
+		} else if p.match(TK_USING) {
+			using = chunkCOptList(p.parseUsingIdentifiers())
+		}
+	}
 	partition := chunkBAndE(p.match(TK_PARTITION_BY), p.parsePartitionedBy)
 	settings := chunkBAndE(p.matchTextSeq("SETTINGS"), p.parseSettingsProperty)
 	default_ := p.matchTextSeq("DEFAULT", "VALUES")
-	expression := p.parseDerivedTableValues()
+	expression := setValues
+	if expression == nil {
+		expression = p.parseDerivedTableValues(true)
+	}
 	if expression == nil {
 		expression = p.parseDdlSelect()
 	}
@@ -194,6 +240,7 @@ func (p *Parser) parseInsert() *Expr {
 		"by_name", byName,
 		"exists", exists,
 		"where", where,
+		"using", using,
 		"partition", partition,
 		"settings", settings,
 		"default", default_,
@@ -207,16 +254,22 @@ func (p *Parser) parseInsert() *Expr {
 	), comments)
 }
 
-// _parse_insert_table (parser.py L3571).
 func (p *Parser) baseParseInsertTable() *Expr {
 	this := p.parseTable(true, false, nil, false, false, true, false)
-	if this.IsA(KTable) && p.matchNoAdvance(TK_ALIAS) {
-		this.Set("alias", p.parseTableAlias(nil))
+	if this.IsA(KTable) && p.match(TK_ALIAS) {
+		// The column list after the alias belongs to the INSERT: INSERT INTO t AS s (a, b)
+		alias := p.parseIdVar(true, nil)
+		if alias == nil {
+			alias = p.parseStringAsIdentifier()
+		}
+		if alias != nil {
+			this.Set("alias", p.expression(New(KTableAlias, "this", alias)))
+		}
+		return p.parseSchema(this)
 	}
 	return this
 }
 
-// _parse_kill (parser.py L3577).
 func (p *Parser) parseKill() *Expr {
 	var kind *Expr
 	if p.matchTexts("CONNECTION", "QUERY") {
@@ -226,7 +279,6 @@ func (p *Parser) parseKill() *Expr {
 	return p.expression(New(KKill, "this", p.parsePrimary(), "kind", kind))
 }
 
-// _parse_on_conflict (parser.py L3582).
 func (p *Parser) parseOnConflict() *Expr {
 	conflict := p.matchTextSeq("ON", "CONFLICT")
 	duplicate := p.matchTextSeq("ON", "DUPLICATE", "KEY")
@@ -253,7 +305,7 @@ func (p *Parser) parseOnConflict() *Expr {
 	var expressions any
 	if p.prev.Type == TK_UPDATE {
 		p.match(TK_SET)
-		expressions = p.parseCSV(p.parseEquality, TK_COMMA)
+		expressions = p.parseCSV(p.parseUpdateAssignment, TK_COMMA)
 	}
 
 	where := p.parseWhere(false)
@@ -269,7 +321,6 @@ func (p *Parser) parseOnConflict() *Expr {
 	))
 }
 
-// _parse_returning (parser.py L3620).
 func (p *Parser) parseReturning() *Expr {
 	if !p.match(TK_RETURNING) {
 		return nil
@@ -279,7 +330,7 @@ func (p *Parser) parseReturning() *Expr {
 	return p.expression(New(KReturning, "expressions", expressions, "into", into))
 }
 
-// _parse_row (parser.py L3630).
+// parseRow parses the FORMAT ... part of ROW FORMAT (ROW already consumed), or returns nil.
 func (p *Parser) parseRow() *Expr {
 	if !p.match(TK_FORMAT) {
 		return nil
@@ -287,7 +338,6 @@ func (p *Parser) parseRow() *Expr {
 	return p.parseRowFormat(false)
 }
 
-// _parse_serde_properties (parser.py L3635).
 func (p *Parser) parseSerdeProperties(with bool) *Expr {
 	index := p.index
 	with = with || p.matchTextSeq("WITH")
@@ -303,7 +353,6 @@ func (p *Parser) parseSerdeProperties(with bool) *Expr {
 	))
 }
 
-// _parse_row_format (parser.py L3646).
 func (p *Parser) parseRowFormat(matchRow bool) *Expr {
 	if matchRow && !p.matchPair(TK_ROW, TK_FORMAT) {
 		return nil
@@ -347,7 +396,6 @@ func (p *Parser) parseRowFormat(matchRow bool) *Expr {
 	return p.expression(New(KRowFormatDelimitedProperty, kwargs...))
 }
 
-// _parse_load (parser.py L3680).
 func (p *Parser) parseLoad() *Expr {
 	if p.matchTextSeq("DATA") {
 		local := p.matchTextSeq("LOCAL")
@@ -385,7 +433,6 @@ func (p *Parser) parseLoad() *Expr {
 	return p.parseAsCommand(p.prev)
 }
 
-// _parse_delete (parser.py L3707).
 func (p *Parser) parseDelete() *Expr {
 	hint := p.parseHint()
 
@@ -433,7 +480,19 @@ func (p *Parser) parseDelete() *Expr {
 	))
 }
 
-// _parse_update (parser.py L3733).
+// parseUpdateAssignment parses one SET assignment: a target, then = and a full boolean expression
+// as its value, so `a = x OR y` assigns `x OR y` to a.
+func (p *Parser) parseUpdateAssignment() *Expr {
+	this := p.parseComparison(nil)
+	if p.match(TK_EQ) {
+		comments := p.prevComments
+		this = p.expressionC(New(KEQ, "this", this, "expression", p.parseDisjunction()), comments)
+	}
+	return this
+}
+
+// baseParseUpdate parses UPDATE <table> followed by SET, RETURNING, FROM, WHERE, ORDER BY and
+// LIMIT clauses in any order.
 func (p *Parser) baseParseUpdate() *Expr {
 	hint := p.parseHint()
 	kwargs := &chunkBKwargs{}
@@ -441,7 +500,7 @@ func (p *Parser) baseParseUpdate() *Expr {
 	kwargs.set("this", p.parseTable(false, true, &p.s.UPDATE_ALIAS_TOKENS, false, false, false, false))
 	for p.curr.ok() {
 		if p.match(TK_SET) {
-			kwargs.set("expressions", p.parseCSV(p.parseEquality, TK_COMMA))
+			kwargs.set("expressions", p.parseCSV(p.parseUpdateAssignment, TK_COMMA))
 		} else if p.matchNoAdvance(TK_RETURNING) {
 			kwargs.set("returning", p.parseReturning())
 		} else if p.matchNoAdvance(TK_FROM) {
@@ -477,14 +536,12 @@ func (p *Parser) baseParseUpdate() *Expr {
 	return p.expression(New(KUpdate, kwargs.kv...))
 }
 
-// _parse_use (parser.py L3762).
 func (p *Parser) baseParseUse() *Expr {
 	kind := p.parseVarFromOptions(p.s.USABLES, false)
 	this := p.parseTable(false, false, nil, false, false, false, false)
 	return p.expression(New(KUse, "kind", kind, "this", this))
 }
 
-// _parse_uncache (parser.py L3770).
 func (p *Parser) parseUncache() *Expr {
 	if !p.match(TK_TABLE) {
 		p.raiseError("Expecting TABLE after UNCACHE", nil)
@@ -495,7 +552,6 @@ func (p *Parser) parseUncache() *Expr {
 	return p.expression(New(KUncache, "exists", exists, "this", this))
 }
 
-// _parse_cache (parser.py L3778).
 func (p *Parser) parseCache() *Expr {
 	lazy := p.matchTextSeq("LAZY")
 	p.match(TK_TABLE)

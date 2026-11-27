@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Callable table types mirroring the dict[...]->callable tables of sqlglot.parser.Parser.
+// Function types of the parser's dispatch tables (FUNCTIONS, STATEMENT_PARSERS, ...).
 type (
 	FuncBuilder        func(args []*Expr, d *Dialect) *Expr
 	parseFn            func(p *Parser) *Expr
@@ -23,7 +23,8 @@ type (
 	pipeTransformFn    func(p *Parser, query *Expr) *Expr
 )
 
-// propKwargs mirrors the **kwargs passed to PROPERTY_PARSERS entries.
+// propKwargs holds the optional modifiers (NO, DUAL, BEFORE, ...) passed to PROPERTY_PARSERS
+// entries.
 type propKwargs struct {
 	no, dual, before, default_, after, minimum, maximum bool
 	local                                               string
@@ -37,6 +38,7 @@ type ParserSettings struct {
 	FUNCTIONS                     map[string]FuncBuilder
 	LAMBDAS                       map[TokenType]lambdaParseFn
 	COLUMN_OPERATORS              map[TokenType]columnOperatorFn
+	JSON_OPERATORS                map[TokenType]columnOperatorFn
 	EXPRESSION_PARSERS            map[Kind]parseFn
 	STATEMENT_PARSERS             map[TokenType]parseFn
 	UNARY_PARSERS                 map[TokenType]parseFn
@@ -66,7 +68,6 @@ type ParserSettings struct {
 	h parserHooks
 }
 
-// Parser mirrors sqlglot.parser.Parser.
 type Parser struct {
 	d *Dialect
 	s *ParserSettings
@@ -91,7 +92,8 @@ type Parser struct {
 	chunkIndex     int
 	nodeCount      int
 
-	// noParenOverlay holds temporary NO_PAREN_FUNCTION_PARSERS entries (sqlglot mutates the class table).
+	// noParenOverlay holds temporary NO_PAREN_FUNCTION_PARSERS entries for this parser only, so the
+	// dialect's shared table is never mutated.
 	noParenOverlay map[string]parseFn
 
 	// depth counts nested entries into the recursive parse methods (see enter).
@@ -102,9 +104,9 @@ type Parser struct {
 }
 
 // maxParseStall bounds how many token-match attempts may happen without the parser ever reaching
-// a new token position. A few SQLGlot parse loops spin forever on malformed input (e.g. a
-// property parser that retreats inside a `while True` property loop); Python hangs there. The Go
-// port raises an error instead. Legitimate parses (including backtracking) stay far below this.
+// a new token position. A few parse loops would otherwise spin forever on malformed input (e.g. a
+// property parser that retreats inside an endless property loop); the parser raises an error
+// instead. Legitimate parses (including backtracking) stay far below this.
 const maxParseStall = 10_000_000
 
 // tick is called on every match attempt.
@@ -120,13 +122,12 @@ func (p *Parser) tick() {
 	}
 }
 
-// maxParseDepth bounds parser recursion. Python raises RecursionError (caught by callers like any
-// other error) where a Go stack overflow would kill the process, so runaway recursion (e.g. a
-// statement parser that re-enters itself without consuming tokens) becomes an error instead.
-// Python's own limit is reached at ~100 nested parentheses; this allows far deeper legitimate SQL.
+// maxParseDepth bounds parser recursion, so runaway recursion (e.g. a statement parser that
+// re-enters itself without consuming tokens) becomes an error instead of a Go stack overflow that
+// would kill the process. The limit is far above the nesting of legitimate SQL.
 const maxParseDepth = 3000
 
-// enter/leave bracket the recursive parse entry points.
+// enter and leave bracket the recursive parse entry points.
 func (p *Parser) enter() {
 	p.depth++
 	if p.depth > maxParseDepth {
@@ -140,7 +141,7 @@ var sentinelNone = &Token{Type: TK_SENTINEL, Text: "SENTINEL", Line: 1, Col: 1, 
 
 func (t *Token) ok() bool { return t != nil && t.Type != TK_SENTINEL }
 
-// ParseOptions mirrors the parser keyword options.
+// ParseOptions configures a parser; zero values keep the defaults.
 type ParseOptions struct {
 	ErrorLevel          *ErrorLevel
 	ErrorMessageContext int
@@ -148,7 +149,6 @@ type ParseOptions struct {
 	MaxNodes            int
 }
 
-// NewParser creates a parser for the dialect.
 func (d *Dialect) NewParser(opts *ParseOptions) *Parser {
 	p := &Parser{}
 	d.initParser(p, opts)
@@ -221,7 +221,7 @@ func (p *Parser) advance(times int) {
 	if index >= 0 && index < p.tokensSize {
 		p.curr = p.tokens[index]
 	} else if index < 0 && -index <= p.tokensSize {
-		// Python negative indexing
+		// A negative index counts from the end
 		p.curr = p.tokens[p.tokensSize+index]
 	} else {
 		p.curr = sentinelNone
@@ -264,7 +264,6 @@ func (p *Parser) addComments(e *Expr) {
 	}
 }
 
-// match mirrors Parser._match(token_type).
 func (p *Parser) match(tt TokenType) bool {
 	p.tick()
 	if p.curr.Type == tt {
@@ -275,10 +274,9 @@ func (p *Parser) match(tt TokenType) bool {
 	return false
 }
 
-// matchNoAdvance mirrors Parser._match(token_type, advance=False).
 func (p *Parser) matchNoAdvance(tt TokenType) bool { return p.curr.Type == tt }
 
-// matchExpr mirrors Parser._match(token_type, expression=e).
+// matchExpr consumes the current token if it has type tt, attaching its comments to e.
 func (p *Parser) matchExpr(tt TokenType, e *Expr) bool {
 	if p.curr.Type == tt {
 		p.advance(1)
@@ -288,7 +286,6 @@ func (p *Parser) matchExpr(tt TokenType, e *Expr) bool {
 	return false
 }
 
-// matchSet mirrors Parser._match_set(types).
 func (p *Parser) matchSet(types TokenSet) bool {
 	p.tick()
 	if types.Has(p.curr.Type) {
@@ -300,7 +297,6 @@ func (p *Parser) matchSet(types TokenSet) bool {
 
 func (p *Parser) matchSetNoAdvance(types TokenSet) bool { return types.Has(p.curr.Type) }
 
-// matchAny mirrors Parser._match_set on an ad-hoc tuple of token types.
 func (p *Parser) matchAny(types ...TokenType) bool {
 	for _, t := range types {
 		if p.curr.Type == t {
@@ -333,7 +329,7 @@ func (p *Parser) matchPairNoAdvance(a, b TokenType) bool {
 	return p.curr.Type == a && p.next.Type == b
 }
 
-// matchTexts mirrors Parser._match_texts(texts).
+// matchTexts consumes the current token if its text equals one of texts, ignoring case.
 func (p *Parser) matchTexts(texts ...string) bool {
 	p.tick()
 	if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) {
@@ -347,7 +343,6 @@ func (p *Parser) matchTexts(texts ...string) bool {
 	return false
 }
 
-// hasUpperText reports whether texts holds pyUpper(text).
 func hasUpperText[V any](texts map[string]V, text string) bool {
 	var buf [64]byte
 	if b, ok := upperASCII(buf[:], text); ok {
@@ -358,7 +353,6 @@ func hasUpperText[V any](texts map[string]V, text string) bool {
 	return found
 }
 
-// matchTextSet mirrors Parser._match_texts with a set/mapping argument.
 func (p *Parser) matchTextSet(texts StrSet) bool {
 	if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && hasUpperText(texts, p.curr.Text) {
 		p.advance(1)
@@ -369,6 +363,10 @@ func (p *Parser) matchTextSet(texts StrSet) bool {
 
 func (p *Parser) matchTextSetNoAdvance(texts StrSet) bool {
 	return !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && hasUpperText(texts, p.curr.Text)
+}
+
+func matchTextKeysNoAdvance[V any](p *Parser, m map[string]V) bool {
+	return !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.curr.Type) && hasUpperText(m, p.curr.Text)
 }
 
 func matchTextKeys[V any](p *Parser, m map[string]V) bool {
@@ -382,7 +380,8 @@ func matchTextKeys[V any](p *Parser, m map[string]V) bool {
 	return false
 }
 
-// matchTextSeq mirrors Parser._match_text_seq(*texts).
+// matchTextSeq consumes the next tokens if their texts equal texts, ignoring case; otherwise it
+// consumes nothing.
 func (p *Parser) matchTextSeq(texts ...string) bool {
 	p.tick()
 	index := p.index
@@ -397,7 +396,6 @@ func (p *Parser) matchTextSeq(texts ...string) bool {
 	return true
 }
 
-// matchTextSeqNoAdvance mirrors Parser._match_text_seq(*texts, advance=False).
 func (p *Parser) matchTextSeqNoAdvance(texts ...string) bool {
 	index := p.index
 	ok := p.matchTextSeq(texts...)
@@ -415,7 +413,7 @@ func (p *Parser) findSQL(start, end *Token) string {
 	return pySlice(p.runes(), int(start.Start), int(end.End)+1)
 }
 
-// runes returns the SQL as code points (positions are code-point offsets, like Python's),
+// runes returns the SQL as code points (token positions are code-point offsets),
 // converting lazily: only error reporting and command fallbacks need it.
 func (p *Parser) runes() []rune {
 	if p.sqlRunes == nil {
@@ -426,7 +424,8 @@ func (p *Parser) runes() []rune {
 
 type parsePanic struct{ err *ParseError }
 
-// raiseError mirrors Parser.raise_error. tok may be nil.
+// raiseError records a parse error at tok, highlighting it in the SQL; a nil tok means the current
+// (or previous) token. With ErrorLevelImmediate it panics right away.
 func (p *Parser) raiseError(message string, tok *Token) {
 	if !tok.ok() {
 		tok = p.curr
@@ -471,7 +470,8 @@ func (p *Parser) validateExpression(e *Expr, args []*Expr) *Expr {
 	return e
 }
 
-// tryParse mirrors Parser._try_parse.
+// tryParse runs fn with errors raised immediately. It backs up to where it started on a parse
+// error (returning the zero value), on a nil result, or when retreat is set.
 func tryParse[T any](p *Parser, fn func() T, retreat bool, isNil func(T) bool) (result T) {
 	index := p.index
 	level := p.errorLevel
@@ -496,12 +496,11 @@ func tryParse[T any](p *Parser, fn func() T, retreat bool, isNil func(T) bool) (
 	return result
 }
 
-// tryParseExpr is tryParse specialized for expression-returning methods.
 func (p *Parser) tryParseExpr(fn func() *Expr, retreat bool) *Expr {
 	return tryParse(p, fn, retreat, func(e *Expr) bool { return e == nil })
 }
 
-// expression mirrors Parser.expression(instance).
+// expression attaches pending comments to e and validates it unless it is a primitive kind.
 func (p *Parser) expression(e *Expr) *Expr {
 	p.addComments(e)
 	if !e.kind.isPrimitive() {
@@ -510,7 +509,6 @@ func (p *Parser) expression(e *Expr) *Expr {
 	return e
 }
 
-// expressionTok mirrors Parser.expression(instance, token).
 func (p *Parser) expressionTok(e *Expr, tok *Token) *Expr {
 	if tok.ok() {
 		e.updatePositionsTok(tok)
@@ -518,7 +516,8 @@ func (p *Parser) expressionTok(e *Expr, tok *Token) *Expr {
 	return p.expression(e)
 }
 
-// expressionC mirrors Parser.expression(instance, comments=comments).
+// expressionC is expression with explicit comments, used instead of the pending ones when
+// non-empty.
 func (p *Parser) expressionC(e *Expr, comments []string) *Expr {
 	if len(comments) > 0 {
 		e.AddComments(comments, false)
@@ -537,7 +536,6 @@ func (e *Expr) updatePositionsTok(tok *Token) {
 	e.clearPositionMeta()
 }
 
-// updatePositionsFrom mirrors update_positions(other_expression).
 func (e *Expr) updatePositionsFrom(other *Expr) *Expr {
 	if other == nil {
 		return e
@@ -612,8 +610,8 @@ func (p *Parser) parseImpl(parseMethod func(p *Parser) *Expr, rawTokens []*Token
 	return p.parseBatchStatements(parseMethod, false)
 }
 
-// Logger receives the messages SQLGlot logs (parse errors under ErrorLevel.WARN). It discards them
-// by default; embedders can replace it.
+// Logger receives log messages (parse errors under ErrorLevelWarn). It discards them by default;
+// embedders can replace it.
 var Logger = func(msg string) {}
 
 func (p *Parser) checkErrors() {
@@ -632,7 +630,6 @@ func (p *Parser) checkErrors() {
 	}
 }
 
-// recoverParse converts parser panics into errors.
 func recoverParse(err *error) {
 	if r := recover(); r != nil {
 		switch x := r.(type) {
@@ -650,8 +647,8 @@ func recoverParse(err *error) {
 	}
 }
 
-// internalError converts an unexpected panic (a Go runtime error in ported code) into an error.
-// Out-of-range indexing is reported like the IndexError Python raises at the same spot.
+// internalError converts an unexpected panic (such as a Go runtime error) into an error.
+// Out-of-range indexing keeps its historical "list index out of range" message.
 func internalError(r any) error {
 	if re, ok := r.(runtime.Error); ok && strings.Contains(re.Error(), "index out of range") {
 		return &ValueError{Msg: "list index out of range"}
@@ -662,14 +659,14 @@ func internalError(r any) error {
 	return fmt.Errorf("internal error: %v", r)
 }
 
-// ParseTokens mirrors Parser.parse(raw_tokens, sql).
 func (p *Parser) ParseTokens(tokens []*Token, sql string) (out []*Expr, err error) {
 	defer recoverParse(&err)
 	out = p.parseImpl(func(p *Parser) *Expr { return p.parseStatement() }, tokens, sql)
 	return out, nil
 }
 
-// ParseInto mirrors Parser.parse_into for a single expression type.
+// ParseInto parses the tokens of sql as expressions of the given kind, using its
+// EXPRESSION_PARSERS entry.
 func (p *Parser) ParseInto(kind Kind, tokens []*Token, sql string) (out []*Expr, err error) {
 	defer recoverParse(&err)
 	fn, ok := p.s.EXPRESSION_PARSERS[kind]
@@ -685,7 +682,7 @@ func (p *Parser) ParseInto(kind Kind, tokens []*Token, sql string) (out []*Expr,
 					}
 					tokText := sql
 					panic(parsePanic{&ParseError{
-						Msg:    fmt.Sprintf("Failed to parse '%s' into %s", tokText, kindClassRepr(kind)),
+						Msg:    fmt.Sprintf("Failed to parse '%s' into %s", tokText, kind.Name()),
 						Errors: pp.err.Errors,
 					}})
 				}
@@ -697,11 +694,7 @@ func (p *Parser) ParseInto(kind Kind, tokens []*Token, sql string) (out []*Expr,
 	return out, nil
 }
 
-func kindClassRepr(k Kind) string {
-	return "<class 'sqlglot.expressions." + kindModule(k) + "." + k.Name() + "'>"
-}
-
-// Parse mirrors Dialect.parse(sql).
+// Parse tokenizes and parses sql into one expression per statement.
 func (d *Dialect) Parse(sql string, opts *ParseOptions) ([]*Expr, error) {
 	tokens, arena, err := d.tokenizeForParse(sql)
 	if arena != nil {
@@ -725,7 +718,7 @@ func (d *Dialect) tokenizeForParse(sql string) ([]*Token, *tokenArena, error) {
 	return d.tok.tokenizeInArena(sql)
 }
 
-// ParseOne mirrors sqlglot.parse_one(sql, read=dialect).
+// ParseOne parses sql into a single expression; several statements are wrapped in a Block.
 func (d *Dialect) ParseOne(sql string, opts *ParseOptions) (*Expr, error) {
 	result, err := d.Parse(sql, opts)
 	if err != nil {
@@ -740,7 +733,7 @@ func (d *Dialect) ParseOne(sql string, opts *ParseOptions) (*Expr, error) {
 	return result[0], nil
 }
 
-// ParseOneInto mirrors sqlglot.parse_one(sql, read=dialect, into=kind).
+// ParseOneInto is ParseOne with sql parsed as the given kind.
 func (d *Dialect) ParseOneInto(kind Kind, sql string, opts *ParseOptions) (*Expr, error) {
 	tokens, arena, err := d.tokenizeForParse(sql)
 	if arena != nil {
@@ -772,7 +765,7 @@ func (p *Parser) warnUnsupported() {
 	if len(sql) > p.errorMessageContext {
 		sql = sql[:p.errorMessageContext]
 	}
-	_ = sql // sqlglot logs a warning here; we stay silent.
+	_ = sql // No warning is logged.
 }
 
 func upperText(t *Token) string { return pyUpper(t.Text) }

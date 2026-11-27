@@ -7,14 +7,14 @@ import (
 	"unicode/utf8"
 )
 
-// Expr is a node of a sqlglot syntax tree. It mirrors sqlglot.expressions.Expression:
-// a class (Kind) plus an ordered mapping of argument keys to values.
+// Expr is a node of a SQL syntax tree: a Kind plus an ordered mapping of argument keys to
+// values.
 //
 // Argument values are one of: nil, *Expr, []*Expr, string, bool, int, DType.
 type Expr struct {
 	kind  Kind
 	flags exprFlags
-	// posLine..posEnd hold the line/col/start/end position metadata (Python's meta["line"], ...)
+	// posLine..posEnd hold the line/col/start/end position metadata (MetaGet("line"), ...)
 	// when flagPosSet is set, kept inline instead of in the meta map.
 	posLine  int32
 	posCol   int32
@@ -22,7 +22,7 @@ type Expr struct {
 	args     []arg
 	parent   *Expr
 	argKey   string
-	index    int32 // -1 means None
+	index    int32 // -1 when e is not in a list argument
 	posEnd   int32
 	// ext holds the rarely set fields (comments, metadata), keeping Expr at 96 bytes.
 	ext  *exprExt
@@ -35,15 +35,14 @@ type exprFlags uint8
 const (
 	flagHashed        exprFlags = 1 << iota // hash holds the cached structural hash
 	flagPosSet                              // posLine..posEnd are set
-	flagEmptyComments                       // comments is [] (not None) and ext holds none
+	flagEmptyComments                       // comments is empty (not nil) and ext holds none
 )
 
 func (e *Expr) hashed() bool { return e.flags&flagHashed != 0 }
 func (e *Expr) posSet() bool { return e.flags&flagPosSet != 0 }
 
-// exprExt holds the optional parts of an Expr.
 type exprExt struct {
-	comments []string // nil mirrors Python's None
+	comments []string // nil means no comments, as opposed to an empty list
 	meta     map[string]any
 }
 
@@ -54,7 +53,8 @@ func (e *Expr) extEnsure() *exprExt {
 	return e.ext
 }
 
-// Comments returns the attached comments (nil when there are none, like Python's None).
+// Comments returns the attached comments: nil when there are none, or an empty list when an empty
+// list was set.
 func (e *Expr) Comments() []string {
 	if e.ext == nil || e.ext.comments == nil {
 		if e.flags&flagEmptyComments != 0 {
@@ -81,7 +81,6 @@ func (e *Expr) SetComments(c []string) {
 	e.extEnsure().comments = c
 }
 
-// metaMap returns the metadata map or nil.
 func (e *Expr) metaMap() map[string]any {
 	if e.ext == nil {
 		return nil
@@ -95,7 +94,7 @@ type arg struct {
 }
 
 // New creates an expression of the given kind from alternating key/value pairs.
-// Keys with nil values are kept (like Python keyword arguments set to None).
+// Keys with nil values are kept, so HasArgKey reports them.
 func New(kind Kind, kv ...any) *Expr {
 	if kind == KDateTrunc {
 		kv = dateTruncCtorArgs(kv)
@@ -148,7 +147,6 @@ type (
 	}
 )
 
-// newExprArgs allocates a zero Expr with room for n arguments.
 func newExprArgs(n int) *Expr {
 	switch {
 	case n <= 0:
@@ -183,13 +181,13 @@ func newExprArgs(n int) *Expr {
 	return e
 }
 
-// unabbreviatedUnitName mirrors TimeUnit.UNABBREVIATED_UNIT_NAME.
 var unabbreviatedUnitName = map[string]string{
 	"D": "DAY", "H": "HOUR", "M": "MINUTE", "MS": "MILLISECOND", "NS": "NANOSECOND",
 	"Q": "QUARTER", "S": "SECOND", "US": "MICROSECOND", "W": "WEEK", "Y": "YEAR",
 }
 
-// timeUnitCtor mirrors TimeUnit.__init__ (unit normalization into a Var).
+// timeUnitCtor normalizes the unit of a new TimeUnit-kind node into an uppercase, unabbreviated
+// Var.
 func timeUnitCtor(e *Expr) {
 	unit := e.ArgE("unit")
 	if unit == nil {
@@ -204,8 +202,8 @@ func timeUnitCtor(e *Expr) {
 		v := New(KVar, "this", pyUpper(name))
 		e.setRaw("unit", v)
 		e.setParent("unit", v, -1)
-		// Python replaces the unit before Expr.__init__ links parents, so the original node is
-		// never attached to e.
+		// The unit is replaced as part of construction, so the original node must not stay
+		// attached to e.
 		if unit.parent == e {
 			unit.parent, unit.argKey, unit.index = nil, "", -1
 		}
@@ -214,7 +212,9 @@ func timeUnitCtor(e *Expr) {
 	}
 }
 
-// dateTruncCtorArgs mirrors DateTrunc.__init__ (pops `unabbreviate`, normalizes `unit`).
+// dateTruncCtorArgs prepares the arguments of a new DateTrunc: it removes the `unabbreviate`
+// option and turns a simple unit into an uppercase string literal, unabbreviated unless the
+// option is false.
 func dateTruncCtorArgs(kv []any) []any {
 	unabbreviate := true
 	out := make([]any, 0, len(kv))
@@ -248,7 +248,8 @@ func dateTruncCtorArgs(kv []any) []any {
 	return out
 }
 
-// normalizeArg converts typed nils to untyped nil so that "value is None" checks work.
+// normalizeArg converts a nil *Expr to untyped nil (so v == nil checks work) and a nil []*Expr
+// to an empty list.
 func normalizeArg(v any) any {
 	switch x := v.(type) {
 	case *Expr:
@@ -263,10 +264,10 @@ func normalizeArg(v any) any {
 	return v
 }
 
-// Kind returns the expression class.
+// Kind returns the expression kind.
 func (e *Expr) Kind() Kind { return e.kind }
 
-// IsA mirrors isinstance(e, kinds). A nil expression is never an instance.
+// IsA reports whether e's kind is, or derives from, any of kinds. A nil expression never matches.
 func (e *Expr) IsA(kinds ...Kind) bool {
 	if e == nil {
 		return false
@@ -274,10 +275,10 @@ func (e *Expr) IsA(kinds ...Kind) bool {
 	return e.kind.IsA(kinds...)
 }
 
-// Is mirrors type(e) is kind (exact class match).
+// Is reports whether e's kind is exactly kind (no subkinds).
 func (e *Expr) Is(kind Kind) bool { return e != nil && e.kind == kind }
 
-// Key returns the lowercase class key.
+// Key returns the lowercase kind key.
 func (e *Expr) Key() string { return e.kind.Key() }
 
 // Parent returns the parent node.
@@ -289,7 +290,6 @@ func (e *Expr) ArgKey() string { return e.argKey }
 // Index returns the position of e in its parent's list argument, or -1.
 func (e *Expr) Index() int { return int(e.index) }
 
-// Args returns the ordered arguments. Callers must not mutate the result.
 func (e *Expr) ArgKeys() []string {
 	out := make([]string, len(e.args))
 	for i, a := range e.args {
@@ -337,7 +337,6 @@ func (e *Expr) ArgL(key string) []*Expr {
 	return nil
 }
 
-// ArgS returns a string argument ("" if absent or not a string).
 func (e *Expr) ArgS(key string) string {
 	if v, ok := e.Arg(key).(string); ok {
 		return v
@@ -345,10 +344,11 @@ func (e *Expr) ArgS(key string) string {
 	return ""
 }
 
-// ArgB returns the truthiness of an argument, like bool(expression.args.get(key)).
+// ArgB reports whether the argument is set to a truthy value (see truthy).
 func (e *Expr) ArgB(key string) bool { return truthy(e.Arg(key)) }
 
-// Truthy mirrors Python truthiness of an argument value.
+// truthy reports whether an argument value counts as set: non-nil expressions, non-empty lists
+// and strings, true, non-zero ints and data types other than DT_NONE. Other values count as set.
 func truthy(v any) bool {
 	switch x := v.(type) {
 	case nil:
@@ -391,7 +391,7 @@ func (e *Expr) invalidateHash() {
 	}
 }
 
-// Set mirrors Expression.set(arg_key, value). A nil value removes the key.
+// Set stores value under key and links its parent pointers. A nil value removes the key.
 func (e *Expr) Set(key string, value any) {
 	e.invalidateHash()
 	value = normalizeArg(value)
@@ -405,7 +405,9 @@ func (e *Expr) Set(key string, value any) {
 	e.setParent(key, value, -1)
 }
 
-// SetIndex mirrors Expression.set(arg_key, value, index, overwrite).
+// SetIndex changes element index (negative counts from the end) of the list under key: nil
+// removes it, a list is spliced in its place, and an expression replaces it (overwrite) or is
+// inserted before it. Out-of-range indexes are ignored.
 func (e *Expr) SetIndex(key string, value any, index int, overwrite bool) {
 	e.invalidateHash()
 	value = normalizeArg(value)
@@ -442,7 +444,7 @@ func (e *Expr) SetIndex(key string, value any, index int, overwrite bool) {
 	e.setParent(key, exprs, index)
 }
 
-// setRaw mirrors self.args[key] = value without parent bookkeeping.
+// setRaw stores value under key without parent bookkeeping.
 func (e *Expr) setRaw(key string, value any) {
 	if i := e.argIndex(key); i >= 0 {
 		e.args[i].val = value
@@ -451,13 +453,12 @@ func (e *Expr) setRaw(key string, value any) {
 	e.args = append(e.args, arg{key, value})
 }
 
-// SetArgRaw mirrors direct assignment to expression.args[key].
+// SetArgRaw stores value under key without updating parent pointers.
 func (e *Expr) SetArgRaw(key string, value any) {
 	e.invalidateHash()
 	e.setRaw(key, normalizeArg(value))
 }
 
-// DeleteArg mirrors expression.args.pop(key, None).
 func (e *Expr) DeleteArg(key string) any {
 	if i := e.argIndex(key); i >= 0 {
 		v := e.args[i].val
@@ -468,7 +469,7 @@ func (e *Expr) DeleteArg(key string) any {
 	return nil
 }
 
-// Append mirrors Expression.append(arg_key, value).
+// Append adds value to the end of the list under key, creating the list if needed.
 func (e *Expr) Append(key string, value *Expr) {
 	e.invalidateHash()
 	list, ok := e.Arg(key).([]*Expr)
@@ -509,7 +510,6 @@ func (e *Expr) setParent(key string, value any, index int) {
 	}
 }
 
-// SetKwargs sets several args in order.
 func (e *Expr) SetKwargs(kv ...any) *Expr {
 	for i := 0; i+1 < len(kv); i += 2 {
 		e.Set(kv[i].(string), kv[i+1])
@@ -517,7 +517,8 @@ func (e *Expr) SetKwargs(kv ...any) *Expr {
 	return e
 }
 
-// Text mirrors Expression.text(key).
+// Text returns the argument under key as text: strings as is, the text of identifiers, literals
+// and variables, the name of stars and NULL, and "" for anything else.
 func (e *Expr) Text(key string) string {
 	if e == nil {
 		return ""
@@ -539,7 +540,8 @@ func (e *Expr) Text(key string) string {
 	return ""
 }
 
-// Name mirrors the `name` property.
+// Name returns the name of e, which depends on its kind (for example a column's identifier text,
+// "*" for a star or NULL for null).
 func (e *Expr) Name() string {
 	if e == nil {
 		return ""
@@ -573,7 +575,7 @@ func (e *Expr) Name() string {
 	return e.Text("this")
 }
 
-// Alias mirrors the `alias` property.
+// Alias returns the alias name of e, or "" when it has none.
 func (e *Expr) Alias() string {
 	if e == nil {
 		return ""
@@ -584,7 +586,6 @@ func (e *Expr) Alias() string {
 	return e.Text("alias")
 }
 
-// AliasColumnNames mirrors the `alias_column_names` property.
 func (e *Expr) AliasColumnNames() []string {
 	ta := e.ArgE("alias")
 	if ta == nil {
@@ -597,7 +598,7 @@ func (e *Expr) AliasColumnNames() []string {
 	return out
 }
 
-// AliasOrName mirrors the `alias_or_name` property.
+// AliasOrName returns the alias of e, or its name when it has no alias.
 func (e *Expr) AliasOrName() string {
 	if e == nil {
 		return ""
@@ -612,7 +613,7 @@ func (e *Expr) AliasOrName() string {
 	return e.Name()
 }
 
-// OutputName mirrors the `output_name` property.
+// OutputName returns the name under which e appears in a query's output, or "" when it has none.
 func (e *Expr) OutputName() string {
 	if e == nil {
 		return ""
@@ -631,7 +632,7 @@ func (e *Expr) OutputName() string {
 		return e.This().Name()
 	case KJSONExtract:
 		if len(e.Expressions()) == 0 {
-			// self.expression.output_name (AttributeError when expression is None/False)
+			// Panics when expression is unset or not an expression (see argAttr).
 			return e.argAttr("expression", "output_name").OutputName()
 		}
 		return ""
@@ -650,12 +651,12 @@ func (e *Expr) OutputName() string {
 	return ""
 }
 
-// IsString mirrors the `is_string` property.
+// IsString reports whether e is a string literal.
 func (e *Expr) IsString() bool {
 	return e.IsA(KLiteral) && e.ArgB("is_string")
 }
 
-// IsNumber mirrors the `is_number` property.
+// IsNumber reports whether e is a numeric literal, possibly negated.
 func (e *Expr) IsNumber() bool {
 	if e.IsA(KLiteral) && !e.ArgB("is_string") {
 		return true
@@ -663,7 +664,7 @@ func (e *Expr) IsNumber() bool {
 	return e.IsA(KNeg) && e.This().IsNumber()
 }
 
-// IsInt mirrors the `is_int` property.
+// IsInt reports whether e is an integer literal, possibly negated.
 func (e *Expr) IsInt() bool {
 	if !e.IsNumber() {
 		return false
@@ -675,14 +676,15 @@ func (e *Expr) IsInt() bool {
 			n = n.This()
 		}
 		if !pyDecimalValid(n.ThisS()) {
-			// Literal.to_py: Decimal(self.this) raises InvalidOperation.
+			// The literal is not a valid decimal number. The message keeps its historical
+			// wording; tests pin it.
 			panic(&ValueError{Msg: "[<class 'decimal.ConversionSyntax'>]"})
 		}
 	}
 	return isInt
 }
 
-// IsStar mirrors the `is_star` property.
+// IsStar reports whether e is or selects a star (*).
 func (e *Expr) IsStar() bool {
 	if e == nil {
 		return false
@@ -705,7 +707,8 @@ func (e *Expr) IsStar() bool {
 	return e.IsA(KStar) || (e.IsA(KColumn) && e.This().IsA(KStar))
 }
 
-// Type mirrors the `type` property.
+// Type returns the type of e: e itself for data types, the annotated type (or target type) for
+// casts and the annotated type otherwise.
 func (e *Expr) Type() *Expr {
 	if e == nil {
 		return nil
@@ -722,16 +725,14 @@ func (e *Expr) Type() *Expr {
 	return e.typ
 }
 
-// RawType returns the annotated type (the `_type` slot).
+// RawType returns the annotated type as stored, without the data-type and cast rules of Type.
 func (e *Expr) RawType() *Expr { return e.typ }
 
 // SetType assigns the annotated type. dt must be a DataType expression or nil.
 func (e *Expr) SetType(dt *Expr) { e.typ = dt }
 
-// SetTypeD assigns a simple data type.
 func (e *Expr) SetTypeD(d DType) { e.typ = NewDataType(d) }
 
-// IsLeaf mirrors Expression.is_leaf().
 func (e *Expr) IsLeaf() bool {
 	for _, a := range e.args {
 		switch v := a.val.(type) {
@@ -784,7 +785,6 @@ func (e *Expr) MetaGet(key string) any {
 	return nil
 }
 
-// setPositions sets the line/col/start/end position metadata.
 func (e *Expr) setPositions(line, col, start, end int) {
 	e.posLine, e.posCol, e.posStart, e.posEnd = int32(line), int32(col), int32(start), int32(end)
 	e.flags |= flagPosSet
@@ -956,9 +956,11 @@ func (e *Expr) deepCopy() *Expr {
 	return c
 }
 
-const sqlglotMeta = "sqlglot.meta"
+const metaCommentPrefix = "sqlglot.meta"
 
-// AddComments mirrors Expression.add_comments.
+// AddComments attaches comments to e, after or (prepend) before the existing ones. Comments that
+// contain metaCommentPrefix followed by k=v, k2 pairs also set metadata: k to v (true/false/1/0
+// become booleans) and k2 to true. An empty list marks e as having empty, non-nil comments.
 func (e *Expr) AddComments(comments []string, prepend bool) {
 	if len(comments) == 0 {
 		if e.Comments() == nil {
@@ -969,7 +971,7 @@ func (e *Expr) AddComments(comments []string, prepend bool) {
 	e.extEnsure()
 	e.flags &^= flagEmptyComments
 	for _, c := range comments {
-		parts := strings.Split(c, sqlglotMeta)
+		parts := strings.Split(c, metaCommentPrefix)
 		if len(parts) > 1 {
 			for _, kv := range strings.Split(strings.Join(parts[1:], ""), ",") {
 				pair := strings.Split(kv, "=")
@@ -1000,7 +1002,7 @@ func toBool(v string) any {
 	return v
 }
 
-// PopComments mirrors Expression.pop_comments.
+// PopComments removes and returns the attached comments, as an empty list when there are none.
 func (e *Expr) PopComments() []string {
 	c := e.Comments()
 	e.SetComments(nil)
@@ -1010,12 +1012,10 @@ func (e *Expr) PopComments() []string {
 	return c
 }
 
-// IterExpressions yields child expressions in argument order.
 func (e *Expr) IterExpressions(reverse bool) []*Expr {
 	return e.appendChildren(nil, reverse)
 }
 
-// nodeCount returns the number of nodes in the tree rooted at e.
 func (e *Expr) nodeCount() int {
 	n := 1
 	for _, a := range e.args {
@@ -1041,7 +1041,6 @@ func (e *Expr) nodeCount() int {
 	return n
 }
 
-// appendChildren appends e's child expressions (IterExpressions order) to out.
 func (e *Expr) appendChildren(out []*Expr, reverse bool) []*Expr {
 	if !reverse {
 		for _, a := range e.args {
@@ -1085,8 +1084,9 @@ func (e *Expr) appendChildren(out []*Expr, reverse bool) []*Expr {
 	return out
 }
 
-// BFS mirrors Expression.bfs. Children are collected after the consumer has seen their parent,
-// like Python's lazy iter_expressions.
+// BFS iterates the tree breadth-first, skipping the children of nodes for which prune returns
+// true. Children are collected after the consumer has seen their parent, so changes the consumer
+// makes to a node are visible when its children are visited.
 func (e *Expr) BFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		var buf [32]*Expr
@@ -1113,7 +1113,8 @@ func (e *Expr) BFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 	}
 }
 
-// DFS mirrors Expression.dfs.
+// DFS iterates the tree depth-first in pre-order, skipping the children of nodes for which prune
+// returns true.
 func (e *Expr) DFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		var buf [32]*Expr
@@ -1132,7 +1133,7 @@ func (e *Expr) DFS(prune func(*Expr) bool) iter.Seq[*Expr] {
 	}
 }
 
-// Walk mirrors Expression.walk.
+// Walk iterates the tree with BFS or DFS.
 func (e *Expr) Walk(bfs bool, prune func(*Expr) bool) iter.Seq[*Expr] {
 	if bfs {
 		return e.BFS(prune)
@@ -1140,7 +1141,7 @@ func (e *Expr) Walk(bfs bool, prune func(*Expr) bool) iter.Seq[*Expr] {
 	return e.DFS(prune)
 }
 
-// FindAll mirrors Expression.find_all (BFS).
+// FindAll iterates, breadth-first, the nodes whose kind is or derives from one of kinds.
 func (e *Expr) FindAll(kinds ...Kind) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		for n := range e.BFS(nil) {
@@ -1153,7 +1154,6 @@ func (e *Expr) FindAll(kinds ...Kind) iter.Seq[*Expr] {
 	}
 }
 
-// FindAllDFS mirrors Expression.find_all(bfs=False).
 func (e *Expr) FindAllDFS(kinds ...Kind) iter.Seq[*Expr] {
 	return func(yield func(*Expr) bool) {
 		for n := range e.DFS(nil) {
@@ -1175,7 +1175,7 @@ func (e *Expr) FindAllList(kinds ...Kind) []*Expr {
 	return out
 }
 
-// Find mirrors Expression.find.
+// Find returns the first node FindAll yields, or nil.
 func (e *Expr) Find(kinds ...Kind) *Expr {
 	if e == nil {
 		return nil
@@ -1186,7 +1186,7 @@ func (e *Expr) Find(kinds ...Kind) *Expr {
 	return nil
 }
 
-// FindAncestor mirrors Expression.find_ancestor.
+// FindAncestor returns the nearest ancestor whose kind is or derives from one of kinds, or nil.
 func (e *Expr) FindAncestor(kinds ...Kind) *Expr {
 	a := e.parent
 	for a != nil && !a.kind.IsA(kinds...) {
@@ -1195,7 +1195,6 @@ func (e *Expr) FindAncestor(kinds ...Kind) *Expr {
 	return a
 }
 
-// findAncestorIn is FindAncestor for a precomputed kindMatcher set.
 func (e *Expr) findAncestorIn(kinds KindSet) *Expr {
 	a := e.parent
 	for a != nil && !kinds.Has(a.kind) {
@@ -1204,10 +1203,8 @@ func (e *Expr) findAncestorIn(kinds KindSet) *Expr {
 	return a
 }
 
-// ParentSelect mirrors Expression.parent_select.
 func (e *Expr) ParentSelect() *Expr { return e.FindAncestor(KSelect) }
 
-// SameParent mirrors Expression.same_parent.
 func (e *Expr) SameParent() bool { return e.parent != nil && e.parent.kind == e.kind }
 
 // Root returns the root of the tree.
@@ -1219,7 +1216,6 @@ func (e *Expr) Root() *Expr {
 	return r
 }
 
-// Depth mirrors Expression.depth.
 func (e *Expr) Depth() int {
 	d := 0
 	for p := e.parent; p != nil; p = p.parent {
@@ -1228,8 +1224,8 @@ func (e *Expr) Depth() int {
 	return d
 }
 
-// Unnest mirrors the polymorphic Expression.unnest: Subquery.unnest (first non-subquery) for
-// subqueries, otherwise strip enclosing Paren nodes.
+// Unnest returns the first non-subquery inside a subquery (see UnnestSubquery) and, for anything
+// else, e with enclosing Paren nodes stripped.
 func (e *Expr) Unnest() *Expr {
 	if e != nil && e.IsA(KSubquery) {
 		return e.UnnestSubquery()
@@ -1241,7 +1237,6 @@ func (e *Expr) Unnest() *Expr {
 	return x
 }
 
-// Unalias mirrors Expression.unalias.
 func (e *Expr) Unalias() *Expr {
 	if e.IsA(KAlias) {
 		return e.This()
@@ -1249,7 +1244,6 @@ func (e *Expr) Unalias() *Expr {
 	return e
 }
 
-// UnnestOperands mirrors Expression.unnest_operands.
 func (e *Expr) UnnestOperands() []*Expr {
 	children := e.IterExpressions(false)
 	for i, c := range children {
@@ -1258,7 +1252,8 @@ func (e *Expr) UnnestOperands() []*Expr {
 	return children
 }
 
-// Flatten mirrors Expression.flatten.
+// Flatten returns the operands of a chain of same-kind nodes (such as a AND b AND c), unnesting
+// them when unnest is set.
 func (e *Expr) Flatten(unnest bool) []*Expr {
 	var out []*Expr
 	prune := func(n *Expr) bool { return n.parent != nil && n.kind != e.kind }
@@ -1274,7 +1269,8 @@ func (e *Expr) Flatten(unnest bool) []*Expr {
 	return out
 }
 
-// Transform mirrors Expression.transform.
+// Transform applies fn to every node depth-first, replacing each node with fn's result, and
+// returns the new root. Children of replaced nodes are not visited. copy transforms a copy.
 func (e *Expr) Transform(fn func(*Expr) *Expr, copy bool) *Expr {
 	start := e
 	if copy {
@@ -1298,7 +1294,8 @@ func (e *Expr) Transform(fn func(*Expr) *Expr, copy bool) *Expr {
 	return root
 }
 
-// Replace mirrors Expression.replace.
+// Replace puts expression in e's place in its parent (nil removes e), detaches e and returns
+// expression.
 func (e *Expr) Replace(expression *Expr) *Expr {
 	parent := e.parent
 	if parent == nil || parent == expression {
@@ -1324,7 +1321,6 @@ func (e *Expr) Replace(expression *Expr) *Expr {
 	return expression
 }
 
-// ReplaceWithList mirrors Expression.replace(list) for list arguments.
 func (e *Expr) ReplaceWithList(list []*Expr) {
 	parent := e.parent
 	if parent == nil {
@@ -1347,7 +1343,6 @@ func (e *Expr) ReplaceWithList(list []*Expr) {
 	e.index = -1
 }
 
-// Pop mirrors Expression.pop.
 func (e *Expr) Pop() *Expr {
 	e.Replace(nil)
 	return e
@@ -1355,7 +1350,7 @@ func (e *Expr) Pop() *Expr {
 
 var hashSeed = maphash.MakeSeed()
 
-// Hash mirrors Expression.__hash__ (string args are compared case-insensitively).
+// Hash returns the cached structural hash of e (string args are compared case-insensitively).
 func (e *Expr) Hash() uint64 {
 	if e.hashed() {
 		return e.hash
@@ -1468,7 +1463,7 @@ func hashValue(h *maphash.Hash, v any, lower bool) {
 			h.WriteString(x)
 		}
 	case bool:
-		// Python: hash(True) == hash(1)
+		// Booleans hash like the integers 0 and 1.
 		h.WriteByte('i')
 		if x {
 			writeU64(h, 1)
@@ -1492,7 +1487,7 @@ func hashValue(h *maphash.Hash, v any, lower bool) {
 	}
 }
 
-// Equal mirrors Expression.__eq__.
+// Equal reports whether e and o have the same kind and structure (see Hash).
 func (e *Expr) Equal(o *Expr) bool {
 	if e == o {
 		return true
@@ -1503,7 +1498,8 @@ func (e *Expr) Equal(o *Expr) bool {
 	return e.kind == o.kind && e.Hash() == o.Hash()
 }
 
-// ErrorMessages mirrors Expression.error_messages.
+// ErrorMessages returns validation errors for e: missing required arguments and, for functions
+// given args, more arguments than the function accepts.
 func (e *Expr) ErrorMessages(args []*Expr) []string {
 	var errs []string
 	for _, a := range e.kind.ArgTypes() {
@@ -1512,11 +1508,11 @@ func (e *Expr) ErrorMessages(args []*Expr) []string {
 		}
 		v := e.Arg(a.name)
 		if v == nil {
-			errs = append(errs, "Required keyword: '"+a.name+"' missing for "+e.classRepr())
+			errs = append(errs, "Required keyword: '"+a.name+"' missing for "+e.Kind().Name())
 			continue
 		}
 		if l, ok := v.([]*Expr); ok && len(l) == 0 {
-			errs = append(errs, "Required keyword: '"+a.name+"' missing for "+e.classRepr())
+			errs = append(errs, "Required keyword: '"+a.name+"' missing for "+e.Kind().Name())
 		}
 	}
 	if args != nil && e.IsA(KFunc) && len(args) > len(e.kind.ArgTypes()) && !e.kind.isVarLenArgs() {
@@ -1525,13 +1521,9 @@ func (e *Expr) ErrorMessages(args []*Expr) []string {
 	return errs
 }
 
-func (e *Expr) classRepr() string {
-	return "<class 'sqlglot.expressions." + kindModule(e.kind) + "." + e.kind.Name() + "'>"
-}
-
-// metaValidateArgs is a transient metadata key set by function builders that mutate their argument
-// list in place in Python (`args.pop(0)`, `args.insert(...)`, `del args[2:]`): the parser validates
-// the built function against the caller's (mutated) list, which a Go builder cannot shrink or grow.
+// metaValidateArgs is a transient metadata key set by function builders that drop, insert or
+// truncate arguments: the parser validates the built function against that adjusted list, which
+// a Go builder cannot hand back by shrinking or growing the caller's slice.
 const metaValidateArgs = "\x00validate_args"
 
 // WithValidateArgs records the post-mutation argument list of a function builder on e and returns e.
@@ -1543,7 +1535,7 @@ func WithValidateArgs(e *Expr, args []*Expr) *Expr {
 }
 
 // callFuncBuilder invokes a FUNCTIONS builder and returns the built expression together with the
-// argument list as Python's caller would see it after the call.
+// argument list to validate it against (the builder's adjusted list, if it recorded one).
 func callFuncBuilder(b FuncBuilder, args []*Expr, d *Dialect) (*Expr, []*Expr) {
 	e := b(args, d)
 	if e == nil || e.metaMap() == nil {

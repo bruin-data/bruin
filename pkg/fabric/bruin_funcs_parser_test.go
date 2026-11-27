@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFabricGeneratedSQLParsesWithSQLGlot(t *testing.T) {
+func TestFabricGeneratedSQLParsesWithSQLParser(t *testing.T) {
 	t.Parallel()
 
-	testBruinGeneratedSQLParsesWithSQLGlot(t, jinja.PlatformFabric, "fabric")
+	testBruinGeneratedSQLParsesWithSQLParser(t, jinja.PlatformFabric, "fabric")
 }
 
-func testBruinGeneratedSQLParsesWithSQLGlot(t *testing.T, platform jinja.Platform, dialect string) {
+func testBruinGeneratedSQLParsesWithSQLParser(t *testing.T, platform jinja.Platform, dialect string) {
 	t.Helper()
 
 	parser, err := sqlparser.NewSQLParserCached()

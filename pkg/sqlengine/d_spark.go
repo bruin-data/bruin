@@ -1,7 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/parsers/spark.py (SparkParser) and sqlglot/generators/spark.py (SparkGenerator).
-
 func init() { registerCustomizer("spark", customizeSpark) }
 
 func customizeSpark(d *Dialect) {
@@ -9,14 +7,8 @@ func customizeSpark(d *Dialect) {
 	customizeSparkGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level builders (parsers/spark.py)
-// ---------------------------------------------------------------------------------------------
-
-// sparkBuildDatediff mirrors parsers.spark._build_datediff.
-//
-// Although Spark docs don't mention the "unit" argument, Spark3 added support for
-// it at some point. Databricks also supports this variant.
+// sparkBuildDatediff also accepts DATEDIFF(unit, start, end): Spark docs don't mention the unit
+// argument, but Spark 3 added it at some point and Databricks supports it too.
 func sparkBuildDatediff(args []*Expr, d *Dialect) *Expr {
 	var unit *Expr
 	this := seqGet(args, 0)
@@ -35,7 +27,6 @@ func sparkBuildDatediff(args []*Expr, d *Dialect) *Expr {
 	)
 }
 
-// sparkBuildDateadd mirrors parsers.spark._build_dateadd.
 func sparkBuildDateadd(args []*Expr, d *Dialect) *Expr {
 	expression := seqGet(args, 1)
 
@@ -47,10 +38,6 @@ func sparkBuildDateadd(args []*Expr, d *Dialect) *Expr {
 	// DATE_ADD / DATEADD / TIMESTAMPADD(unit, value integer, expr)
 	return New(KTimestampAdd, "this", seqGet(args, 2), "expression", expression, "unit", seqGet(args, 0))
 }
-
-// ---------------------------------------------------------------------------------------------
-// SparkParser
-// ---------------------------------------------------------------------------------------------
 
 func customizeSparkParser(d *Dialect) {
 	P := d.P
@@ -87,7 +74,6 @@ func customizeSparkParser(d *Dialect) {
 	F["DATEDIFF"] = sparkBuildDatediff
 	F["DATE_DIFF"] = sparkBuildDatediff
 	F["JSON_OBJECT_KEYS"] = fromArgList(KJSONKeys)
-	F["LISTAGG"] = fromArgList(KGroupConcat)
 	F["TIMESTAMP_LTZ"] = spark2BuildAsCast("TIMESTAMP_LTZ")
 	F["TIMESTAMP_NTZ"] = spark2BuildAsCast("TIMESTAMP_NTZ")
 	F["TRY_ELEMENT_AT"] = func(args []*Expr, d *Dialect) *Expr {
@@ -104,22 +90,32 @@ func customizeSparkParser(d *Dialect) {
 
 	P.PLACEHOLDER_PARSERS[TK_L_BRACE] = sparkParseQueryParameter
 
+	P.FUNCTION_PARSERS["LISTAGG"] = func(p *Parser) *Expr { return p.parseStringAgg() }
 	P.FUNCTION_PARSERS["SUBSTR"] = func(p *Parser) *Expr { return p.parseSubstring() }
 
 	P.STATEMENT_PARSERS[TK_DECLARE] = func(p *Parser) *Expr { return p.parseDeclare() }
 
+	P.h.parseFieldDef = sparkParseFieldDef
+	// BD literals keep their trailing zeros; exponent literals get a zero scale.
+	P.h.buildCast = hiveBuildCast(false, false)
 	P.h.parseGeneratedAsIdentity = sparkParseGeneratedAsIdentity
 	P.h.parsePivotAggregation = sparkParsePivotAggregation
 }
 
-// sparkParseQueryParameter mirrors SparkParser._parse_query_parameter.
+// sparkParseQueryParameter parses a {name} widget placeholder; the opening brace is already
+// consumed.
 func sparkParseQueryParameter(p *Parser) *Expr {
 	this := p.parseIdVar(true, nil)
 	p.match(TK_R_BRACE)
 	return p.expression(New(KPlaceholder, "this", this, "widget", true))
 }
 
-// sparkParseGeneratedAsIdentity mirrors SparkParser._parse_generated_as_identity.
+// sparkParseFieldDef parses a column definition whose name may be a dotted path, as in
+// ALTER TABLE ... ADD COLUMNS (a.b INT), which adds field b to the struct column a.
+func sparkParseFieldDef(p *Parser) *Expr {
+	return p.parseColumnDef(p.parseColumnOps(p.parseField(true, nil, false)), true)
+}
+
 func sparkParseGeneratedAsIdentity(p *Parser) *Expr {
 	this := p.baseParseGeneratedAsIdentity()
 	if this.Expression() != nil {
@@ -128,10 +124,8 @@ func sparkParseGeneratedAsIdentity(p *Parser) *Expr {
 	return this
 }
 
-// sparkParsePivotAggregation mirrors SparkParser._parse_pivot_aggregation.
-//
-// Spark 3+ and Databricks support non aggregate functions in PIVOT too, e.g
-// PIVOT (..., 'foo' AS bar FOR col_to_pivot IN (...)).
+// sparkParsePivotAggregation also accepts non-aggregate functions, as Spark 3+ and Databricks do,
+// e.g. PIVOT (..., 'foo' AS bar FOR col_to_pivot IN (...)).
 func sparkParsePivotAggregation(p *Parser) *Expr {
 	aggregateExpr := p.parseFunction(nil, false, true, false)
 	if aggregateExpr == nil {
@@ -140,12 +134,6 @@ func sparkParsePivotAggregation(p *Parser) *Expr {
 	return p.parseAlias(aggregateExpr, false)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers (generators/spark.py)
-// ---------------------------------------------------------------------------------------------
-
-// sparkNormalizePartition mirrors generators.spark._normalize_partition.
-// Normalize the expressions in PARTITION BY (<expression>, <expression>, ...)
 func sparkNormalizePartition(e *Expr) *Expr {
 	if e.IsA(KLiteral) {
 		return ToIdentifier(e.Name(), nil)
@@ -153,7 +141,6 @@ func sparkNormalizePartition(e *Expr) *Expr {
 	return e
 }
 
-// sparkDateaddSQL mirrors generators.spark._dateadd_sql.
 func sparkDateaddSQL(g *Generator, e *Expr) string {
 	if !e.ArgB("unit") || (e.IsA(KTsOrDsAdd) && pyUpper(e.Text("unit")) == "DAY") {
 		// Coming from Hive/Spark2 DATE_ADD or roundtripping the 2-arg version of Spark3/DB
@@ -174,7 +161,6 @@ func sparkDateaddSQL(g *Generator, e *Expr) string {
 	return this
 }
 
-// sparkGroupconcatSQL mirrors generators.spark._groupconcat_sql.
 func sparkGroupconcatSQL(g *Generator, e *Expr) string {
 	if g.d.Version[0] < 4 {
 		separator := e.ArgE("separator")
@@ -191,10 +177,6 @@ func sparkGroupconcatSQL(g *Generator, e *Expr) string {
 
 	return groupconcatSQL(g, e, "LISTAGG", ",", true, false)
 }
-
-// ---------------------------------------------------------------------------------------------
-// SparkGenerator
-// ---------------------------------------------------------------------------------------------
 
 func customizeSparkGenerator(d *Dialect) {
 	T := d.G.TRANSFORMS
@@ -237,6 +219,12 @@ func customizeSparkGenerator(d *Dialect) {
 	T[KSafeMultiply] = renameFunc("TRY_MULTIPLY")
 	T[KSafeSubtract] = renameFunc("TRY_SUBTRACT")
 	T[KStartsWith] = renameFunc("STARTSWITH")
+	T[KStabilityProperty] = func(g *Generator, e *Expr) string {
+		if e.Name() == "IMMUTABLE" {
+			return "DETERMINISTIC"
+		}
+		return "NOT DETERMINISTIC"
+	}
 	T[KTimeAdd] = dateDeltaToBinaryIntervalOp(false)
 	T[KTimeSub] = dateDeltaToBinaryIntervalOp(false)
 	T[KTsOrDsAdd] = sparkDateaddSQL
@@ -268,12 +256,11 @@ func customizeSparkGenerator(d *Dialect) {
 	h.ifblockSQL = sparkIfblockSQL
 }
 
-// sparkIgnorenullsSQL mirrors SparkGenerator.ignorenulls_sql.
+// sparkIgnorenullsSQL renders IGNORE NULLS with the base generator instead of the Hive override.
 func sparkIgnorenullsSQL(g *Generator, e *Expr) string {
 	return g.baseIgnorenullsSQL(e)
 }
 
-// sparkBracketSQL mirrors SparkGenerator.bracket_sql.
 func sparkBracketSQL(g *Generator, e *Expr) string {
 	if e.ArgB("safe") {
 		key := seqGet(g.bracketOffsetExpressions(e, 1), 0)
@@ -283,17 +270,14 @@ func sparkBracketSQL(g *Generator, e *Expr) string {
 	return spark2BracketSQL(g, e)
 }
 
-// sparkComputedcolumnconstraintSQL mirrors SparkGenerator.computedcolumnconstraint_sql.
 func sparkComputedcolumnconstraintSQL(g *Generator, e *Expr) string {
 	return "GENERATED ALWAYS AS (" + g.sqlKey(e, "this") + ")"
 }
 
-// sparkAnyvalueSQL mirrors SparkGenerator.anyvalue_sql.
 func sparkAnyvalueSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// sparkDatediffSQL mirrors SparkGenerator.datediff_sql.
 func sparkDatediffSQL(g *Generator, e *Expr) string {
 	end := g.sqlKey(e, "this")
 	start := g.sqlKey(e, "expression")
@@ -305,7 +289,6 @@ func sparkDatediffSQL(g *Generator, e *Expr) string {
 	return g.fn("DATEDIFF", end, start)
 }
 
-// sparkPlaceholderSQL mirrors SparkGenerator.placeholder_sql.
 func sparkPlaceholderSQL(g *Generator, e *Expr) string {
 	if !e.ArgB("widget") {
 		return g.basePlaceholderSQL(e)
@@ -314,7 +297,6 @@ func sparkPlaceholderSQL(g *Generator, e *Expr) string {
 	return "{" + e.Name() + "}"
 }
 
-// sparkReadparquetSQL mirrors SparkGenerator.readparquet_sql.
 func sparkReadparquetSQL(g *Generator, e *Expr) string {
 	if len(e.Expressions()) != 1 {
 		g.unsupported("READ_PARQUET with multiple arguments is not supported")
@@ -325,7 +307,8 @@ func sparkReadparquetSQL(g *Generator, e *Expr) string {
 	return "parquet.`" + parquetFile.Name() + "`"
 }
 
-// sparkIfblockSQL mirrors SparkGenerator.ifblock_sql.
+// sparkIfblockSQL turns IF OBJECT_ID(name[, 'U']) IS NOT NULL DROP ... into DROP ... IF EXISTS;
+// other IF blocks go to the base generator.
 func sparkIfblockSQL(g *Generator, e *Expr) string {
 	condition := e.This()
 	trueBlock := e.ArgE("true")

@@ -1,9 +1,5 @@
 package sqlengine
 
-// Ports of sqlglot.parser.Parser column definition and column/table constraint parsing
-// (parser.py L7300-L7713).
-
-// _parse_column_def (parser.py L7300).
 func (p *Parser) baseParseColumnDef(this *Expr, computedColumn bool) *Expr {
 	// column defs are not really columns, they're identifiers
 	if this.IsA(KColumn) {
@@ -25,7 +21,15 @@ func (p *Parser) baseParseColumnDef(this *Expr, computedColumn bool) *Expr {
 	if (kind == nil && p.match(TK_ALIAS)) || p.matchTexts("ALIAS", "MATERIALIZED") {
 		persisted := upperText(p.prev) == "MATERIALIZED"
 		ccThis := p.parseDisjunction()
-		ccPersisted := persisted || p.matchTextSeq("PERSISTED")
+		// Storage is matched before the data type so STORED is not taken as a type name
+		// (typeless columns, e.g. b AS (a * 2) STORED)
+		if !persisted {
+			if p.matchTextSeq("PERSISTED") {
+				persisted = true
+			} else if p.matchTexts("STORED", "VIRTUAL") {
+				persisted = upperText(p.prev) == "STORED"
+			}
+		}
 		var dataType *Expr
 		if p.matchTextSeq("AUTO") {
 			dataType = New(KVar, "this", "AUTO")
@@ -36,7 +40,7 @@ func (p *Parser) baseParseColumnDef(this *Expr, computedColumn bool) *Expr {
 		constraintKind := New(
 			KComputedColumnConstraint,
 			"this", ccThis,
-			"persisted", ccPersisted,
+			"persisted", persisted,
 			"data_type", dataType,
 			"not_null", notNull,
 		)
@@ -80,10 +84,9 @@ func (p *Parser) baseParseColumnDef(this *Expr, computedColumn bool) *Expr {
 	return p.expression(New(KColumnDef, "this", this, "kind", kind, "constraints", constraints, "position", position))
 }
 
-// _parse_auto_increment (parser.py L7377).
 func (p *Parser) parseAutoIncrement() *Expr {
 	var start, increment *Expr
-	var order any // None / True / False
+	var order any // nil, true or false
 
 	if p.matchNoAdvance(TK_L_PAREN) {
 		args := p.parseWrappedCSV(p.parseBitwise, TK_COMMA, false)
@@ -115,7 +118,6 @@ func (p *Parser) parseAutoIncrement() *Expr {
 	return New(KAutoIncrementColumnConstraint)
 }
 
-// _parse_check_constraint (parser.py L7410).
 func (p *Parser) baseParseCheckConstraint() *Expr {
 	if !p.matchNoAdvance(TK_L_PAREN) {
 		return nil
@@ -126,7 +128,6 @@ func (p *Parser) baseParseCheckConstraint() *Expr {
 	return p.expression(New(KCheckColumnConstraint, "this", this, "enforced", enforced))
 }
 
-// _parse_auto_property (parser.py L7421).
 func (p *Parser) parseAutoProperty() *Expr {
 	if !p.matchTextSeq("REFRESH") {
 		p.retreat(p.index - 1)
@@ -135,7 +136,6 @@ func (p *Parser) parseAutoProperty() *Expr {
 	return p.expression(New(KAutoRefreshProperty, "this", p.parseVar(false, nil, true)))
 }
 
-// _parse_compress (parser.py L7427).
 func (p *Parser) parseCompress() *Expr {
 	if p.matchNoAdvance(TK_L_PAREN) {
 		return p.expression(New(KCompressColumnConstraint,
@@ -145,7 +145,6 @@ func (p *Parser) parseCompress() *Expr {
 	return p.expression(New(KCompressColumnConstraint, "this", p.parseBitwise()))
 }
 
-// _parse_generated_as_identity (parser.py L7435).
 func (p *Parser) baseParseGeneratedAsIdentity() *Expr {
 	var this *Expr
 	if p.matchTextSeq("BY", "DEFAULT") {
@@ -170,7 +169,7 @@ func (p *Parser) baseParseGeneratedAsIdentity() *Expr {
 	identity := p.matchTextSeq("IDENTITY")
 
 	if p.match(TK_L_PAREN) {
-		if p.match(TK_START_WITH) {
+		if p.matchTextSeq("START", "WITH") {
 			this.Set("start", p.parseBitwise())
 		}
 		if p.matchTextSeq("INCREMENT", "BY") {
@@ -190,7 +189,7 @@ func (p *Parser) baseParseGeneratedAsIdentity() *Expr {
 		}
 
 		if !identity {
-			this.Set("expression", p.parseRange(nil))
+			this.Set("expression", p.parseDisjunction())
 		} else if !this.ArgB("start") && p.matchNoAdvance(TK_NUMBER) {
 			args := p.parseCSV(p.parseBitwise, TK_COMMA)
 			this.Set("start", seqGet(args, 0))
@@ -203,13 +202,11 @@ func (p *Parser) baseParseGeneratedAsIdentity() *Expr {
 	return this
 }
 
-// _parse_inline (parser.py L7488).
 func (p *Parser) parseInline() *Expr {
 	p.matchTextSeq("LENGTH")
 	return p.expression(New(KInlineLengthColumnConstraint, "this", p.parseBitwise()))
 }
 
-// _parse_not_constraint (parser.py L7492).
 func (p *Parser) parseNotConstraint() *Expr {
 	if p.matchTextSeq("NULL") {
 		return p.expression(New(KNotNullColumnConstraint))
@@ -226,10 +223,10 @@ func (p *Parser) parseNotConstraint() *Expr {
 	return nil
 }
 
-// _parse_column_constraint (parser.py L7504).
-func (p *Parser) parseColumnConstraint() *Expr {
+func (p *Parser) baseParseColumnConstraint() *Expr {
 	var this *Expr
-	if p.match(TK_CONSTRAINT) {
+	// CONSTRAINT directly followed by a reserved constraint kind has no name
+	if p.match(TK_CONSTRAINT) && !p.matchTextSetNoAdvance(p.s.RESERVED_CONSTRAINT_KINDS) {
 		this = p.parseIdVar(true, nil)
 	}
 
@@ -248,12 +245,20 @@ func (p *Parser) parseColumnConstraint() *Expr {
 		return p.expression(New(KColumnConstraint, "this", this, "kind", constraint))
 	}
 
+	// CHARSET and CHAR SET are synonyms of CHARACTER SET
+	if p.match(TK_CHARACTER_SET) || p.matchPair(TK_CHAR, TK_SET) {
+		return p.expression(New(
+			KColumnConstraint,
+			"this", this,
+			"kind", p.expression(New(KCharacterSetColumnConstraint, "this", p.parseVarOrString(false))),
+		))
+	}
+
 	return this
 }
 
-// _parse_constraint (parser.py L7523).
 func (p *Parser) baseParseConstraint() *Expr {
-	if !p.match(TK_CONSTRAINT) {
+	if !p.match(TK_CONSTRAINT) || p.matchTextSetNoAdvance(p.s.RESERVED_CONSTRAINT_KINDS) {
 		return p.parseUnnamedConstraint(p.s.SCHEMA_UNNAMED_CONSTRAINTS)
 	}
 
@@ -261,7 +266,6 @@ func (p *Parser) baseParseConstraint() *Expr {
 	return p.expression(New(KConstraint, "this", this, "expressions", p.parseUnnamedConstraints()))
 }
 
-// _parse_unnamed_constraints (parser.py L7531).
 func (p *Parser) parseUnnamedConstraints() []*Expr {
 	constraints := []*Expr{}
 	for {
@@ -278,7 +282,6 @@ func (p *Parser) parseUnnamedConstraints() []*Expr {
 	return constraints
 }
 
-// _parse_unnamed_constraint (parser.py L7541).
 func (p *Parser) parseUnnamedConstraint(constraints StrSet) *Expr {
 	index := p.index
 
@@ -299,7 +302,8 @@ func (p *Parser) parseUnnamedConstraint(constraints StrSet) *Expr {
 	parser, ok := p.s.CONSTRAINT_PARSERS[constraintKey]
 	if !ok {
 		p.raiseError("No parser found for schema constraint "+constraintKey+".", nil)
-		// Python then fails with a KeyError on the CONSTRAINT_PARSERS lookup.
+		// raiseError may only record the error; the lookup still fails, with the quoted key
+		// as the message.
 		panic(&ValueError{Msg: pyRepr(constraintKey)})
 	}
 
@@ -311,7 +315,6 @@ func (p *Parser) parseUnnamedConstraint(constraints StrSet) *Expr {
 	return result
 }
 
-// _parse_unique_key (parser.py L7559).
 func (p *Parser) baseParseUniqueKey() *Expr {
 	if p.curr.ok() && p.curr.Type != TK_IDENTIFIER {
 		if _, ok := p.s.CONSTRAINT_PARSERS[upperText(p.curr)]; ok {
@@ -321,13 +324,12 @@ func (p *Parser) baseParseUniqueKey() *Expr {
 	return p.parseIdVar(false, nil)
 }
 
-// _parse_unique (parser.py L7568).
 func (p *Parser) baseParseUnique() *Expr {
 	p.matchTexts("KEY", "INDEX")
 	nulls := p.matchTextSeq("NULLS", "NOT", "DISTINCT")
 	this := p.parseSchema(p.parseUniqueKey())
-	// self._match(TokenType.USING) and self._advance_any() and self._prev.text: False when USING is
-	// unmatched, None when no token follows it.
+	// index_type is false (not nil) when USING is absent, nil when no token follows USING, and the
+	// token's text otherwise.
 	var indexType any = false
 	if p.match(TK_USING) {
 		indexType = nil
@@ -347,10 +349,8 @@ func (p *Parser) baseParseUnique() *Expr {
 	))
 }
 
-// _parse_key_constraint_options (parser.py L7580)
-//
-// NOTE: sqlglot returns list[str]; the generated signature said []*Expr, but this method is only
-// called from this file, so it returns []string (stored as-is in the "options" arg).
+// parseKeyConstraintOptions returns the options as strings, stored as-is in the "options" arg;
+// a missing event or action reads None.
 func (p *Parser) parseKeyConstraintOptions() []string {
 	options := []string{}
 	for {
@@ -392,21 +392,20 @@ func (p *Parser) parseKeyConstraintOptions() []string {
 	return options
 }
 
-// _parse_references (parser.py L7614).
 func (p *Parser) parseReferences(match bool) *Expr {
 	if match && !p.match(TK_REFERENCES) {
 		return nil
 	}
 
-	var expressions any // None
+	var expressions any // left nil
 	this := p.parseTable(true, false, nil, false, false, false, false)
 	options := p.parseKeyConstraintOptions()
 	return p.expression(New(KReference, "this", this, "expressions", expressions, "options", options))
 }
 
-// _parse_foreign_key (parser.py L7623).
+// baseParseForeignKey stores each ON action under its lowercased event name, the last one winning.
 func (p *Parser) baseParseForeignKey() *Expr {
-	var expressions any // None unless the column list is present
+	var expressions any // nil unless the column list is present
 	if !p.matchNoAdvance(TK_REFERENCES) {
 		expressions = p.parseWrappedIdVars(false)
 	}
@@ -449,14 +448,12 @@ func (p *Parser) baseParseForeignKey() *Expr {
 	return p.expression(New(KForeignKey, kv...))
 }
 
-// _parse_primary_key_part (parser.py L7658).
 func (p *Parser) baseParsePrimaryKeyPart() *Expr {
 	return p.parseField(false, nil, false)
 }
 
-// _parse_period_for_system_time (parser.py L7661).
 func (p *Parser) parsePeriodForSystemTime() *Expr {
-	if !p.match(TK_TIMESTAMP_SNAPSHOT) {
+	if !p.matchTextSeq("FOR", "SYSTEM_TIME") {
 		p.retreat(p.index - 1)
 		return nil
 	}
@@ -466,9 +463,8 @@ func (p *Parser) parsePeriodForSystemTime() *Expr {
 		"this", seqGet(idVars, 0), "expression", seqGet(idVars, 1)))
 }
 
-// _parse_primary_key (parser.py L7673).
 func (p *Parser) baseParsePrimaryKey(wrappedOptional bool, inProps bool, namedPrimaryKey bool) *Expr {
-	var desc any // None / True / False
+	var desc any // nil, true or false
 	if p.matchAny(TK_ASC, TK_DESC) {
 		desc = p.prev.Type == TK_DESC
 	}

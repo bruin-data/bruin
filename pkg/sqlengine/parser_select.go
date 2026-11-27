@@ -1,11 +1,6 @@
 package sqlengine
 
-// Port of sqlglot/parser.py L3799-4314 (chunk B, part 2): partition, VALUES tuples, projections,
-// wrapped select, SELECT, WITH / CTE, recursive search, table alias, subquery, implicit unnests,
-// query modifiers, hints, INTO, FROM.
-
-// chunkBSelectStar mirrors exp.select("*"): a Select whose only projection is the Star parsed
-// from "*" (including the positions recorded by _parse_star_ops).
+// chunkBSelectStar returns SELECT *, whose Star has the args and positions of a parsed "*".
 func chunkBSelectStar() *Expr {
 	star := New(KStar, "ilike", nil, "except_", nil, "replace", nil, "rename", nil)
 	star.setPositions(1, 1, 0, 0)
@@ -14,11 +9,10 @@ func chunkBSelectStar() *Expr {
 	return sel
 }
 
-// chunkBSelectFrom mirrors Select.from_(expression) for an expression argument: non-From
-// expressions are wrapped in a From; the expression itself is not copied.
+// chunkBSelectFrom sets the FROM of sel to expression, wrapped in a From unless it is one; the
+// expression is not copied.
 func chunkBSelectFrom(sel *Expr, expression *Expr) *Expr {
 	if expression == nil {
-		// maybe_parse(None) raises ParseError("SQL cannot be None")
 		panic(parsePanic{&ParseError{Msg: "SQL cannot be None"}})
 	}
 	if !expression.IsA(KFrom) {
@@ -28,8 +22,6 @@ func chunkBSelectFrom(sel *Expr, expression *Expr) *Expr {
 	return sel
 }
 
-// chunkBToIdentifier mirrors exp.to_identifier(name, quoted=None, copy=copy) for nil, string
-// and expression inputs.
 func chunkBToIdentifier(name any, copy bool) *Expr {
 	switch v := name.(type) {
 	case nil:
@@ -46,13 +38,13 @@ func chunkBToIdentifier(name any, copy bool) *Expr {
 			}
 			return v
 		}
-		panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + kindClassRepr(v.Kind())})
+		panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + v.Kind().Name()})
 	}
 	panic(&ValueError{Msg: "Name needs to be a string or an Identifier"})
 }
 
-// chunkBAlias mirrors exp.alias_(expression, alias, table=table, copy=copy) for an expression input.
-// alias is nil, a string or an Identifier; table is a bool or a []*Expr of column names.
+// chunkBAlias aliases expression like AliasExpr, or sets a TableAlias like AliasTableExpr when
+// table is true or a non-empty []*Expr of column names. alias is nil, a string or an Identifier.
 func chunkBAlias(expression *Expr, alias any, table any, copy bool) *Expr {
 	e := expression
 	if copy {
@@ -79,7 +71,7 @@ func chunkBAlias(expression *Expr, alias any, table any, copy bool) *Expr {
 		return e
 	}
 
-	// We don't set the "alias" arg for Window expressions (see exp.alias_)
+	// We don't set the "alias" arg for Window expressions (see aliasImpl)
 	if e.Kind().hasArgType("alias") && e.Kind() != KWindow {
 		e.Set("alias", id)
 		return e
@@ -87,8 +79,6 @@ func chunkBAlias(expression *Expr, alias any, table any, copy bool) *Expr {
 	return New(KAlias, "this", e, "alias", id)
 }
 
-// chunkBColumn mirrors exp.column(col, table, db, catalog, fields=fields, copy=copy) for
-// expression parts.
 func chunkBColumn(col, table, db, catalog *Expr, fields []*Expr, copy bool) *Expr {
 	if !col.IsA(KStar) {
 		col = chunkBToIdentifier(col, copy)
@@ -112,14 +102,15 @@ func chunkBColumn(col, table, db, catalog *Expr, fields []*Expr, copy bool) *Exp
 	return this
 }
 
-// chunkBTableToColumn mirrors Table.to_column(copy=copy).
+// chunkBTableToColumn converts a table reference into a column reference with the same dotted
+// name, keeping its alias. A table that wraps a function or array yields that expression.
 func chunkBTableToColumn(table *Expr, copy bool) *Expr {
 	parts := table.Parts()
 	lastPart := parts[len(parts)-1]
 
 	var col *Expr
 	if lastPart.IsA(KIdentifier) {
-		// column(*reversed(parts[0:4]), fields=parts[4:], copy=copy)
+		// the first four parts, reversed, are column, table, db and catalog; the rest become fields
 		head := parts
 		if len(head) > 4 {
 			head = head[:4]
@@ -134,7 +125,6 @@ func chunkBTableToColumn(table *Expr, copy bool) *Expr {
 		}
 		col = chunkBColumn(rev[0], rev[1], rev[2], rev[3], fields, copy)
 	} else {
-		// This branch will be reached if a function or array is wrapped in a `Table`
 		col = lastPart
 	}
 
@@ -145,7 +135,8 @@ func chunkBTableToColumn(table *Expr, copy bool) *Expr {
 	return col
 }
 
-// chunkBNormalizeIdentifiers mirrors optimizer.normalize_identifiers.normalize_identifiers(expression, dialect).
+// chunkBNormalizeIdentifiers normalizes the identifiers in expression for dialect d, skipping
+// subtrees marked case_sensitive.
 func chunkBNormalizeIdentifiers(expression *Expr, d *Dialect) *Expr {
 	prune := func(n *Expr) bool { return truthy(n.MetaGet("case_sensitive")) }
 	for node := range expression.Walk(true, prune) {
@@ -158,8 +149,8 @@ func chunkBNormalizeIdentifiers(expression *Expr, d *Dialect) *Expr {
 	return expression
 }
 
-// chunkBParseOneInto mirrors exp.maybe_parse(sql, into=kind, dialect=d) for a string input.
-// Errors propagate like the Python exceptions (ParseError is catchable by _try_parse).
+// chunkBParseOneInto parses sql as kind with dialect d. A ParseError panics as a parsePanic, which
+// tryParseExpr recovers from; other errors panic as they are.
 func chunkBParseOneInto(d *Dialect, kind Kind, sql string) *Expr {
 	e, err := d.ParseOneInto(kind, sql, nil)
 	if err != nil {
@@ -171,7 +162,6 @@ func chunkBParseOneInto(d *Dialect, kind Kind, sql string) *Expr {
 	return e
 }
 
-// _parse_partition (parser.py L3799).
 func (p *Parser) baseParsePartition() *Expr {
 	if !p.matchTextSet(p.s.PARTITION_KEYWORDS) {
 		return nil
@@ -185,7 +175,9 @@ func (p *Parser) baseParsePartition() *Expr {
 	))
 }
 
-// _parse_value (parser.py L3810).
+// baseParseValue parses one VALUES row: a parenthesized tuple (with DEFAULT entries where
+// supported) or a single expression as a one-element tuple. values is not used here; dialect
+// overrides use it.
 func (p *Parser) baseParseValue(values bool) *Expr {
 	parseValueExpression := func() *Expr {
 		if p.d.S.SUPPORTS_VALUES_DEFAULT && p.match(TK_DEFAULT) {
@@ -208,37 +200,27 @@ func (p *Parser) baseParseValue(values bool) *Expr {
 	return nil
 }
 
-// _parse_projections (parser.py L3827).
+// baseParseProjections parses the SELECT list. The second result, an exclude list, is always nil
+// here; dialect overrides may set it.
 func (p *Parser) baseParseProjections() ([]*Expr, []*Expr) {
 	return p.parseExpressions(), nil
 }
 
-// _parse_wrapped_select (parser.py L3832).
+// baseParseWrappedSelect parses what follows "(": PIVOT/UNPIVOT, a FROM-first query, a table
+// (when table is set) or a SELECT, followed by set operations and query modifiers.
 func (p *Parser) baseParseWrappedSelect(table bool) *Expr {
 	var this *Expr
 	if p.matchAny(TK_PIVOT, TK_UNPIVOT) {
 		this = p.parseSimplifiedPivot(p.prev.Type == TK_UNPIVOT)
-	} else if p.match(TK_FROM) {
-		from := p.parseFrom(true, true, true)
-		// Support parentheses for duckdb FROM-first syntax
-		sel := p.parseSelect(false, false, true, true, true, from)
-		if sel != nil {
-			if !sel.ArgB("from_") {
-				sel.Set("from_", from)
-			}
-			this = sel
-		} else {
-			this = chunkBSelectFrom(chunkBSelectStar(), from)
-			this = p.parseQueryModifiers(p.parseSetOperations(this))
-		}
 	} else {
-		if table {
+		// A FROM-first query or TABLE name query is parsed as a query even when table is set
+		if table && !p.matchNoAdvance(TK_FROM) && !p.isTableQuery() {
 			this = p.parseTable(false, false, nil, false, false, false, true)
 		} else {
 			this = p.parseSelect(true, false, true, false, true, nil)
 		}
 
-		// Transform exp.Values into a exp.Table to pass through parse_query_modifiers
+		// Transform Values into a Table to pass through parseQueryModifiers
 		// in case a modifier (e.g. join) is following
 		if table && this.IsA(KValues) && this.Alias() != "" {
 			alias := this.ArgE("alias").Pop()
@@ -251,7 +233,8 @@ func (p *Parser) baseParseWrappedSelect(table bool) *Expr {
 	return this
 }
 
-// _parse_select (parser.py L3865).
+// parseSelect parses a query (see parseSelectQuery) and any pipe syntax (|>) after it. from is
+// the FROM already parsed for a FROM-first query, or nil.
 func (p *Parser) parseSelect(nested bool, table bool, parseSubqueryAlias bool, parseSetOperation bool, consumePipe bool, from *Expr) *Expr {
 	p.enter()
 	defer p.leave()
@@ -264,7 +247,6 @@ func (p *Parser) parseSelect(nested bool, table bool, parseSubqueryAlias bool, p
 		if query.IsA(KQuery) {
 			query = p.parsePipeSyntaxQuery(query)
 			if query != nil && table {
-				// query.subquery(copy=False)
 				query = New(KSubquery, "this", query, "alias", nil)
 			}
 		}
@@ -273,7 +255,9 @@ func (p *Parser) parseSelect(nested bool, table bool, parseSubqueryAlias bool, p
 	return query
 }
 
-// _parse_select_query (parser.py L3890).
+// parseSelectQuery parses a query: WITH followed by a statement, SELECT, TABLE name (when table
+// is not set), a parenthesized query (when nested or table is set), VALUES, FROM-first, SUMMARIZE
+// or DESCRIBE, followed by set operations when parseSetOperation is set.
 func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bool, parseSetOperation bool) *Expr {
 	cte := p.parseWith(false)
 
@@ -311,8 +295,32 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 
 	// duckdb supports leading with FROM x
 	var from *Expr
+	var laterals []*Expr
 	if p.matchNoAdvance(TK_FROM) {
 		from = p.parseFrom(true, false, true)
+		for {
+			lateral := p.parseLateral()
+			if lateral == nil {
+				break
+			}
+			laterals = append(laterals, lateral)
+		}
+	}
+
+	// Hive supports multi-table inserts: FROM x INSERT ... SELECT ... [INSERT ... SELECT ...]
+	if from != nil && !nested && !table && p.matchNoAdvance(TK_INSERT) {
+		source := from.This()
+		source.Set("laterals", chunkCOptList(laterals))
+
+		var inserts []*Expr
+		for p.match(TK_INSERT) {
+			comments := p.prevComments
+			insert := p.parseInsert()
+			insert.AddComments(comments, true)
+			inserts = append(inserts, insert)
+		}
+
+		return p.expressionC(New(KMultitableInserts, "expressions", inserts, "source", source), from.Comments())
 	}
 
 	var this *Expr
@@ -385,6 +393,7 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 			"limit", limit,
 			"exclude", excludeArg,
 			"operation_modifiers", operationModifiersArg,
+			"laterals", chunkCOptList(laterals),
 		))
 		this.SetComments(comments)
 
@@ -402,6 +411,22 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 		}
 
 		this = p.parseQueryModifiers(this)
+	} else if !table && p.isTableQuery() {
+		// TABLE name is shorthand for SELECT * FROM name
+		p.advance(1)
+		comments := p.prevComments
+		only := p.match(TK_ONLY)
+		relation := p.parseWrapped(func() *Expr { return p.parseTableParts(false, false, false, false) }, true)
+		if only && relation != nil {
+			relation.Set("only", true)
+		}
+		p.match(TK_STAR)
+		this = p.expressionC(New(
+			KSelect,
+			"expressions", []*Expr{New(KStar)},
+			"from_", New(KFrom, "this", relation),
+		), comments)
+		this = p.parseQueryModifiers(this)
 	} else if (table || nested) && p.match(TK_L_PAREN) {
 		comments := p.prevComments
 		this = p.parseWrappedSelect(table)
@@ -411,13 +436,14 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 		}
 
 		// We return early here so that the UNION isn't attached to the subquery by the
-		// following call to _parse_set_operations, but instead becomes the parent node
+		// following call to parseSetOperations, but instead becomes the parent node
 		p.matchRParen(nil)
 		return p.parseSubquery(this, parseSubqueryAlias)
 	} else if p.matchNoAdvance(TK_VALUES) {
-		this = p.parseDerivedTableValues()
+		this = p.parseDerivedTableValues(false)
 	} else if from != nil {
 		this = chunkBSelectFrom(chunkBSelectStar(), from.This())
+		this.Set("laterals", chunkCOptList(laterals))
 		this = p.parseQueryModifiers(this)
 	} else if p.match(TK_SUMMARIZE) {
 		summarizeTable := p.match(TK_TABLE)
@@ -441,7 +467,12 @@ func (p *Parser) parseSelectQuery(nested bool, table bool, parseSubqueryAlias bo
 	return this
 }
 
-// _parse_recursive_with_search (parser.py L4032).
+func (p *Parser) isTableQuery() bool {
+	return p.s.SUPPORTS_TABLE_QUERY &&
+		p.curr.Type == TK_TABLE &&
+		(p.s.ID_VAR_TOKENS.Has(p.next.Type) || p.next.Type == TK_ONLY)
+}
+
 func (p *Parser) parseRecursiveWithSearch() *Expr {
 	p.matchTextSeq("SEARCH")
 
@@ -458,17 +489,22 @@ func (p *Parser) parseRecursiveWithSearch() *Expr {
 
 	this := p.parseIdVar(true, nil)
 	expression := chunkBAndE(p.matchTextSeq("SET"), func() *Expr { return p.parseIdVar(true, nil) })
+	to := chunkBAndE(p.matchTextSeq("TO"), p.parseBitwise)
+	def := chunkBAndE(p.match(TK_DEFAULT), p.parseBitwise)
 	using := chunkBAndE(p.matchTextSeq("USING"), func() *Expr { return p.parseIdVar(true, nil) })
 	return p.expression(New(
 		KRecursiveWithSearch,
 		"kind", kind,
 		"this", this,
 		"expression", expression,
+		"to", to,
+		"default", def,
 		"using", using,
 	))
 }
 
-// _parse_with (parser.py L4051).
+// parseWith parses WITH [RECURSIVE] cte, ... with an optional SEARCH and / or CYCLE clause.
+// skipWithToken means WITH was already consumed.
 func (p *Parser) parseWith(skipWithToken bool) *Expr {
 	if !skipWithToken && !p.match(TK_WITH) {
 		return nil
@@ -479,10 +515,16 @@ func (p *Parser) parseWith(skipWithToken bool) *Expr {
 
 	var lastComments []string
 	expressions := []*Expr{}
+	var udfs []*Expr
 	for {
 		cte := p.parseCte()
-		if cte.IsA(KCTE) {
-			expressions = append(expressions, cte)
+		if cte != nil {
+			// Inline function specifications are kept apart from the CTEs
+			if cte.IsA(KFunctionSpecification) {
+				udfs = append(udfs, cte)
+			} else {
+				expressions = append(expressions, cte)
+			}
 			if len(lastComments) > 0 {
 				cte.AddComments(lastComments, false)
 			}
@@ -492,6 +534,8 @@ func (p *Parser) parseWith(skipWithToken bool) *Expr {
 			break
 		} else {
 			p.match(TK_WITH)
+			// A later WITH, e.g. the query's own after inline functions, may be RECURSIVE
+			recursive = p.match(TK_RECURSIVE) || recursive
 		}
 
 		lastComments = p.prevComments
@@ -501,16 +545,30 @@ func (p *Parser) parseWith(skipWithToken bool) *Expr {
 	if recursive {
 		recursiveArg = true
 	}
+	var udfsArg any
+	if len(udfs) > 0 {
+		udfsArg = udfs
+	}
 	search := p.parseRecursiveWithSearch()
+
+	var cycle *Expr
+	if search != nil && search.ArgS("kind") != "CYCLE" && p.matchTextSeqNoAdvance("CYCLE") {
+		cycle = p.parseRecursiveWithSearch()
+	}
+
 	return p.expressionC(New(
 		KWith,
 		"expressions", expressions,
 		"recursive", recursiveArg,
 		"search", search,
+		"cycle", cycle,
+		"udfs", udfsArg,
 	), comments)
 }
 
-// _parse_cte (parser.py L4083).
+// baseParseCte parses name [(columns)] [USING KEY (...)] AS [[NOT] MATERIALIZED] (statement); a
+// VALUES body becomes SELECT * FROM VALUES. When AS is required but missing it rewinds and
+// returns nil.
 func (p *Parser) baseParseCte() *Expr {
 	index := p.index
 
@@ -555,20 +613,41 @@ func (p *Parser) baseParseCte() *Expr {
 	return cte
 }
 
-// _values_to_select (parser.py L4123).
+// valuesToSelect wraps VALUES in SELECT * FROM, aliasing it _values when it has no alias. Query
+// modifiers parsed onto the VALUES (e.g. ORDER BY, LIMIT) move to the SELECT.
 func (p *Parser) valuesToSelect(values *Expr) *Expr {
-	if values.Alias() != "" {
-		return chunkBSelectFrom(chunkBSelectStar(), values)
+	var modifierKeys []string
+	var modifiers []any
+	for _, key := range QUERY_MODIFIERS {
+		if v := values.Arg(key); truthy(v) {
+			modifierKeys = append(modifierKeys, key)
+			modifiers = append(modifiers, v)
+			values.Set(key, nil)
+		}
 	}
-	return chunkBSelectFrom(chunkBSelectStar(), chunkBAlias(values, "_values", true, true))
+
+	source := values
+	if values.Alias() == "" {
+		source = chunkBAlias(values, "_values", true, true)
+	}
+	sel := chunkBSelectFrom(chunkBSelectStar(), source)
+	for i, key := range modifierKeys {
+		sel.Set(key, modifiers[i])
+	}
+	return sel
 }
 
-// _parse_table_alias (parser.py L4128).
-func (p *Parser) parseTableAlias(aliasTokens *TokenSet) *Expr {
+// baseParseTableAlias parses [AS] alias [(columns)]; aliasTokens defaults to TABLE_ALIAS_TOKENS.
+func (p *Parser) baseParseTableAlias(aliasTokens *TokenSet) *Expr {
 	// In some dialects, LIMIT and OFFSET can act as both identifiers and keywords (clauses)
 	// so this section tries to parse the clause version and if it fails, it treats the token
 	// as an identifier (alias)
 	if p.canParseLimitOrOffset() {
+		return nil
+	}
+
+	// START followed by WITH is not an implicit alias: it begins a START WITH ... CONNECT BY clause
+	if upperText(p.curr) == "START" && upperText(p.next) == "WITH" {
 		return nil
 	}
 
@@ -609,7 +688,6 @@ func (p *Parser) parseTableAlias(aliasTokens *TokenSet) *Expr {
 	return tableAlias
 }
 
-// _parse_subquery (parser.py L4161).
 func (p *Parser) parseSubquery(this *Expr, parseAlias bool) *Expr {
 	if this == nil {
 		return nil
@@ -633,7 +711,8 @@ func (p *Parser) parseSubquery(this *Expr, parseAlias bool) *Expr {
 	))
 }
 
-// _implicit_unnests_to_explicit (parser.py L4176).
+// implicitUnnestsToExplicit rewrites joins on a column path of an earlier table, as in
+// FROM t, t.arr, into explicit UNNESTs.
 func (p *Parser) implicitUnnestsToExplicit(this *Expr) *Expr {
 	refs := map[string]bool{
 		chunkBNormalizeIdentifiers(this.ArgE("from_").This().Copy(), p.d).AliasOrName(): true,
@@ -650,7 +729,7 @@ func (p *Parser) implicitUnnestsToExplicit(this *Expr) *Expr {
 				tableAsColumn := chunkBTableToColumn(table, true)
 				unnest := New(KUnnest, "expressions", []*Expr{tableAsColumn})
 
-				// Table.to_column creates a parent Alias node that we want to convert to
+				// chunkBTableToColumn creates a parent Alias node that we want to convert to
 				// a TableAlias and attach to the Unnest, so it matches the parser's output
 				if alias := table.ArgE("alias"); alias.IsA(KTableAlias) {
 					tableAsColumn.Replace(tableAsColumn.This())
@@ -667,7 +746,9 @@ func (p *Parser) implicitUnnestsToExplicit(this *Expr) *Expr {
 	return this
 }
 
-// _parse_query_modifiers (parser.py L4209).
+// parseQueryModifiers parses the joins, laterals and QUERY_MODIFIER_PARSERS clauses (WHERE,
+// GROUP BY, LIMIT, ...) that follow this, moving a LIMIT's offset into a separate Offset. It then
+// makes implicit unnests explicit where the dialect has them.
 func (p *Parser) parseQueryModifiers(this *Expr) *Expr {
 	if this.IsA(p.s.MODIFIABLES...) {
 		for join := range p.parseJoins(nil) {
@@ -684,6 +765,12 @@ func (p *Parser) parseQueryModifiers(this *Expr) *Expr {
 		for {
 			if parser, ok := p.s.QUERY_MODIFIER_PARSERS[p.curr.Type]; ok {
 				modifierToken := p.curr
+
+				// A LIMIT or FETCH after TOP is left for an enclosing set operation, so
+				// SELECT 1 UNION ALL SELECT TOP 2 2 LIMIT 1 limits the union.
+				if (modifierToken.Type == TK_LIMIT || modifierToken.Type == TK_FETCH) && isTopLimit(this.ArgE("limit")) {
+					break
+				}
 				key, expression := parser(p)
 
 				if truthy(expression) {
@@ -709,6 +796,18 @@ func (p *Parser) parseQueryModifiers(this *Expr) *Expr {
 					continue
 				}
 			}
+
+			if upperText(p.curr) == "START" {
+				modifierToken := p.curr
+				if connect := p.parseConnect(false); connect != nil {
+					if this.ArgB("connect") {
+						p.raiseError("Found multiple 'START WITH' clauses", modifierToken)
+					}
+
+					this.Set("connect", connect)
+					continue
+				}
+			}
 			break
 		}
 	}
@@ -720,14 +819,19 @@ func (p *Parser) parseQueryModifiers(this *Expr) *Expr {
 	return this
 }
 
-// _parse_hint_fallback_to_string (parser.py L4249).
+func isTopLimit(limit *Expr) bool {
+	return limit != nil && limit.MetaGet("top") == true
+}
+
+// parseHintFallbackToString consumes the remaining tokens and keeps their SQL text as a single
+// hint.
 func (p *Parser) parseHintFallbackToString() *Expr {
 	start := p.curr
 	for p.curr.ok() {
 		p.advance(1)
 	}
 
-	// self._tokens[self._index - 1] (Python negative indexing)
+	// the last consumed token; an index of -1 wraps around to the last token
 	i := p.index - 1
 	if i < 0 {
 		i += len(p.tokens)
@@ -736,12 +840,12 @@ func (p *Parser) parseHintFallbackToString() *Expr {
 	return New(KHint, "expressions", []string{p.findSQL(start, end)})
 }
 
-// _parse_hint_function_call (parser.py L4257).
 func (p *Parser) baseParseHintFunctionCall() *Expr {
 	return p.parseFunctionCall(nil, false, true, false)
 }
 
-// _parse_hint_body (parser.py L4260).
+// parseHintBody parses a list of hints, falling back to the raw text when parsing fails or tokens
+// remain.
 func (p *Parser) parseHintBody() *Expr {
 	startIndex := p.index
 	shouldFallbackToString := false
@@ -780,7 +884,7 @@ func (p *Parser) parseHintBody() *Expr {
 	return p.expression(New(KHint, "expressions", hints))
 }
 
-// _parse_hint (parser.py L4282).
+// parseHint parses a /*+ ... */ hint, whose text is the comment of the HINT token.
 func (p *Parser) parseHint() *Expr {
 	if p.match(TK_HINT) && len(p.prevComments) > 0 {
 		return chunkBParseOneInto(p.d, KHint, p.prevComments[0])
@@ -789,7 +893,6 @@ func (p *Parser) parseHint() *Expr {
 	return nil
 }
 
-// _parse_into (parser.py L4288).
 func (p *Parser) baseParseInto() *Expr {
 	if !p.match(TK_INTO) {
 		return nil
@@ -803,7 +906,8 @@ func (p *Parser) baseParseInto() *Expr {
 	return p.expression(New(KInto, "this", this, "temporary", temp, "unlogged", unlogged))
 }
 
-// _parse_from (parser.py L4300).
+// parseFrom parses FROM table, with the joins when joins is set. skipFromToken means FROM was
+// already consumed.
 func (p *Parser) parseFrom(joins bool, skipFromToken bool, consumePipe bool) *Expr {
 	if !skipFromToken && !p.match(TK_FROM) {
 		return nil

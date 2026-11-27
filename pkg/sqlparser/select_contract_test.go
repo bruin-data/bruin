@@ -12,11 +12,8 @@ func TestExtractSelectContract(t *testing.T) {
 	for _, dialect := range contractDialects {
 		t.Run("dialect/"+dialect, func(t *testing.T) {
 			want := base
-			if dialect == "fabric" {
+			if dialect == "fabric" || dialect == "tsql" {
 				want = "WITH a AS (SELECT AccountDimId AS AccountDimId FROM dbo.DimAccount) SELECT AccountDimId FROM a"
-			}
-			if dialect == "tsql" {
-				want = "WITH a AS (SELECT AccountDimId AS accountdimid FROM dbo.DimAccount) SELECT AccountDimId FROM a"
 			}
 			for _, tc := range []struct{ name, query string }{
 				{"plain select", base},

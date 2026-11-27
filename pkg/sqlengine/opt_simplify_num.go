@@ -1,9 +1,9 @@
 package sqlengine
 
-// Python numeric semantics needed by the port of sqlglot/optimizer/simplify.py:
-// `Literal.to_py()` returns a Python int or a decimal.Decimal, and simplify does arithmetic and
-// comparisons on those values (Decimal uses the default context: prec=28, ROUND_HALF_EVEN,
-// Emin=-999999, Emax=999999, InvalidOperation/DivisionByZero/Overflow trapped).
+// Numeric values for constant folding in simplify. A number literal evaluates to an exact integer
+// or to a decimal, and simplify does arithmetic and comparisons on those values. Decimal
+// arithmetic uses 28 significant digits, round-half-even and exponents in [-999999, 999999];
+// invalid operations, division by zero and overflow panic.
 
 import (
 	"math/big"
@@ -11,8 +11,9 @@ import (
 	"unicode"
 )
 
-// smpPyError mirrors a Python exception that simplify does not catch (TypeError, OverflowError,
-// decimal.InvalidOperation, AttributeError...). It is raised with panic, like the Python raise.
+// smpPyError is an evaluation error that simplify does not recover from (type mismatch, overflow,
+// invalid decimal operation, ...). It is raised with panic; Type and Msg keep their historical
+// wording (e.g. "TypeError").
 type smpPyError struct{ Type, Msg string }
 
 func (e *smpPyError) Error() string { return e.Type + ": " + e.Msg }
@@ -27,7 +28,8 @@ const (
 	smpDecEtop  = smpDecEmax - smpDecPrec + 1
 )
 
-// smpDecimal mirrors a decimal.Decimal value: (-1)**neg * coef * 10**exp, or a special value.
+// smpDecimal is an arbitrary-precision decimal (-1)**neg * coef * 10**exp, or a special value
+// (infinity or NaN).
 type smpDecimal struct {
 	neg     bool
 	coef    *big.Int // >= 0 (nil for specials)
@@ -36,7 +38,6 @@ type smpDecimal struct {
 	payload string
 }
 
-// smpNum mirrors a Python number produced by Literal.to_py: an int or a Decimal.
 type smpNum struct {
 	isInt bool
 	i     *big.Int
@@ -72,7 +73,8 @@ func smpDigitValue(r rune) int {
 	return -1
 }
 
-// smpParsePyInt mirrors Python's int(str) (base 10).
+// smpParsePyInt parses a base-10 integer, allowing surrounding whitespace, a sign, single
+// underscores between digits and any Unicode decimal digits.
 func smpParsePyInt(s string) (*big.Int, bool) {
 	s = pyStrip(s)
 	if s == "" {
@@ -116,8 +118,8 @@ func smpParsePyInt(s string) (*big.Int, bool) {
 	return i, true
 }
 
-// smpParseDecimal mirrors decimal.Decimal(str): underscores are dropped, Unicode digits and
-// whitespace are converted, surrounding whitespace is stripped.
+// smpParseDecimal parses a decimal number, Infinity or [s]NaN[payload]: underscores are dropped,
+// Unicode digits and whitespace are converted, surrounding whitespace is stripped.
 func smpParseDecimal(s string) (smpDecimal, bool) {
 	var b strings.Builder
 	for _, r := range s {
@@ -225,7 +227,8 @@ func smpDecFromInt(i *big.Int) smpDecimal {
 	return smpDecimal{neg: i.Sign() < 0, coef: new(big.Int).Abs(i)}
 }
 
-// String mirrors Decimal.__str__ (to-scientific-string).
+// String formats d with the to-scientific-string rules of the General Decimal Arithmetic
+// specification.
 func (d smpDecimal) String() string {
 	sign := ""
 	if d.neg {
@@ -270,7 +273,8 @@ func (d smpDecimal) String() string {
 	return sign + intpart + fracpart + exp
 }
 
-// smpDecFix mirrors Decimal._fix under the default context.
+// smpDecFix rounds coef * 10**exp to the working precision and clamps the exponent to the
+// allowed range, panicking on overflow.
 func smpDecFix(neg bool, coef *big.Int, exp int64) smpDecimal {
 	if coef.Sign() == 0 {
 		newExp := exp
@@ -318,7 +322,8 @@ func smpDecFix(neg bool, coef *big.Int, exp int64) smpDecimal {
 	return smpDecimal{neg: neg, coef: new(big.Int).Set(coef), exp: exp}
 }
 
-// smpRoundHalfEven mirrors Decimal._round_half_even on the digit string.
+// smpRoundHalfEven decides how rounding digits to prec digits (half to even) changes the kept
+// part: 1 to round up, 0 when the dropped digits are all zero, -1 to truncate.
 func smpRoundHalfEven(digits string, prec int) int {
 	rest := digits[prec:]
 	exactHalf := len(rest) > 0 && rest[0] == '5' && strings.Trim(rest[1:], "0") == ""
@@ -378,8 +383,8 @@ func smpDecAdd(a, b smpDecimal) smpDecimal {
 		return smpDecFix(a.neg, new(big.Int).Mul(a.coef, smpPow10(a.exp-e)), e)
 	}
 
-	// _normalize: give both operands the same exponent (a negligible operand is replaced by a
-	// tiny one, which yields the same rounded result).
+	// Give both operands the same exponent (a negligible operand is replaced by a tiny one, which
+	// yields the same rounded result).
 	type workRep struct {
 		neg bool
 		i   *big.Int
@@ -500,7 +505,7 @@ func smpDecDiv(a, b smpDecimal) smpDecimal {
 	return smpDecFix(neg, coeff, exp)
 }
 
-// smpDecCmp compares two decimals (ordering comparisons with NaN raise InvalidOperation).
+// smpDecCmp compares two decimals; comparing with NaN panics with an invalid-operation error.
 func smpDecCmp(a, b smpDecimal) int {
 	if a.isNaN() || b.isNaN() {
 		smpDecInvalid()
@@ -548,7 +553,6 @@ func (n smpNum) toDec() smpDecimal {
 	return n.d
 }
 
-// String mirrors str(number).
 func (n smpNum) String() string {
 	if n.isInt {
 		return n.i.String()
@@ -577,12 +581,12 @@ func smpNumMul(a, b smpNum) smpNum {
 	return smpNum{d: smpDecMul(a.toDec(), b.toDec())}
 }
 
-// smpNumDiv mirrors a / b where at least one operand is a Decimal.
 func smpNumDiv(a, b smpNum) smpNum {
 	return smpNum{d: smpDecDiv(a.toDec(), b.toDec())}
 }
 
-// smpNumEq mirrors a == b.
+// smpNumEq reports whether a and b are numerically equal. NaN equals nothing, and a signaling
+// NaN panics.
 func smpNumEq(a, b smpNum) bool {
 	if a.isInt && b.isInt {
 		return a.i.Cmp(b.i) == 0
@@ -597,7 +601,6 @@ func smpNumEq(a, b smpNum) bool {
 	return smpDecCmp(da, db) == 0
 }
 
-// smpNumCmp mirrors the ordering comparisons of a and b.
 func smpNumCmp(a, b smpNum) int {
 	if a.isInt && b.isInt {
 		return a.i.Cmp(b.i)
@@ -605,7 +608,7 @@ func smpNumCmp(a, b smpNum) int {
 	return smpDecCmp(a.toDec(), b.toDec())
 }
 
-// smpNumToInt mirrors int(number) (Decimal values are truncated toward zero).
+// smpNumToInt converts n to an integer, truncating decimals toward zero; NaN and infinity panic.
 func smpNumToInt(n smpNum) *big.Int {
 	if n.isInt {
 		return n.i
@@ -629,11 +632,11 @@ func smpNumToInt(n smpNum) *big.Int {
 	return r
 }
 
-// smpLiteralNumber mirrors exp.Literal.number(value) for a Python number.
 func smpLiteralNumber(n smpNum) *Expr { return LiteralNumber(n.String()) }
 
-// smpToPy mirrors Expr.to_py: Literal -> int | Decimal | str, Neg -> number * -1, Null -> None,
-// Boolean -> bool; anything else raises ValueError.
+// smpToPy evaluates a constant expression: a number literal to an smpNum, a string literal to its
+// string, a negated number to its negation, NULL to nil and a boolean to its bool. Anything else
+// panics with a ValueError.
 func smpToPy(e *Expr) any {
 	switch {
 	case e.IsA(KLiteral):
@@ -662,10 +665,10 @@ func smpToPy(e *Expr) any {
 	case e.IsA(KBoolean):
 		return e.Arg("this")
 	}
-	panic(&ValueError{Msg: "expression cannot be converted to a Python object."})
+	panic(&ValueError{Msg: "expression is not a constant."})
 }
 
-// smpToPyNum returns e.to_py() for a number expression (e.is_number must hold).
+// smpToPyNum evaluates a number expression (e.IsNumber() must hold) to an smpNum.
 func smpToPyNum(e *Expr) smpNum {
 	v, ok := smpToPy(e).(smpNum)
 	if !ok {
@@ -674,7 +677,8 @@ func smpToPyNum(e *Expr) smpNum {
 	return v
 }
 
-// smpPyInt mirrors int(value) for the values Expr.to_py can return.
+// smpPyInt converts a value returned by smpToPy to an integer: numbers are truncated, strings
+// parsed and booleans become 0 or 1; nil and other values panic.
 func smpPyInt(v any) *big.Int {
 	switch x := v.(type) {
 	case smpNum:
@@ -697,7 +701,8 @@ func smpPyInt(v any) *big.Int {
 	return nil
 }
 
-// smpPyEq mirrors Python's a == b for the values compared by simplify.
+// smpPyEq reports whether two evaluated constants are equal: numbers numerically, strings and
+// datetimes by value, other values by Go equality. Values of different types are unequal.
 func smpPyEq(a, b any) bool {
 	switch x := a.(type) {
 	case smpNum:
@@ -717,7 +722,8 @@ func smpPyEq(a, b any) bool {
 	return a == b
 }
 
-// smpPyCmp mirrors Python's ordering comparisons (raises TypeError for unorderable operands).
+// smpPyCmp orders two evaluated constants of the same type (numbers, strings or datetimes); other
+// operands panic with a "TypeError" smpPyError.
 func smpPyCmp(a, b any, op string) int {
 	switch x := a.(type) {
 	case smpNum:

@@ -1,7 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/parsers/spark2.py (Spark2Parser) and sqlglot/generators/spark2.py (Spark2Generator).
-
 import "sync"
 
 func init() { registerCustomizer("spark2", customizeSpark2) }
@@ -11,13 +9,8 @@ func customizeSpark2(d *Dialect) {
 	customizeSpark2Generator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level builders (parsers/spark2.py)
-// ---------------------------------------------------------------------------------------------
-
 var spark2DataTypeCache sync.Map // string -> *Expr
 
-// spark2DataTypeFromStr mirrors exp.DataType.from_str(to_type) (default dialect), returning a fresh copy.
 func spark2DataTypeFromStr(toType string) *Expr {
 	if v, ok := spark2DataTypeCache.Load(toType); ok {
 		return v.(*Expr).Copy()
@@ -27,16 +20,11 @@ func spark2DataTypeFromStr(toType string) *Expr {
 	return dt
 }
 
-// spark2BuildAsCast mirrors parsers.spark2.build_as_cast.
 func spark2BuildAsCast(toType string) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		return New(KCast, "this", seqGet(args, 0), "to", spark2DataTypeFromStr(toType))
 	}
 }
-
-// ---------------------------------------------------------------------------------------------
-// Spark2Parser
-// ---------------------------------------------------------------------------------------------
 
 func customizeSpark2Parser(d *Dialect) {
 	P := d.P
@@ -116,7 +104,9 @@ func customizeSpark2Parser(d *Dialect) {
 	}
 
 	FP := P.FUNCTION_PARSERS
+	FP["AND"] = func(p *Parser) *Expr { return p.parseConnectorFunction(KAnd) }
 	FP["APPROX_PERCENTILE"] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KApproxQuantile, 0) }
+	FP["OR"] = func(p *Parser) *Expr { return p.parseConnectorFunction(KOr) }
 	for _, hint := range []string{
 		"BROADCAST", "BROADCASTJOIN", "MAPJOIN", "MERGE", "SHUFFLEMERGE", "MERGEJOIN",
 		"SHUFFLE_HASH", "SHUFFLE_REPLICATE_NL",
@@ -126,17 +116,39 @@ func customizeSpark2Parser(d *Dialect) {
 
 	P.h.parseDropColumn = spark2ParseDropColumn
 	P.h.pivotColumnNames = spark2PivotColumnNames
+	P.h.parseProperty = spark2ParseProperty
+	// BD literals keep their trailing zeros and the negative scale of exponent literals.
+	P.h.buildCast = hiveBuildCast(false, true)
 }
 
-// spark2ParseDropColumn mirrors Spark2Parser._parse_drop_column.
-func spark2ParseDropColumn(p *Parser) *Expr {
-	if p.matchTextSeq("DROP", "COLUMNS") {
-		return p.expression(New(KDrop, "this", p.parseSchema(nil), "kind", "COLUMNS"))
+// spark2ParseProperty parses the data source OPTIONS (key value, ...) of CREATE TABLE ... USING,
+// whose keys may be strings and whose = is optional, and other properties as usual.
+func spark2ParseProperty(p *Parser) any {
+	if p.matchTextSeqNoAdvance("OPTIONS", "(") {
+		p.advance(1)
+		return p.expression(New(KOptionsProperty, "expressions", p.parseWrappedCSV(func() *Expr {
+			return p.parseKeyValuePropertyOpt(nil, true)
+		}, TK_COMMA, false)))
 	}
-	return nil
+
+	return p.baseParseProperty()
 }
 
-// spark2PivotColumnNames mirrors Spark2Parser._pivot_column_names.
+func spark2ParseDropColumn(p *Parser) *Expr {
+	if !p.matchTextSeq("DROP", "COLUMNS") {
+		return p.baseParseDropColumn()
+	}
+
+	exists := p.parseExists(false)
+	columns := p.parseWrappedCSV(p.parseFieldDef, TK_COMMA, true)
+	return p.expression(New(
+		KDrop,
+		"this", New(KSchema, "expressions", columns),
+		"kind", "COLUMNS",
+		"exists", exists,
+	))
+}
+
 func spark2PivotColumnNames(p *Parser, aggregations []*Expr) []string {
 	if len(aggregations) == 1 {
 		return []string{}
@@ -144,11 +156,6 @@ func spark2PivotColumnNames(p *Parser, aggregations []*Expr) []string {
 	return pivotColumnNames(aggregations, MustDialect("spark"))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers (generators/spark2.py)
-// ---------------------------------------------------------------------------------------------
-
-// spark2JSONFormatSQL mirrors generators.spark2._json_format_sql.
 func spark2JSONFormatSQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -170,7 +177,6 @@ func spark2JSONFormatSQL(g *Generator, e *Expr) string {
 	return g.fn("TO_JSON", this, e.Arg("options"))
 }
 
-// spark2MapSQL mirrors generators.spark2._map_sql.
 func spark2MapSQL(g *Generator, e *Expr) string {
 	keys := e.Arg("keys")
 	values := e.Arg("values")
@@ -182,7 +188,6 @@ func spark2MapSQL(g *Generator, e *Expr) string {
 	return g.fn("MAP_FROM_ARRAYS", keys, values)
 }
 
-// spark2StrToDate mirrors generators.spark2._str_to_date.
 func spark2StrToDate(g *Generator, e *Expr) string {
 	timeFormat := g.formatTime(e, nil, nil)
 	if timeFormat == HIVE_DATE_FORMAT {
@@ -191,7 +196,6 @@ func spark2StrToDate(g *Generator, e *Expr) string {
 	return g.fn("TO_DATE", e.Arg("this"), hiveNilIfEmpty(timeFormat))
 }
 
-// spark2UnixToTimeSQL mirrors generators.spark2._unix_to_time_sql.
 func spark2UnixToTimeSQL(g *Generator, e *Expr) string {
 	scale := e.ArgE("scale")
 	timestamp := e.This()
@@ -213,10 +217,8 @@ func spark2UnixToTimeSQL(g *Generator, e *Expr) string {
 	return g.fn("TIMESTAMP_SECONDS", unixSeconds)
 }
 
-// spark2UnaliasPivot mirrors generators.spark2._unalias_pivot.
-//
-// Spark doesn't allow PIVOT aliases, so we need to remove them and possibly wrap a
-// pivoted source in a subquery with the same alias to preserve the query's semantics.
+// spark2UnaliasPivot removes PIVOT aliases, which Spark doesn't allow, wrapping the pivoted
+// source in a subquery with the same alias to preserve the query's semantics.
 func spark2UnaliasPivot(expression *Expr) *Expr {
 	if expression.IsA(KFrom) && len(expression.This().ArgL("pivots")) > 0 {
 		pivot := expression.This().ArgL("pivots")[0]
@@ -233,33 +235,13 @@ func spark2UnaliasPivot(expression *Expr) *Expr {
 	return expression
 }
 
-// spark2UnqualifyPivotColumns mirrors generators.spark2._unqualify_pivot_columns.
-//
-// Spark doesn't allow the column referenced in the PIVOT's field to be qualified,
-// so we need to unqualify it.
-func spark2UnqualifyPivotColumns(expression *Expr) *Expr {
-	if expression.IsA(KPivot) {
-		fields := []*Expr{}
-		for _, field := range expression.ArgL("fields") {
-			fields = append(fields, transformUnqualifyColumns(field))
-		}
-		expression.Set("fields", fields)
-	}
-
-	return expression
-}
-
-// spark2TemporaryStorageProvider mirrors generators.spark2.temporary_storage_provider.
-// spark2, spark, Databricks require a storage provider for temporary tables.
+// spark2TemporaryStorageProvider adds a parquet file format to the properties of a temporary
+// table: spark2, spark and Databricks require a storage provider for temporary tables.
 func spark2TemporaryStorageProvider(expression *Expr) *Expr {
 	provider := New(KFileFormatProperty, "this", LiteralString("parquet"))
 	expression.ArgE("properties").Append("expressions", provider)
 	return expression
 }
-
-// ---------------------------------------------------------------------------------------------
-// Spark2Generator
-// ---------------------------------------------------------------------------------------------
 
 func customizeSpark2Generator(d *Dialect) {
 	T := d.G.TRANSFORMS
@@ -291,7 +273,16 @@ func customizeSpark2Generator(d *Dialect) {
 		return "((" + g.fn("DAYOFWEEK", e.Arg("this")) + " % 7) + 1)"
 	}
 	T[KDayOfYear] = renameFunc("DAYOFYEAR")
-	T[KFormat] = renameFunc("FORMAT_STRING")
+	T[KFormat] = func(g *Generator, e *Expr) string {
+		if e.ArgB("is_fmt") {
+			return g.formatSQL(e)
+		}
+		args := []any{e.This()}
+		for _, x := range e.Expressions() {
+			args = append(args, x)
+		}
+		return g.fn("FORMAT_STRING", args...)
+	}
 	T[KFrom] = transformPreprocess([]func(*Expr) *Expr{spark2UnaliasPivot}, nil)
 	T[KFromTimeZone] = func(g *Generator, e *Expr) string {
 		return g.fn("TO_UTC_TIMESTAMP", e.Arg("this"), e.Arg("zone"))
@@ -300,11 +291,11 @@ func customizeSpark2Generator(d *Dialect) {
 	T[KLogicalAnd] = renameFunc("BOOL_AND")
 	T[KLogicalOr] = renameFunc("BOOL_OR")
 	T[KMap] = spark2MapSQL
-	T[KPivot] = transformPreprocess([]func(*Expr) *Expr{spark2UnqualifyPivotColumns}, nil)
+	T[KPivot] = transformPreprocess([]func(*Expr) *Expr{transformUnqualifyPivotFields}, nil)
 	T[KReduce] = renameFunc("AGGREGATE")
 	T[KRegexpReplace] = func(g *Generator, e *Expr) string {
 		if !e.HasArgKey("replacement") {
-			// e.args["replacement"] raises KeyError
+			// A missing replacement argument fails with the key name as the message.
 			panic(&ValueError{Msg: "'replacement'"})
 		}
 		return g.fn("REGEXP_REPLACE", e.Arg("this"), e.Arg("expression"), e.Arg("replacement"), e.Arg("position"))
@@ -338,6 +329,9 @@ func customizeSpark2Generator(d *Dialect) {
 	delete(T, KRight)
 
 	d.G.methods[KFileFormatProperty] = spark2FileformatpropertySQL
+	d.G.methods[KOptionsProperty] = func(g *Generator, e *Expr) string {
+		return "OPTIONS (" + g.expressions(e, exprsOpts{flat: true}) + ")"
+	}
 
 	h := &d.G.h
 	h.structSQL = spark2StructSQL
@@ -347,14 +341,20 @@ func customizeSpark2Generator(d *Dialect) {
 	h.bracketSQL = spark2BracketSQL
 }
 
-// spark2StructSQL mirrors Spark2Generator.struct_sql.
+// spark2StructSQL renders Struct with the base generator instead of the Hive override.
 func spark2StructSQL(g *Generator, e *Expr) string {
 	return g.baseStructSQL(e)
 }
 
-// spark2CastSQL mirrors Spark2Generator.cast_sql.
 func spark2CastSQL(g *Generator, e *Expr, safePrefix string) string {
 	arg := e.This()
+	if to := e.ArgE("to"); arg.IsA(KLiteral) && arg.IsNumber() && to.IsTypeOf(DT_DECIMAL) {
+		if params := to.Expressions(); len(params) == 2 && params[1].This().IsA(KNeg) {
+			// Spark 2 supports negative scales in literals, but not in DECIMAL type syntax.
+			return g.sql(arg) + "BD"
+		}
+	}
+
 	isJSONExtract := arg.IsA(KJSONExtract, KJSONExtractScalar) && !arg.ArgB("variant_extract")
 
 	// We can't use a non-nested type (eg. STRING) as a schema
@@ -374,7 +374,6 @@ func spark2CastSQL(g *Generator, e *Expr, safePrefix string) string {
 	return g.baseCastSQL(e, safePrefix)
 }
 
-// spark2FileformatpropertySQL mirrors Spark2Generator.fileformatproperty_sql.
 func spark2FileformatpropertySQL(g *Generator, e *Expr) string {
 	if e.ArgB("hive_format") {
 		return hiveFileformatpropertySQL(g, e)
@@ -383,8 +382,11 @@ func spark2FileformatpropertySQL(g *Generator, e *Expr) string {
 	return "USING " + pyUpper(e.Name())
 }
 
-// spark2AltercolumnSQL mirrors Spark2Generator.altercolumn_sql.
 func spark2AltercolumnSQL(g *Generator, e *Expr) string {
+	if e.ArgB("exists") {
+		g.unsupported("ALTER COLUMN IF EXISTS is not supported by this dialect")
+	}
+
 	this := g.sqlKey(e, "this")
 	newName := g.sqlKey(e, "rename_to")
 	if newName == "" {
@@ -400,12 +402,13 @@ func spark2AltercolumnSQL(g *Generator, e *Expr) string {
 	return "RENAME COLUMN " + this + " TO " + newName
 }
 
-// spark2RenamecolumnSQL mirrors Spark2Generator.renamecolumn_sql.
+// spark2RenamecolumnSQL renders RenameColumn with the base generator instead of the Hive override.
 func spark2RenamecolumnSQL(g *Generator, e *Expr) string {
 	return g.baseRenamecolumnSQL(e)
 }
 
-// spark2BracketSQL mirrors Spark2Generator.bracket_sql.
+// spark2BracketSQL renders subscripts with safe explicitly false as ELEMENT_AT and everything else
+// with the base generator.
 func spark2BracketSQL(g *Generator, e *Expr) string {
 	if v, ok := e.Arg("safe").(bool); ok && !v {
 		return bracketToElementAtSQL(g, e)

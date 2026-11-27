@@ -7,13 +7,10 @@ import (
 	"unicode/utf8"
 )
 
-// Port of sqlglot/optimizer/annotate_types.py.
-//
-// Python values typed `exp.DataType | exp.DType | None` are represented as `any` holding a
-// *Expr (DataType), a DType or nil. Use annT to turn a possibly-nil *Expr into such a value
-// (a typed nil *Expr must never be stored in an `any`).
+// Type values are passed as `any` holding a DataType *Expr, a DType or nil. Use annT to turn a
+// possibly-nil *Expr into such a value (a typed nil *Expr must never be stored in an `any`).
 
-// BIGINT_EXTRACT_DATE_PARTS: EXTRACT/DATE_PART specifiers that return BIGINT instead of INT.
+// BIGINT_EXTRACT_DATE_PARTS are the EXTRACT/DATE_PART specifiers that return BIGINT instead of INT.
 var BIGINT_EXTRACT_DATE_PARTS = newStrSet(
 	"EPOCH_SECOND",
 	"EPOCH_MILLISECOND",
@@ -22,25 +19,21 @@ var BIGINT_EXTRACT_DATE_PARTS = newStrSet(
 	"NANOSECOND",
 )
 
-// AnnotateOptions mirrors the keyword arguments of annotate_types.
 type AnnotateOptions struct {
-	// Schema is used as-is when set (ensure_schema returns Schema instances unchanged, so
-	// Dialect is then ignored for the schema, exactly like Python).
+	// Schema is used as is when set; Dialect is then ignored for the schema.
 	Schema *MappingSchema
-	// SchemaMap is a raw nested mapping schema (Python dict), wrapped in a MappingSchema.
+	// SchemaMap is a raw nested mapping schema, wrapped in a MappingSchema.
 	SchemaMap *SchemaMap
 	// Dialect is used when constructing the MappingSchema.
 	Dialect *Dialect
-	// ExpressionMetadata maps expression classes to annotators (default: the dialect's).
+	// ExpressionMetadata maps expression kinds to annotators (default: the dialect's).
 	ExpressionMetadata ExprMetadataType
 	// CoercesTo maps a type to the set of types it can be coerced into (default: the dialect's).
 	CoercesTo map[DType]DTypeSet
-	// OverwriteTypes re-annotates already annotated nodes. nil means True (Python's default).
+	// OverwriteTypes re-annotates already annotated nodes. nil means true.
 	OverwriteTypes *bool
 }
 
-// AnnotateTypes mirrors annotate_types(expression, schema, expression_metadata, coerces_to,
-// dialect, overwrite_types): infers the types of an expression, annotating its AST accordingly.
 func AnnotateTypes(expression *Expr, o AnnotateOptions) *Expr {
 	schema := annEnsureSchema(o.Schema, o.SchemaMap, o.Dialect)
 	overwriteTypes := o.OverwriteTypes == nil || *o.OverwriteTypes
@@ -53,12 +46,10 @@ func AnnotateTypes(expression *Expr, o AnnotateOptions) *Expr {
 	return a.annotate(expression, true)
 }
 
-// annotateTypes mirrors annotate_types(expression, dialect=d) (used by generator/dialect code).
 func annotateTypes(e *Expr, d *Dialect) *Expr {
 	return AnnotateTypes(e, AnnotateOptions{Dialect: d})
 }
 
-// annEnsureSchema mirrors sqlglot.schema.ensure_schema(schema, dialect=dialect).
 func annEnsureSchema(schema *MappingSchema, mapping *SchemaMap, dialect *Dialect) *MappingSchema {
 	if schema != nil {
 		return schema
@@ -92,7 +83,8 @@ func annCoerceDate(l *Expr, unit *Expr) any {
 	return DT_UNKNOWN
 }
 
-// annBinaryCoercion mirrors BinaryCoercionFunc: (left, right) -> DataType | DType | None.
+// annBinaryCoercion returns the result type of a binary operation from its operands: a DataType
+// *Expr, a DType or nil.
 type annBinaryCoercion func(l, r *Expr) any
 
 func swapArgs(fn annBinaryCoercion) annBinaryCoercion {
@@ -138,22 +130,17 @@ func annCopyCoercesTo(m map[DType]DTypeSet) map[DType]DTypeSet {
 	return out
 }
 
-// Coercion tables. sqlglot builds these at import time and BigQuery mutates the base table in
-// place when its dialect module is imported:
+// Coercion tables. BigQuery extends a copy of the base table:
 //
-//	COERCES_TO = {**TypeAnnotator.COERCES_TO, BIGDECIMAL: {DOUBLE}}   # shallow copy
-//	COERCES_TO[DECIMAL] |= {BIGDECIMAL}                               # mutates the shared sets
-//	COERCES_TO[BIGINT] |= {BIGDECIMAL}
-//	COERCES_TO[VARCHAR] |= {DATE, DATETIME, TIME, TIMESTAMP, TIMESTAMPTZ}
+//	BIGDECIMAL coerces to DOUBLE
+//	DECIMAL and BIGINT also coerce to BIGDECIMAL
+//	VARCHAR also coerces to DATE, DATETIME, TIME, TIMESTAMP and TIMESTAMPTZ
 //
-// so in Python, TypeAnnotator.COERCES_TO (used by every dialect without its own table) depends on
-// whether BigQuery has been loaded in the process. The port does not reproduce that leak: BigQuery
-// uses its own extended table and every other dialect the pristine base table, so results never
-// depend on which dialects were used before. Hive and Databricks deep-copy the base table when
-// they are imported; they get the pristine one too (as if loaded before BigQuery).
+// Hive and Databricks extend copies of their own, and every other dialect uses the unmodified
+// base table, so results never depend on which dialects were used before.
 var (
 	annCoercesOnce            sync.Once
-	annBaseCoercesTo          map[DType]DTypeSet // _COERCES_TO before BigQuery is imported
+	annBaseCoercesTo          map[DType]DTypeSet // shared by dialects without a table of their own
 	annBigQueryCoercesTo      map[DType]DTypeSet
 	annHiveCoercesTo          map[DType]DTypeSet
 	annDatabricksCoercesTo    map[DType]DTypeSet
@@ -164,7 +151,6 @@ func annInitCoercions() {
 	annCoercesOnce.Do(func() {
 		annBaseCoercesTo = annBuildCoercesTo()
 
-		// sqlglot/dialects/bigquery.py
 		mutated := annCopyCoercesTo(annBaseCoercesTo)
 		mutated[DT_DECIMAL] = mutated[DT_DECIMAL].With(DT_BIGDECIMAL)
 		mutated[DT_BIGINT] = mutated[DT_BIGINT].With(DT_BIGDECIMAL)
@@ -172,13 +158,12 @@ func annInitCoercions() {
 		annBigQueryCoercesTo = annCopyCoercesTo(mutated)
 		annBigQueryCoercesTo[DT_BIGDECIMAL] = newDTypeSet(DT_DOUBLE)
 
-		// sqlglot/dialects/hive.py: support only the non-ANSI mode (default for Hive, Spark2, Spark)
+		// Hive: support only the non-ANSI mode (default for Hive, Spark2, Spark)
 		annHiveCoercesTo = annCopyCoercesTo(annBaseCoercesTo)
 		for _, targetType := range DataType_NUMERIC_TYPES.Union(DataType_TEMPORAL_TYPES).With(DT_INTERVAL).Items() {
 			annHiveCoercesTo[targetType] = annHiveCoercesTo[targetType].Union(DataType_TEXT_TYPES)
 		}
 
-		// sqlglot/dialects/databricks.py
 		annDatabricksCoercesTo = annCopyCoercesTo(annBaseCoercesTo)
 		for _, textType := range DataType_TEXT_TYPES.Items() {
 			annDatabricksCoercesTo[textType] = annDatabricksCoercesTo[textType].
@@ -191,14 +176,13 @@ func annInitCoercions() {
 	})
 }
 
-// typeAnnotatorCoercesTo mirrors TypeAnnotator.COERCES_TO, without BigQuery's leak (see the
-// comment on the tables above).
 func typeAnnotatorCoercesTo() map[DType]DTypeSet {
 	annInitCoercions()
 	return annBaseCoercesTo
 }
 
-// coercesToFor mirrors the dialect class attribute COERCES_TO (nil for the empty base dict).
+// coercesToFor returns the coercion table of d or of its nearest parent dialect with one, or nil
+// when the dialect uses the base table.
 func coercesToFor(d *Dialect) map[DType]DTypeSet {
 	annInitCoercions()
 	for _, name := range append([]string{d.Name}, d.parents...) {
@@ -214,7 +198,8 @@ func coercesToFor(d *Dialect) map[DType]DTypeSet {
 	return nil
 }
 
-// annBuildBinaryCoercions mirrors TypeAnnotator.BINARY_COERCIONS.
+// annBuildBinaryCoercions builds the default binary coercions (text with interval, text with
+// numeric, date with interval), in both operand orders.
 func annBuildBinaryCoercions() map[[2]DType]annBinaryCoercion {
 	out := map[[2]DType]annBinaryCoercion{}
 
@@ -231,9 +216,8 @@ func annBuildBinaryCoercions() map[[2]DType]annBinaryCoercion {
 		for _, numeric := range DataType_NUMERIC_TYPES.Items() {
 			// text + numeric will yield the numeric type to match most dialects' semantics
 			textNumeric[[2]DType{text, numeric}] = func(l, r *Expr) any {
-				// Python: `l.type if l.type in exp.DataType.NUMERIC_TYPES else r.type`. l.type is a
-				// DataType and NUMERIC_TYPES holds DType members, so the membership test is always
-				// False and the right operand's type is returned.
+				// r is always the numeric operand (swapAll swaps the arguments for numeric + text),
+				// so this yields the numeric type.
 				return annT(r.Type())
 			}
 		}
@@ -251,7 +235,6 @@ func annBuildBinaryCoercions() map[[2]DType]annBinaryCoercion {
 	return out
 }
 
-// TypeAnnotator mirrors sqlglot.optimizer.annotate_types.TypeAnnotator.
 type TypeAnnotator struct {
 	schema             *MappingSchema
 	dialect            *Dialect
@@ -259,7 +242,6 @@ type TypeAnnotator struct {
 	coercesTo          map[DType]DTypeSet
 	binaryCoercions    map[[2]DType]annBinaryCoercion
 
-	// Caches the annotated sub-expressions, to ensure we only visit them once
 	visited map[*Expr]struct{}
 
 	// Caches NULL-annotated expressions to set them to UNKNOWN after type inference is completed
@@ -268,16 +250,22 @@ type TypeAnnotator struct {
 	// Databricks and Spark ≥v3 actually support NULL (i.e., VOID) as a type
 	supportsNullType bool
 
-	// Maps an exp.SetOperation (e.g. UNION) to its projection types. This is computed if the
-	// exp.SetOperation is the expression of a scope source, as selecting from it multiple times
-	// would reprocess the entire subtree to coerce the types of its operands' projections
-	setopColumnTypes map[*Expr]*omap[any]
+	// Maps a SetOperation (e.g. UNION) to its ordered output columns and their types. An operand's
+	// entry is consumed by its parent set operation; source queries keep theirs for later column
+	// lookups.
+	setopColumnTypes map[*Expr][]annNamedType
 
-	// When set to False, this enables partial annotation by skipping already-annotated nodes
+	// When false, this enables partial annotation by skipping already-annotated nodes
 	overwriteTypes bool
 
-	// Maps (Scope, source_name) to its column projections and types
+	// Maps (scope, source name) to its column projections and types
 	scopeSourceSelects map[annScopeSourceKey]*omap[any]
+}
+
+// annNamedType is an output column of a set operation: its name and type (a DType or a DataType).
+type annNamedType struct {
+	name string
+	typ  any
 }
 
 type annScopeSourceKey struct {
@@ -285,9 +273,8 @@ type annScopeSourceKey struct {
 	name  string
 }
 
-// newTypeAnnotator mirrors TypeAnnotator(schema, expression_metadata, coerces_to,
-// binary_coercions, overwrite_types). Empty/nil optional arguments fall back to the dialect's
-// tables, like Python's `x or default`.
+// newTypeAnnotator returns a TypeAnnotator for schema. Empty or nil optional arguments fall back
+// to the dialect's tables.
 func newTypeAnnotator(schema *MappingSchema, expressionMetadata ExprMetadataType, coercesTo map[DType]DTypeSet,
 	binaryCoercions map[[2]DType]annBinaryCoercion, overwriteTypes bool,
 ) *TypeAnnotator {
@@ -308,7 +295,7 @@ func newTypeAnnotator(schema *MappingSchema, expressionMetadata ExprMetadataType
 		visited:            map[*Expr]struct{}{},
 		nullExpressions:    newAnnExprSet(),
 		supportsNullType:   dialect.S.SUPPORTS_NULL_TYPE,
-		setopColumnTypes:   map[*Expr]*omap[any]{},
+		setopColumnTypes:   map[*Expr][]annNamedType{},
 		overwriteTypes:     overwriteTypes,
 		scopeSourceSelects: map[annScopeSourceKey]*omap[any]{},
 	}
@@ -327,23 +314,21 @@ func newTypeAnnotator(schema *MappingSchema, expressionMetadata ExprMetadataType
 	return a
 }
 
-// Schema returns the annotator's schema.
 func (a *TypeAnnotator) Schema() *MappingSchema { return a.schema }
 
-// Dialect returns the annotator's dialect.
 func (a *TypeAnnotator) Dialect() *Dialect { return a.dialect }
 
-// Clear mirrors TypeAnnotator.clear() (exported for the Simplifier's annotator interface).
+// Clear resets the annotation caches (exported for the Simplifier's annotator interface).
 func (a *TypeAnnotator) Clear() { a.clear() }
 
-// Annotate mirrors TypeAnnotator.annotate(expression, annotate_scope) (exported for the
-// Simplifier's annotator interface).
+// Annotate annotates expression like annotate (exported for the Simplifier's annotator
+// interface).
 func (a *TypeAnnotator) Annotate(expression *Expr, annotateScope bool) *Expr {
 	return a.annotate(expression, annotateScope)
 }
 
 func init() {
-	// Simplifier: TypeAnnotator(schema=ensure_schema(None, dialect=self.dialect), overwrite_types=False)
+	// The Simplifier's annotator uses an empty schema for its dialect and keeps existing types.
 	smpNewTypeAnnotator = func(d *Dialect) smpTypeAnnotator {
 		return newTypeAnnotator(annEnsureSchema(nil, nil, d), nil, nil, nil, false)
 	}
@@ -352,7 +337,7 @@ func init() {
 func (a *TypeAnnotator) clear() {
 	a.visited = map[*Expr]struct{}{}
 	a.nullExpressions = newAnnExprSet()
-	a.setopColumnTypes = map[*Expr]*omap[any]{}
+	a.setopColumnTypes = map[*Expr][]annNamedType{}
 	a.scopeSourceSelects = map[annScopeSourceKey]*omap[any]{}
 }
 
@@ -374,7 +359,8 @@ func (a *TypeAnnotator) uncache(expression *Expr, deep bool) {
 	}
 }
 
-// setType mirrors TypeAnnotator._set_type. targetType is nil, a DType or a DataType *Expr.
+// setType sets the type of expression and marks it visited. targetType is nil, a DType or a
+// DataType *Expr.
 func (a *TypeAnnotator) setType(expression *Expr, targetType any) *Expr {
 	prevType := expression.Type()
 
@@ -408,7 +394,6 @@ func (a *TypeAnnotator) setType(expression *Expr, targetType any) *Expr {
 	return expression
 }
 
-// annotate mirrors TypeAnnotator.annotate(expression, annotate_scope).
 func (a *TypeAnnotator) annotate(expression *Expr, annotateScope bool) *Expr {
 	// This flag is used to avoid costly scope traversals when we only care about annotating
 	// non-column expressions (partial type inference), e.g., when simplifying in the optimizer
@@ -430,8 +415,6 @@ func (a *TypeAnnotator) annotate(expression *Expr, annotateScope bool) *Expr {
 	return expression
 }
 
-// annSourceExpression mirrors `source.expression` for a scope source (Scope.expression, or the
-// `expression` property of a non-Table source expression).
 func annSourceExpression(src Source) *Expr {
 	if src.Scope != nil {
 		return src.Scope.Expression
@@ -447,97 +430,51 @@ func (a *TypeAnnotator) getScopeSourceSelects(scope *Scope, sourceName string) *
 		selects = newOMap[any]()
 		source, hasSource := scope.Sources.Get(sourceName)
 
-		if hasSource && source.Scope != nil {
-			expression := source.Scope.Expression
-
-			if expression.IsA(KUDTF) {
-				var values []*Expr
-
-				if expression.IsA(KLateral) {
-					if expression.This().IsA(KExplode) {
-						values = []*Expr{expression.This().This()}
-					}
-				} else if expression.IsA(KUnnest) {
-					values = []*Expr{expression}
-				} else if !expression.IsA(KTableFromRows) {
-					values = seqGet(expression.Expressions(), 0).Expressions()
-				}
-
-				if len(values) == 0 {
-					return newOMap[any]()
-				}
-
-				aliasColumnNames := expression.AliasColumnNames()
-
-				var expType *Expr
-				if expression.IsA(KUnnest) {
-					expType = expression.Type()
-				} else if expression.IsA(KLateral) && expression.This().IsA(KExplode) {
-					expType = expression.This().Type()
-				}
-
-				var structType *Expr
-				if expType != nil && expType.IsTypeOf(DT_STRUCT) {
-					structType = expType
-				}
-
-				if structType != nil {
-					for _, colDef := range structType.Expressions() {
-						if colDef.IsA(KColumnDef) && colDef.ArgE("kind") != nil {
-							selects.Set(colDef.Name(), colDef.ArgE("kind"))
-						}
-					}
-				} else {
-					for i := 0; i < len(aliasColumnNames) && i < len(values); i++ {
-						selects.Set(aliasColumnNames[i], annT(values[i].Type()))
-					}
-				}
-			} else if expression.IsA(KSetOperation) &&
-				len(expression.This().Selects()) == len(expression.Expression().Selects()) {
-				selects = a.getSetopColumnTypes(expression)
-			} else if expression.IsA(KSelectable) {
-				for _, s := range expression.Selects() {
-					if s.Type() != nil {
-						selects.Set(s.AliasOrName(), s.Type())
-					}
-				}
+		// A (UN)PIVOT chain is named by the alias of its last operator
+		var pivots []*Expr
+		for _, pivot := range scope.Pivots() {
+			if parent := pivot.Parent(); parent != nil && seqGet(parent.ArgL("pivots"), -1) == pivot && pivot.AliasOrName() == sourceName {
+				pivots = parent.ArgL("pivots")
+				break
 			}
-		} else {
-			var pivots []*Expr
-			if hasSource && source.Table.IsA(KTable) {
-				pivots = source.Table.ArgL("pivots")
+		}
+
+		if len(pivots) > 0 {
+			parent := pivots[len(pivots)-1].Parent()
+			var parentSource Source
+			if parent != nil {
+				parentSource, _ = scope.Sources.Get(parent.AliasOrName())
+			}
+
+			if parentSource.Scope == nil && parent.IsA(KTable) && parent.DbName() == "" {
+				// A chain aliased like the CTE it reads from shadows it in the sources, so the
+				// CTE's scope is looked up directly
+				parentSource, _ = scope.CTESources.Get(parent.Name())
+			}
+
+			var srcTypes *omap[any]
+			if parentSource.Scope != nil {
+				srcTypes = a.getSourceScopeSelects(parentSource.Scope)
+			} else if parent.IsA(KTable) {
+				srcTypes = a.schema.Find(parent, false, true)
+				if srcTypes.Len() == 0 {
+					srcTypes = newOMap[any]()
+				}
 			} else {
-				pivots = scope.Pivots()
+				srcTypes = newOMap[any]()
 			}
+
 			for _, pivot := range pivots {
-				if pivot.AliasOrName() == sourceName {
-					parent := pivot.Parent()
-					var parentSource Source
-					hasParentSource := false
-					if parent != nil {
-						parentSource, hasParentSource = scope.Sources.Get(parent.AliasOrName())
-					}
-
-					var srcTypes *omap[any]
-					if parent != nil && hasParentSource && parentSource.Scope != nil {
-						srcTypes = a.getScopeSourceSelects(scope, parent.AliasOrName())
-					} else if parent.IsA(KTable) {
-						srcTypes = a.schema.Find(parent, false, true)
-						if srcTypes.Len() == 0 {
-							srcTypes = newOMap[any]()
-						}
-					} else {
-						srcTypes = newOMap[any]()
-					}
-
-					if pivot.ArgB("unpivot") {
-						selects = a.getUnpivotColumnTypes(pivot, srcTypes)
-					} else {
-						selects = a.getPivotColumnTypes(pivot, srcTypes)
-					}
-					break
+				if pivot.ArgB("unpivot") {
+					srcTypes = a.getUnpivotColumnTypes(pivot, srcTypes)
+				} else {
+					srcTypes = a.getPivotColumnTypes(pivot, srcTypes)
 				}
 			}
+
+			selects = srcTypes
+		} else if hasSource && source.Scope != nil {
+			selects = a.getSourceScopeSelects(source.Scope)
 		}
 
 		a.scopeSourceSelects[key] = selects
@@ -546,58 +483,141 @@ func (a *TypeAnnotator) getScopeSourceSelects(scope *Scope, sourceName string) *
 	return selects
 }
 
-// annotateScope mirrors TypeAnnotator.annotate_scope.
-func (a *TypeAnnotator) annotateScope(scope *Scope) {
-	// isinstance(self.schema, MappingSchema) always holds in the Go port.
-	for _, tableColumn := range scope.TableColumns() {
-		source, _ := scope.Sources.Get(tableColumn.Name())
+func (a *TypeAnnotator) getSourceScopeSelects(source *Scope) *omap[any] {
+	selects := newOMap[any]()
+	expression := source.Expression
 
-		if source.Table.IsA(KTable) {
-			schema := a.schema.Find(source.Table, false, true)
-			if schema == nil {
-				continue
+	if source.IsCTE() {
+		// A recursive reference can point to an unfinished UNION: its nearest resolved anchor
+		// prefix is used until the recursive branches have been annotated.
+		for expression.IsA(KSetOperation) {
+			if _, ok := a.setopColumnTypes[expression]; ok {
+				break
 			}
-
-			columnDefs := make([]*Expr, 0, schema.Len())
-			for _, c := range schema.Keys() {
-				v, _ := schema.Get(c)
-				kind, _ := v.(*Expr)
-				columnDefs = append(columnDefs, New(KColumnDef, "this", ToIdentifier(c, nil), "kind", kind))
-			}
-			structType := New(KDataType, "this", DT_STRUCT, "expressions", columnDefs, "nested", true)
-			a.setType(tableColumn, structType)
-		} else if source.Scope != nil && source.Scope.Expression.IsA(KQuery) &&
-			annQueryTypeOrUnknown(source.Scope.Expression).IsTypeOf(DT_STRUCT) {
-			queryType, _ := source.Scope.Expression.MetaGet("query_type").(*Expr)
-			a.setType(tableColumn, annT(queryType))
+			expression = unnestMethod(expression.This())
 		}
 	}
 
-	// Iterate through all the expressions of the current scope in post-order, and annotate
+	switch {
+	case expression.IsA(KUDTF):
+		var values []*Expr
+
+		if expression.IsA(KLateral) {
+			if expression.This().IsA(KExplode) {
+				values = []*Expr{expression.This().This()}
+			}
+		} else if expression.IsA(KUnnest) {
+			values = []*Expr{expression}
+		} else if !expression.IsA(KTableFromRows) {
+			values = seqGet(expression.Expressions(), 0).Expressions()
+		}
+
+		if len(values) == 0 {
+			return selects
+		}
+
+		aliasColumnNames := expression.AliasColumnNames()
+
+		var expType *Expr
+		if expression.IsA(KUnnest) {
+			expType = expression.Type()
+		} else if expression.IsA(KLateral) && expression.This().IsA(KExplode) {
+			expType = expression.This().Type()
+		}
+
+		if expType != nil && expType.IsTypeOf(DT_STRUCT) {
+			for _, colDef := range expType.Expressions() {
+				if colDef.IsA(KColumnDef) && colDef.ArgE("kind") != nil {
+					selects.Set(colDef.Name(), colDef.ArgE("kind"))
+				}
+			}
+		} else if expression.IsA(KValues) {
+			// Like a set operation's, each VALUES column's type is coerced across all rows
+			columnTypes := make([]any, len(values))
+			for i := range columnTypes {
+				columnTypes[i] = DT_NULL
+			}
+			for _, row := range expression.Expressions() {
+				for i, value := range row.Expressions() {
+					if i >= len(columnTypes) {
+						break
+					}
+					var valueType any = DT_UNKNOWN
+					if value.Type() != nil {
+						valueType = value.Type()
+					}
+					columnTypes[i] = a.maybeCoerce(valueType, columnTypes[i])
+				}
+			}
+			for i := 0; i < len(aliasColumnNames) && i < len(columnTypes); i++ {
+				selects.Set(aliasColumnNames[i], columnTypes[i])
+			}
+		} else {
+			for i := 0; i < len(aliasColumnNames) && i < len(values); i++ {
+				selects.Set(aliasColumnNames[i], annT(values[i].Type()))
+			}
+		}
+
+		if offset := expression.ArgE("offset"); expression.IsA(KUnnest) && offset.IsA(KIdentifier) {
+			selects.Set(offset.Name(), DT_BIGINT)
+		}
+	case expression.IsA(KSetOperation):
+		for _, c := range a.getSetopColumnTypes(expression) {
+			selects.Set(c.name, c.typ)
+		}
+	case expression.IsA(KSelectable):
+		for _, s := range expression.Selects() {
+			if s.Type() != nil {
+				selects.Set(s.AliasOrName(), s.Type())
+			}
+		}
+	}
+
+	return selects
+}
+
+// annotateScope annotates one scope: table columns as STRUCTs of their schema, then every node in
+// post-order, then ORDER BY references to aliases. In dialects whose query results are structs it
+// also records the query's STRUCT type.
+func (a *TypeAnnotator) annotateScope(scope *Scope) {
 	a.annotateExpression(scope.Expression, scope)
 	a.fixupOrderByAliases(scope)
 
 	if a.dialect.S.QUERY_RESULTS_ARE_STRUCTS && scope.Expression.IsA(KQuery) {
-		selects := scope.Expression.Selects()
-		columnDefs := make([]*Expr, 0, len(selects))
-		for _, sel := range selects {
-			var kind *Expr
-			if t := sel.Type(); t != nil {
-				kind = t.Copy()
+		delete(scope.Expression.Meta(), "query_type")
+
+		var columnTypes []annNamedType
+		if scope.Expression.IsA(KSetOperation) {
+			columnTypes = a.getSetopColumnTypes(scope.Expression)
+		} else {
+			for _, sel := range scope.Expression.Selects() {
+				var t any
+				if sel.Type() != nil {
+					t = sel.Type()
+				}
+				columnTypes = append(columnTypes, annNamedType{sel.OutputName(), t})
 			}
-			columnDefs = append(columnDefs, New(KColumnDef, "this", ToIdentifier(sel.OutputName(), nil), "kind", kind))
+		}
+
+		columnDefs := make([]*Expr, 0, len(columnTypes))
+		for _, c := range columnTypes {
+			var kind *Expr
+			if c.typ != nil {
+				kind = DataTypeBuild(c.typ, nil, false, true)
+			}
+			columnDefs = append(columnDefs, New(KColumnDef, "this", ToIdentifier(c.name, nil), "kind", kind))
 		}
 		structType := New(KDataType, "this", DT_STRUCT, "expressions", columnDefs, "nested", true)
 
-		anyUnknown := false
-		for _, cd := range structType.Expressions() {
-			if kind := cd.ArgE("kind"); kind != nil && kind.IsTypeOf(DT_UNKNOWN) {
-				anyUnknown = true
+		complete := len(columnDefs) > 0
+		for _, cd := range columnDefs {
+			if kind := cd.ArgE("kind"); kind == nil || kind.IsTypeOf(DT_UNKNOWN) {
+				complete = false
 				break
 			}
 		}
-		if !anyUnknown {
-			// We don't use `_set_type` on purpose here. If we annotated the query directly, then
+		if complete {
+			// We don't use setType on purpose here. If we annotated the query directly, then
 			// using it in other contexts (e.g., ARRAY(<query>)) could result in incorrect type
 			// annotations, i.e., it shouldn't be interpreted as a STRUCT value.
 			scope.Expression.Meta()["query_type"] = structType
@@ -605,12 +625,49 @@ func (a *TypeAnnotator) annotateScope(scope *Scope) {
 	}
 }
 
-// annQueryTypeOrUnknown mirrors `expression.meta_get("query_type") or exp.DType.UNKNOWN.into_expr()`.
-func annQueryTypeOrUnknown(e *Expr) *Expr {
-	if qt, ok := e.MetaGet("query_type").(*Expr); ok && qt != nil {
-		return qt
+// annotateTableColumn types a whole-row reference to a source as a STRUCT of the source's
+// columns, or UNKNOWN when some column type is unknown.
+func (a *TypeAnnotator) annotateTableColumn(expression *Expr, scope *Scope) {
+	source, _ := scope.Sources.Get(expression.Name())
+	var columnTypes *omap[any]
+
+	isPivot := false
+	for _, pivot := range scope.Pivots() {
+		if pivot.Alias() == expression.Name() {
+			isPivot = true
+			break
+		}
 	}
-	return NewDataType(DT_UNKNOWN)
+
+	if isPivot {
+		columnTypes = a.getScopeSourceSelects(scope, expression.Name())
+	} else if source.Scope != nil {
+		if queryType, _ := source.Scope.Expression.MetaGet("query_type").(*Expr); queryType != nil && queryType.IsTypeOf(DT_STRUCT) {
+			a.setType(expression, queryType)
+			return
+		}
+	} else if source.Table != nil {
+		columnTypes = a.schema.Find(source.Table, false, true)
+	}
+
+	complete := columnTypes.Len() > 0
+	for _, kind := range columnTypes.Values() {
+		if kind == nil || DataTypeBuild(kind, nil, false, false).IsTypeOf(DT_UNKNOWN) {
+			complete = false
+			break
+		}
+	}
+	if !complete {
+		a.setType(expression, DT_UNKNOWN)
+		return
+	}
+
+	columnDefs := make([]*Expr, 0, columnTypes.Len())
+	for _, name := range columnTypes.Keys() {
+		kind, _ := columnTypes.Get(name)
+		columnDefs = append(columnDefs, New(KColumnDef, "this", ToIdentifier(name, nil), "kind", DataTypeBuild(kind, nil, false, true)))
+	}
+	a.setType(expression, New(KDataType, "this", DT_STRUCT, "expressions", columnDefs, "nested", true))
 }
 
 type annStackItem struct {
@@ -618,7 +675,9 @@ type annStackItem struct {
 	childrenAnnotated bool
 }
 
-// annotateExpression mirrors TypeAnnotator._annotate_expression. scope may be nil.
+// annotateExpression annotates expression and its descendants in post-order, skipping visited
+// nodes. Columns are typed from their source in scope; other nodes use their kind's annotator or
+// return type. scope may be nil.
 func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 	stack := []annStackItem{{expression, false}}
 	var children []*Expr
@@ -642,7 +701,12 @@ func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 			continue
 		}
 
-		if scope != nil && expr.IsA(KColumn) && expr.TableName() != "" {
+		if scope != nil && expr.IsA(KTableColumn) {
+			a.annotateTableColumn(expr, scope)
+			continue
+		}
+
+		if scope != nil && expr.IsA(KColumn) && expr.TableName() != "" && !expr.IsStar() {
 			var source Source
 			found := false
 			sourceScope := scope
@@ -654,7 +718,18 @@ func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 			}
 
 			if found && source.Table.IsA(KTable) {
-				var tableColType any = a.schema.GetColumnType(source.Table, expr, "", nil, nil)
+				// A column named by the table alias's column list reads the physical column at
+				// the same position
+				columnExpr := expr
+				if aliasColumns := source.Table.AliasColumnNames(); len(aliasColumns) > 0 {
+					if i := indexOfStr(aliasColumns, expr.Name()); i >= 0 {
+						if physical := a.schema.ColumnNames(source.Table, false, nil, nil); i < len(physical) {
+							columnExpr = ColumnExpr(physical[i], nil, nil, nil, nil, boolp(true), true)
+						}
+					}
+				}
+
+				var tableColType any = a.schema.GetColumnType(source.Table, columnExpr, "", nil, nil)
 				if dt, ok := tableColType.(*Expr); ok && dt.IsTypeOf(DT_UNKNOWN) && source.Table.ArgB("pivots") {
 					tableColType = DT_UNKNOWN
 					ss := sourceScope
@@ -708,6 +783,10 @@ func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 			continue
 		}
 
+		if expr.IsA(KSetOperation) {
+			a.annotateSetOperation(expr)
+		}
+
 		spec := a.expressionMetadata[expr.Kind()]
 
 		if spec != nil && spec.Annotator != nil {
@@ -720,8 +799,8 @@ func (a *TypeAnnotator) annotateExpression(expression *Expr, scope *Scope) {
 	}
 }
 
-// annPivotColType mirrors the `not source and scope.pivots and (col_type := ...)` branch of
-// _annotate_expression, returning nil when it does not apply.
+// annPivotColType returns the type of a pivot output column for a column without a source in a
+// scope with pivots, or nil when that does not apply.
 func (a *TypeAnnotator) annPivotColType(found bool, scope *Scope, expr *Expr) any {
 	if found || len(scope.Pivots()) == 0 {
 		return nil
@@ -742,7 +821,7 @@ func (a *TypeAnnotator) fixupOrderByAliases(scope *Scope) {
 	}
 
 	// Build alias -> type map from fully-annotated projections (last match wins,
-	// consistent with how _expand_alias_refs handles duplicate aliases).
+	// consistent with how column qualification expands duplicate alias references).
 	aliasTypes := map[string]*Expr{}
 	for _, sel := range query.Selects() {
 		if sel.IsA(KAlias) && sel.This().Type() != nil && !sel.This().IsTypeOf(DT_UNKNOWN) {
@@ -776,8 +855,7 @@ func (a *TypeAnnotator) fixupOrderByAliases(scope *Scope) {
 	}
 }
 
-// maybeCoerce mirrors TypeAnnotator._maybe_coerce: returns type2 if type1 can be coerced into
-// it, otherwise type1.
+// maybeCoerce returns type2 if type1 can be coerced into it, otherwise type1.
 //
 // If either type is parameterized (e.g. DECIMAL(18, 2) contains two parameters), we assume
 // type1 does not coerce into type2, so we also return it in this case.
@@ -801,7 +879,6 @@ func (a *TypeAnnotator) maybeCoerce(type1, type2 any) any {
 		type2Value = type2
 	}
 
-	// We propagate the UNKNOWN type upwards if found
 	if type1Value == DT_UNKNOWN || type2Value == DT_UNKNOWN {
 		return DT_UNKNOWN
 	}
@@ -823,63 +900,79 @@ func (a *TypeAnnotator) maybeCoerce(type1, type2 any) any {
 	return type1Value
 }
 
-// getSetopColumnTypes mirrors TypeAnnotator._get_setop_column_types: computes the coerced column
-// types for a SetOperation (UNION, INTERSECT, EXCEPT, ...), coercing types across left and right
-// operands for all projections.
-func (a *TypeAnnotator) getSetopColumnTypes(setop *Expr) *omap[any] {
-	if cached, ok := a.setopColumnTypes[setop]; ok {
-		return cached
-	}
+func (a *TypeAnnotator) getSetopColumnTypes(setop *Expr) []annNamedType {
+	return a.setopColumnTypes[setop]
+}
 
-	colTypes := newOMap[any]()
-
-	// Validate that left and right have same number of projections
-	if !(setop.IsA(KSetOperation) &&
-		len(setop.This().Selects()) > 0 &&
-		len(setop.Expression().Selects()) > 0 &&
-		len(setop.This().Selects()) == len(setop.Expression().Selects())) {
-		return colTypes
-	}
-
-	// Process a chain / sub-tree of set operations
-	for setOp := range setop.Walk(true, func(n *Expr) bool { return !n.IsA(KSetOperation, KSubquery) }) {
-		if !setOp.IsA(KSetOperation) {
+// annotateSetOperation records the output columns of a set operation whose operands are
+// annotated: positionally matched (or by name, for BY NAME) with their types coerced. Duplicate
+// names are kept until positional matching is done.
+func (a *TypeAnnotator) annotateSetOperation(expression *Expr) {
+	var operands [2][]annNamedType
+	for i, operand := range []*Expr{unnestMethod(expression.This()), unnestMethod(expression.Expression())} {
+		if operand.IsA(KSetOperation) {
+			operands[i] = a.setopColumnTypes[operand]
+			delete(a.setopColumnTypes, operand)
 			continue
 		}
-
-		setopCols := newOMap[any]()
-		if setOp.ArgB("by_name") {
-			rTypeBySelect := newOMap[any]()
-			for _, s := range setOp.Expression().Selects() {
-				rTypeBySelect.Set(s.AliasOrName(), annT(s.Type()))
+		for _, s := range operand.Selects() {
+			var t any = DT_UNKNOWN
+			if s.Type() != nil {
+				t = s.Type()
 			}
-			for _, s := range setOp.This().Selects() {
-				rType, _ := rTypeBySelect.Get(s.AliasOrName())
-				if rType == nil {
-					rType = DT_UNKNOWN
-				}
-				setopCols.Set(s.AliasOrName(), a.maybeCoerce(annT(s.Type()), rType))
-			}
-		} else {
-			ls, rs := setOp.This().Selects(), setOp.Expression().Selects()
-			for i := 0; i < len(ls) && i < len(rs); i++ {
-				setopCols.Set(ls[i].AliasOrName(), a.maybeCoerce(annT(ls[i].Type()), annT(rs[i].Type())))
-			}
+			operands[i] = append(operands[i], annNamedType{s.AliasOrName(), t})
 		}
+	}
+	left, right := operands[0], operands[1]
 
-		// Coerce intermediate results with the previously registered types, if they exist
-		for _, colName := range setopCols.Keys() {
-			colType, _ := setopCols.Get(colName)
-			prev, ok := colTypes.Get(colName)
-			if !ok {
-				prev = DT_NULL
+	var columns []annNamedType
+	if len(left) > 0 && len(right) > 0 {
+		if expression.ArgB("by_name") {
+			leftTypes, rightTypes := newOMap[any](), newOMap[any]()
+			for _, c := range left {
+				leftTypes.Set(c.name, c.typ)
 			}
-			colTypes.Set(colName, a.maybeCoerce(colType, prev))
+			for _, c := range right {
+				rightTypes.Set(c.name, c.typ)
+			}
+
+			var names []string
+			if on := expression.ArgL("on"); len(on) > 0 {
+				for _, column := range on {
+					names = append(names, column.Name())
+				}
+			} else if expression.KindText() == "INNER" {
+				for _, name := range leftTypes.Keys() {
+					if rightTypes.Has(name) {
+						names = append(names, name)
+					}
+				}
+			} else if expression.SideText() == "LEFT" {
+				names = leftTypes.Keys()
+			} else {
+				names = dedupeStrings(append(append([]string{}, leftTypes.Keys()...), rightTypes.Keys()...))
+			}
+
+			// Missing columns are NULL-filled, preserving the other operand's type.
+			for _, name := range names {
+				leftType, ok := leftTypes.Get(name)
+				if !ok {
+					leftType = DT_NULL
+				}
+				rightType, ok := rightTypes.Get(name)
+				if !ok {
+					rightType = DT_NULL
+				}
+				columns = append(columns, annNamedType{name, a.maybeCoerce(leftType, rightType)})
+			}
+		} else if len(left) == len(right) {
+			for i := range left {
+				columns = append(columns, annNamedType{left[i].name, a.maybeCoerce(left[i].typ, right[i].typ)})
+			}
 		}
 	}
 
-	a.setopColumnTypes[setop] = colTypes
-	return colTypes
+	a.setopColumnTypes[expression] = columns
 }
 
 func (a *TypeAnnotator) getUnpivotColumnTypes(pivot *Expr, srcTypes *omap[any]) *omap[any] {
@@ -908,7 +1001,15 @@ func (a *TypeAnnotator) getUnpivotColumnTypes(pivot *Expr, srcTypes *omap[any]) 
 			valCols = valExpr.Expressions()
 		}
 		for i := 0; i < len(valCols) && i < len(inCols); i++ {
-			newTypes.Set(valCols[i].OutputName(), annT(inCols[i].Type()))
+			// A chained operator's IN-list may name columns an earlier operator produced, which
+			// carry no annotation of their own
+			var inType any = annT(inCols[i].Type())
+			if t := inCols[i].Type(); t == nil || t.IsTypeOf(DT_UNKNOWN) {
+				if srcType, _ := srcTypes.Get(inCols[i].OutputName()); srcType != nil {
+					inType = srcType
+				}
+			}
+			newTypes.Set(valCols[i].OutputName(), inType)
 		}
 	}
 
@@ -933,12 +1034,21 @@ func (a *TypeAnnotator) getPivotColumnTypes(pivot *Expr, srcTypes *omap[any]) *o
 
 	pivotConstants := firstField.Expressions()
 
-	// The first agg_cols_offset entries are source columns that pass through the PIVOT unchanged;
+	// The first aggColsOffset entries are source columns that pass through the PIVOT unchanged;
 	// the rest are the aggregated columns, one per combination of IN value and aggregate function.
 	outputToSrc := PivotOutputColumns(pivot, srcTypes.Keys())
 
 	var aggTypes []any
 	for _, agg := range pivot.Expressions() {
+		if agg.Type() == nil || agg.IsTypeOf(DT_UNKNOWN) {
+			// Output types may be requested before the PIVOT itself has been annotated
+			agg = agg.Copy()
+			for column := range agg.FindAll(KColumn) {
+				srcType, _ := srcTypes.Get(column.Name())
+				a.setType(column, srcType)
+			}
+			a.annotateExpression(agg, nil)
+		}
 		if agg.IsA(KAlias) {
 			aggTypes = append(aggTypes, annT(agg.This().Type()))
 		} else {
@@ -981,7 +1091,7 @@ zip:
 func (a *TypeAnnotator) annotateBinary(expression *Expr) *Expr {
 	left, right := expression.Left(), expression.Right()
 	if left == nil || right == nil {
-		// sqlglot logs "Failed to annotate badly formed binary expression" here.
+		// A binary expression missing an operand gets the UNKNOWN type.
 		a.setType(expression, nil)
 		return expression
 	}
@@ -1032,13 +1142,16 @@ func (a *TypeAnnotator) annotateLiteral(expression *Expr) *Expr {
 	return expression
 }
 
-// annotateByArgs mirrors TypeAnnotator._annotate_by_args(expression, *args) with
-// promote=False and array=False. Each arg is an argument key (string) or an expression.
+// annotateByArgs types expression by coercing the types of args, without promotion or array
+// wrapping. Each arg is an argument key (string) or an expression.
 func (a *TypeAnnotator) annotateByArgs(expression *Expr, args ...any) *Expr {
 	return a.annotateByArgsFull(expression, false, false, args...)
 }
 
-// annotateByArgsFull mirrors TypeAnnotator._annotate_by_args(expression, *args, promote, array).
+// annotateByArgsFull types expression by coercing the types of args. Each arg is an argument key
+// (string) or an expression. The first nested type wins and any UNKNOWN argument makes the result
+// UNKNOWN. promote widens integers to BIGINT and floats to DOUBLE; array wraps the result in an
+// ARRAY.
 func (a *TypeAnnotator) annotateByArgsFull(expression *Expr, promote bool, array bool, args ...any) *Expr {
 	var literalType, nonLiteralType any
 	var nestedType *Expr
@@ -1061,10 +1174,16 @@ func (a *TypeAnnotator) annotateByArgsFull(expression *Expr, promote bool, array
 			}
 
 			if nestedType != nil {
+				// Only an ARRAY<NULL> is resolved by a later array; other nested types are kept.
+				if nestedType.IsTypeOf(DT_ARRAY) && len(nestedType.Expressions()) > 0 &&
+					nestedType.Expressions()[0].IsTypeOf(DT_NULL) &&
+					exprType.IsTypeOf(DT_ARRAY) && len(exprType.Expressions()) > 0 {
+					nestedType = exprType
+				}
 				continue
 			}
 
-			// Stop coercing at the first nested data type found
+			// The first nested data type wins, an ARRAY<NULL> being resolved by later arrays
 			if exprType.ArgB("nested") {
 				nestedType = exprType
 			} else if expr.IsA(KLiteral) {
@@ -1102,6 +1221,9 @@ func (a *TypeAnnotator) annotateByArgsFull(expression *Expr, promote bool, array
 			resultType = literalType
 		case nonLiteralType != nil:
 			resultType = nonLiteralType
+		case array:
+			// The elements of an empty array are NULL-typed
+			resultType = DT_NULL
 		default:
 			resultType = DT_UNKNOWN
 		}
@@ -1120,7 +1242,7 @@ func (a *TypeAnnotator) annotateByArgsFull(expression *Expr, promote bool, array
 		}
 	}
 
-	if array {
+	if array && !expression.IsTypeOf(DT_UNKNOWN) {
 		a.setType(expression, New(KDataType, "this", DT_ARRAY, "expressions", []*Expr{expression.Type()}, "nested", true))
 	}
 
@@ -1228,6 +1350,12 @@ func (a *TypeAnnotator) annotateSubquery(expression *Expr) *Expr {
 	query := expression.UnnestSubquery()
 
 	if query.IsA(KQuery) {
+		if kind, _ := query.Arg("kind").(string); kind == "STRUCT" {
+			// SELECT AS STRUCT returns its row as a single STRUCT value
+			queryType, _ := query.MetaGet("query_type").(*Expr)
+			a.setType(expression, annT(queryType))
+			return expression
+		}
 		selects := query.Selects()
 		if len(selects) == 1 {
 			a.setType(expression, annT(selects[0].Type()))
@@ -1239,8 +1367,8 @@ func (a *TypeAnnotator) annotateSubquery(expression *Expr) *Expr {
 	return expression
 }
 
-// annotateStructValue mirrors TypeAnnotator._annotate_struct_value; it returns a DataType, a
-// ColumnDef or nil (None).
+// annotateStructValue returns the field type of a struct argument: a ColumnDef for a named field,
+// a DataType for an unnamed one, or nil when its type is UNKNOWN.
 func (a *TypeAnnotator) annotateStructValue(expression *Expr) *Expr {
 	// Case: STRUCT(key AS value)
 	var this *Expr
@@ -1290,20 +1418,16 @@ func (a *TypeAnnotator) annotateMap(expression *Expr) *Expr {
 
 	mapType := New(KDataType, "this", DT_MAP)
 	if keys.IsA(KArray) && values.IsA(KArray) {
-		var keyType any = DT_UNKNOWN
-		if t := seqGet(keys.Type().Expressions(), 0); t != nil {
-			keyType = t
-		}
-		var valueType any = DT_UNKNOWN
-		if t := seqGet(values.Type().Expressions(), 0); t != nil {
-			valueType = t
+		keyType := seqGet(keys.Type().Expressions(), 0)
+		valueType := seqGet(values.Type().Expressions(), 0)
+
+		if keyType == nil || keyType.IsTypeOf(DT_UNKNOWN) || valueType == nil || valueType.IsTypeOf(DT_UNKNOWN) {
+			a.setType(expression, DT_UNKNOWN)
+			return expression
 		}
 
-		// A DataType never compares equal to a DType, so this only checks that both types exist.
-		if keyType != DT_UNKNOWN && valueType != DT_UNKNOWN {
-			mapType.Set("expressions", []*Expr{keyType.(*Expr), valueType.(*Expr)})
-			mapType.Set("nested", true)
-		}
+		mapType.Set("expressions", []*Expr{keyType, valueType})
+		mapType.Set("nested", true)
 	}
 
 	a.setType(expression, mapType)
@@ -1316,7 +1440,7 @@ func (a *TypeAnnotator) annotateToMap(expression *Expr) *Expr {
 	if arg.IsTypeOf(DT_STRUCT) {
 		for _, coldef := range arg.Type().Expressions() {
 			kind := annColumnDefKind(coldef)
-			// `kind != exp.DType.UNKNOWN` always holds: kind is a DataType or None, never a DType.
+			// No UNKNOWN check: kind is a DataType or nil, never a DType, so it is always used.
 			mapType.Set("expressions", []*Expr{NewDataType(DT_VARCHAR), kind})
 			mapType.Set("nested", true)
 			break
@@ -1375,10 +1499,7 @@ func (a *TypeAnnotator) annotateByArrayElement(expression *Expr) *Expr {
 	return expression
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers (not direct ports).
-
-// annT converts a possibly-nil DataType pointer into a `DataType | DType | None` value.
+// annT converts a possibly-nil DataType pointer into a type value (a DataType *Expr or nil).
 func annT(dt *Expr) any {
 	if dt == nil {
 		return nil
@@ -1386,7 +1507,7 @@ func annT(dt *Expr) any {
 	return dt
 }
 
-// annThisOfType mirrors `t.this if isinstance(t, exp.DataType) else t`.
+// annThisOfType returns the DType of a DataType value, or t itself for any other value.
 func annThisOfType(t any) any {
 	if dt, ok := t.(*Expr); ok && dt != nil {
 		return dt.Arg("this")
@@ -1394,13 +1515,11 @@ func annThisOfType(t any) any {
 	return t
 }
 
-// annDTypeIn mirrors `value in SOME_DTYPE_SET` for a value that may not be a DType.
 func annDTypeIn(v any, set DTypeSet) bool {
 	d, ok := v.(DType)
 	return ok && set.Has(d)
 }
 
-// annEnsureList mirrors sqlglot.helper.ensure_list for argument values.
 func annEnsureList(v any) []*Expr {
 	switch x := v.(type) {
 	case nil:
@@ -1422,8 +1541,8 @@ func annEnsureList(v any) []*Expr {
 	return nil
 }
 
-// annColumnDefKind mirrors the `kind` property access on a struct field (ColumnDef.kind); other
-// expressions (e.g. unnamed DataType fields) have no such attribute in Python.
+// annColumnDefKind returns the kind of a struct field ColumnDef. Other expressions (e.g. unnamed
+// DataType fields) have no kind and panic with an annAttributeError.
 func annColumnDefKind(e *Expr) *Expr {
 	if e.IsA(KColumnDef) {
 		return e.ArgE("kind")
@@ -1431,7 +1550,6 @@ func annColumnDefKind(e *Expr) *Expr {
 	panic(&annAttributeError{Msg: fmt.Sprintf("'%s' object has no attribute 'kind'", annPyTypeName(e))})
 }
 
-// annMapKeys mirrors Map.keys / VarMap.keys.
 func annMapKeys(e *Expr) []*Expr {
 	if !e.IsA(KMap, KVarMap) {
 		return nil
@@ -1442,7 +1560,6 @@ func annMapKeys(e *Expr) []*Expr {
 	return nil
 }
 
-// annMapValues mirrors Map.values / VarMap.values.
 func annMapValues(e *Expr) []*Expr {
 	if values := e.ArgE("values"); values != nil {
 		return values.Expressions()
@@ -1450,7 +1567,7 @@ func annMapValues(e *Expr) []*Expr {
 	return nil
 }
 
-// annIndexOf mirrors list.index (structural equality), returning -1 when absent.
+// annIndexOf returns the index of the first element of list structurally equal to x, or -1.
 func annIndexOf(list []*Expr, x *Expr) int {
 	for i, e := range list {
 		if e == x || (e != nil && e.Equal(x)) {
@@ -1467,20 +1584,22 @@ func annPyTypeName(e *Expr) string {
 	return e.Kind().Name()
 }
 
-// annPyTypeRepr mirrors repr(type(x)) for an expression (or None).
+// annPyTypeRepr names the kind of e for error messages; nil keeps the historical
+// "<class 'NoneType'>" wording.
 func annPyTypeRepr(e *Expr) string {
 	if e == nil {
 		return "<class 'NoneType'>"
 	}
-	return e.classRepr()
+	return e.Kind().Name()
 }
 
-// annAttributeError mirrors a Python AttributeError raised by sqlglot on malformed input.
+// annAttributeError reports malformed input, such as a struct field without a kind. Messages keep
+// their historical wording.
 type annAttributeError struct{ Msg string }
 
 func (e *annAttributeError) Error() string { return e.Msg }
 
-// annExprSet is an insertion-ordered set of expressions keyed by identity (Python dict[id, expr]).
+// annExprSet is an insertion-ordered set of expressions keyed by identity.
 type annExprSet struct {
 	index map[*Expr]int
 	items []*Expr
@@ -1513,19 +1632,16 @@ func (s *annExprSet) values() []*Expr {
 	return out
 }
 
-// ---------------------------------------------------------------------------------------------
-// Ports of sqlglot.helper date helpers (Python's datetime.date/datetime.fromisoformat, which in
-// CPython 3.13 are implemented in C: Modules/_datetimemodule.c).
+// ISO 8601 date and datetime validation for date literal coercion. Dates are calendar dates
+// (YYYY-MM-DD, YYYYMMDD) or week dates (YYYY-Www[-D], YYYYWww[D]); a datetime adds a time after a
+// one-character separator, with an optional fraction and UTC offset.
 
-// DATE_UNITS: interval units that operate on date components.
 var annDATE_UNITS = newStrSet("day", "week", "month", "quarter", "year", "year_month")
 
-// annIsDateUnit mirrors sqlglot.helper.is_date_unit.
 func annIsDateUnit(expression *Expr) bool {
 	return expression != nil && annDATE_UNITS.Has(pyLower(expression.Name()))
 }
 
-// annIsISODate mirrors sqlglot.helper.is_iso_date (datetime.date.fromisoformat succeeds).
 func annIsISODate(text string) bool {
 	b := annCStr(text)
 	n := len(text)
@@ -1536,9 +1652,8 @@ func annIsISODate(text string) bool {
 	return rv >= 0 && annValidYMD(year, month, day)
 }
 
-// annIsISODatetime mirrors sqlglot.helper.is_iso_datetime (datetime.datetime.fromisoformat succeeds).
 func annIsISODatetime(text string) bool {
-	// _sanitize_isoformat_str: all valid ISO 8601 strings are at least 7 characters long
+	// All valid ISO 8601 strings are at least 7 characters long
 	if utf8.RuneCountInString(text) < 7 {
 		return false
 	}
@@ -1547,7 +1662,6 @@ func annIsISODatetime(text string) bool {
 
 	separatorLocation := annFindISOFormatDatetimeSeparator(b, length)
 
-	// date runs up to separator_location
 	year, month, day, rv := annParseISOFormatDate(b, separatorLocation)
 
 	var hour, minute, second, microsecond, tzoffset, tzusec int
@@ -1573,7 +1687,7 @@ func annIsISODatetime(text string) bool {
 		return false
 	}
 
-	// tzinfo_from_isoformat_results: the offset must be strictly within (-24h, 24h)
+	// The UTC offset must be strictly within (-24h, 24h)
 	if rv == 1 && tzoffset != 0 {
 		total := int64(tzoffset)*1_000_000 + int64(tzusec)
 		if total <= -86_400_000_000 || total >= 86_400_000_000 {
@@ -1600,7 +1714,8 @@ func (b annCStr) at(i int) byte {
 
 func annIsDigit(c byte) bool { return c >= '0' && c <= '9' }
 
-// annParseDigits mirrors parse_digits: returns the value, the new position and success.
+// annParseDigits parses numDigits decimal digits at p, returning the value, the new position and
+// success.
 func annParseDigits(b annCStr, p int, numDigits int) (int, int, bool) {
 	v := 0
 	for range numDigits {
@@ -1614,7 +1729,8 @@ func annParseDigits(b annCStr, p int, numDigits int) (int, int, bool) {
 	return v, p, true
 }
 
-// annParseISOFormatDate mirrors parse_isoformat_date (the date runs over `length` bytes).
+// annParseISOFormatDate parses a calendar or week date at the start of b; the date runs over
+// length bytes. rv is 0 on success and negative on failure.
 func annParseISOFormatDate(b annCStr, length int) (year, month, day, rv int) {
 	p := 0
 	var ok bool
@@ -1638,7 +1754,7 @@ func annParseISOFormatDate(b annCStr, length int) (year, month, day, rv int) {
 			return 0, 0, 0, -3
 		}
 
-		// `length` is a size_t in C: a negative separator location compares as a huge value.
+		// A negative length (no separator found) counts as unbounded.
 		if length < 0 || p < length {
 			if usesSeparator {
 				c := b.at(p)
@@ -1682,7 +1798,8 @@ func annParseISOFormatDate(b annCStr, length int) (year, month, day, rv int) {
 	return year, month, day, 0
 }
 
-// annISOToYMD mirrors iso_to_ymd.
+// annISOToYMD converts an ISO year, week and weekday into a calendar date. The last result is 0
+// on success and negative for an out-of-range year, week or weekday.
 func annISOToYMD(isoYear, isoWeek, isoDay int) (int, int, int, int) {
 	// Year is bounded to 0 < year < 10000 because 9999-12-31 is (9999, 52, 5)
 	if isoYear < 1 || isoYear > 9999 {
@@ -1707,7 +1824,7 @@ func annISOToYMD(isoYear, isoWeek, isoDay int) (int, int, int, int) {
 		return 0, 0, 0, -3
 	}
 
-	// iso_week1_monday
+	// Monday of ISO week 1
 	jan1 := time.Date(isoYear, time.January, 1, 0, 0, 0, 0, time.UTC)
 	firstWeekday := annWeekdayMon0(isoYear, 1, 1)
 	week1Monday := jan1.AddDate(0, 0, -firstWeekday)
@@ -1727,7 +1844,7 @@ func annWeekdayMon0(y, m, d int) int {
 
 func annIsLeap(y int) bool { return y%4 == 0 && (y%100 != 0 || y%400 == 0) }
 
-// annValidYMD mirrors check_date_args.
+// annValidYMD reports whether y-m-d is a valid date in years 1 through 9999.
 func annValidYMD(y, m, d int) bool {
 	if y < 1 || y > 9999 || m < 1 || m > 12 || d < 1 {
 		return false
@@ -1739,7 +1856,8 @@ func annValidYMD(y, m, d int) bool {
 	return d <= dim
 }
 
-// annFindISOFormatDatetimeSeparator mirrors _find_isoformat_datetime_separator.
+// annFindISOFormatDatetimeSeparator returns the byte position of the separator between date and
+// time, inferred from the date format, or -1 for a malformed week date.
 func annFindISOFormatDatetimeSeparator(b annCStr, length int) int {
 	const dateSeparator = '-'
 	const weekIndicator = 'W'
@@ -1778,7 +1896,6 @@ func annFindISOFormatDatetimeSeparator(b annCStr, length int) int {
 		// YYYYWww (7) or YYYYWwwd (8)
 		idx := 7
 		for ; idx < length; idx++ {
-			// Keep going until we run out of digits.
 			if !annIsDigit(b.at(idx)) {
 				break
 			}
@@ -1798,7 +1915,9 @@ func annFindISOFormatDatetimeSeparator(b annCStr, length int) int {
 	return 8
 }
 
-// annParseHHMMSSFF mirrors parse_hh_mm_ss_ff over b[start:end].
+// annParseHHMMSSFF parses HH[:MM[:SS[.ffffff]]] over b[start:end] (the colons may be omitted
+// together). It returns 0 at the end of the string, 1 if more text follows and a negative value on
+// error.
 func annParseHHMMSSFF(b annCStr, start, end int, hour, minute, second, microsecond *int) int {
 	*hour, *minute, *second, *microsecond = 0, 0, 0, 0
 	p := start
@@ -1836,7 +1955,6 @@ func annParseHHMMSSFF(b annCStr, start, end int, hour, minute, second, microseco
 		}
 	}
 
-	// Parse fractional components
 	lenRemains := end - p
 	toParse := lenRemains
 	if lenRemains >= 6 {
@@ -1859,14 +1977,15 @@ func annParseHHMMSSFF(b annCStr, start, end int, hour, minute, second, microseco
 		p++ // skip truncated digits
 	}
 
-	// Return 1 if it's not the end of the string
 	if b.at(p) != 0 {
 		return 1
 	}
 	return 0
 }
 
-// annParseISOFormatTime mirrors parse_isoformat_time over b[start:start+dtlen].
+// annParseISOFormatTime parses a time with an optional Z or +/-HH[:MM[:SS[.ffffff]]] UTC offset
+// over b[start:start+dtlen]. It returns 0 without an offset, 1 with one and a negative value on
+// error.
 func annParseISOFormatTime(b annCStr, start, dtlen int, hour, minute, second, microsecond, tzoffset, tzmicrosecond *int) int {
 	p := start
 	pEnd := start + dtlen
@@ -1896,7 +2015,6 @@ func annParseISOFormatTime(b annCStr, start, dtlen int, hour, minute, second, mi
 		return 0
 	}
 
-	// Special case UTC / Zulu time.
 	if b.at(tzinfoPos) == 'Z' {
 		*tzoffset = 0
 		*tzmicrosecond = 0

@@ -52,8 +52,8 @@ func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 		{name: "parameterized casts", query: "SELECT CAST(x AS NUMBER(10,2)), x::VARCHAR(10) FROM t", want: true},
 		{name: "structured casts", query: "SELECT CAST(x AS ARRAY(NUMBER(10,2))) FROM t", want: true},
 		{name: "quoted function-like alias", query: `WITH "CAST"(x) AS (SELECT 1) SELECT CAST(x AS INT) FROM "CAST"`, want: true},
-		{name: "SQLGlot special function", query: "SELECT ARG_MAX(1,2)", want: true},
-		{name: "SQLGlot cast alias", query: "SELECT SAFE_CAST(1 AS INT)", want: true},
+		{name: "parser-specific function", query: "SELECT ARG_MAX(1,2)", want: true},
+		{name: "SAFE_CAST alias", query: "SELECT SAFE_CAST(1 AS INT)", want: true},
 		{name: "UDF in normalized argument", query: "SELECT DATEADD(TIME_TO_STR(1, 'x'), 1, CURRENT_DATE())", want: true},
 		{name: "UDF sharing CTE name", query: "WITH READ_CSV(x) AS (SELECT 1) SELECT READ_CSV('x')", want: true},
 		{name: "UDF after parameterized cast", query: "SELECT CAST(x AS NUMBER(10,2)), READ_CSV('x') FROM t", want: true},
@@ -151,7 +151,7 @@ func TestSQLParserIsReadOnlyQuery(t *testing.T) {
 	}
 }
 
-func TestValidateReadOnlyQueryAlwaysUsesPython(t *testing.T) {
+func TestValidateReadOnlyQueryAlwaysUsesTheParser(t *testing.T) {
 	t.Parallel()
 	require.NoError(t, ValidateReadOnlyQuery("SELECT 1; SELECT 2", "snowflake"))
 	require.IsType(t, &SQLParser{}, readOnlyParser)

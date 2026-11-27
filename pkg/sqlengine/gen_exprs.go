@@ -7,16 +7,16 @@ import (
 	"sync"
 )
 
-// Generator chunk C (part 2): sqlglot/generator.py check_sql .. parsedatetime_sql, plus helpers.
-
-// check_sql (generator.py L3701).
 func (g *Generator) checkSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	return "CHECK (" + this + ")"
 }
 
-// foreignkey_sql (generator.py L3705).
 func (g *Generator) foreignkeySQL(expression *Expr) string {
+	this := g.sqlKey(expression, "this")
+	if this != "" {
+		this = " " + this
+	}
 	expressions := g.expressions(expression, exprsOpts{flat: true})
 	if expressions != "" {
 		expressions = " (" + expressions + ")"
@@ -37,10 +37,9 @@ func (g *Generator) foreignkeySQL(expression *Expr) string {
 	if options != "" {
 		options = " " + options
 	}
-	return "FOREIGN KEY" + expressions + reference + del + update + options
+	return "FOREIGN KEY" + this + expressions + reference + del + update + options
 }
 
-// primarykey_sql (generator.py L3718).
 func (g *Generator) primarykeySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -55,18 +54,15 @@ func (g *Generator) primarykeySQL(expression *Expr) string {
 	return "PRIMARY KEY" + this + " (" + expressions + ")" + include + options
 }
 
-// timeserieskey_sql (generator.py L3727).
 func (g *Generator) baseTimeserieskeySQL(expression *Expr) string {
 	g.unsupported("TIMESERIES primary key columns are not supported")
 	return g.sqlKey(expression, "this")
 }
 
-// if_sql (generator.py L3731).
 func (g *Generator) ifSQL(expression *Expr) string {
 	return g.caseSQL(New(KCase, "ifs", []*Expr{expression}, "default", expression.Arg("false")))
 }
 
-// matchagainst_sql (generator.py L3734).
 func (g *Generator) baseMatchagainstSQL(expression *Expr) string {
 	var expressions []any
 	if truthy(g.s.MATCH_AGAINST_TABLE_PREFIX) {
@@ -88,23 +84,20 @@ func (g *Generator) baseMatchagainstSQL(expression *Expr) string {
 	return g.fn("MATCH", expressions...) + " AGAINST(" + g.sqlKey(expression, "this") + modifier + ")"
 }
 
-// jsonkeyvalue_sql (generator.py L3751).
 func (g *Generator) jsonkeyvalueSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + g.s.JSON_KEY_VALUE_PAIR_SEP + " " + g.sqlKey(expression, "expression")
 }
 
-// jsonpath_sql (generator.py L3754).
 func (g *Generator) baseJsonpathSQL(expression *Expr) string {
 	path := strings.TrimLeft(g.expressions(expression, exprsOpts{sep: strp2(""), flat: true}), ".")
 
 	if g.s.QUOTE_JSON_PATH {
-		path = g.d.S.QUOTE_START + path + g.d.S.QUOTE_END
+		path = g.d.S.QUOTE_START + g.escapeStr(path, true, "", "", false) + g.d.S.QUOTE_END
 	}
 
 	return path
 }
 
-// json_path_part (generator.py L3762). expression is an int, a string or a JSONPathPart *Expr.
 func (g *Generator) jsonPathPart(expression any) string {
 	switch x := expression.(type) {
 	case *Expr:
@@ -118,7 +111,6 @@ func (g *Generator) jsonPathPart(expression any) string {
 			return transform(g, x)
 		}
 	case bool:
-		// Python bools are ints: str(True) == "True"
 		if x {
 			return "True"
 		}
@@ -130,8 +122,7 @@ func (g *Generator) jsonPathPart(expression any) string {
 	s, _ := expression.(string)
 	var escaped string
 	if g.quoteJSONPathKeyUsingBrackets && g.s.JSON_PATH_SINGLE_QUOTE_ESCAPE {
-		// sqlglot computes an escaped value and then discards it (uses the raw key).
-		escaped = "\\'" + s + "\\'"
+		escaped = "'" + strings.ReplaceAll(s, "'", "\\'") + "'"
 	} else {
 		escaped = strings.ReplaceAll(s, `"`, `\"`)
 		escaped = `"` + escaped + `"`
@@ -140,21 +131,27 @@ func (g *Generator) jsonPathPart(expression any) string {
 	return escaped
 }
 
-// formatjson_sql (generator.py L3783).
+func (g *Generator) formatSQL(expression *Expr) string {
+	if expression.ArgB("is_fmt") && expression.This().IsString() && len(expression.Expressions()) == 0 &&
+		!strings.ContainsAny(expression.Name(), "{}") {
+		return g.sql(expression.This())
+	}
+
+	g.genDUnsupportedArgs(expression, "is_fmt")
+	return g.functionFallbackSQL(expression)
+}
+
 func (g *Generator) formatjsonSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " FORMAT JSON"
 }
 
-// formatphrase_sql (generator.py L3786).
 func (g *Generator) formatphraseSQL(expression *Expr) string {
-	// Output the Teradata column FORMAT override.
 	// https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/SQL-Data-Types-and-Literals/Data-Type-Formats-and-Format-Phrases/FORMAT
 	this := g.sqlKey(expression, "this")
 	fmt := g.sqlKey(expression, "format")
 	return this + " (FORMAT " + fmt + ")"
 }
 
-// _jsonobject_sql (generator.py L3793).
 func (g *Generator) jsonobjectSQL(expression *Expr, name string) string {
 	nullHandling := ""
 	if v := expression.Arg("null_handling"); truthy(v) {
@@ -196,7 +193,6 @@ func (g *Generator) jsonobjectSQL(expression *Expr, name string) string {
 	)
 }
 
-// jsonarray_sql (generator.py L3819).
 func (g *Generator) jsonarraySQL(expression *Expr) string {
 	nullHandling := ""
 	if v := expression.Arg("null_handling"); truthy(v) {
@@ -215,7 +211,6 @@ func (g *Generator) jsonarraySQL(expression *Expr) string {
 	)
 }
 
-// jsonarrayagg_sql (generator.py L3829).
 func (g *Generator) jsonarrayaggSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	order := g.sqlKey(expression, "order")
@@ -240,7 +235,6 @@ func (g *Generator) jsonarrayaggSQL(expression *Expr) string {
 	)
 }
 
-// jsoncolumndef_sql (generator.py L3843).
 func (g *Generator) jsoncolumndefSQL(expression *Expr) string {
 	path := g.sqlKey(expression, "path")
 	if path != "" {
@@ -269,12 +263,10 @@ func (g *Generator) jsoncolumndefSQL(expression *Expr) string {
 	return this + kind + formatJSON + path + ordinality
 }
 
-// jsonschema_sql (generator.py L3859).
 func (g *Generator) jsonschemaSQL(expression *Expr) string {
 	return g.fn("COLUMNS", gchunkCExprsToAny(expression.Expressions())...)
 }
 
-// jsontable_sql (generator.py L3862).
 func (g *Generator) jsontableSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	path := g.sqlKey(expression, "path")
@@ -295,7 +287,6 @@ func (g *Generator) jsontableSQL(expression *Expr) string {
 	)
 }
 
-// openjsoncolumndef_sql (generator.py L3875).
 func (g *Generator) openjsoncolumndefSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kind := g.sqlKey(expression, "kind")
@@ -310,7 +301,6 @@ func (g *Generator) openjsoncolumndefSQL(expression *Expr) string {
 	return this + " " + kind + path + asJSON
 }
 
-// openjson_sql (generator.py L3883).
 func (g *Generator) openjsonSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	path := g.sqlKey(expression, "path")
@@ -325,7 +315,6 @@ func (g *Generator) openjsonSQL(expression *Expr) string {
 	return "OPENJSON(" + this + path + ")" + with
 }
 
-// in_sql (generator.py L3895).
 func (g *Generator) baseInSQL(expression *Expr) string {
 	query := expression.ArgE("query")
 	unnest := expression.ArgE("unnest")
@@ -349,12 +338,10 @@ func (g *Generator) baseInSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + isGlobal + " IN " + inSQL
 }
 
-// in_unnest_op (generator.py L3912).
 func (g *Generator) baseInUnnestOp(unnest *Expr) string {
 	return "(SELECT " + g.sql(unnest) + ")"
 }
 
-// interval_sql (generator.py L3915).
 func (g *Generator) baseIntervalSQL(expression *Expr) string {
 	unitExpression := expression.ArgE("unit")
 	unit := ""
@@ -377,9 +364,9 @@ func (g *Generator) baseIntervalSQL(expression *Expr) string {
 		}
 		if this != "" {
 			if unitExpression != nil && unitExpression.IsA(KIntervalSpan) {
-				return "INTERVAL '" + this + "'" + unit
+				return "INTERVAL " + g.sql(LiteralString(this)) + unit
 			}
-			return "INTERVAL '" + this + unit + "'"
+			return "INTERVAL " + g.sql(LiteralString(this+unit))
 		}
 		return "INTERVAL" + unit
 	}
@@ -397,12 +384,10 @@ func (g *Generator) baseIntervalSQL(expression *Expr) string {
 	return "INTERVAL" + this + unit
 }
 
-// return_sql (generator.py L3937).
 func (g *Generator) returnSQL(expression *Expr) string {
 	return "RETURN " + g.sqlKey(expression, "this")
 }
 
-// reference_sql (generator.py L3940).
 func (g *Generator) referenceSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressions := g.expressions(expression, exprsOpts{flat: true})
@@ -416,7 +401,6 @@ func (g *Generator) referenceSQL(expression *Expr) string {
 	return "REFERENCES " + this + expressions + options
 }
 
-// anonymous_sql (generator.py L3948).
 func (g *Generator) anonymousSQL(expression *Expr) string {
 	// We don't normalize qualified functions such as a.b.foo(), because they can be case-sensitive
 	parent := expression.Parent()
@@ -427,29 +411,25 @@ func (g *Generator) anonymousSQL(expression *Expr) string {
 	)
 }
 
-// paren_sql (generator.py L3957).
 func (g *Generator) parenSQL(expression *Expr) string {
 	sql := g.segSep(g.indentDefault(g.sqlKey(expression, "this")), "")
 	return "(" + sql + g.segSep(")", "")
 }
 
-// neg_sql (generator.py L3961).
 func (g *Generator) negSQL(expression *Expr) string {
 	// This makes sure we don't convert "- - 5" to "--5", which is a comment
 	thisSQL := g.sqlKey(expression, "this")
 	sep := ""
-	if thisSQL[0] == '-' { // panics on "" like Python's IndexError
+	if thisSQL[0] == '-' { // panics on an empty operand
 		sep = " "
 	}
 	return "-" + sep + thisSQL
 }
 
-// not_sql (generator.py L3967).
 func (g *Generator) baseNotSQL(expression *Expr) string {
 	return "NOT " + g.sqlKey(expression, "this")
 }
 
-// alias_sql (generator.py L3970).
 func (g *Generator) aliasSQL(expression *Expr) string {
 	alias := g.sqlKey(expression, "alias")
 	if alias != "" {
@@ -458,7 +438,6 @@ func (g *Generator) aliasSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + alias
 }
 
-// pivotalias_sql (generator.py L3975).
 func (g *Generator) pivotaliasSQL(expression *Expr) string {
 	alias := expression.ArgE("alias")
 
@@ -482,72 +461,59 @@ func (g *Generator) pivotaliasSQL(expression *Expr) string {
 	return g.aliasSQL(expression)
 }
 
-// aliases_sql (generator.py L3992).
 func (g *Generator) baseAliasesSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " AS (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// atindex_sql (generator.py L3995).
 func (g *Generator) atindexSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	index := g.sqlKey(expression, "expression")
 	return this + " AT " + index
 }
 
-// attimezone_sql (generator.py L4000).
 func (g *Generator) baseAttimezoneSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	zone := g.sqlKey(expression, "zone")
 	return this + " AT TIME ZONE " + zone
 }
 
-// fromtimezone_sql (generator.py L4005).
 func (g *Generator) fromtimezoneSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	zone := g.sqlKey(expression, "zone")
 	return this + " AT TIME ZONE " + zone + " AT TIME ZONE 'UTC'"
 }
 
-// fromiso8601date_sql (generator.py L4010).
 func (g *Generator) fromiso8601dateSQL(expression *Expr) string {
 	return g.sql(gchunkCCast(expression.This(), DT_DATE))
 }
 
-// fromiso8601timestamp_sql (generator.py L4013).
 func (g *Generator) fromiso8601timestampSQL(expression *Expr) string {
 	return g.sql(gchunkCCast(expression.This(), DT_TIMESTAMPTZ))
 }
 
-// fromiso8601timestampnanos_sql (generator.py L4016).
 func (g *Generator) fromiso8601timestampnanosSQL(expression *Expr) string {
 	return g.sql(gchunkCCast(expression.This(), DT_TIMESTAMPTZ))
 }
 
-// add_sql (generator.py L4019).
 func (g *Generator) addSQL(expression *Expr) string {
 	return g.binary(expression, "+")
 }
 
-// and_sql (generator.py L4022).
 func (g *Generator) andSQL(expression *Expr, stack []any) string {
 	return g.connectorSQL(expression, "AND", stack)
 }
 
-// or_sql (generator.py L4025).
 func (g *Generator) orSQL(expression *Expr, stack []any) string {
 	return g.connectorSQL(expression, "OR", stack)
 }
 
-// xor_sql (generator.py L4028).
 func (g *Generator) xorSQL(expression *Expr, stack []any) string {
 	return g.connectorSQL(expression, "XOR", stack)
 }
 
-// connector_sql (generator.py L4031)
-//
-// Python passes the stack list by reference and the callee appends to it. A Go slice cannot grow
-// in place, so the loop below calls connectorPush (the `stack is not None` branch) with a pointer.
-// A non-nil stack passed from outside only mirrors the return value.
+// connectorSQL renders a chain of AND, OR and XOR nodes iteratively, with an explicit stack, so
+// deep chains do not recurse. With a non-nil stack it only pushes the operands of expression and
+// returns op; the caller's stack is not updated, only the returned op is meaningful.
 func (g *Generator) connectorSQL(expression *Expr, op string, stack []any) string {
 	if stack != nil {
 		return g.connectorPush(expression, op, &stack)
@@ -561,7 +527,6 @@ func (g *Generator) connectorSQL(expression *Expr, op string, stack []any) strin
 		node := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		if n, ok := node.(*Expr); ok && n.IsA(KConnector) {
-			// getattr(self, f"{node.key}_sql")(node, stack): and_sql / or_sql / xor_sql
 			ops[g.connectorPush(n, gchunkCConnectorOp(n), &stack)] = true
 		} else {
 			sql := g.sql(node)
@@ -580,7 +545,9 @@ func (g *Generator) connectorSQL(expression *Expr, op string, stack []any) strin
 	return strings.Join(sqls, sep)
 }
 
-// connectorPush is the `stack is not None` branch of connector_sql.
+// connectorPush pushes the operands of a connector onto stack (right, op, left, so the left
+// operand pops first) and returns op, with the node's comments attached when comments are on.
+// A connector with an expressions list is pushed pre-rendered.
 func (g *Generator) connectorPush(expression *Expr, op string, stack *[]any) string {
 	if len(expression.Expressions()) > 0 {
 		*stack = append(*stack, g.expressions(expression, exprsOpts{sep: strp2(" " + op + " ")}))
@@ -594,7 +561,6 @@ func (g *Generator) connectorPush(expression *Expr, op string, stack *[]any) str
 	return op
 }
 
-// gchunkCConnectorOp maps a Connector node to the op its <key>_sql method passes to connector_sql.
 func gchunkCConnectorOp(e *Expr) string {
 	switch e.Kind() {
 	case KAnd:
@@ -607,37 +573,30 @@ func gchunkCConnectorOp(e *Expr) string {
 	panic(&ValueError{Msg: "'Generator' object has no attribute '" + e.Key() + "_sql'"})
 }
 
-// bitwiseand_sql (generator.py L4065).
 func (g *Generator) bitwiseandSQL(expression *Expr) string {
 	return g.binary(expression, "&")
 }
 
-// bitwiseleftshift_sql (generator.py L4068).
 func (g *Generator) bitwiseleftshiftSQL(expression *Expr) string {
 	return g.binary(expression, "<<")
 }
 
-// bitwisenot_sql (generator.py L4071).
 func (g *Generator) baseBitwisenotSQL(expression *Expr) string {
 	return "~" + g.sqlKey(expression, "this")
 }
 
-// bitwiseor_sql (generator.py L4074).
 func (g *Generator) bitwiseorSQL(expression *Expr) string {
 	return g.binary(expression, "|")
 }
 
-// bitwiserightshift_sql (generator.py L4077).
 func (g *Generator) bitwiserightshiftSQL(expression *Expr) string {
 	return g.binary(expression, ">>")
 }
 
-// bitwisexor_sql (generator.py L4080).
 func (g *Generator) baseBitwisexorSQL(expression *Expr) string {
 	return g.binary(expression, "^")
 }
 
-// cast_sql (generator.py L4083). safePrefix "" stands for None.
 func (g *Generator) baseCastSQL(expression *Expr, safePrefix string) string {
 	formatSQL := g.sqlKey(expression, "format")
 	if formatSQL != "" {
@@ -658,19 +617,16 @@ func (g *Generator) baseCastSQL(expression *Expr, safePrefix string) string {
 	return safePrefix + "CAST(" + g.sqlKey(expression, "this") + " AS" + toSQL + def + formatSQL + action + ")"
 }
 
-// strtotime_sql (generator.py L4095)
-// Base implementation that excludes safe, zone, and target_type metadata args.
+// baseStrtotimeSQL leaves out the safe, zone and target_type metadata args.
 func (g *Generator) baseStrtotimeSQL(expression *Expr) string {
 	return g.fn("STR_TO_TIME", expression.Arg("this"), expression.Arg("format"))
 }
 
-// strtodate_sql (generator.py L4099)
-// Base implementation that excludes the safe and default_year metadata args.
+// baseStrtodateSQL leaves out the safe and default_year metadata args.
 func (g *Generator) baseStrtodateSQL(expression *Expr) string {
 	return g.fn("STR_TO_DATE", expression.Arg("this"), expression.Arg("format"))
 }
 
-// parsedatetime_sql (generator.py L4102).
 func (g *Generator) baseParsedatetimeSQL(expression *Expr) string {
 	return g.fn(
 		"PARSE_DATETIME",
@@ -680,10 +636,6 @@ func (g *Generator) baseParsedatetimeSQL(expression *Expr) string {
 	)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers used by generator chunk C (prefixed gchunkC so they can be unified later).
-
-// gchunkCCsv mirrors sqlglot.helper.csv(*args, sep=sep).
 func gchunkCCsv(sep string, args ...string) string {
 	var parts []string
 	for _, a := range args {
@@ -694,7 +646,6 @@ func gchunkCCsv(sep string, args ...string) string {
 	return strings.Join(parts, sep)
 }
 
-// gchunkCExprsToAny converts an expression list into variadic args for g.fn / g.funcFull.
 func gchunkCExprsToAny(list []*Expr) []any {
 	out := make([]any, len(list))
 	for i, e := range list {
@@ -703,7 +654,6 @@ func gchunkCExprsToAny(list []*Expr) []any {
 	return out
 }
 
-// gchunkCPyStr mirrors Python str(value) for raw arg values interpolated in f-strings.
 func gchunkCPyStr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -726,7 +676,6 @@ func gchunkCPyStr(v any) string {
 	return fmt.Sprint(v)
 }
 
-// gchunkCWrap mirrors expressions.core._wrap(expression, kind).
 func gchunkCWrap(e *Expr, kind Kind) *Expr {
 	if e.IsA(kind) {
 		return Paren(e)
@@ -739,7 +688,6 @@ var (
 	gchunkCBaseTypeMappingVal  map[DType]string
 )
 
-// gchunkCBaseTypeMapping is Dialect.get_or_raise(None).generator_class.TYPE_MAPPING.
 func gchunkCBaseTypeMapping() map[DType]string {
 	gchunkCBaseTypeMappingOnce.Do(func() {
 		gchunkCBaseTypeMappingVal = generatorSettings_base().TYPE_MAPPING
@@ -747,7 +695,8 @@ func gchunkCBaseTypeMapping() map[DType]string {
 	return gchunkCBaseTypeMappingVal
 }
 
-// gchunkCDataTypeIsType mirrors DataType.is_type(dtype) for a single DType (check_nullable=False).
+// gchunkCDataTypeIsType reports whether dt has the given type, ignoring nullability;
+// user-defined types must match exactly.
 func gchunkCDataTypeIsType(dt *Expr, dtype DType) bool {
 	if dt == nil {
 		return false
@@ -759,7 +708,6 @@ func gchunkCDataTypeIsType(dt *Expr, dtype DType) bool {
 	return dt.DTypeOf() == dtype
 }
 
-// gchunkCIsType mirrors Expr.is_type(dtype), including the DataType and Cast overrides.
 func gchunkCIsType(e *Expr, dtype DType) bool {
 	if e == nil {
 		return false
@@ -774,7 +722,6 @@ func gchunkCIsType(e *Expr, dtype DType) bool {
 	return t != nil && gchunkCDataTypeIsType(t, dtype)
 }
 
-// gchunkCCast mirrors exp.cast(expression, to) for a DType target (copy=True, dialect=None).
 func gchunkCCast(expression *Expr, to DType) *Expr {
 	if expression == nil {
 		panic(&ParseError{Msg: "SQL cannot be None"})
@@ -809,7 +756,6 @@ func gchunkCCast(expression *Expr, to DType) *Expr {
 	return c
 }
 
-// gchunkCIs mirrors Expr.is_(other) (Expr._binop(Is, other)).
 func gchunkCIs(self, other *Expr) *Expr {
 	this := self.Copy()
 	other = other.Copy()
@@ -820,7 +766,6 @@ func gchunkCIs(self, other *Expr) *Expr {
 	return New(KIs, "this", this, "expression", other)
 }
 
-// gchunkCOr mirrors exp.or_(*expressions) with copy=True, wrap=True.
 func gchunkCOr(expressions ...*Expr) *Expr {
 	var conditions []*Expr
 	for _, e := range expressions {
@@ -842,21 +787,18 @@ func gchunkCOr(expressions ...*Expr) *Expr {
 	return this
 }
 
-// gchunkCCaseWhen mirrors Case.when(condition, then) with copy=True.
 func gchunkCCaseWhen(c *Expr, condition, then *Expr) *Expr {
 	instance := c.Copy()
 	instance.Append("ifs", New(KIf, "this", condition.Copy(), "true", then.Copy()))
 	return instance
 }
 
-// gchunkCCaseElse mirrors Case.else_(condition) with copy=True.
 func gchunkCCaseElse(c *Expr, condition *Expr) *Expr {
 	instance := c.Copy()
 	instance.Set("default", condition.Copy())
 	return instance
 }
 
-// gchunkCMapDatePart mirrors sqlglot.dialects.dialect.map_date_part(part, dialect).
 func gchunkCMapDatePart(part *Expr, d *Dialect) *Expr {
 	mapped := ""
 	if part != nil && !(part.IsA(KColumn) && len(part.Parts()) != 1) {
@@ -872,7 +814,6 @@ func gchunkCMapDatePart(part *Expr, d *Dialect) *Expr {
 	return part
 }
 
-// gchunkCConcatToDpipeSQL mirrors sqlglot.dialects.dialect.concat_to_dpipe_sql.
 func gchunkCConcatToDpipeSQL(g *Generator, expression *Expr) string {
 	exprs := expression.Expressions()
 	if len(exprs) == 0 {
@@ -885,10 +826,8 @@ func gchunkCConcatToDpipeSQL(g *Generator, expression *Expr) string {
 	return g.sql(acc)
 }
 
-// gchunkCAnnotateTypes mirrors sqlglot.optimizer.annotate_types.annotate_types(e, dialect=d).
 func gchunkCAnnotateTypes(e *Expr, d *Dialect) *Expr { return annotateTypes(e, d) }
 
-// gchunkCApplyIndexOffset mirrors sqlglot.expressions.apply_index_offset.
 func gchunkCApplyIndexOffset(this *Expr, expressions []*Expr, offset int, d *Dialect) []*Expr {
 	return dhApplyIndexOffset(this, expressions, offset, d)
 }

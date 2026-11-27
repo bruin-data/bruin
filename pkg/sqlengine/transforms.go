@@ -5,12 +5,6 @@ import (
 	"strconv"
 )
 
-// Port of sqlglot/transforms.py (plus helper.find_new_name).
-//
-// Transform functions take and return *Expr. Factories (explode_projection_to_unnest) return
-// closures, and preprocess returns a GenFunc usable as a Generator.TRANSFORMS entry.
-
-// findNewName mirrors sqlglot.helper.find_new_name.
 func findNewName(taken StrSet, base string) string {
 	if !taken.Has(base) {
 		return base
@@ -24,11 +18,9 @@ func findNewName(taken StrSet, base string) string {
 	return n
 }
 
-// transformPreprocess mirrors transforms.preprocess(transforms, generator).
-//
-// It creates a new transform by chaining a sequence of transformations and converts the resulting
-// expression to SQL, using either the "_sql" method corresponding to the resulting expression,
-// or the appropriate Generator.TRANSFORMS function. generator may be nil (None).
+// transformPreprocess chains transforms and renders the result with generator, else with the
+// render method of the result's kind or its Generator.TRANSFORMS entry. An UnsupportedError raised
+// by a transformation is reported as unsupported.
 func transformPreprocess(transforms []func(*Expr) *Expr, generator GenFunc) GenFunc {
 	return func(g *Generator, expression *Expr) string {
 		expressionType := expression.Kind()
@@ -63,9 +55,9 @@ func transformPreprocess(transforms []func(*Expr) *Expr, generator GenFunc) GenF
 					return g.functionFallbackSQL(expression)
 				}
 
-				// Ensures we don't enter an infinite loop. This can happen when the original expression
-				// has the same type as the final expression and there's no _sql method available for it,
-				// because then it'd re-enter _to_sql.
+				// Ensures we don't enter an infinite loop. This can happen when the original
+				// expression has the same type as the final expression and there's no render method
+				// available for it, because then it'd re-enter this transform.
 				panic(&ValueError{Msg: fmt.Sprintf("Expr type %s requires a _sql method in order to be transformed.", expression.Kind().Name())})
 			}
 
@@ -76,7 +68,8 @@ func transformPreprocess(transforms []func(*Expr) *Expr, generator GenFunc) GenF
 	}
 }
 
-// transformUnnestGenerateDateArrayUsingRecursiveCte mirrors transforms.unnest_generate_date_array_using_recursive_cte.
+// transformUnnestGenerateDateArrayUsingRecursiveCte replaces UNNEST(GENERATE_DATE_ARRAY(...)) in
+// FROM and JOIN with a recursive CTE that generates the dates.
 func transformUnnestGenerateDateArrayUsingRecursiveCte(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		count := 0
@@ -147,8 +140,6 @@ func transformUnnestGenerateDateArrayUsingRecursiveCte(expression *Expr) *Expr {
 	return expression
 }
 
-// transformUnnestGenerateSeries mirrors transforms.unnest_generate_series:
-// unnests GENERATE_SERIES or SEQUENCE table references.
 func transformUnnestGenerateSeries(expression *Expr) *Expr {
 	this := expression.This()
 	if expression.IsA(KTable) && this.IsA(KGenerateSeries) {
@@ -163,8 +154,8 @@ func transformUnnestGenerateSeries(expression *Expr) *Expr {
 	return expression
 }
 
-// transformEliminateDistinctOn mirrors transforms.eliminate_distinct_on: converts SELECT DISTINCT ON
-// statements to a subquery with a window function.
+// transformEliminateDistinctOn converts SELECT DISTINCT ON statements to a subquery with a window
+// function.
 func transformEliminateDistinctOn(expression *Expr) *Expr {
 	if expression.IsA(KSelect) &&
 		expression.ArgB("distinct") &&
@@ -224,17 +215,18 @@ func transformEliminateDistinctOn(expression *Expr) *Expr {
 	return expression
 }
 
-// transformEliminateQualify mirrors transforms.eliminate_qualify: converts SELECT statements that
-// contain the QUALIFY clause into subqueries, filtered equivalently.
-//
-// Some dialects don't support window functions in the WHERE clause, so we need to include them as
-// projections in the subquery, in order to refer to them in the outer filter using aliases. Also,
-// if a column is referenced in the QUALIFY clause but is not selected, we need to include it too,
-// otherwise we won't be able to refer to it in the outer query's WHERE clause. Finally, if a
-// newly aliased projection is referenced in the QUALIFY clause, it will be replaced by the
-// corresponding expression to avoid creating invalid column references.
+// transformEliminateQualify rewrites a SELECT with QUALIFY into a filtered subquery. Window
+// functions and columns that QUALIFY references become aliased projections of the subquery, since
+// some dialects don't allow window functions in WHERE and the outer filter can only refer to
+// selected columns. A reference to a newly aliased projection is replaced by its expression, to
+// avoid invalid column references.
 func transformEliminateQualify(expression *Expr) *Expr {
 	if expression.IsA(KSelect) && expression.ArgB("qualify") {
+		if parent := expression.Parent(); parent.IsA(KInsert) && parent.Parent().IsA(KMultitableInserts) {
+			// A FROM-first multi-table INSERT branch shares its parent's FROM, so it can't be wrapped
+			panic(&UnsupportedError{Msg: "QUALIFY is not supported in a FROM-first multi-table INSERT branch"})
+		}
+
 		taken := newStrSet(expression.NamedSelects()...)
 		for _, sel := range expression.Selects() {
 			if sel.AliasOrName() == "" {
@@ -308,10 +300,8 @@ func transformEliminateQualify(expression *Expr) *Expr {
 	return expression
 }
 
-// transformRemovePrecisionParameterizedTypes mirrors transforms.remove_precision_parameterized_types.
-//
-// Some dialects only allow the precision for parameterized types to be defined in the DDL and not in
-// other expressions. This transforms removes the precision from parameterized types in expressions.
+// transformRemovePrecisionParameterizedTypes drops type parameters such as precision, which some
+// dialects only allow in DDL.
 func transformRemovePrecisionParameterizedTypes(expression *Expr) *Expr {
 	for node := range expression.FindAll(KDataType) {
 		kept := []*Expr{}
@@ -326,8 +316,8 @@ func transformRemovePrecisionParameterizedTypes(expression *Expr) *Expr {
 	return expression
 }
 
-// transformUnqualifyUnnest mirrors transforms.unqualify_unnest: removes references to unnest table
-// aliases, added by the optimizer's qualify_columns step.
+// transformUnqualifyUnnest removes references to unnest table aliases, added by the optimizer's
+// QualifyColumns step.
 func transformUnqualifyUnnest(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		unnestAliases := newStrSet()
@@ -355,13 +345,13 @@ func transformUnqualifyUnnest(expression *Expr) *Expr {
 	return expression
 }
 
-// transformUnnestToExplode mirrors transforms.unnest_to_explode(expression) (unnest_using_arrays_zip=True).
+// transformUnnestToExplode is transformUnnestToExplodeFull with ARRAYS_ZIP for multiple arrays.
 func transformUnnestToExplode(expression *Expr) *Expr {
 	return transformUnnestToExplodeFull(expression, true)
 }
 
-// transformUnnestToExplodeFull mirrors transforms.unnest_to_explode(expression, unnest_using_arrays_zip):
-// converts cross join unnest into lateral view explode.
+// transformUnnestToExplodeFull converts cross join unnest into lateral view explode. Multiple
+// arrays are zipped with ARRAYS_ZIP when unnestUsingArraysZip is set and unsupported otherwise.
 func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *Expr {
 	unnestZipExprs := func(u *Expr, unnestExprs []*Expr, hasMultiExpr bool) []*Expr {
 		if hasMultiExpr {
@@ -369,7 +359,6 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 				panic(&UnsupportedError{Msg: "Cannot transpile UNNEST with multiple input arrays"})
 			}
 
-			// Use INLINE(ARRAYS_ZIP(...)) for multiple expressions
 			zipExprs := []*Expr{New(KAnonymous, "this", "ARRAYS_ZIP", "expressions", unnestExprs)}
 			u.Set("expressions", zipExprs)
 			return zipExprs
@@ -387,7 +376,6 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 		return KExplode
 	}
 
-	// offsetColumn mirrors `offset if isinstance(offset, exp.Identifier) else exp.to_identifier("pos")`.
 	offsetColumn := func(offset any) *Expr {
 		if o, ok := offset.(*Expr); ok && o.IsA(KIdentifier) {
 			return o
@@ -414,7 +402,7 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 				columns = alias.ArgL("columns")
 			}
 			if offset := unnest.Arg("offset"); truthy(offset) {
-				// list.insert mutates alias.args["columns"] in place when it is a non-empty list.
+				// A non-empty alias column list is updated in place as well.
 				aliased := len(columns) > 0
 				columns = append([]*Expr{offsetColumn(offset)}, columns...)
 				if aliased {
@@ -457,11 +445,11 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 				}
 
 				exprs := unnest.Expressions()
-				// The number of unnest.expressions will be changed by _unnest_zip_exprs, we need to record it here
+				// unnestZipExprs changes the number of unnest.expressions, so record it here
 				hasMultiExpr := len(exprs) > 1
 				exprs = unnestZipExprs(unnest, exprs, hasMultiExpr)
 
-				// joins.remove(join): removes the first element that is (or equals) join, in place.
+				// Remove the first element that is (or equals) join, in place.
 				i := tfmListIndex(joins, join)
 				if i < 0 {
 					panic(&ValueError{Msg: "list.remove(x): x not in list"})
@@ -471,8 +459,9 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 
 				aliasCols := alias.ArgL("columns")
 
-				// # Handle UNNEST to LATERAL VIEW EXPLODE: Exception is raised when there are 0 or > 2 aliases
-				// Spark LATERAL VIEW EXPLODE requires single alias for array/struct and two for Map type column unlike unnest in trino/presto which can take an arbitrary amount.
+				// Handle UNNEST to LATERAL VIEW EXPLODE: an error is raised when there are 0 or > 2
+				// aliases. Spark LATERAL VIEW EXPLODE requires a single alias for array/struct and
+				// two for a Map type column, unlike unnest in Trino/Presto, which takes any number.
 				// Refs: https://spark.apache.org/docs/latest/sql-ref-syntax-qry-select-lateral-view.html
 
 				if !hasMultiExpr && len(aliasCols) != 1 && len(aliasCols) != 2 {
@@ -503,8 +492,8 @@ func transformUnnestToExplodeFull(expression *Expr, unnestUsingArraysZip bool) *
 	return expression
 }
 
-// transformExplodeProjectionToUnnest mirrors transforms.explode_projection_to_unnest(index_offset):
-// converts explode/posexplode projections into unnests.
+// transformExplodeProjectionToUnnest returns a transform that converts explode/posexplode
+// projections into unnests; indexOffset is the first array index of the target dialect.
 func transformExplodeProjectionToUnnest(indexOffset int) func(*Expr) *Expr {
 	return func(expression *Expr) *Expr {
 		if expression.IsA(KSelect) {
@@ -532,7 +521,7 @@ func transformExplodeProjectionToUnnest(indexOffset int) func(*Expr) *Expr {
 
 			// we use list here because expression.selects is mutated inside the loop
 			for _, sel := range append([]*Expr{}, expression.Selects()...) {
-				explode := sel.Find(KExplode)
+				explode := FindInScope(sel, KExplode)
 
 				if explode != nil {
 					var posAlias any = ""
@@ -552,7 +541,7 @@ func transformExplodeProjectionToUnnest(indexOffset int) func(*Expr) *Expr {
 						alias = sel.Replace(tfmAlias(sel.This(), "", nil, nil, false))
 					} else {
 						alias = sel.Replace(tfmAlias(sel, "", nil, nil, true))
-						explode = alias.Find(KExplode)
+						explode = FindInScope(alias, KExplode)
 						tfmAssert(explode != nil, "")
 					}
 
@@ -691,11 +680,8 @@ func transformExplodeProjectionToUnnest(indexOffset int) func(*Expr) *Expr {
 	}
 }
 
-// tfmIsPercentile mirrors isinstance(expression, exp.PERCENTILES).
 func tfmIsPercentile(e *Expr) bool { return e.IsA(KPercentileCont, KPercentileDisc) }
 
-// transformAddWithinGroupForPercentiles mirrors transforms.add_within_group_for_percentiles:
-// transforms percentiles by adding a WITHIN GROUP clause to them.
 func transformAddWithinGroupForPercentiles(expression *Expr) *Expr {
 	if tfmIsPercentile(expression) &&
 		!expression.Parent().IsA(KWithinGroup) &&
@@ -709,8 +695,6 @@ func transformAddWithinGroupForPercentiles(expression *Expr) *Expr {
 	return expression
 }
 
-// transformRemoveWithinGroupForPercentiles mirrors transforms.remove_within_group_for_percentiles:
-// transforms percentiles by getting rid of their corresponding WITHIN GROUP clause.
 func transformRemoveWithinGroupForPercentiles(expression *Expr) *Expr {
 	if expression.IsA(KWithinGroup) &&
 		tfmIsPercentile(expression.This()) &&
@@ -723,8 +707,8 @@ func transformRemoveWithinGroupForPercentiles(expression *Expr) *Expr {
 	return expression
 }
 
-// transformAddRecursiveCteColumnNames mirrors transforms.add_recursive_cte_column_names: uses
-// projection output names in recursive CTE definitions to define the CTEs' columns.
+// transformAddRecursiveCteColumnNames uses projection output names in recursive CTE definitions to
+// define the CTEs' columns.
 func transformAddRecursiveCteColumnNames(expression *Expr) *Expr {
 	if expression.IsA(KWith) && expression.ArgB("recursive") {
 		nextName := nameSequence("_c_")
@@ -752,8 +736,7 @@ func transformAddRecursiveCteColumnNames(expression *Expr) *Expr {
 	return expression
 }
 
-// transformEpochCastToTs mirrors transforms.epoch_cast_to_ts: replaces 'epoch' in casts by the
-// equivalent date literal.
+// transformEpochCastToTs replaces 'epoch' in casts by the equivalent date literal.
 func transformEpochCastToTs(expression *Expr) *Expr {
 	if expression.IsA(KCast, KTryCast) &&
 		pyLower(expression.Name()) == "epoch" &&
@@ -764,8 +747,8 @@ func transformEpochCastToTs(expression *Expr) *Expr {
 	return expression
 }
 
-// transformEliminateSemiAndAntiJoins mirrors transforms.eliminate_semi_and_anti_joins: converts SEMI
-// and ANTI joins into equivalent forms that use EXIST instead.
+// transformEliminateSemiAndAntiJoins converts SEMI and ANTI joins into equivalent forms that use
+// EXISTS instead.
 func transformEliminateSemiAndAntiJoins(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		for _, join := range append([]*Expr{}, expression.ArgL("joins")...) {
@@ -786,11 +769,9 @@ func transformEliminateSemiAndAntiJoins(expression *Expr) *Expr {
 	return expression
 }
 
-// transformEliminateFullOuterJoin mirrors transforms.eliminate_full_outer_join.
-//
-// Converts a query with a FULL OUTER join to a union of identical queries that
-// use LEFT/RIGHT OUTER joins instead. This transformation currently only works
-// for queries that have a single FULL OUTER join.
+// transformEliminateFullOuterJoin converts a query with a FULL OUTER join to a union of identical
+// queries that use LEFT/RIGHT OUTER joins instead. This transformation currently only works for
+// queries that have a single FULL OUTER join.
 func transformEliminateFullOuterJoin(expression *Expr) *Expr {
 	if expression.IsA(KSelect) {
 		var fullOuterJoinIndexes []int
@@ -804,7 +785,6 @@ func transformEliminateFullOuterJoin(expression *Expr) *Expr {
 
 		if len(fullOuterJoins) == 1 {
 			expressionCopy := expression.Copy()
-			expression.Set("limit", nil)
 			index, fullOuterJoin := fullOuterJoinIndexes[0], fullOuterJoins[0]
 
 			tables := [2]string{expression.ArgE("from_").AliasOrName(), fullOuterJoin.AliasOrName()}
@@ -833,25 +813,26 @@ func transformEliminateFullOuterJoin(expression *Expr) *Expr {
 			)
 			expressionCopy.ArgL("joins")[index].Set("side", "right")
 			expressionCopy = tfmWhere(expressionCopy, []any{tfmNot(New(KExists, "this", antiJoinClause), true)}, true, true)
-			expressionCopy.Set("with_", nil) // remove CTEs from RIGHT side
-			expression.Set("order", nil)     // remove order by from LEFT side
 
-			return tfmUnion(expression, expressionCopy, false, false)
+			// CTEs and pagination apply to the whole union
+			union := tfmUnion(expression, expressionCopy, false, false)
+			for _, arg := range []string{"with_", "order", "limit", "offset"} {
+				if value := expression.Arg(arg); truthy(value) {
+					expression.Set(arg, nil)
+					expressionCopy.Set(arg, nil)
+					union.Set(arg, value)
+				}
+			}
+			return union
 		}
 	}
 
 	return expression
 }
 
-// transformMoveCtesToTopLevel mirrors transforms.move_ctes_to_top_level.
-//
-// Some dialects (e.g. Hive, T-SQL, Spark prior to version 3) only allow CTEs to be
-// defined at the top-level, so for example queries like:
-//
-//	SELECT * FROM (WITH t(c) AS (SELECT 1) SELECT * FROM t) AS subq
-//
-// are invalid in those dialects. This transformation can be used to ensure all CTEs are
-// moved to the top level so that the final SQL code is valid from a syntax standpoint.
+// transformMoveCtesToTopLevel moves nested CTEs to the top-level WITH, for dialects (e.g. Hive,
+// T-SQL, Spark before 3) that reject SELECT * FROM (WITH t(c) AS (SELECT 1) SELECT * FROM t) AS
+// subq.
 //
 // TODO: handle name clashes whilst moving CTEs (it can get quite tricky & costly).
 func transformMoveCtesToTopLevel(expression *Expr) *Expr {
@@ -892,14 +873,16 @@ func transformMoveCtesToTopLevel(expression *Expr) *Expr {
 	return expression
 }
 
-// tfmEnsureBoolTypes is (exp.DType.UNKNOWN, *exp.DataType.NUMERIC_TYPES).
+// tfmEnsureBoolTypes holds DT_UNKNOWN and the numeric types: values of these types used as
+// conditions get an explicit <> 0.
 var tfmEnsureBoolTypes = append([]DType{DT_UNKNOWN}, DataType_NUMERIC_TYPES.Items()...)
 
-// transformEnsureBools mirrors transforms.ensure_bools: converts numeric values used in conditions
-// into explicit boolean expressions.
+// transformEnsureBools converts numeric values and boolean casts used in conditions into explicit
+// comparisons.
 func transformEnsureBools(expression *Expr) *Expr {
 	ensureBool := func(node *Expr) {
 		if node.IsNumber() ||
+			(node.IsA(KCast) && tfmIsTypeD(node, DT_BOOLEAN)) ||
 			(!node.IsA(KSubqueryPredicate) && tfmIsTypeD(node, tfmEnsureBoolTypes...)) ||
 			(node.IsA(KColumn) && node.Type() == nil) {
 			node.Replace(tfmBinop(KNEQ, node, 0, false))
@@ -913,7 +896,9 @@ func transformEnsureBools(expression *Expr) *Expr {
 	return expression
 }
 
-// tfmCanonicalizeEnsureBools mirrors sqlglot.optimizer.canonicalize.ensure_bools.
+// tfmCanonicalizeEnsureBools applies replaceFunc to the condition operands of expression: both
+// sides of AND/OR, the operand of NOT, IF conditions (outside simple CASE) and WHERE/HAVING
+// predicates.
 func tfmCanonicalizeEnsureBools(expression *Expr, replaceFunc func(*Expr)) *Expr {
 	if expression.IsA(KConnector) {
 		replaceFunc(expression.Left())
@@ -930,10 +915,23 @@ func tfmCanonicalizeEnsureBools(expression *Expr, replaceFunc func(*Expr)) *Expr
 	return expression
 }
 
-// transformUnqualifyColumns mirrors transforms.unqualify_columns.
+// transformUnqualifyPivotFields unqualifies the columns in a (UN)PIVOT's FOR clause and IN-list,
+// which some dialects only accept as simple names, leaving the aggregate qualified.
+func transformUnqualifyPivotFields(expression *Expr) *Expr {
+	if expression.IsA(KPivot) {
+		fields := []*Expr{}
+		for _, field := range expression.ArgL("fields") {
+			fields = append(fields, transformUnqualifyColumns(field))
+		}
+		expression.Set("fields", fields)
+	}
+
+	return expression
+}
+
+// transformUnqualifyColumns removes the table, db and catalog qualifiers of every column.
 func transformUnqualifyColumns(expression *Expr) *Expr {
 	for column := range expression.FindAll(KColumn) {
-		// We only wanna pop off the table, db, catalog args
 		parts := column.Parts()
 		if len(parts) == 0 {
 			continue
@@ -946,27 +944,26 @@ func transformUnqualifyColumns(expression *Expr) *Expr {
 	return expression
 }
 
-// transformRemoveUniqueConstraints mirrors transforms.remove_unique_constraints.
 func transformRemoveUniqueConstraints(expression *Expr) *Expr {
 	tfmAssert(expression.IsA(KCreate), "")
 	for constraint := range expression.FindAll(KUniqueColumnConstraint) {
-		if constraint.Parent() != nil {
-			constraint.Parent().Pop()
+		// An unnamed table constraint is the UNIQUE itself, not its parent schema
+		if parent := constraint.Parent(); parent.IsA(KColumnConstraint, KConstraint) {
+			parent.Pop()
+		} else {
+			constraint.Pop()
 		}
 	}
 
 	return expression
 }
 
-// transformCtasWithTmpTablesToCreateTmpView mirrors transforms.ctas_with_tmp_tables_to_create_tmp_view(expression)
-// (with the default tmp_storage_provider=lambda e: e).
 func transformCtasWithTmpTablesToCreateTmpView(expression *Expr) *Expr {
 	return transformCtasWithTmpTablesToCreateTmpViewFull(expression, nil)
 }
 
-// transformCtasWithTmpTablesToCreateTmpViewFull mirrors
-// transforms.ctas_with_tmp_tables_to_create_tmp_view(expression, tmp_storage_provider).
-// A nil tmpStorageProvider means the default identity function.
+// transformCtasWithTmpTablesToCreateTmpViewFull turns CREATE TEMPORARY TABLE ... AS query into
+// CREATE TEMPORARY VIEW; a temporary table without a query goes through tmpStorageProvider.
 func transformCtasWithTmpTablesToCreateTmpViewFull(expression *Expr, tmpStorageProvider func(*Expr) *Expr) *Expr {
 	if tmpStorageProvider == nil {
 		tmpStorageProvider = func(e *Expr) *Expr { return e }
@@ -984,7 +981,6 @@ func transformCtasWithTmpTablesToCreateTmpViewFull(expression *Expr, tmpStorageP
 		}
 	}
 
-	// CTAS with temp tables map to CREATE TEMPORARY VIEW
 	if expression.KindText() == "TABLE" && temporary {
 		if expression.Expression() != nil {
 			return New(
@@ -1000,11 +996,9 @@ func transformCtasWithTmpTablesToCreateTmpViewFull(expression *Expr, tmpStorageP
 	return expression
 }
 
-// transformMoveSchemaColumnsToPartitionedBy mirrors transforms.move_schema_columns_to_partitioned_by.
-//
-// In Hive, the PARTITIONED BY property acts as an extension of a table's schema. When the
-// PARTITIONED BY value is an array of column names, they are transformed into a schema.
-// The corresponding columns are removed from the create statement.
+// transformMoveSchemaColumnsToPartitionedBy moves the columns named by a PARTITIONED BY array out
+// of the CREATE's schema into a PARTITIONED BY schema. In Hive, PARTITIONED BY acts as an
+// extension of the table's schema.
 func transformMoveSchemaColumnsToPartitionedBy(expression *Expr) *Expr {
 	tfmAssert(expression.IsA(KCreate), "")
 	schema := expression.This()
@@ -1040,11 +1034,9 @@ func transformMoveSchemaColumnsToPartitionedBy(expression *Expr) *Expr {
 	return expression
 }
 
-// transformMovePartitionedByToSchemaColumns mirrors transforms.move_partitioned_by_to_schema_columns.
-//
-// Spark 3 supports both "HIVEFORMAT" and "DATASOURCE" formats for CREATE TABLE.
-//
-// Currently, SQLGlot uses the DATASOURCE format for Spark 3.
+// transformMovePartitionedByToSchemaColumns moves PARTITIONED BY column definitions into the table
+// schema, leaving only their names in PARTITIONED BY, as the DATASOURCE CREATE TABLE format used
+// for Spark 3 expects.
 func transformMovePartitionedByToSchemaColumns(expression *Expr) *Expr {
 	tfmAssert(expression.IsA(KCreate), "")
 	prop := expression.Find(KPartitionedByProperty)
@@ -1074,181 +1066,7 @@ func transformMovePartitionedByToSchemaColumns(expression *Expr) *Expr {
 	return expression
 }
 
-// transformStructKvToAlias mirrors transforms.struct_kv_to_alias: converts struct arguments to
-// aliases, e.g. STRUCT(1 AS y).
-func transformStructKvToAlias(expression *Expr) *Expr {
-	if expression.IsA(KStruct) {
-		out := []*Expr{}
-		for _, e := range expression.Expressions() {
-			if e.IsA(KPropertyEQ) {
-				out = append(out, tfmAlias(e.Expression(), e.Arg("this"), nil, nil, true))
-			} else {
-				out = append(out, e)
-			}
-		}
-		expression.Set("expressions", out)
-	}
-
-	return expression
-}
-
-// transformEliminateJoinMarks mirrors transforms.eliminate_join_marks.
-//
-// https://docs.oracle.com/cd/B19306_01/server.102/b14200/queries006.htm#sthref3178
-//
-//  1. You cannot specify the (+) operator in a query block that also contains FROM clause join syntax.
-//  2. The (+) operator can appear only in the WHERE clause or, in the context of left-correlation
-//     (that is, when specifying the TABLE clause) in the FROM clause, and can be applied only to a
-//     column of a table or view.
-//
-// The (+) operator does not produce an outer join if you specify one table in the outer query and
-// the other table in an inner query. You cannot use the (+) operator to outer-join a table to itself,
-// although self joins are valid. The (+) operator can be applied only to a column, not to an arbitrary
-// expression. However, an arbitrary expression can contain one or more columns marked with the (+)
-// operator. A WHERE condition containing the (+) operator cannot be combined with another condition
-// using the OR logical operator. A WHERE condition cannot use the IN comparison condition to compare a
-// column marked with the (+) operator with an expression. A WHERE condition cannot compare any column
-// marked with the (+) operator with a subquery.
-func transformEliminateJoinMarks(expression *Expr) *Expr {
-	// we go in reverse to check the main query for left correlation
-	scopes := TraverseScope(expression)
-	for si := len(scopes) - 1; si >= 0; si-- {
-		scope := scopes[si]
-		query := scope.Expression
-
-		where := query.ArgE("where")
-		joins := query.ArgL("joins")
-
-		if where == nil {
-			continue
-		}
-		hasJoinMark := false
-		for c := range where.FindAll(KColumn) {
-			if c.ArgB("join_mark") {
-				hasJoinMark = true
-				break
-			}
-		}
-		if !hasJoinMark {
-			continue
-		}
-
-		// knockout: we do not support left correlation (see point 2)
-		tfmAssert(!scope.IsCorrelatedSubquery(), "Correlated queries are not supported")
-
-		// make sure we have AND of ORs to have clear join terms
-		where = NormalizeCNF(where.This(), false, 128)
-		tfmAssert(normalizedCNF(where, false), "Cannot normalize JOIN predicates")
-		// dict of {name: list of join AND conditions}
-		joinsOns := newOMap[[]*Expr]()
-		conds := []*Expr{where}
-		if where.IsA(KAnd) {
-			conds = where.Flatten(true)
-		}
-		for _, cond := range conds {
-			var joinCols []*Expr
-			for col := range cond.FindAll(KColumn) {
-				if col.ArgB("join_mark") {
-					joinCols = append(joinCols, col)
-				}
-			}
-
-			leftJoinTable := newStrSet()
-			for _, col := range joinCols {
-				leftJoinTable.Add(col.TableName())
-			}
-			if len(leftJoinTable) == 0 {
-				continue
-			}
-
-			tfmAssert(!(len(leftJoinTable) > 1), "Cannot combine JOIN predicates from different tables")
-
-			for _, col := range joinCols {
-				col.Set("join_mark", false)
-			}
-
-			var table string
-			for t := range leftJoinTable {
-				table = t
-			}
-			predicates, _ := joinsOns.Get(table)
-			joinsOns.Set(table, append(predicates, cond))
-		}
-
-		oldJoins := newOMap[*Expr]()
-		for _, join := range joins {
-			oldJoins.Set(join.AliasOrName(), join)
-		}
-		newJoins := newOMap[*Expr]()
-		queryFrom := query.ArgE("from_")
-
-		for _, table := range joinsOns.Keys() {
-			predicates, _ := joinsOns.Get(table)
-			source, ok := oldJoins.Get(table)
-			if !ok {
-				source = queryFrom
-			}
-			joinWhat := source.This().Copy()
-			newJoins.Set(joinWhat.AliasOrName(), New(
-				KJoin,
-				"this", joinWhat,
-				"on", tfmAnd(tfmAnys(predicates), true, true),
-				"kind", "LEFT",
-			))
-
-			for _, p := range predicates {
-				for p.Parent().IsA(KParen) {
-					p.Parent().Replace(p)
-				}
-
-				parent := p.Parent()
-				p.Pop()
-				if parent.IsA(KBinary) {
-					if left := parent.ArgE("this"); left == nil {
-						parent.Replace(parent.Right())
-					} else {
-						parent.Replace(left)
-					}
-				} else if parent.IsA(KWhere) {
-					parent.Pop()
-				}
-			}
-		}
-
-		if newJoins.Has(queryFrom.AliasOrName()) {
-			// Python iterates `old_joins.keys() - new_joins.keys()` (a set); we take the first
-			// remaining key in insertion order.
-			var onlyOldJoins []string
-			for _, k := range oldJoins.Keys() {
-				if !newJoins.Has(k) {
-					onlyOldJoins = append(onlyOldJoins, k)
-				}
-			}
-			tfmAssert(len(onlyOldJoins) >= 1, "Cannot determine which table to use in the new FROM clause")
-
-			newFromName := onlyOldJoins[0]
-			oldJoin, _ := oldJoins.Get(newFromName)
-			query.Set("from_", New(KFrom, "this", oldJoin.This()))
-		}
-
-		if newJoins.Len() > 0 {
-			for _, n := range oldJoins.Keys() { // preserve any other joins
-				j, _ := oldJoins.Get(n)
-				if !newJoins.Has(n) && n != query.ArgE("from_").Name() {
-					if j.KindText() == "" {
-						j.Set("kind", "CROSS")
-					}
-					newJoins.Set(n, j)
-				}
-			}
-			query.Set("joins", newJoins.Values())
-		}
-	}
-
-	return expression
-}
-
-// transformAnyToExists mirrors transforms.any_to_exists: transforms the ANY operator to Spark's EXISTS.
+// transformAnyToExists transforms the ANY operator to Spark's EXISTS.
 //
 // For example,
 //   - Postgres: SELECT * FROM tbl WHERE 5 > ANY(tbl.col)
@@ -1277,8 +1095,8 @@ func transformAnyToExists(expression *Expr) *Expr {
 	return expression
 }
 
-// transformEliminateWindowClause mirrors transforms.eliminate_window_clause: eliminates the `WINDOW`
-// query clause by inling each named window.
+// transformEliminateWindowClause eliminates the `WINDOW` query clause by inlining each named
+// window.
 func transformEliminateWindowClause(expression *Expr) *Expr {
 	windowsArg := expression.Arg("windows")
 	if expression.IsA(KSelect) && windowsArg != nil {
@@ -1300,7 +1118,7 @@ func transformEliminateWindowClause(expression *Expr) *Expr {
 				case *Expr:
 					window.Set(key, arg.Copy())
 				case []*Expr:
-					// list.copy() is shallow: the elements are shared (and re-parented).
+					// A shallow copy: the elements are shared (and re-parented).
 					window.Set(key, append([]*Expr{}, arg...))
 				}
 			}
@@ -1319,9 +1137,7 @@ func transformEliminateWindowClause(expression *Expr) *Expr {
 	return expression
 }
 
-// transformInheritStructFieldNames mirrors transforms.inherit_struct_field_names.
-//
-// Inherit field names from the first struct in an array.
+// transformInheritStructFieldNames inherits field names from the first struct in an array.
 //
 // BigQuery supports implicitly inheriting names from the first STRUCT in an array:
 //
@@ -1352,17 +1168,14 @@ func transformInheritStructFieldNames(expression *Expr) *Expr {
 		fieldNames = append(fieldNames, fld.This())
 	}
 
-	// Apply field names to subsequent structs that don't have them
 	for _, st := range append([]*Expr{}, expression.Expressions()[1:]...) {
 		if !st.IsA(KStruct) || len(st.Expressions()) != len(fieldNames) {
 			continue
 		}
 
-		// Convert unnamed expressions to PropertyEQ with inherited names
 		newExpressions := []*Expr{}
 		for i, expr := range st.Expressions() {
 			if !expr.IsA(KPropertyEQ) {
-				// Create PropertyEQ: field_name := value, preserving the type from the inner expression
 				propertyEQ := New(
 					KPropertyEQ,
 					"this", fieldNames[i].Copy(),
@@ -1381,24 +1194,21 @@ func transformInheritStructFieldNames(expression *Expr) *Expr {
 	return expression
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers (prefixed tfm): ports of sqlglot builders used by the transforms. They mirror the
-// Python copy semantics exactly, since several transforms depend on node identity.
-// ---------------------------------------------------------------------------------------------
+// The tfm helpers below copy or reuse their arguments deliberately: several transforms depend on
+// node identity.
 
-// tfmPyError mirrors a Python built-in exception (AssertionError, IndexError, TypeError) raised by a transform.
+// tfmPyError is an internal error raised (as a panic) by a transform. Type names the error kind
+// in its historical wording (AssertionError, IndexError, TypeError).
 type tfmPyError struct{ Type, Msg string }
 
 func (e *tfmPyError) Error() string { return e.Msg }
 
-// tfmAssert mirrors a Python `assert cond, msg`.
 func tfmAssert(cond bool, msg string) {
 	if !cond {
 		panic(&tfmPyError{Type: "AssertionError", Msg: msg})
 	}
 }
 
-// tfmBaseDialect mirrors Dialect.get_or_raise(None).
 func tfmBaseDialect() *Dialect {
 	d, err := GetDialect("")
 	if err != nil {
@@ -1407,7 +1217,6 @@ func tfmBaseDialect() *Dialect {
 	return d
 }
 
-// tfmIsNone reports whether v is Python None (nil or a nil *Expr).
 func tfmIsNone(v any) bool {
 	if v == nil {
 		return true
@@ -1418,7 +1227,6 @@ func tfmIsNone(v any) bool {
 	return false
 }
 
-// tfmAnys converts an expression list to a []any argument list.
 func tfmAnys(xs []*Expr) []any {
 	out := make([]any, len(xs))
 	for i, x := range xs {
@@ -1427,7 +1235,6 @@ func tfmAnys(xs []*Expr) []any {
 	return out
 }
 
-// tfmOptBool mirrors a Python `bool | None` value (e.g. Identifier.args.get("quoted")).
 func tfmOptBool(v any) *bool {
 	if b, ok := v.(bool); ok {
 		return &b
@@ -1435,7 +1242,6 @@ func tfmOptBool(v any) *bool {
 	return nil
 }
 
-// tfmListIndex mirrors list.index(x) (identity or Expression.__eq__); -1 when absent.
 func tfmListIndex(list []*Expr, x *Expr) int {
 	for i, y := range list {
 		if y == x || (y != nil && y.Equal(x)) {
@@ -1445,8 +1251,6 @@ func tfmListIndex(list []*Expr, x *Expr) int {
 	return -1
 }
 
-// tfmMaybeParse mirrors exp.maybe_parse(v, into=into, prefix=prefix, copy=copy) with the default
-// dialect. into == KNone means None.
 func tfmMaybeParse(v any, into Kind, prefix string, copy bool) *Expr {
 	var sql string
 	switch x := v.(type) {
@@ -1486,7 +1290,6 @@ func tfmMaybeParse(v any, into Kind, prefix string, copy bool) *Expr {
 	return e
 }
 
-// tfmToIdentifier mirrors exp.to_identifier(name, quoted=quoted, copy=copy).
 func tfmToIdentifier(name any, quoted *bool, copy bool) *Expr {
 	switch x := name.(type) {
 	case nil:
@@ -1501,14 +1304,13 @@ func tfmToIdentifier(name any, quoted *bool, copy bool) *Expr {
 			}
 			return x
 		}
-		panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + x.classRepr()})
+		panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + x.Kind().Name()})
 	case string:
 		return ToIdentifier(x, quoted)
 	}
 	panic(&ValueError{Msg: fmt.Sprintf("Name needs to be a string or an Identifier, got: %T", name)})
 }
 
-// tfmConvert mirrors exp.convert(value, copy=copy) for the value types used by the transforms.
 func tfmConvert(v any, copy bool) *Expr {
 	switch x := v.(type) {
 	case nil:
@@ -1531,7 +1333,6 @@ func tfmConvert(v any, copy bool) *Expr {
 	panic(&ValueError{Msg: fmt.Sprintf("Cannot convert %v", v)})
 }
 
-// tfmWrap mirrors exp._wrap(expression, kind).
 func tfmWrap(e *Expr, kind Kind) *Expr {
 	if e.IsA(kind) {
 		return New(KParen, "this", e)
@@ -1539,7 +1340,6 @@ func tfmWrap(e *Expr, kind Kind) *Expr {
 	return e
 }
 
-// tfmBinop mirrors Expr._binop(klass, other, reverse) (eq, neq, >, <=, -, ...).
 func tfmBinop(kind Kind, self *Expr, other any, reverse bool) *Expr {
 	this := self.Copy()
 	o := tfmConvert(other, true)
@@ -1553,7 +1353,6 @@ func tfmBinop(kind Kind, self *Expr, other any, reverse bool) *Expr {
 	return New(kind, "this", this, "expression", o)
 }
 
-// tfmCombine mirrors exp._combine(expressions, operator, copy=copy, wrap=wrap).
 func tfmCombine(expressions []any, operator Kind, copy, wrap bool) *Expr {
 	var conditions []*Expr
 	for _, x := range expressions {
@@ -1580,24 +1379,21 @@ func tfmCombine(expressions []any, operator Kind, copy, wrap bool) *Expr {
 	return this
 }
 
-// tfmAnd mirrors exp.and_(*expressions, copy=copy, wrap=wrap) (and Expr.and_).
 func tfmAnd(expressions []any, copy, wrap bool) *Expr {
 	return tfmCombine(expressions, KAnd, copy, wrap)
 }
 
-// tfmOr mirrors exp.or_(*expressions, copy=copy, wrap=wrap) (and Expr.or_).
 func tfmOr(expressions []any, copy, wrap bool) *Expr {
 	return tfmCombine(expressions, KOr, copy, wrap)
 }
 
-// tfmNot mirrors exp.not_(expression, copy=copy) (and Expr.not_).
 func tfmNot(expression any, copy bool) *Expr {
 	this := tfmMaybeParse(expression, KCondition, "", copy)
 	return New(KNot, "this", tfmWrap(this, KConnector))
 }
 
-// tfmColumn mirrors exp.column(col, table, quoted=quoted, copy=copy) (db and catalog None).
-// table == nil means None (an empty string still builds an Identifier, like Python).
+// tfmColumn builds a column reference from col (a name, Identifier or Star) and an optional table.
+// table == nil means no table; an empty string still builds an Identifier.
 func tfmColumn(col any, table any, quoted *bool, copy bool) *Expr {
 	var this *Expr
 	if c, ok := col.(*Expr); ok && c.IsA(KStar) {
@@ -1615,8 +1411,9 @@ func tfmColumn(col any, table any, quoted *bool, copy bool) *Expr {
 	)
 }
 
-// tfmAlias mirrors exp.alias_(expression, alias, table=table, quoted=quoted, copy=copy) (and Expr.as_).
-// table is the Python `table` sequence; an empty/nil table means False.
+// tfmAlias aliases expression. With table column names it sets a TableAlias with those columns;
+// otherwise it sets the alias arg when the kind has one (except for windows) or wraps the
+// expression in an Alias. An empty or nil table means a plain alias.
 func tfmAlias(expression any, alias any, table []any, quoted *bool, copy bool) *Expr {
 	exp := tfmMaybeParse(expression, KNone, "", copy)
 	aliasID := tfmToIdentifier(alias, quoted, true)
@@ -1645,7 +1442,6 @@ func tfmAlias(expression any, alias any, table []any, quoted *bool, copy bool) *
 	return New(KAlias, "this", exp, "alias", aliasID)
 }
 
-// tfmListBuilder mirrors exp._apply_list_builder(*expressions, instance, arg, append, copy, into).
 func tfmListBuilder(instance *Expr, arg string, expressions []any, into Kind, appendFlag, copy bool) *Expr {
 	inst := instance
 	if copy && instance != nil {
@@ -1668,17 +1464,14 @@ func tfmListBuilder(instance *Expr, arg string, expressions []any, into Kind, ap
 	return inst
 }
 
-// tfmSelect mirrors exp.select(*expressions, copy=copy).
 func tfmSelect(expressions []any, copy bool) *Expr {
 	return tfmSelectAppend(New(KSelect), expressions, true, copy)
 }
 
-// tfmSelectAppend mirrors Select.select(*expressions, append=append, copy=copy).
 func tfmSelectAppend(instance *Expr, expressions []any, appendFlag, copy bool) *Expr {
 	return tfmListBuilder(instance, "expressions", expressions, KExpr, appendFlag, copy)
 }
 
-// tfmSelectFrom mirrors Select.from_(expression, copy=copy).
 func tfmSelectFrom(instance *Expr, expression any, copy bool) *Expr {
 	if x, ok := expression.(*Expr); ok && x != nil && !x.IsA(KFrom) {
 		expression = New(KFrom, "this", x)
@@ -1692,7 +1485,6 @@ func tfmSelectFrom(instance *Expr, expression any, copy bool) *Expr {
 	return inst
 }
 
-// tfmWhere mirrors Query.where(*expressions, append=append, copy=copy).
 func tfmWhere(instance *Expr, expressions []any, appendFlag, copy bool) *Expr {
 	var filtered []any
 	for _, x := range expressions {
@@ -1726,7 +1518,6 @@ func tfmWhere(instance *Expr, expressions []any, appendFlag, copy bool) *Expr {
 	return inst
 }
 
-// tfmSubquery mirrors Query.subquery(alias, copy=copy).
 func tfmSubquery(instance *Expr, alias any, copy bool) *Expr {
 	inst := instance
 	if copy && instance != nil {
@@ -1746,15 +1537,12 @@ func tfmSubquery(instance *Expr, alias any, copy bool) *Expr {
 	return New(KSubquery, "this", inst, "alias", a)
 }
 
-// tfmUnion mirrors exp.union(left, right, distinct=distinct, copy=copy) (and Query.union).
 func tfmUnion(left, right *Expr, distinct, copy bool) *Expr {
 	l := tfmMaybeParse(left, KNone, "", copy)
 	r := tfmMaybeParse(right, KNone, "", copy)
 	return New(KUnion, "this", l, "expression", r, "distinct", distinct)
 }
 
-// tfmJoin mirrors Select.join(expression, join_type=joinType, copy=copy) for an expression argument
-// (on/using/join_alias None, append=True).
 func tfmJoin(instance *Expr, expression *Expr, joinType string, copy bool) *Expr {
 	if expression == nil {
 		panic(genPanic{&ParseError{Msg: "SQL cannot be None"}})
@@ -1789,7 +1577,6 @@ func tfmJoin(instance *Expr, expression *Expr, joinType string, copy bool) *Expr
 	return tfmListBuilder(instance, "joins", []any{join}, KNone, true, copy)
 }
 
-// tfmArray mirrors exp.array(*expressions, copy=copy).
 func tfmArray(expressions []any, copy bool) *Expr {
 	parsed := []*Expr{}
 	for _, x := range expressions {
@@ -1798,7 +1585,6 @@ func tfmArray(expressions []any, copy bool) *Expr {
 	return New(KArray, "expressions", parsed)
 }
 
-// tfmFunc mirrors exp.func(name, *args) with the default dialect (copy=True).
 func tfmFunc(name string, args ...any) *Expr {
 	d := tfmBaseDialect()
 
@@ -1821,7 +1607,6 @@ func tfmFunc(name string, args ...any) *Expr {
 	return function
 }
 
-// tfmDataTypeBuild mirrors exp.DataType.build(dtype) for a string dtype (DataType.from_str, udt=False).
 func tfmDataTypeBuild(dtype string) *Expr {
 	if pyUpper(dtype) == "UNKNOWN" {
 		return NewDataType(DT_UNKNOWN)
@@ -1834,12 +1619,12 @@ func tfmDataTypeBuild(dtype string) *Expr {
 	return e
 }
 
-// tfmCast mirrors exp.cast(expression, to, copy=copy) with the default dialect, for a string type.
+// tfmCast casts expression to the type named to. A cast whose target type already is, or renders
+// like, to in the base dialect is returned unchanged.
 func tfmCast(expression any, to string, copy bool) *Expr {
 	expr := tfmMaybeParse(expression, KNone, "", copy)
 	dataType := tfmDataTypeBuild(to)
 
-	// dont re-cast if the expression is already a cast to the correct type
 	if expr.IsA(KCast) {
 		typeMapping := tfmBaseDialect().G.TYPE_MAPPING
 
@@ -1866,8 +1651,8 @@ func tfmCast(expression any, to string, copy bool) *Expr {
 	return result
 }
 
-// tfmTypeOf returns the DataType that Expr.is_type compares against: the node itself for data
-// types, Cast.to for casts (Cast.is_type override), otherwise the annotated type.
+// tfmTypeOf returns the DataType that tfmIsType compares against: the node itself for data types,
+// the target type for casts, otherwise the annotated type.
 func tfmTypeOf(e *Expr) *Expr {
 	if e == nil {
 		return nil
@@ -1881,7 +1666,8 @@ func tfmTypeOf(e *Expr) *Expr {
 	return e.RawType()
 }
 
-// tfmIsType mirrors Expr.is_type(*dtypes) for DataType expression arguments.
+// tfmIsType reports whether e has one of the types dtypes. Parameterized and user-defined types
+// compare structurally, others by their DType.
 func tfmIsType(e *Expr, dtypes ...*Expr) bool {
 	t := tfmTypeOf(e)
 	if t == nil {
@@ -1902,7 +1688,6 @@ func tfmIsType(e *Expr, dtypes ...*Expr) bool {
 	return false
 }
 
-// tfmIsTypeD mirrors Expr.is_type(*dtypes) for DType arguments.
 func tfmIsTypeD(e *Expr, dtypes ...DType) bool {
 	t := tfmTypeOf(e)
 	if t == nil {
@@ -1921,8 +1706,6 @@ func tfmIsTypeD(e *Expr, dtypes ...DType) bool {
 	return false
 }
 
-// tfmSetType mirrors the Expr.type setter for a DataType (or None) value: values whose class is
-// not exactly DataType go through DataType.build, which copies DataType subclasses.
 func tfmSetType(e *Expr, dtype *Expr) {
 	if dtype != nil && !dtype.Is(KDataType) && dtype.IsA(KDataType) {
 		dtype = dtype.Copy()

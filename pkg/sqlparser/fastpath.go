@@ -6,13 +6,13 @@ import (
 	"unicode/utf8"
 )
 
-// Commands used to cross a process boundary to Python as JSON, so every request and response
-// went through a JSON round trip. The in-process engine keeps the observable semantics of that
-// round trip without paying for it: requests are normalized to exactly the shapes encoding/json
-// decodes into (objects, arrays, float64 numbers, strings, bools, nil), and results are converted
-// to the typed responses with json.Unmarshal semantics (an empty JSON array decodes to an empty,
-// non-nil slice; null to nil). Values outside the handled shapes, and strings with invalid UTF-8
-// (which encoding/json coerces), take the real JSON round trip instead.
+// Commands once ran in a separate process, so every request and response went through a JSON
+// round trip. The in-process engine keeps the observable semantics of that round trip without
+// paying for it: requests are normalized to exactly the shapes encoding/json decodes into
+// (objects, arrays, float64 numbers, strings, bools, nil), and results are converted to the typed
+// responses with json.Unmarshal semantics (an empty JSON array decodes to an empty, non-nil
+// slice; null to nil). Values outside the handled shapes, and strings with invalid UTF-8 (which
+// encoding/json coerces), take the real JSON round trip instead.
 
 // The response types are aliases of unnamed struct types, like the ones the public methods used to
 // decode into, so that encoding/json error messages (which name the struct type) are unchanged.
@@ -217,7 +217,7 @@ func normalizeValue(v any) (any, bool) {
 }
 
 // checkSchema passes a schema through as a Schema instead of its decoded map[string]any form:
-// the lineage command reads both identically (sorted keys, nil column maps as None), so only the
+// the lineage command reads both identically (sorted keys, nil column maps as null), so only the
 // UTF-8 coercion of the JSON round trip needs checking.
 func checkSchema(x map[string]map[string]string) (any, bool) {
 	if x == nil {

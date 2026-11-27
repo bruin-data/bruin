@@ -129,8 +129,8 @@ func TestSQLParser_HoistDeclares(t *testing.T) {
 
 	t.Run("BEGIN TRANSACTION does not swallow following semicolons", func(t *testing.T) {
 		t.Parallel()
-		// `BEGIN TRANSACTION` emits TokenType::Begin without a matching
-		// END (COMMIT/ROLLBACK don't produce TokenType::End). If we
+		// `BEGIN TRANSACTION` emits a TK_BEGIN token without a matching
+		// END (COMMIT/ROLLBACK don't produce TK_END). If we
 		// blindly tracked it as a block, every ';' after it would be
 		// classified as nested and the script would collapse into one
 		// non-DECLARE slice.
@@ -162,8 +162,8 @@ func TestSQLParser_HoistDeclares(t *testing.T) {
 
 	t.Run("non-ASCII text survives the round trip", func(t *testing.T) {
 		t.Parallel()
-		// The parser subprocess must decode its pipes as UTF-8; Windows
-		// defaults to the locale code page and returns 'é›ª' instead.
+		// Non-ASCII text must come back unchanged, not as 'é›ª' (UTF-8
+		// read in a Windows code page, a bug of the old parser process).
 		in := "SELECT 'pre; \u96ea' AS message;\nDECLARE y INT64;"
 		got, err := parser.HoistDeclares(in, pipeline.AssetTypeBigqueryQuery)
 		require.NoError(t, err)

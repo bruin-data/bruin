@@ -5,9 +5,6 @@ import (
 	"strings"
 )
 
-// Generator chunk D (part 1): sqlglot/generator.py currentdate_sql .. format_time.
-
-// currentdate_sql (generator.py L4110).
 func (g *Generator) baseCurrentdateSQL(expression *Expr) string {
 	zone := g.sqlKey(expression, "this")
 	if zone != "" {
@@ -16,7 +13,6 @@ func (g *Generator) baseCurrentdateSQL(expression *Expr) string {
 	return "CURRENT_DATE"
 }
 
-// collate_sql (generator.py L4114).
 func (g *Generator) baseCollateSQL(expression *Expr) string {
 	if g.s.COLLATE_IS_FUNC {
 		return g.functionFallbackSQL(expression)
@@ -24,12 +20,10 @@ func (g *Generator) baseCollateSQL(expression *Expr) string {
 	return g.binary(expression, "COLLATE")
 }
 
-// command_sql (generator.py L4119).
 func (g *Generator) commandSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " " + pyStrip(expression.Text("expression"))
 }
 
-// comment_sql (generator.py L4122).
 func (g *Generator) commentSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kind := expression.Arg("kind")
@@ -45,7 +39,6 @@ func (g *Generator) commentSQL(expression *Expr) string {
 	return "COMMENT" + existsSQL + "ON" + materialized + " " + genDPyStr(kind) + " " + this + " IS " + expressionSQL
 }
 
-// mergetreettlaction_sql (generator.py L4130).
 func (g *Generator) mergetreettlactionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	delete := ""
@@ -67,7 +60,6 @@ func (g *Generator) mergetreettlactionSQL(expression *Expr) string {
 	return this + delete + recompress + toDisk + toVolume
 }
 
-// mergetreettl_sql (generator.py L4141).
 func (g *Generator) mergetreettlSQL(expression *Expr) string {
 	where := g.sqlKey(expression, "where")
 	group := g.sqlKey(expression, "group")
@@ -83,9 +75,8 @@ func (g *Generator) mergetreettlSQL(expression *Expr) string {
 	return "TTL" + g.seg(g.expressions(expression, exprsOpts{})) + where + group + aggregates
 }
 
-// transaction_sql (generator.py L4152).
 func (g *Generator) baseTransactionSQL(expression *Expr) string {
-	// "modes" is a list of strings (see Parser._parse_transaction).
+	// "modes" is a list of strings (see parseTransaction).
 	modes := g.expressions(nil, exprsOpts{sqls: genDArgSqls(expression.Arg("modes")), hasSqls: true})
 	if modes != "" {
 		modes = " " + modes
@@ -93,7 +84,6 @@ func (g *Generator) baseTransactionSQL(expression *Expr) string {
 	return "BEGIN" + modes
 }
 
-// commit_sql (generator.py L4157).
 func (g *Generator) baseCommitSQL(expression *Expr) string {
 	chain := expression.Arg("chain")
 	chainSQL := ""
@@ -108,7 +98,6 @@ func (g *Generator) baseCommitSQL(expression *Expr) string {
 	return "COMMIT" + chainSQL
 }
 
-// rollback_sql (generator.py L4164).
 func (g *Generator) baseRollbackSQL(expression *Expr) string {
 	savepoint := expression.Arg("savepoint")
 	savepointSQL := ""
@@ -118,9 +107,17 @@ func (g *Generator) baseRollbackSQL(expression *Expr) string {
 	return "ROLLBACK" + savepointSQL
 }
 
-// altercolumn_sql (generator.py L4169).
 func (g *Generator) baseAltercolumnSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
+
+	exists := ""
+	if expression.ArgB("exists") {
+		if g.s.SUPPORTS_ALTER_COLUMN_IF_EXISTS {
+			exists = " IF EXISTS"
+		} else {
+			g.unsupported("ALTER COLUMN IF EXISTS is not supported by this dialect")
+		}
+	}
 
 	dtype := g.sqlKey(expression, "dtype")
 	if dtype != "" {
@@ -136,22 +133,22 @@ func (g *Generator) baseAltercolumnSQL(expression *Expr) string {
 		if g.s.ALTER_SET_TYPE != "" {
 			alterSetType = g.s.ALTER_SET_TYPE + " "
 		}
-		return "ALTER COLUMN " + this + " " + alterSetType + dtype + collate + using
+		return "ALTER COLUMN" + exists + " " + this + " " + alterSetType + dtype + collate + using
 	}
 
 	def := g.sqlKey(expression, "default")
 	if def != "" {
-		return "ALTER COLUMN " + this + " SET DEFAULT " + def
+		return "ALTER COLUMN" + exists + " " + this + " SET DEFAULT " + def
 	}
 
 	comment := g.sqlKey(expression, "comment")
 	if comment != "" {
-		return "ALTER COLUMN " + this + " COMMENT " + comment
+		return "ALTER COLUMN" + exists + " " + this + " COMMENT " + comment
 	}
 
 	visible := expression.Arg("visible")
 	if truthy(visible) {
-		return "ALTER COLUMN " + this + " SET " + genDPyStr(visible)
+		return "ALTER COLUMN" + exists + " " + this + " SET " + genDPyStr(visible)
 	}
 
 	allowNull := expression.Arg("allow_null")
@@ -166,13 +163,13 @@ func (g *Generator) baseAltercolumnSQL(expression *Expr) string {
 		if truthy(drop) {
 			keyword = "DROP"
 		}
-		return "ALTER COLUMN " + this + " " + keyword + " NOT NULL"
+		return "ALTER COLUMN" + exists + " " + this + " " + keyword + " NOT NULL"
 	}
 
-	return "ALTER COLUMN " + this + " DROP DEFAULT"
+	return "ALTER COLUMN" + exists + " " + this + " DROP DEFAULT"
 }
 
-// modifycolumn_sql (generator.py L4205).
+// modifycolumnSQL renders MODIFY COLUMN, or CHANGE COLUMN for renames.
 func (g *Generator) modifycolumnSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	renameFrom := g.sqlKey(expression, "rename_from")
@@ -188,7 +185,6 @@ func (g *Generator) modifycolumnSQL(expression *Expr) string {
 	return "MODIFY COLUMN " + this
 }
 
-// alterindex_sql (generator.py L4216).
 func (g *Generator) alterindexSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 
@@ -200,7 +196,7 @@ func (g *Generator) alterindexSQL(expression *Expr) string {
 	return "ALTER INDEX " + this + " " + visibleSQL
 }
 
-// alterdiststyle_sql (generator.py L4224).
+// alterdiststyleSQL renders Redshift's ALTER DISTSTYLE, as KEY DISTKEY col for column keys.
 func (g *Generator) alterdiststyleSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if !expression.This().IsA(KVar) {
@@ -209,7 +205,6 @@ func (g *Generator) alterdiststyleSQL(expression *Expr) string {
 	return "ALTER DISTSTYLE " + this
 }
 
-// altersortkey_sql (generator.py L4230).
 func (g *Generator) altersortkeySQL(expression *Expr) string {
 	compound := ""
 	if expression.ArgB("compound") {
@@ -226,10 +221,10 @@ func (g *Generator) altersortkeySQL(expression *Expr) string {
 	return "ALTER" + compound + " SORTKEY " + this
 }
 
-// alterrename_sql (generator.py L4237).
+// baseAlterrenameSQL renders RENAME [TO] name, dropping the database when the dialect does not
+// allow it in renames.
 func (g *Generator) baseAlterrenameSQL(expression *Expr, includeTo bool) string {
 	if !g.s.RENAME_TABLE_WITH_DB {
-		// Remove db from tables
 		expression = expression.Transform(func(n *Expr) *Expr {
 			if n.IsA(KTable) {
 				return genDTable(n.This())
@@ -245,7 +240,6 @@ func (g *Generator) baseAlterrenameSQL(expression *Expr, includeTo bool) string 
 	return "RENAME" + toKw + " " + this
 }
 
-// renamecolumn_sql (generator.py L4247).
 func (g *Generator) baseRenamecolumnSQL(expression *Expr) string {
 	exists := ""
 	if expression.ArgB("exists") {
@@ -256,7 +250,6 @@ func (g *Generator) baseRenamecolumnSQL(expression *Expr) string {
 	return "RENAME COLUMN" + exists + " " + oldColumn + " TO " + newColumn
 }
 
-// alterset_sql (generator.py L4253).
 func (g *Generator) baseAltersetSQL(expression *Expr) string {
 	exprs := g.expressions(expression, exprsOpts{flat: true})
 	if g.s.ALTER_SET_WRAPPED {
@@ -266,7 +259,6 @@ func (g *Generator) baseAltersetSQL(expression *Expr) string {
 	return "SET " + exprs
 }
 
-// alter_sql (generator.py L4260).
 func (g *Generator) baseAlterSQL(expression *Expr) string {
 	actions := expression.ArgL("actions")
 
@@ -334,7 +326,6 @@ func (g *Generator) baseAlterSQL(expression *Expr) string {
 	return "ALTER " + iceberg + kind + exists + only + this + onCluster + check + g.sep(" ") + actionsSQL + notValid + options + cascade
 }
 
-// altersession_sql (generator.py L4306).
 func (g *Generator) altersessionSQL(expression *Expr) string {
 	itemsSQL := g.expressions(expression, exprsOpts{flat: true})
 	keyword := "SET"
@@ -344,7 +335,6 @@ func (g *Generator) altersessionSQL(expression *Expr) string {
 	return keyword + " " + itemsSQL
 }
 
-// add_column_sql (generator.py L4311).
 func (g *Generator) baseAddColumnSQL(expression *Expr) string {
 	sql := g.sql(expression)
 	var columnText string
@@ -359,7 +349,6 @@ func (g *Generator) baseAddColumnSQL(expression *Expr) string {
 	return "ADD" + columnText + " " + sql
 }
 
-// droppartition_sql (generator.py L4322).
 func (g *Generator) droppartitionSQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{})
 	exists := " "
@@ -369,17 +358,14 @@ func (g *Generator) droppartitionSQL(expression *Expr) string {
 	return "DROP" + exists + expressions
 }
 
-// dropprimarykey_sql (generator.py L4327).
 func (g *Generator) dropprimarykeySQL(expression *Expr) string {
 	return "DROP PRIMARY KEY"
 }
 
-// addconstraint_sql (generator.py L4330).
 func (g *Generator) addconstraintSQL(expression *Expr) string {
 	return "ADD " + g.expressions(expression, exprsOpts{noIndent: true})
 }
 
-// addpartition_sql (generator.py L4333).
 func (g *Generator) addpartitionSQL(expression *Expr) string {
 	exists := ""
 	if expression.ArgB("exists") {
@@ -392,7 +378,8 @@ func (g *Generator) addpartitionSQL(expression *Expr) string {
 	return "ADD " + exists + g.sql(expression.Arg("this")) + location
 }
 
-// distinct_sql (generator.py L4339).
+// distinctSQL gives dialects without multi-argument DISTINCT a CASE that yields NULL when any
+// argument is NULL.
 func (g *Generator) distinctSQL(expression *Expr) string {
 	this := g.expressions(expression, exprsOpts{flat: true})
 
@@ -401,7 +388,7 @@ func (g *Generator) distinctSQL(expression *Expr) string {
 		for _, arg := range expression.Expressions() {
 			caseExpr = genDCaseWhen(caseExpr, genDBinop(KIs, arg, Null()), Null(), true)
 		}
-		// case.else_(str) parses the string with the default dialect.
+		// genDCaseElse parses the string with the default dialect.
 		this = g.sql(genDCaseElse(caseExpr, "("+this+")", true))
 	}
 
@@ -416,17 +403,14 @@ func (g *Generator) distinctSQL(expression *Expr) string {
 	return "DISTINCT" + this + on
 }
 
-// ignorenulls_sql (generator.py L4354).
 func (g *Generator) baseIgnorenullsSQL(expression *Expr) string {
 	return g.embedIgnoreNulls(expression, "IGNORE NULLS")
 }
 
-// respectnulls_sql (generator.py L4357).
 func (g *Generator) baseRespectnullsSQL(expression *Expr) string {
 	return g.embedIgnoreNulls(expression, "RESPECT NULLS")
 }
 
-// havingmax_sql (generator.py L4360).
 func (g *Generator) havingmaxSQL(expression *Expr) string {
 	thisSQL := g.sqlKey(expression, "this")
 	expressionSQL := g.sqlKey(expression, "expression")
@@ -437,7 +421,7 @@ func (g *Generator) havingmaxSQL(expression *Expr) string {
 	return thisSQL + " HAVING " + kind + " " + expressionSQL
 }
 
-// intdiv_sql (generator.py L4366).
+// intdivSQL renders integer division as CAST(a / b AS INT).
 func (g *Generator) intdivSQL(expression *Expr) string {
 	return g.sql(
 		New(
@@ -448,7 +432,8 @@ func (g *Generator) intdivSQL(expression *Expr) string {
 	)
 }
 
-// dpipe_sql (generator.py L4374).
+// baseDpipeSQL renders || concatenation, or CONCAT over text casts for safe concatenation in
+// dialects with strict string concatenation.
 func (g *Generator) baseDpipeSQL(expression *Expr) string {
 	if g.d.S.STRICT_STRING_CONCAT && expression.ArgB("safe") {
 		var args []any
@@ -460,7 +445,8 @@ func (g *Generator) baseDpipeSQL(expression *Expr) string {
 	return g.binary(expression, "||")
 }
 
-// div_sql (generator.py L4379).
+// divSQL renders a / b, adjusting operands so safe and typed division keep their semantics in
+// the target dialect.
 func (g *Generator) divSQL(expression *Expr) string {
 	l, r := expression.Left(), expression.Right()
 
@@ -481,7 +467,7 @@ func (g *Generator) divSQL(expression *Expr) string {
 	return g.binary(expression, "/")
 }
 
-// safedivide_sql (generator.py L4400).
+// safedivideSQL renders safe division as IF(d <> 0, n / d, NULL).
 func (g *Generator) safedivideSQL(expression *Expr) string {
 	n := genDWrap(expression.This(), KBinary)
 	d := genDWrap(expression.Expression(), KBinary)
@@ -493,37 +479,31 @@ func (g *Generator) safedivideSQL(expression *Expr) string {
 	))
 }
 
-// overlaps_sql (generator.py L4405).
 func (g *Generator) overlapsSQL(expression *Expr) string {
 	return g.binary(expression, "OVERLAPS")
 }
 
-// distance_sql (generator.py L4408).
 func (g *Generator) distanceSQL(expression *Expr) string {
 	return g.binary(expression, "<->")
 }
 
-// distancend_sql (generator.py L4411).
 func (g *Generator) distancendSQL(expression *Expr) string {
 	return g.binary(expression, "<<->>")
 }
 
-// dot_sql (generator.py L4414).
 func (g *Generator) baseDotSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + "." + g.sqlKey(expression, "expression")
 }
 
-// eq_sql (generator.py L4417).
 func (g *Generator) baseEqSQL(expression *Expr) string {
 	return g.binary(expression, "=")
 }
 
-// propertyeq_sql (generator.py L4420).
 func (g *Generator) propertyeqSQL(expression *Expr) string {
 	return g.binary(expression, ":=")
 }
 
-// escape_sql (generator.py L4423).
+// escapeSQL renders x ESCAPE y, expanding LIKE ANY/ALL first where quantifiers are unsupported.
 func (g *Generator) escapeSQL(expression *Expr) string {
 	this := expression.This()
 	if this.IsA(KLike, KILike) &&
@@ -534,33 +514,36 @@ func (g *Generator) escapeSQL(expression *Expr) string {
 	return g.binary(expression, "ESCAPE")
 }
 
-// glob_sql (generator.py L4433).
 func (g *Generator) globSQL(expression *Expr) string {
 	return g.binary(expression, "GLOB")
 }
 
-// gt_sql (generator.py L4436).
 func (g *Generator) gtSQL(expression *Expr) string {
 	return g.binary(expression, ">")
 }
 
-// gte_sql (generator.py L4439).
 func (g *Generator) gteSQL(expression *Expr) string {
 	return g.binary(expression, ">=")
 }
 
-// is_sql (generator.py L4442).
+// baseIsSQL renders a IS [NOT] b, turning IS [NOT] TRUE / FALSE into a / NOT a where the dialect
+// does not allow booleans after IS.
 func (g *Generator) baseIsSQL(expression *Expr) string {
+	negate := expression.ArgB("negate")
 	if !g.s.IS_BOOL_ALLOWED && expression.Expression().IsA(KBoolean) {
-		if expression.Expression().ArgB("this") {
+		if expression.Expression().ArgB("this") != negate {
 			return g.sql(expression.Arg("this"))
 		}
 		return g.sql(genDNot(expression.This(), true))
 	}
+	if negate {
+		return g.binary(expression, "IS NOT")
+	}
 	return g.binary(expression, "IS")
 }
 
-// _like_sql (generator.py L4449).
+// likeSQL renders LIKE / ILIKE. Where LIKE ANY/ALL is unsupported, it expands into one LIKE per
+// pattern joined with OR/AND, carrying escape along.
 func (g *Generator) likeSQL(expression *Expr, escape *Expr) string {
 	this := expression.This()
 	rhs := expression.Expression()
@@ -623,77 +606,67 @@ func (g *Generator) likeSQL(expression *Expr, escape *Expr) string {
 	return g.binary(expression, op)
 }
 
-// like_sql (generator.py L4499).
 func (g *Generator) likeSQL_(expression *Expr) string {
 	return g.likeSQL(expression, nil)
 }
 
-// ilike_sql (generator.py L4502).
 func (g *Generator) ilikeSQL(expression *Expr) string {
 	return g.likeSQL(expression, nil)
 }
 
-// match_sql (generator.py L4505).
 func (g *Generator) matchSQL(expression *Expr) string {
+	if expression.ArgB("kind") || expression.ArgB("analyzer") {
+		g.unsupported("MATCH variants and USING ANALYZER are not supported in this dialect")
+	}
 	return g.binary(expression, "MATCH")
 }
 
-// similarto_sql (generator.py L4508).
 func (g *Generator) similartoSQL(expression *Expr) string {
 	return g.binary(expression, "SIMILAR TO")
 }
 
-// lt_sql (generator.py L4511).
 func (g *Generator) ltSQL(expression *Expr) string {
 	return g.binary(expression, "<")
 }
 
-// lte_sql (generator.py L4514).
 func (g *Generator) lteSQL(expression *Expr) string {
 	return g.binary(expression, "<=")
 }
 
-// mod_sql (generator.py L4517).
 func (g *Generator) baseModSQL(expression *Expr) string {
 	return g.binary(expression, "%")
 }
 
-// mul_sql (generator.py L4520).
 func (g *Generator) mulSQL(expression *Expr) string {
 	return g.binary(expression, "*")
 }
 
-// neq_sql (generator.py L4523).
 func (g *Generator) baseNeqSQL(expression *Expr) string {
 	return g.binary(expression, "<>")
 }
 
-// nullsafeeq_sql (generator.py L4526).
 func (g *Generator) nullsafeeqSQL(expression *Expr) string {
 	return g.binary(expression, "IS NOT DISTINCT FROM")
 }
 
-// nullsafeneq_sql (generator.py L4529).
 func (g *Generator) nullsafeneqSQL(expression *Expr) string {
 	return g.binary(expression, "IS DISTINCT FROM")
 }
 
-// sub_sql (generator.py L4532).
 func (g *Generator) subSQL(expression *Expr) string {
 	return g.binary(expression, "-")
 }
 
-// trycast_sql (generator.py L4535).
 func (g *Generator) baseTrycastSQL(expression *Expr) string {
 	return g.castSQL(expression, "TRY_")
 }
 
-// jsoncast_sql (generator.py L4538).
+// jsoncastSQL renders a JSON cast as a plain CAST.
 func (g *Generator) jsoncastSQL(expression *Expr) string {
 	return g.castSQL(expression, "")
 }
 
-// try_sql (generator.py L4541).
+// trySQL renders TRY(expr), or just expr in dialects without TRY.
 func (g *Generator) trySQL(expression *Expr) string {
 	if !g.s.TRY_SUPPORTED {
 		g.unsupported("Unsupported TRY function")
@@ -703,7 +676,8 @@ func (g *Generator) trySQL(expression *Expr) string {
 	return g.fn("TRY", expression.Arg("this"))
 }
 
-// log_sql (generator.py L4548).
+// baseLogSQL renders LOG with the base in the position the dialect expects; dialects without a
+// two-argument LOG get LOG2/LOG10 for those bases.
 func (g *Generator) baseLogSQL(expression *Expr) string {
 	this := expression.This()
 	expr := expression.Expression()
@@ -721,7 +695,6 @@ func (g *Generator) baseLogSQL(expression *Expr) string {
 	return g.fn("LOG", this, expr)
 }
 
-// use_sql (generator.py L4562).
 func (g *Generator) useSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if kind != "" {
@@ -737,7 +710,6 @@ func (g *Generator) useSQL(expression *Expr) string {
 	return "USE" + kind + this
 }
 
-// ceil_floor (generator.py L4590).
 func (g *Generator) ceilFloor(expression *Expr) string {
 	toClause := g.sqlKey(expression, "to")
 	if toClause != "" {
@@ -747,7 +719,8 @@ func (g *Generator) ceilFloor(expression *Expr) string {
 	return g.functionFallbackSQL(expression)
 }
 
-// format_time (generator.py L4640). Returns "" for None.
+// baseFormatTime converts the format of expression to the dialect's format, using the dialect's
+// inverse mapping and trie unless others are given. It returns "" when there is no format.
 func (g *Generator) baseFormatTime(expression *Expr, inverseTimeMapping map[string]string, inverseTimeTrie *trie) string {
 	mapping := inverseTimeMapping
 	if len(mapping) == 0 {
@@ -758,14 +731,14 @@ func (g *Generator) baseFormatTime(expression *Expr, inverseTimeMapping map[stri
 		tr = g.d.inverseTimeTrie
 	}
 	if genDTrieEmpty(tr) {
-		// time.format_time: trie = trie or new_trie(mapping)
+		// formatTime builds a trie from the mapping when given nil.
 		tr = nil
 	}
 	s, _ := formatTime(g.sqlKey(expression, "format"), mapping, tr)
 	return s
 }
 
-// genDUnsupportedArgs mirrors the @unsupported_args(...) decorator for plain argument names.
+// genDUnsupportedArgs reports each set argument of args as unsupported for the target dialect.
 func (g *Generator) genDUnsupportedArgs(expression *Expr, args ...string) {
 	for _, arg := range args {
 		if expression.ArgB(arg) {

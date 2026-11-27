@@ -8,7 +8,7 @@ import (
 )
 
 // The *_contract_test.go suites characterize the public Go calls against the
-// embedded SQLGlot runtime. Run them independently with:
+// SQL engine (pkg/sqlengine). Run them independently with:
 //
 //   go test -tags=no_duckdb_arrow ./pkg/sqlparser -run Contract -count=1
 //
@@ -16,9 +16,9 @@ import (
 // test. Keep types, casing, errors and omissions intact. Comments call out known
 // bugs: recording one here does not endorse it or make emitted SQL safe to run.
 // Each operation has its own test entry point so a replacement can be compared
-// operation by operation without routing expected values through SQLGlot.
+// operation by operation without routing expected values through the engine.
 
-// These are Bruin's distinct parser dialects, not every dialect SQLGlot accepts.
+// These are Bruin's distinct parser dialects, not every dialect the engine accepts.
 // Keep this list explicit: adding a platform must also extend the contract suite.
 // Platform aliases (e.g. MotherDuck -> DuckDB) are tested by the mapping tests.
 var contractDialects = []string{
@@ -27,7 +27,7 @@ var contractDialects = []string{
 	"spark", "starrocks", "trino", "tsql",
 }
 
-// SQLGlot's error location and ANSI highlighting are observable in Go errors.
+// The engine's error location and ANSI highlighting are observable in Go errors.
 // These literals deliberately do not ask the parser to format expectations.
 const (
 	contractSelectFromError     = "Expected table name but got <Token token_type: TokenType.SENTINEL, text: SENTINEL, line: 1, col: 1, start: 0, end: 0, comments: []>. Line 1, Col: 11.\n  SELECT \x1b[4mFROM\x1b[0m"

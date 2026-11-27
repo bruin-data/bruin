@@ -13,15 +13,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// SQLParser analyzes SQL in-process with pkg/sqlengine. It used to drive an embedded Python
-// interpreter running SQLGlot; the API and behavior are unchanged.
+// SQLParser analyzes SQL in-process with pkg/sqlengine. Its API dates from when parsing ran in a
+// separate process, which is why it still has Start and Close.
 type SQLParser struct {
 	tmpDir         string
 	started        bool
 	randomize      bool
 	MaxQueryLength int
 
-	// mutex serializes commands per instance, like the single-threaded Python process did.
+	// mutex serializes commands per instance: commands on one parser run one at a time.
 	mutex      sync.Mutex
 	startMutex sync.Mutex
 }
@@ -230,8 +230,8 @@ func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.Asset
 }
 
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
-	// Round-trip through JSON so that handlers observe exactly what the Python process received
-	// (map key order, null for nil maps/slices, numbers as float64).
+	// Round-trip through JSON so that handlers observe exactly what a JSON request decodes to
+	// (null for nil maps/slices, numbers as float64).
 	payload, err := json.Marshal(pc)
 	if err != nil {
 		return "", err

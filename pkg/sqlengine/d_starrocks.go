@@ -1,68 +1,184 @@
 package sqlengine
 
-// Port of sqlglot/dialects/starrocks.py (class StarRocks), sqlglot/parsers/starrocks.py
-// (StarRocksParser) and sqlglot/generators/starrocks.py (StarRocksGenerator). StarRocks inherits
-// from MySQL: only the differences from the MySQL classes are ported here.
+// StarRocks builds on the MySQL dialect, so only its differences from MySQL are applied here.
+
+import "strings"
 
 func init() {
 	registerCustomizer("starrocks", customizeStarRocks)
 	mysqlPartitionPropertyImpls["starrocks"] = starrocksParsePartitionProperty
 }
 
-// ---------------------------------------------------------------------------------------------
-// Customizer
-// ---------------------------------------------------------------------------------------------
-
 func customizeStarRocks(d *Dialect) {
 	P := d.P
 
-	// FUNCTIONS
 	P.FUNCTIONS["ADDDATE"] = buildDateDeltaWithInterval(KDateAdd, "DAY")
 	P.FUNCTIONS["DATE_ADD"] = buildDateDeltaWithInterval(KDateAdd, "DAY")
 	P.FUNCTIONS["DATE_SUB"] = buildDateDeltaWithInterval(KDateSub, "DAY")
 	P.FUNCTIONS["SUBDATE"] = buildDateDeltaWithInterval(KDateSub, "DAY")
 	P.FUNCTIONS["DATE_TRUNC"] = buildTimestampTrunc
-	P.FUNCTIONS["DATEDIFF"] = func(args []*Expr, d *Dialect) *Expr {
-		return New(KDateDiff, "this", seqGet(args, 0), "expression", seqGet(args, 1), "unit", LiteralString("DAY"))
-	}
 	P.FUNCTIONS["DATE_DIFF"] = func(args []*Expr, d *Dialect) *Expr {
 		return New(KDateDiff, "this", seqGet(args, 1), "expression", seqGet(args, 2), "unit", seqGet(args, 0))
 	}
 	P.FUNCTIONS["ARRAY_FLATTEN"] = fromArgList(KFlatten)
+	P.FUNCTIONS["LIKE"] = dialectBuildLike(KLike, false)
+	P.FUNCTIONS["TO_DAYS"] = fromArgList(KToDays)
 	P.FUNCTIONS["REGEXP"] = fromArgList(KRegexpLike)
 	// StarRocks' MAP() is a variadic constructor: MAP(k1, v1, k2, v2, ...)
 	// https://docs.starrocks.io/docs/sql-reference/sql-functions/map-functions/map/
 	P.FUNCTIONS["MAP"] = func(args []*Expr, d *Dialect) *Expr { return buildVarMap(args) }
+	P.FUNCTIONS["TIME_SLICE"] = starrocksBuildTimeSlice
+	// TABLE(<tvf>) wraps a table function invocation whose arguments are constants
+	// https://docs.starrocks.io/docs/sql-reference/sql-functions/table-functions/generate_series/
+	P.FUNCTIONS["TABLE"] = func(args []*Expr, _ *Dialect) *Expr { return New(KTableFromRows, "this", seqGet(args, 0)) }
 
-	// PROPERTY_PARSERS
-	P.PROPERTY_PARSERS["PROPERTIES"] = mysqlNoKwargs("StarRocksParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["PROPERTIES"] = noKwargs(func(p *Parser) any {
 		return p.parseWrappedProperties()
 	})
-	P.PROPERTY_PARSERS["UNIQUE"] = mysqlNoKwargs("StarRocksParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["AGGREGATE"] = noKwargs(func(p *Parser) any {
+		return anyExpr(p.parseCompositeKeyProperty(KAggregateKeyProperty))
+	})
+	P.PROPERTY_PARSERS["UNIQUE"] = noKwargs(func(p *Parser) any {
 		return anyExpr(p.parseCompositeKeyProperty(KUniqueKeyProperty))
 	})
-	P.PROPERTY_PARSERS["ROLLUP"] = mysqlNoKwargs("StarRocksParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["ROLLUP"] = noKwargs(func(p *Parser) any {
 		return anyExpr(starrocksParseRollupProperty(p))
 	})
-	P.PROPERTY_PARSERS["REFRESH"] = mysqlNoKwargs("StarRocksParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["REFRESH"] = noKwargs(func(p *Parser) any {
 		return anyExpr(starrocksParseRefreshProperty(p))
 	})
 
-	// Method overrides
+	P.STATEMENT_PARSERS[TK_REFRESH] = starrocksParseRefresh
+
+	// The aggregation type of a value column in an AGGREGATE KEY table, e.g. pv BIGINT SUM
+	// https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/CREATE_TABLE/
+	for _, name := range []string{"SUM", "MAX", "MIN", "REPLACE", "REPLACE_IF_NOT_NULL", "HLL_UNION"} {
+		P.CONSTRAINT_PARSERS[name] = func(p *Parser) *Expr { return VarExpr(upperText(p.prev)) }
+	}
+
 	P.h.parseCreate = starrocksParseCreate
 	P.h.parseUnnest = starrocksParseUnnest
 	P.h.parsePartitionedBy = starrocksParsePartitionedBy
+	P.h.parseTable = starrocksParseTable
+	P.h.parseBracket = starrocksParseBracket
 
 	customizeStarRocksGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// StarRocksParser methods
-// ---------------------------------------------------------------------------------------------
+// starrocksParseBracket parses a map{key: value, ...} literal as a map rather than a struct; map
+// stays an identifier elsewhere.
+// https://docs.starrocks.io/docs/sql-reference/data-types/semi_structured/Map/
+func starrocksParseBracket(p *Parser, this *Expr) *Expr {
+	isMapLiteral := this.IsA(KColumn) && this.Text("table") == "" && pyUpper(this.Name()) == "MAP" &&
+		p.matchNoAdvance(TK_L_BRACE)
 
-// starrocksParseRollupProperty mirrors StarRocksParser._parse_rollup_property.
+	bracket := p.baseParseBracket(this)
+	if !isMapLiteral || bracket == nil {
+		return bracket
+	}
+
+	// Wrap the literal itself, not any subscripts that follow it, e.g. map{...}[1]
+	literal := bracket
+	for literal.IsA(KBracket) {
+		literal = literal.This()
+	}
+
+	toMap := p.expression(New(KToMap, "this", literal.Copy()))
+	if literal == bracket {
+		return toMap
+	}
+
+	literal.Replace(toMap)
+	return bracket
+}
+
+// starrocksParseRefresh reads the materialized view name as bare table parts, since a table would
+// take PARTITION and FORCE as a partition selection and an index hint.
+// https://docs.starrocks.io/docs/sql-reference/sql-statements/materialized_view/REFRESH_MATERIALIZED_VIEW/
+func starrocksParseRefresh(p *Parser) *Expr {
+	if !p.matchTextSeq("MATERIALIZED", "VIEW") {
+		return p.parseRefresh()
+	}
+
+	this := p.parseTableParts(false, false, false, false)
+
+	var partitionStart, partitionEnd *Expr
+	if p.matchTextSeq("PARTITION", "START") {
+		partitionStart = p.parseWrapped(p.parseString, false)
+		p.matchTextSeq("END")
+		partitionEnd = p.parseWrapped(p.parseString, false)
+	}
+
+	force := p.matchTextSeq("FORCE")
+	var mode any
+	if p.matchTextSeq("WITH", "SYNC", "MODE") {
+		mode = "SYNC"
+	} else if p.matchTextSeq("WITH", "ASYNC", "MODE") {
+		mode = "ASYNC"
+	}
+
+	return p.expression(New(
+		KRefresh,
+		"this", this,
+		"kind", "MATERIALIZED VIEW",
+		"partition_start", partitionStart,
+		"partition_end", partitionEnd,
+		"force", force,
+		"mode", mode,
+	))
+}
+
+// starrocksBuildTimeSlice builds TIME_SLICE(dt, INTERVAL n unit [, FLOOR | CEIL]).
+// https://docs.starrocks.io/docs/sql-reference/sql-functions/date-time-functions/time_slice/
+func starrocksBuildTimeSlice(args []*Expr, d *Dialect) *Expr {
+	if len(args) < 2 {
+		return nil
+	}
+
+	var timeSlice, boundary *Expr
+	if args[1].IsA(KInterval) {
+		timeSlice = buildDateDeltaWithInterval(KTimeSlice, "")(args, d)
+		boundary = seqGet(args, 2)
+	} else {
+		timeSlice = FromArgList(KTimeSlice, args)
+		boundary = seqGet(args, 3)
+	}
+	if timeSlice == nil {
+		return nil
+	}
+
+	// StarRocks rejects a quoted slice length
+	if amount := timeSlice.Expression(); amount.IsString() && pyIntParse(amount.Name(), 10) {
+		timeSlice.Set("expression", LiteralNumber(amount.Name()))
+	}
+
+	if boundary != nil {
+		kind := "START"
+		if pyUpper(boundary.Name()) == "CEIL" {
+			kind = "END"
+		}
+		timeSlice.Set("kind", LiteralString(kind))
+	}
+
+	// StarRocks anchors slices at 0001-01-01, unlike Snowflake's 1970-01-01 epoch
+	timeSlice.Set("origin", LiteralString("0001-01-01"))
+	return timeSlice
+}
+
+func starrocksTimesliceSQL(g *Generator, e *Expr) string {
+	interval := New(KInterval, "this", e.Expression(), "unit", e.ArgE("unit"))
+	var boundary *Expr
+	if kind := pyUpper(e.Text("kind")); kind != "" {
+		if kind == "END" {
+			boundary = VarExpr("CEIL")
+		} else {
+			boundary = VarExpr("FLOOR")
+		}
+	}
+	return g.fn("TIME_SLICE", e.This(), interval, boundary)
+}
+
 func starrocksParseRollupProperty(p *Parser) *Expr {
-	// ROLLUP (rollup_name (col1, col2) [FROM from_index] [PROPERTIES (...)], ...)
 	parseRollupIndex := func() *Expr {
 		this := p.parseIdVar(true, nil)
 		expressions := p.parseWrappedIdVars(false)
@@ -86,7 +202,6 @@ func starrocksParseRollupProperty(p *Parser) *Expr {
 	return p.expression(New(KRollupProperty, "expressions", p.parseWrappedCSV(parseRollupIndex, TK_COMMA, false)))
 }
 
-// starrocksParseCreate mirrors StarRocksParser._parse_create.
 func starrocksParseCreate(p *Parser) *Expr {
 	create := p.baseParseCreate()
 
@@ -105,7 +220,22 @@ func starrocksParseCreate(p *Parser) *Expr {
 	return create
 }
 
-// starrocksParseUnnest mirrors StarRocksParser._parse_unnest.
+func starrocksParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
+	table := p.baseParseTable(schema, joins, aliasTokens, parseBracket, isDbReference, parsePartition, consumePipe)
+	if table.IsA(KTable) && table.This().IsA(KTableFromRows) {
+		tableFromRows := table.This()
+		for _, at := range KTableFromRows.ArgTypes() {
+			if at.name != "this" {
+				tableFromRows.Set(at.name, table.Arg(at.name))
+			}
+		}
+
+		table = tableFromRows
+	}
+
+	return table
+}
+
 func starrocksParseUnnest(p *Parser, withAlias bool) *Expr {
 	unnest := p.baseParseUnnest(withAlias)
 
@@ -114,15 +244,13 @@ func starrocksParseUnnest(p *Parser, withAlias bool) *Expr {
 
 		if alias == nil {
 			// Starrocks defaults to naming the table alias as "unnest"
-			alias = New(
-				KTableAlias,
-				"this", ToIdentifier("unnest", nil),
-				"columns", []*Expr{ToIdentifier("unnest", nil)},
-			)
+			alias = New(KTableAlias, "this", ToIdentifier("unnest", nil))
 			unnest.Set("alias", alias)
-		} else if !alias.ArgB("columns") {
-			// Starrocks defaults to naming the UNNEST column as "unnest"
-			// if it's not otherwise specified
+		}
+
+		// Starrocks defaults to naming the UNNEST column as "unnest" if it's not otherwise
+		// specified. With several arrays every column is named "unnest", so none is added.
+		if !alias.ArgB("columns") && len(unnest.Expressions()) == 1 {
 			alias.Set("columns", []*Expr{ToIdentifier("unnest", nil)})
 		}
 	}
@@ -130,7 +258,6 @@ func starrocksParseUnnest(p *Parser, withAlias bool) *Expr {
 	return unnest
 }
 
-// starrocksParsePartitionedBy mirrors StarRocksParser._parse_partitioned_by.
 func starrocksParsePartitionedBy(p *Parser) *Expr {
 	return p.expression(New(
 		KPartitionedByProperty,
@@ -141,7 +268,6 @@ func starrocksParsePartitionedBy(p *Parser) *Expr {
 	))
 }
 
-// starrocksParsePartitionProperty mirrors StarRocksParser._parse_partition_property.
 func starrocksParsePartitionProperty(p *Parser) any {
 	expr := mysqlParsePartitionProperty(p)
 
@@ -169,8 +295,6 @@ func starrocksParsePartitionProperty(p *Parser) any {
 	))
 }
 
-// starrocksParsePartitioningGranularityDynamic mirrors
-// StarRocksParser._parse_partitioning_granularity_dynamic.
 func starrocksParsePartitioningGranularityDynamic(p *Parser) *Expr {
 	p.matchTextSeq("START")
 	start := p.parseWrapped(func() *Expr { return p.parseString() }, false)
@@ -186,11 +310,6 @@ func starrocksParsePartitioningGranularityDynamic(p *Parser) *Expr {
 	return p.expression(New(KPartitionByRangePropertyDynamic, "start", start, "end", end, "every", every))
 }
 
-// starrocksParseRefreshProperty mirrors StarRocksParser._parse_refresh_property.
-//
-// REFRESH [DEFERRED | IMMEDIATE]
-//
-//	[ASYNC | ASYNC [START (<start_time>)] EVERY (INTERVAL <refresh_interval>) | MANUAL]
 func starrocksParseRefreshProperty(p *Parser) *Expr {
 	var method any = false
 	if p.matchTexts("DEFERRED", "IMMEDIATE") {
@@ -224,14 +343,8 @@ func starrocksParseRefreshProperty(p *Parser) *Expr {
 	))
 }
 
-// ---------------------------------------------------------------------------------------------
-// StarRocksGenerator
-// ---------------------------------------------------------------------------------------------
-
-// starrocksEliminateBetweenInDelete mirrors _eliminate_between_in_delete.
-//
-// StarRocks doesn't support BETWEEN in DELETE statements, so we convert
-// BETWEEN expressions to explicit comparisons.
+// starrocksEliminateBetweenInDelete rewrites BETWEEN in the WHERE clause of a DELETE as explicit
+// comparisons, because StarRocks doesn't support BETWEEN in DELETE statements.
 func starrocksEliminateBetweenInDelete(expression *Expr) *Expr {
 	if where := expression.ArgE("where"); where != nil {
 		for between := range where.FindAll(KBetween) {
@@ -244,7 +357,7 @@ func starrocksEliminateBetweenInDelete(expression *Expr) *Expr {
 	return expression
 }
 
-// starrocksStDistanceSphere mirrors st_distance_sphere.
+// starrocksStDistanceSphere renders StDistance as ST_Distance_Sphere(x1, y1, x2, y2).
 // https://docs.starrocks.io/docs/sql-reference/sql-functions/spatial-functions/st_distance_sphere/
 func starrocksStDistanceSphere(g *Generator, e *Expr) string {
 	point1 := e.Arg("this")
@@ -258,16 +371,33 @@ func starrocksStDistanceSphere(g *Generator, e *Expr) string {
 	return g.fn("ST_Distance_Sphere", point1X, point1Y, point2X, point2Y)
 }
 
+func starrocksTomapSQL(g *Generator, e *Expr) string {
+	literal := e.This()
+	if !literal.IsA(KStruct) {
+		return "MAP " + g.sql(literal)
+	}
+
+	entries := make([]string, 0, len(literal.Expressions()))
+	for _, entry := range literal.Expressions() {
+		entries = append(entries, g.sqlKey(entry, "this")+":"+g.sqlKey(entry, "expression"))
+	}
+	return "MAP{" + strings.Join(entries, ", ") + "}"
+}
+
 func customizeStarRocksGenerator(d *Dialect) {
 	G := d.G
 	T := G.TRANSFORMS
 
 	// StarRocks uses the native TRIM(str, chars)/LTRIM/RTRIM function form, not
 	// MySQL's TRIM(chars FROM str) syntax, so it falls back to the base generator.
+	// DATEDIFF and PIVOT have StarRocks render methods instead of MySQL's transforms.
+	delete(T, KDateDiff)
 	delete(T, KDateTrunc)
+	delete(T, KPivot)
 	delete(T, KTrim)
 
 	T[KArgMax] = renameFunc("MAX_BY")
+	T[KTimeSlice] = starrocksTimesliceSQL
 	T[KArgMin] = renameFunc("MIN_BY")
 	T[KArray] = inlineArraySQL
 	T[KArrayAgg] = renameFunc("ARRAY_AGG")
@@ -280,9 +410,6 @@ func customizeStarRocksGenerator(d *Dialect) {
 	T[KArrayToString] = renameFunc("ARRAY_JOIN")
 	T[KApproxDistinct] = approxCountDistinctSQL
 	T[KCurrentVersion] = func(g *Generator, e *Expr) string { return "CURRENT_VERSION()" }
-	T[KDateDiff] = func(g *Generator, e *Expr) string {
-		return g.fn("DATE_DIFF", unitToStr(e, "DAY"), e.Arg("this"), e.Arg("expression"))
-	}
 	T[KDelete] = transformPreprocess([]func(*Expr) *Expr{starrocksEliminateBetweenInDelete}, nil)
 	T[KFlatten] = renameFunc("ARRAY_FLATTEN")
 	T[KJSONExtractScalar] = arrowJSONExtractSQL
@@ -290,6 +417,7 @@ func customizeStarRocksGenerator(d *Dialect) {
 	// Both MAP forms (two-array MAP([keys], [values]) and variadic MAP(k1, v1, ...))
 	// generate StarRocks' variadic MAP(k1, v1, k2, v2, ...) constructor
 	T[KMap] = func(g *Generator, e *Expr) string { return varMapSQL(g, e, "MAP") }
+	T[KToMap] = starrocksTomapSQL
 	T[KProperty] = propertySQL
 	T[KRegexpLike] = renameFunc("REGEXP")
 	// Inherited from MySQL, minus operations StarRocks supports natively
@@ -315,12 +443,70 @@ func customizeStarRocksGenerator(d *Dialect) {
 	T[KVarMap] = func(g *Generator, e *Expr) string { return varMapSQL(g, e, "MAP") }
 
 	G.h.createSQL = starrocksCreateSQL
+	G.h.ignorenullsSQL = starrocksIgnorenullsSQL
+	// RESPECT NULLS is the default behavior, and StarRocks rejects the keyword
+	G.h.respectnullsSQL = func(g *Generator, e *Expr) string { return g.sqlKey(e, "this") }
 	G.h.clusterpropertySQL = starrocksClusterpropertySQL
 	G.h.refreshtriggerpropertySQL = starrocksRefreshtriggerpropertySQL
 	G.methods[KPartitionedByProperty] = starrocksPartitionedbypropertySQL
+	G.methods[KRefresh] = starrocksRefreshSQL
+	G.methods[KDateDiff] = starrocksDatediffSQL
+	G.methods[KPivot] = starrocksPivotSQL
 }
 
-// starrocksCreateSQL mirrors StarRocksGenerator.create_sql.
+// starrocksDatediffSQL renders a day difference over date parts as DATEDIFF(a, b) and any other
+// difference as DATE_DIFF(unit, a, b), which counts elapsed units.
+// https://docs.starrocks.io/docs/sql-reference/sql-functions/date-time-functions/datediff/
+func starrocksDatediffSQL(g *Generator, e *Expr) string {
+	unit := e.ArgE("unit")
+	if e.ArgB("date_part_boundary") && (unit == nil || pyUpper(unit.Name()) == "DAY") {
+		return g.fn("DATEDIFF", e.This(), e.Expression())
+	}
+	return g.fn("DATE_DIFF", unitToStr(e, "DAY"), e.This(), e.Expression())
+}
+
+// starrocksPivotSQL renders PIVOT (...); UNPIVOT and the PIVOT statement are unsupported.
+// https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/SELECT/SELECT_PIVOT/
+func starrocksPivotSQL(g *Generator, e *Expr) string {
+	if e.ArgB("unpivot") || e.ArgB("this") {
+		return noPivotSQL(g, e)
+	}
+	return g.pivotSQL(e)
+}
+
+// starrocksIgnorenullsSQL renders IGNORE NULLS right after the first argument of FIRST_VALUE,
+// LAST_VALUE, LAG and LEAD, e.g. LAG(x IGNORE NULLS, 1, 0); elsewhere it is unsupported.
+// https://docs.starrocks.io/docs/sql-reference/sql-functions/Window_function/
+func starrocksIgnorenullsSQL(g *Generator, e *Expr) string {
+	fn := e.This()
+	if fn.IsA(KFirstValue, KLastValue, KLag, KLead) {
+		arg := g.baseIgnorenullsSQL(New(KIgnoreNulls, "this", fn.This().Copy()))
+		return g.fn(fn.Kind().SQLName(), arg, fn.Arg("offset"), fn.Arg("default"))
+	}
+	return mysqlIgnorenullsSQL(g, e)
+}
+
+func starrocksRefreshSQL(g *Generator, e *Expr) string {
+	this := g.sqlKey(e, "this")
+	kind := ""
+	if !e.This().IsA(KLiteral) {
+		kind = e.Text("kind") + " "
+	}
+	partition := ""
+	if partitionStart := g.sqlKey(e, "partition_start"); partitionStart != "" {
+		partition = " PARTITION START (" + partitionStart + ") END (" + g.sqlKey(e, "partition_end") + ")"
+	}
+	force := ""
+	if e.ArgB("force") {
+		force = " FORCE"
+	}
+	mode := g.sqlKey(e, "mode")
+	if mode != "" {
+		mode = " WITH " + mode + " MODE"
+	}
+	return "REFRESH " + kind + this + partition + force + mode
+}
+
 func starrocksCreateSQL(g *Generator, e *Expr) string {
 	// Starrocks' primary key is defined outside of the schema, so we need to move it there
 	schema := e.This()
@@ -335,8 +521,7 @@ func starrocksCreateSQL(g *Generator, e *Expr) string {
 				e.Set("properties", props)
 			}
 
-			// Verify if the first one is an engine property. Is true then insert it after the engine,
-			// otherwise insert it at the beginning
+			// Insert after the ENGINE property if there is one, otherwise at the beginning.
 			engine := props.Find(KEngineProperty)
 			engineIndex := -1
 			if engine != nil {
@@ -352,7 +537,6 @@ func starrocksCreateSQL(g *Generator, e *Expr) string {
 	return g.baseCreateSQL(e)
 }
 
-// starrocksPartitionedbypropertySQL mirrors StarRocksGenerator.partitionedbyproperty_sql.
 func starrocksPartitionedbypropertySQL(g *Generator, e *Expr) string {
 	this := e.This()
 	if this.IsA(KSchema) {
@@ -377,8 +561,6 @@ func starrocksPartitionedbypropertySQL(g *Generator, e *Expr) string {
 	return "PARTITION BY " + g.sql(this)
 }
 
-// starrocksClusterpropertySQL mirrors StarRocksGenerator.clusterproperty_sql.
-// Generate StarRocks ORDER BY clause for clustering.
 func starrocksClusterpropertySQL(g *Generator, e *Expr) string {
 	if e.ArgB("this") {
 		g.unsupported("Unsupported CLUSTER BY " + g.sqlKey(e, "this"))
@@ -388,9 +570,7 @@ func starrocksClusterpropertySQL(g *Generator, e *Expr) string {
 	return "ORDER BY (" + expressions + ")"
 }
 
-// starrocksRefreshtriggerpropertySQL mirrors StarRocksGenerator.refreshtriggerproperty_sql.
-// Generate StarRocks REFRESH clause for materialized views.
-// There is a little difference of the syntax between StarRocks and Doris.
+// starrocksRefreshtriggerpropertySQL renders StarRocks' REFRESH clause, which differs slightly from Doris'.
 func starrocksRefreshtriggerpropertySQL(g *Generator, e *Expr) string {
 	method := g.sqlKey(e, "method")
 	if method != "" {

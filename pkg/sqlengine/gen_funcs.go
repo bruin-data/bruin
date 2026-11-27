@@ -1,13 +1,11 @@
 package sqlengine
 
-// Port of sqlglot/generator.py (generator chunk E, part 1): dateadd_sql .. arrayagg_sql.
-
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
-// dateadd_sql (generator.py L5170).
 func (g *Generator) dateaddSQL(expression *Expr) string {
 	return g.fn(
 		"DATE_ADD",
@@ -17,7 +15,6 @@ func (g *Generator) dateaddSQL(expression *Expr) string {
 	)
 }
 
-// arrayany_sql (generator.py L5180).
 func (g *Generator) arrayanySQL(expression *Expr) string {
 	if g.s.CAN_IMPLEMENT_ARRAY_ANY {
 		filtered := New(KArrayFilter, "this", expression.This(), "expression", expression.Expression())
@@ -26,7 +23,7 @@ func (g *Generator) arrayanySQL(expression *Expr) string {
 		return g.sql(Paren(genECombine([]*Expr{originalIsEmpty, filteredNotEmpty}, KOr, true, true).Copy()))
 	}
 
-	// SQLGlot's executor supports ARRAY_ANY, so we don't wanna warn for the SQLGlot dialect
+	// The base dialect keeps ARRAY_ANY as is, so it is not reported as unsupported there.
 	if g.d.ClassName != "Dialect" {
 		g.unsupported("ARRAY_ANY is unsupported")
 	}
@@ -34,7 +31,6 @@ func (g *Generator) arrayanySQL(expression *Expr) string {
 	return g.functionFallbackSQL(expression)
 }
 
-// struct_sql (generator.py L5195).
 func (g *Generator) baseStructSQL(expression *Expr) string {
 	var exprs []*Expr
 	for _, e := range expression.Expressions() {
@@ -55,7 +51,6 @@ func (g *Generator) baseStructSQL(expression *Expr) string {
 	return g.functionFallbackSQL(expression)
 }
 
-// partitionrange_sql (generator.py L5208).
 func (g *Generator) basePartitionrangeSQL(expression *Expr) string {
 	low := g.sqlKey(expression, "this")
 	high := g.sqlKey(expression, "expression")
@@ -63,7 +58,6 @@ func (g *Generator) basePartitionrangeSQL(expression *Expr) string {
 	return low + " TO " + high
 }
 
-// truncatetable_sql (generator.py L5214).
 func (g *Generator) truncatetableSQL(expression *Expr) string {
 	target := "TABLE"
 	if expression.ArgB("is_database") {
@@ -99,8 +93,8 @@ func (g *Generator) truncatetableSQL(expression *Expr) string {
 	return "TRUNCATE " + target + exists + tables + onCluster + identity + option + partition
 }
 
-// convert_sql (generator.py L5236)
-// This transpiles T-SQL's CONVERT function
+// baseConvertSQL transpiles T-SQL's CONVERT function into a cast, or into a string/time
+// conversion when a known style is given.
 // https://learn.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16
 func (g *Generator) baseConvertSQL(expression *Expr) string {
 	to := expression.This()
@@ -113,7 +107,7 @@ func (g *Generator) baseConvertSQL(expression *Expr) string {
 		return ""
 	}
 
-	// Retrieve length of datatype and override to default if not specified
+	// T-SQL's CONVERT defaults an unsized text type to length 30.
 	if seqGet(to.Expressions(), 0) == nil && g.s.PARAMETERIZABLE_TEXT_TYPES.Has(to.DTypeOf()) {
 		to = New(KDataType, "this", to.DTypeOf(), "expressions", []*Expr{LiteralInt(30)}, "nested", false)
 	}
@@ -124,7 +118,6 @@ func (g *Generator) baseConvertSQL(expression *Expr) string {
 		castKind = KCast
 	}
 
-	// Check whether a conversion with format (T-SQL calls this 'style') is applicable
 	if style.IsA(KLiteral) && style.IsInt() {
 		styleValue := style.Name()
 		convertedStyle, ok := MustDialect("tsql").S.CONVERT_FORMAT_MAPPING[styleValue]
@@ -132,7 +125,7 @@ func (g *Generator) baseConvertSQL(expression *Expr) string {
 			g.unsupported("Unsupported T-SQL 'style' value: " + styleValue)
 		}
 		if !ok {
-			// exp.Literal.string(None)
+			// An unknown style is rendered as the string literal 'None'.
 			convertedStyle = "None"
 		}
 
@@ -157,7 +150,6 @@ func (g *Generator) baseConvertSQL(expression *Expr) string {
 	return g.sql(transformed)
 }
 
-// _jsonpathkey_sql (generator.py L5278).
 func (g *Generator) baseJsonpathkeySQL(expression *Expr) string {
 	if thisE := expression.This(); thisE.IsA(KJSONPathWildcard) {
 		this := g.jsonPathPart(thisE)
@@ -175,20 +167,12 @@ func (g *Generator) baseJsonpathkeySQL(expression *Expr) string {
 
 	this = g.jsonPathPart(this)
 
-	if quoted && g.s.QUOTE_JSON_PATH {
-		// The whole path is rendered as a single quoted string literal, so the bracketed key
-		// (which may itself contain backslash-escaped quotes, e.g. ["x \"y\"z"]) must be
-		// escaped again for the outer string literal (-> ["x \\"y\\"z"]).
-		this = g.escapeStr(this, true, "", "", false)
-	}
-
 	if g.quoteJSONPathKeyUsingBrackets && g.s.JSON_PATH_BRACKETED_KEY_SUPPORTED {
 		return "[" + this + "]"
 	}
 	return "." + this
 }
 
-// _jsonpathsubscript_sql (generator.py L5304).
 func (g *Generator) baseJsonpathsubscriptSQL(expression *Expr) string {
 	this := g.jsonPathPart(expression.Arg("this"))
 	if this != "" {
@@ -197,7 +181,6 @@ func (g *Generator) baseJsonpathsubscriptSQL(expression *Expr) string {
 	return ""
 }
 
-// _simplify_unless_literal (generator.py L5308).
 func (g *Generator) simplifyUnlessLiteral(expression *Expr) *Expr {
 	if !expression.IsA(KLiteral) {
 		expression = simplifyExpr(expression, g.d)
@@ -206,7 +189,8 @@ func (g *Generator) simplifyUnlessLiteral(expression *Expr) *Expr {
 	return expression
 }
 
-// _embed_ignore_nulls (generator.py L5316).
+// embedIgnoreNulls renders IGNORE/RESPECT NULLS (text) after its operand, or inside the aggregate
+// call when the dialect requires that.
 func (g *Generator) embedIgnoreNulls(expression *Expr, text string) string {
 	this := expression.This()
 	if len(g.s.RESPECT_IGNORE_NULLS_UNSUPPORTED_EXPRESSIONS) > 0 && this.IsA(g.s.RESPECT_IGNORE_NULLS_UNSUPPORTED_EXPRESSIONS...) {
@@ -217,10 +201,10 @@ func (g *Generator) embedIgnoreNulls(expression *Expr, text string) string {
 	if g.s.IGNORE_NULLS_IN_FUNC && !truthy(expression.MetaGet("inline")) {
 		if g.s.IGNORE_NULLS_BEFORE_ORDER {
 			// The first modifier here will be the one closest to the AggFunc's arg
-			// (stable sort by: HavingMax < Order < Limit)
+			// (stable sort by: HavingMax < Order < Limit); modifiers of subqueries don't count
 			var mod *Expr
 			modRank := 3
-			for x := range expression.FindAll(KHavingMax, KOrder, KLimit) {
+			for x := range FindAllInScope(expression, KHavingMax, KOrder, KLimit) {
 				rank := 2
 				if x.IsA(KHavingMax) {
 					rank = 0
@@ -251,7 +235,6 @@ func (g *Generator) embedIgnoreNulls(expression *Expr, text string) string {
 	return g.sqlKey(expression, "this") + " " + text
 }
 
-// copyparameter_sql (generator.py L5357).
 func (g *Generator) copyparameterSQL(expression *Expr) string {
 	option := g.sqlKey(expression, "this")
 
@@ -287,7 +270,6 @@ func (g *Generator) copyparameterSQL(expression *Expr) string {
 	return option + op + value
 }
 
-// credentials_sql (generator.py L5380).
 func (g *Generator) credentialsSQL(expression *Expr) string {
 	credExpr := expression.Arg("credentials")
 	var credentials string
@@ -330,7 +312,6 @@ func (g *Generator) credentialsSQL(expression *Expr) string {
 	return credentials + storage + encryption + iamRole + region
 }
 
-// copy_sql (generator.py L5405).
 func (g *Generator) copySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if g.s.COPY_HAS_INTO_KEYWORD {
@@ -377,12 +358,10 @@ func (g *Generator) copySQL(expression *Expr) string {
 	return "COPY" + this + kind + " " + files + credentials + params
 }
 
-// semicolon_sql (generator.py L5433).
 func (g *Generator) semicolonSQL(expression *Expr) string {
 	return ""
 }
 
-// datadeletionproperty_sql (generator.py L5436).
 func (g *Generator) datadeletionpropertySQL(expression *Expr) string {
 	onSQL := "OFF"
 	if expression.ArgB("on") {
@@ -404,7 +383,6 @@ func (g *Generator) datadeletionpropertySQL(expression *Expr) string {
 	return "DATA_DELETION=" + onSQL
 }
 
-// maskingpolicycolumnconstraint_sql (generator.py L5448).
 func (g *Generator) maskingpolicycolumnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressions := g.expressions(expression, exprsOpts{flat: true})
@@ -414,7 +392,6 @@ func (g *Generator) maskingpolicycolumnconstraintSQL(expression *Expr) string {
 	return "MASKING POLICY " + this + expressions
 }
 
-// gapfill_sql (generator.py L5456).
 func (g *Generator) gapfillSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	this = "TABLE " + this
@@ -427,7 +404,6 @@ func (g *Generator) gapfillSQL(expression *Expr) string {
 	return g.fn("GAP_FILL", args...)
 }
 
-// scope_resolution (generator.py L5461).
 func (g *Generator) baseScopeResolution(rhs string, scopeName string) string {
 	var scope any
 	if scopeName != "" {
@@ -436,7 +412,6 @@ func (g *Generator) baseScopeResolution(rhs string, scopeName string) string {
 	return g.fn("SCOPE_RESOLUTION", scope, rhs)
 }
 
-// scoperesolution_sql (generator.py L5464).
 func (g *Generator) scoperesolutionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	exprE := expression.Expression()
@@ -456,9 +431,8 @@ func (g *Generator) scoperesolutionSQL(expression *Expr) string {
 	return g.scopeResolution(expr, this)
 }
 
-// parsejson_sql (generator.py L5476).
 func (g *Generator) baseParsejsonSQL(expression *Expr) string {
-	// PARSE_JSON_NAME = None is represented by ""
+	// An empty PARSE_JSON_NAME means the dialect has no such function.
 	if g.s.PARSE_JSON_NAME == "" {
 		return g.sql(expression.Arg("this"))
 	}
@@ -466,7 +440,6 @@ func (g *Generator) baseParsejsonSQL(expression *Expr) string {
 	return g.fn(g.s.PARSE_JSON_NAME, expression.Arg("this"), expression.Arg("expression"))
 }
 
-// rand_sql (generator.py L5482).
 func (g *Generator) baseRandSQL(expression *Expr) string {
 	lower := g.sqlKey(expression, "lower")
 	upper := g.sqlKey(expression, "upper")
@@ -477,7 +450,6 @@ func (g *Generator) baseRandSQL(expression *Expr) string {
 	return g.fn("RAND", expression.Arg("this"))
 }
 
-// changes_sql (generator.py L5490).
 func (g *Generator) changesSQL(expression *Expr) string {
 	information := g.sqlKey(expression, "information")
 	information = "INFORMATION => " + information
@@ -493,7 +465,6 @@ func (g *Generator) changesSQL(expression *Expr) string {
 	return "CHANGES (" + information + ")" + atBefore + end
 }
 
-// pad_sql (generator.py L5500).
 func (g *Generator) basePadSQL(expression *Expr) string {
 	prefix := "R"
 	if expression.ArgB("is_left") {
@@ -511,7 +482,6 @@ func (g *Generator) basePadSQL(expression *Expr) string {
 	return g.fn(prefix+"PAD", expression.Arg("this"), expression.Arg("expression"), fillPattern)
 }
 
-// summarize_sql (generator.py L5509).
 func (g *Generator) summarizeSQL(expression *Expr) string {
 	table := ""
 	if expression.ArgB("table") {
@@ -520,7 +490,6 @@ func (g *Generator) summarizeSQL(expression *Expr) string {
 	return "SUMMARIZE" + table + " " + g.sql(expression.Arg("this"))
 }
 
-// explodinggenerateseries_sql (generator.py L5513).
 func (g *Generator) explodinggenerateseriesSQL(expression *Expr) string {
 	kv := make([]any, 0, 2*len(expression.ArgKeys()))
 	for _, k := range expression.ArgKeys() {
@@ -544,7 +513,6 @@ func (g *Generator) explodinggenerateseriesSQL(expression *Expr) string {
 	return g.sql(generateSeries)
 }
 
-// converttimezone_sql (generator.py L5528).
 func (g *Generator) baseConverttimezoneSQL(expression *Expr) string {
 	if g.s.SUPPORTS_CONVERT_TIMEZONE {
 		return g.functionFallbackSQL(expression)
@@ -563,7 +531,6 @@ func (g *Generator) baseConverttimezoneSQL(expression *Expr) string {
 	return g.sql(expr)
 }
 
-// json_sql (generator.py L5545).
 func (g *Generator) jsonSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -589,7 +556,6 @@ func (g *Generator) jsonSQL(expression *Expr) string {
 	return "JSON" + this + withSQL + uniqueSQL
 }
 
-// jsonvalue_sql (generator.py L5562).
 func (g *Generator) jsonvalueSQL(expression *Expr) string {
 	path := g.sqlKey(expression, "path")
 	returning := g.sqlKey(expression, "returning")
@@ -605,7 +571,6 @@ func (g *Generator) jsonvalueSQL(expression *Expr) string {
 	return g.fn("JSON_VALUE", expression.Arg("this"), path+returning+onCondition)
 }
 
-// skipjsoncolumn_sql (generator.py L5572).
 func (g *Generator) skipjsoncolumnSQL(expression *Expr) string {
 	regexpSQL := ""
 	if expression.ArgB("regexp") {
@@ -614,7 +579,8 @@ func (g *Generator) skipjsoncolumnSQL(expression *Expr) string {
 	return "SKIP" + regexpSQL + " " + g.sql(expression.Arg("expression"))
 }
 
-// conditionalinsert_sql (generator.py L5576).
+// conditionalinsertSQL renders one branch of a multi-table insert: WHEN cond THEN INTO ... or
+// ELSE INTO ... (the branch insert without its INSERT keyword).
 func (g *Generator) conditionalinsertSQL(expression *Expr) string {
 	else_ := ""
 	if expression.ArgB("else_") {
@@ -635,15 +601,26 @@ func (g *Generator) conditionalinsertSQL(expression *Expr) string {
 	return condition + insert
 }
 
-// multitableinserts_sql (generator.py L5583).
 func (g *Generator) multitableinsertsSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
-	expressions := g.seg(g.expressions(expression, exprsOpts{sep: strp2(" ")}))
-	res := "INSERT " + kind + expressions + g.seg(g.sqlKey(expression, "source"))
-	return res
+	source := g.sqlKey(expression, "source")
+
+	var sql string
+	if kind != "" {
+		expressions := g.seg(g.expressions(expression, exprsOpts{sep: strp2(" ")}))
+		sql = "INSERT " + kind + expressions + g.seg(source)
+	} else {
+		// without a kind it is the FROM-first form: FROM x INSERT ... [INSERT ...]
+		inserts := make([]string, 0, len(expression.Expressions()))
+		for _, e := range expression.Expressions() {
+			inserts = append(inserts, g.sql(e))
+		}
+		sql = "FROM " + source + g.seg(strings.Join(inserts, g.sep1()))
+	}
+
+	return g.prependCtes(expression, sql)
 }
 
-// oncondition_sql (generator.py L5589).
 func (g *Generator) onconditionSQL(expression *Expr) string {
 	// Static options like "NULL ON ERROR" are stored as strings, in contrast to "DEFAULT <expr> ON ERROR"
 	var empty string
@@ -674,7 +651,6 @@ func (g *Generator) onconditionSQL(expression *Expr) string {
 	return empty + errorSQL + null
 }
 
-// jsonextractquote_sql (generator.py L5617).
 func (g *Generator) jsonextractquoteSQL(expression *Expr) string {
 	scalar := ""
 	if expression.ArgB("scalar") {
@@ -683,7 +659,6 @@ func (g *Generator) jsonextractquoteSQL(expression *Expr) string {
 	return g.sqlKey(expression, "option") + " QUOTES" + scalar
 }
 
-// jsonexists_sql (generator.py L5621).
 func (g *Generator) jsonexistsSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	path := g.sqlKey(expression, "path")
@@ -703,8 +678,6 @@ func (g *Generator) jsonexistsSQL(expression *Expr) string {
 	return g.fn("JSON_EXISTS", this, path)
 }
 
-// _add_arrayagg_null_filter (generator.py L5635)
-// Add NULL filter to ARRAY_AGG if dialect requires it.
 func (g *Generator) addArrayaggNullFilter(arrayAggSQL string, arrayAggExpr *Expr, columnExpr *Expr) string {
 	// Add a NULL FILTER on the column to mimic the results going from a dialect that excludes nulls
 	// on ARRAY_AGG (e.g Spark) to one that doesn't (e.g. DuckDB)
@@ -732,17 +705,11 @@ func (g *Generator) addArrayaggNullFilter(arrayAggSQL string, arrayAggExpr *Expr
 	return arrayAggSQL
 }
 
-// arrayagg_sql (generator.py L5675).
 func (g *Generator) baseArrayaggSQL(expression *Expr) string {
 	arrayAgg := g.functionFallbackSQL(expression)
 	return g.addArrayaggNullFilter(arrayAgg, expression, expression.This())
 }
 
-// ---------------------------------------------------------------------------
-// Chunk E helpers (ports of sqlglot builders / dialect helpers used above).
-// ---------------------------------------------------------------------------
-
-// genEUnitToStr mirrors sqlglot.dialects.dialect.unit_to_str(expression, default).
 func genEUnitToStr(expression *Expr, def string) *Expr {
 	unit := expression.ArgE("unit")
 	if unit == nil {
@@ -759,7 +726,6 @@ func genEUnitToStr(expression *Expr, def string) *Expr {
 	return LiteralString(unit.Name())
 }
 
-// genEWrap mirrors expressions.core._wrap(expression, kind).
 func genEWrap(e *Expr, kind Kind) *Expr {
 	if e.IsA(kind) {
 		return Paren(e)
@@ -767,8 +733,6 @@ func genEWrap(e *Expr, kind Kind) *Expr {
 	return e
 }
 
-// genEBinop mirrors Expr._binop(klass, other) where other is already an expression
-// (convert(other, copy=True) copies it).
 func genEBinop(kind Kind, self *Expr, other *Expr) *Expr {
 	this := self.Copy()
 	o := other.Copy()
@@ -779,8 +743,6 @@ func genEBinop(kind Kind, self *Expr, other *Expr) *Expr {
 	return New(kind, "this", this, "expression", o)
 }
 
-// genECombine mirrors expressions.core._combine (used by and_ / or_ / Expr.and_ / Expr.or_).
-// op is KAnd or KOr. nil expressions are skipped.
 func genECombine(expressions []*Expr, op Kind, copy bool, wrap bool) *Expr {
 	var conditions []*Expr
 	for _, x := range expressions {
@@ -807,7 +769,6 @@ func genECombine(expressions []*Expr, op Kind, copy bool, wrap bool) *Expr {
 	return this
 }
 
-// genENot mirrors exp.not_(expression, copy) / Expr.not_(copy).
 func genENot(expression *Expr, copy bool) *Expr {
 	this := expression
 	if copy {
@@ -816,8 +777,7 @@ func genENot(expression *Expr, copy bool) *Expr {
 	return New(KNot, "this", genEWrap(this, KConnector))
 }
 
-// genEAlias mirrors exp.alias_(expression, alias) with table=False, quoted=None, copy=True.
-// alias is a string, an Identifier expression or nil.
+// genEAlias aliases a copy of expression; alias is a string, an Identifier expression or nil.
 func genEAlias(expression *Expr, alias any) *Expr {
 	e := expression.Copy()
 
@@ -828,7 +788,7 @@ func genEAlias(expression *Expr, alias any) *Expr {
 	case *Expr:
 		if a != nil {
 			if !a.IsA(KIdentifier) {
-				panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + kindClassRepr(a.Kind())})
+				panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + a.Kind().Name()})
 			}
 			id = a.Copy()
 		}
@@ -843,13 +803,12 @@ func genEAlias(expression *Expr, alias any) *Expr {
 	return New(KAlias, "this", e, "alias", id)
 }
 
-// genECast mirrors exp.cast(expression, to, copy=True, dialect=d) for a DType target.
-// d == nil means the base dialect.
+// genECast casts a copy of expression to the type to. A cast whose target type already is, or
+// renders like, to in dialect d is returned unchanged. d == nil means the base dialect.
 func genECast(expression *Expr, to DType, d *Dialect) *Expr {
 	expr := expression.Copy()
 	dataType := NewDataType(to)
 
-	// dont re-cast if the expression is already a cast to the correct type
 	if expr.IsA(KCast) {
 		targetDialect := d
 		if targetDialect == nil {
@@ -883,8 +842,6 @@ func genECast(expression *Expr, to DType, d *Dialect) *Expr {
 	return cast
 }
 
-// genEIsType mirrors Expr.is_type(*dtypes) for plain DType arguments
-// (DataType.is_type on data types, Cast.is_type -> to.is_type, otherwise the annotated type).
 func genEIsType(e *Expr, dtypes ...DType) bool {
 	if e == nil {
 		return false
@@ -916,7 +873,6 @@ func genEIsType(e *Expr, dtypes ...DType) bool {
 	return false
 }
 
-// genEDropLastRune mirrors Python's s[:-1].
 func genEDropLastRune(s string) string {
 	r := []rune(s)
 	if len(r) == 0 {
@@ -925,7 +881,6 @@ func genEDropLastRune(s string) string {
 	return string(r[:len(r)-1])
 }
 
-// genEPyStr mirrors Python's str(value) inside f-strings.
 func genEPyStr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -948,15 +903,16 @@ func genEPyStr(v any) string {
 	return fmt.Sprint(v)
 }
 
-// Generator.SAFE_JSON_PATH_KEY_RE overrides (Python `$` also matches before a trailing newline,
-// and `\w` is Unicode-aware).
+// Dialect-specific patterns for JSON path keys that can be rendered unbracketed. They accept one
+// trailing newline before the end, and their word class is Unicode-aware (\p{L}, \p{N}, _).
 var (
 	genEBigQuerySafeJSONPathKeyRE = regexp.MustCompile(`^[\-\p{L}\p{N}_]*\n?$`)
 	genEHiveSafeJSONPathKeyRE     = regexp.MustCompile(`^[_\-a-zA-Z][\-\p{L}\p{N}_]*\n?$`)
 )
 
-// genESafeJSONPathKeyRE mirrors self.SAFE_JSON_PATH_KEY_RE (not part of the generated settings):
-// BigQueryGenerator and HiveGenerator override it; DatabricksGenerator resets it to SAFE_IDENTIFIER_RE.
+// genESafeJSONPathKeyRE returns the dialect's pattern for unbracketed JSON path keys (it is not
+// part of the generator settings): BigQuery and Hive have their own, while Databricks, although
+// derived from Hive, uses SAFE_IDENTIFIER_RE like the base dialect.
 func genESafeJSONPathKeyRE(g *Generator) *regexp.Regexp {
 	switch {
 	case g.d.Is("databricks"):

@@ -1,17 +1,7 @@
 package sqlengine
 
-import (
-	"fmt"
-	"sync"
-)
+import "sync"
 
-// Port of sqlglot/parsers/clickhouse.py (ClickHouseParser).
-
-// ---------------------------------------------------------------------------------------------
-// Module-level builders
-// ---------------------------------------------------------------------------------------------
-
-// clickhouseBuildDatetimeFormat mirrors _build_datetime_format(expr_type).
 func clickhouseBuildDatetimeFormat(kind Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		expr := buildFormattedTime(kind, "", nil)(args, d)
@@ -25,7 +15,6 @@ func clickhouseBuildDatetimeFormat(kind Kind) FuncBuilder {
 	}
 }
 
-// clickhouseBuildCountIf mirrors _build_count_if.
 func clickhouseBuildCountIf(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 1 {
 		return New(KCountIf, "this", seqGet(args, 0))
@@ -34,7 +23,6 @@ func clickhouseBuildCountIf(args []*Expr, _ *Dialect) *Expr {
 	return New(KCombinedAggFunc, "this", "countIf", "expressions", args)
 }
 
-// clickhouseBuildStrToDate mirrors _build_str_to_date.
 func clickhouseBuildStrToDate(args []*Expr, _ *Dialect) *Expr {
 	if len(args) == 3 {
 		return New(KAnonymous, "this", "STR_TO_DATE", "expressions", args)
@@ -44,18 +32,16 @@ func clickhouseBuildStrToDate(args []*Expr, _ *Dialect) *Expr {
 	return CastExpr(strtodate, NewDataType(DT_DATETIME), true, nil)
 }
 
-// clickhouseBuildTimestampTrunc mirrors _build_timestamp_trunc(unit).
 func clickhouseBuildTimestampTrunc(unit string) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		return New(KTimestampTrunc, "this", seqGet(args, 0), "unit", VarExpr(unit), "zone", seqGet(args, 1))
 	}
 }
 
-// clickhouseBuildSplitByChar mirrors _build_split_by_char.
 func clickhouseBuildSplitByChar(args []*Expr, d *Dialect) *Expr {
 	sep := seqGet(args, 0)
 	if sep.IsA(KLiteral) {
-		// sep.to_py() is a str only for string literals
+		// only a string literal qualifies; numeric literals keep the anonymous call
 		if sep.IsString() && len(sep.ThisS()) == 1 {
 			return clickhouseBuildSplit(KSplit)(args, d)
 		}
@@ -64,16 +50,29 @@ func clickhouseBuildSplitByChar(args []*Expr, d *Dialect) *Expr {
 	return New(KAnonymous, "this", "splitByChar", "expressions", args)
 }
 
-// clickhouseBuildSplit mirrors _build_split(exp_class).
+// clickhouseBuildSplit returns a builder for kind from ClickHouse's argument order:
+// (separator, string[, limit]).
 func clickhouseBuildSplit(kind Kind) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr {
 		return New(kind, "this", seqGet(args, 1), "expression", seqGet(args, 0), "limit", seqGet(args, 2))
 	}
 }
 
-// clickhouseTimestampTruncUnits mirrors TIMESTAMP_TRUNC_UNITS.
-// Skip the 'week' unit since ClickHouse's toStartOfWeek
-// uses an extra mode argument to specify the first day of the week.
+// clickhouseBuildArrayLambdaFunc returns a builder for kind from ClickHouse's argument order
+// (lambda, array). A call over several arrays, such as arrayMap((x, y) -> x + y, arr1, arr2),
+// has no counterpart in other dialects and stays an anonymous call to name.
+func clickhouseBuildArrayLambdaFunc(kind Kind, name string) FuncBuilder {
+	return func(args []*Expr, _ *Dialect) *Expr {
+		if len(args) > 2 {
+			return New(KAnonymous, "this", name, "expressions", args)
+		}
+
+		return New(kind, "this", seqGet(args, 1), "expression", seqGet(args, 0))
+	}
+}
+
+// clickhouseTimestampTruncUnits omits WEEK: toStartOfWeek takes an extra mode argument for the
+// first day of the week.
 var clickhouseTimestampTruncUnits = []string{
 	"MICROSECOND",
 	"MILLISECOND",
@@ -88,7 +87,7 @@ var clickhouseTimestampTruncUnits = []string{
 
 type clickhouseAggParts struct {
 	name   string
-	suffix string // "" means None
+	suffix string // "" means no suffix
 }
 
 var (
@@ -97,8 +96,9 @@ var (
 	clickhouseAggSuffixes        []string
 )
 
-// clickhouseAggFuncMappingGet returns AGG_FUNC_MAPPING (memoized examples of all 0- and 1-suffix
-// aggregate function names) and AGG_FUNCTIONS_SUFFIXES (sorted longest-first).
+// clickhouseAggFuncMappingGet returns, built once, a map from every aggregate function name with
+// zero or one combinator suffix to its parts, and the combinator suffixes (AGG_FUNCTIONS_SUFFIXES,
+// sorted longest first).
 func clickhouseAggFuncMappingGet() (map[string]clickhouseAggParts, []string) {
 	clickhouseAggFuncMappingOnce.Do(func() {
 		data := parserSettings_clickhouse()
@@ -117,8 +117,8 @@ func clickhouseAggFuncMappingGet() (map[string]clickhouseAggParts, []string) {
 	return clickhouseAggFuncMapping, clickhouseAggSuffixes
 }
 
-// clickhouseResolveAgg mirrors ClickHouseParser._resolve_clickhouse_agg. It returns the aggregate
-// function name and the (outermost-last) list of combinator suffixes, or ok=false (None).
+// clickhouseResolveAgg splits an aggregate function name into its base name and its combinator
+// suffixes (outermost last). ok is false when the name is not an aggregate function.
 func clickhouseResolveAgg(name string) (string, []string, bool) {
 	// ClickHouse allows chaining multiple combinators on aggregate functions.
 	// See https://clickhouse.com/docs/sql-reference/aggregate-functions/combinators
@@ -128,7 +128,7 @@ func clickhouseResolveAgg(name string) (string, []string, bool) {
 
 	// Until we are able to identify a 1- or 0-suffix aggregate function by name,
 	// repeatedly strip and queue suffixes (checking longer suffixes first). This loop only
-	// runs for 2 or more suffixes, as AGG_FUNC_MAPPING memoizes all 0- and 1-suffix
+	// runs for 2 or more suffixes, as the mapping already holds every 0- and 1-suffix name.
 	var accumulated []string
 	var parts clickhouseAggParts
 	for {
@@ -151,7 +151,6 @@ func clickhouseResolveAgg(name string) (string, []string, bool) {
 		}
 	}
 
-	// We now have a 0- or 1-suffix aggregate
 	if parts.suffix != "" {
 		// this is a 1-suffix aggregate (either naturally or via repeated suffix
 		// stripping). prepend the innermost suffix.
@@ -161,14 +160,9 @@ func clickhouseResolveAgg(name string) (string, []string, bool) {
 	return parts.name, accumulated, true
 }
 
-// ---------------------------------------------------------------------------------------------
-// Parser customization
-// ---------------------------------------------------------------------------------------------
-
 func customizeClickHouseParser(d *Dialect) {
 	s := d.P
 
-	// FUNCTIONS
 	delete(s.FUNCTIONS, "TRANSFORM")
 	delete(s.FUNCTIONS, "APPROX_TOP_SUM")
 	regexpExtract := func(args []*Expr, _ *Dialect) *Expr {
@@ -186,22 +180,18 @@ func customizeClickHouseParser(d *Dialect) {
 		s.FUNCTIONS["TOSTARTOF"+unit] = clickhouseBuildTimestampTrunc(unit)
 	}
 	for name, fn := range map[string]FuncBuilder{
-		"ANY":           fromArgList(KAnyValue),
-		"ARRAYCOMPACT":  fromArgList(KArrayCompact),
-		"ARRAYCONCAT":   fromArgList(KArrayConcat),
-		"ARRAYDISTINCT": fromArgList(KArrayDistinct),
-		"ARRAYEXCEPT":   fromArgList(KArrayExcept),
-		"ARRAYSUM":      fromArgList(KArraySum),
-		"ARRAYMAX":      fromArgList(KArrayMax),
-		"ARRAYMIN":      fromArgList(KArrayMin),
-		"ARRAYREVERSE":  fromArgList(KArrayReverse),
-		"ARRAYSLICE":    fromArgList(KArraySlice),
-		"ARRAYFILTER": func(args []*Expr, _ *Dialect) *Expr {
-			return New(KArrayFilter, "this", seqGet(args, 1), "expression", seqGet(args, 0))
-		},
-		"ARRAYMAP": func(args []*Expr, _ *Dialect) *Expr {
-			return New(KTransform, "this", seqGet(args, 1), "expression", seqGet(args, 0))
-		},
+		"ANY":               fromArgList(KAnyValue),
+		"ARRAYCOMPACT":      fromArgList(KArrayCompact),
+		"ARRAYCONCAT":       fromArgList(KArrayConcat),
+		"ARRAYDISTINCT":     fromArgList(KArrayDistinct),
+		"ARRAYEXCEPT":       fromArgList(KArrayExcept),
+		"ARRAYSUM":          fromArgList(KArraySum),
+		"ARRAYMAX":          fromArgList(KArrayMax),
+		"ARRAYMIN":          fromArgList(KArrayMin),
+		"ARRAYREVERSE":      fromArgList(KArrayReverse),
+		"ARRAYSLICE":        fromArgList(KArraySlice),
+		"ARRAYFILTER":       clickhouseBuildArrayLambdaFunc(KArrayFilter, "arrayFilter"),
+		"ARRAYMAP":          clickhouseBuildArrayLambdaFunc(KTransform, "arrayMap"),
 		"CURRENTDATABASE":   fromArgList(KCurrentDatabase),
 		"CURRENTSCHEMAS":    fromArgList(KCurrentSchemas),
 		"COUNTIF":           clickhouseBuildCountIf,
@@ -219,7 +209,8 @@ func customizeClickHouseParser(d *Dialect) {
 		"FORMATDATETIME":    clickhouseBuildDatetimeFormat(KTimeToStr),
 		"HAS":               fromArgList(KArrayContains),
 		"ILIKE":             dialectBuildLike(KILike, false),
-		"JSONEXTRACTSTRING": buildJSONExtractPath(KJSONExtractScalar, false, false, ""),
+		"JSONEXTRACTRAW":    buildJSONExtractPath(KJSONExtract, false, true, ""),
+		"JSONEXTRACTSTRING": buildJSONExtractPath(KJSONExtractScalar, false, true, ""),
 		"LENGTH": func(args []*Expr, _ *Dialect) *Expr {
 			return New(KLength, "this", seqGet(args, 0), "binary", true)
 		},
@@ -249,6 +240,9 @@ func customizeClickHouseParser(d *Dialect) {
 		"SPLITBYSTRING":         clickhouseBuildSplit(KSplit),
 		"SUBSTRINGINDEX":        fromArgList(KSubstringIndex),
 		"TOTYPENAME":            fromArgList(KTypeof),
+		"TRIMBOTH":              fromArgList(KTrim),
+		"TRIMLEFT":              func(args []*Expr, _ *Dialect) *Expr { return buildTrim(args, true, false) },
+		"TRIMRIGHT":             func(args []*Expr, _ *Dialect) *Expr { return buildTrim(args, false, false) },
 		"EDITDISTANCE":          fromArgList(KLevenshtein),
 		"JAROWINKLERSIMILARITY": fromArgList(KJarowinklerSimilarity),
 		"LEVENSHTEINDISTANCE":   fromArgList(KLevenshtein),
@@ -257,7 +251,6 @@ func customizeClickHouseParser(d *Dialect) {
 		s.FUNCTIONS[name] = fn
 	}
 
-	// FUNCTION_PARSERS
 	delete(s.FUNCTION_PARSERS, "MATCH")
 	s.FUNCTION_PARSERS["ARRAYJOIN"] = func(p *Parser) *Expr {
 		return p.expression(New(KExplode, "this", p.parseExpression()))
@@ -269,30 +262,30 @@ func customizeClickHouseParser(d *Dialect) {
 	s.FUNCTION_PARSERS["TUPLE"] = func(p *Parser) *Expr {
 		return FromArgList(KStruct, p.parseFunctionArgs(true))
 	}
-	s.FUNCTION_PARSERS["AND"] = func(p *Parser) *Expr { return AndExpr(p.parseFunctionArgs(false)...) }
-	s.FUNCTION_PARSERS["OR"] = func(p *Parser) *Expr { return OrExpr(p.parseFunctionArgs(false)...) }
+	s.FUNCTION_PARSERS["AND"] = func(p *Parser) *Expr { return p.parseConnectorFunction(KAnd) }
+	s.FUNCTION_PARSERS["OR"] = func(p *Parser) *Expr { return p.parseConnectorFunction(KOr) }
 	s.FUNCTION_PARSERS["XOR"] = func(p *Parser) *Expr { return XorExpr(p.parseFunctionArgs(false)...) }
+	// view(SELECT ...) is a table function whose only argument is a query
+	s.FUNCTION_PARSERS["VIEW"] = func(p *Parser) *Expr {
+		query := p.parseSelect(false, false, true, true, true, nil)
+		return p.expression(New(KAnonymous, "this", "view", "expressions", []*Expr{query}))
+	}
 
-	// PROPERTY_PARSERS
 	delete(s.PROPERTY_PARSERS, "DYNAMIC")
 	s.PROPERTY_PARSERS["ENGINE"] = noKwargsE(func(p *Parser) *Expr { return clickhouseParseEngineProperty(p) })
 	s.PROPERTY_PARSERS["UUID"] = noKwargsE(func(p *Parser) *Expr {
 		return p.expression(New(KUuidProperty, "this", p.parseString()))
 	})
 
-	// NO_PAREN_FUNCTION_PARSERS
 	delete(s.NO_PAREN_FUNCTION_PARSERS, "ANY")
 
-	// RANGE_PARSERS
 	s.RANGE_PARSERS[TK_GLOBAL] = func(p *Parser, this *Expr) *Expr { return clickhouseParseGlobalIn(p, this) }
 
-	// COLUMN_OPERATORS
 	delete(s.COLUMN_OPERATORS, TK_PLACEHOLDER)
 	s.COLUMN_OPERATORS[TK_DOTCARET] = func(p *Parser, this, field *Expr) *Expr {
 		return p.expression(New(KNestedJSONSelect, "this", this, "expression", field))
 	}
 
-	// QUERY_MODIFIER_PARSERS
 	s.QUERY_MODIFIER_PARSERS[TK_SETTINGS] = func(p *Parser) (string, any) {
 		p.advance(1)
 		return "settings", p.parseCSV(func() *Expr { return p.parseAssignment() }, TK_COMMA)
@@ -302,23 +295,19 @@ func customizeClickHouseParser(d *Dialect) {
 		return "format", anyExpr(p.parseIdVar(true, nil))
 	}
 
-	// CONSTRAINT_PARSERS
 	s.CONSTRAINT_PARSERS["INDEX"] = func(p *Parser) *Expr { return clickhouseParseIndexConstraint(p, "") }
 	s.CONSTRAINT_PARSERS["CODEC"] = func(p *Parser) *Expr { return p.parseCompress() }
 	s.CONSTRAINT_PARSERS["ASSUME"] = func(p *Parser) *Expr { return clickhouseParseAssumeConstraint(p) }
 
-	// ALTER_PARSERS
-	s.ALTER_PARSERS["MODIFY"] = func(p *Parser) any { return anyExpr(clickhouseParseAlterTableModify(p)) }
+	s.ALTER_PARSERS["MODIFY"] = func(p *Parser) any { return anyExpr(p.parseAlterTableAlter()) }
 	s.ALTER_PARSERS["REPLACE"] = func(p *Parser) any { return anyExpr(clickhouseParseAlterTableReplace(p)) }
 
-	// PLACEHOLDER_PARSERS
 	s.PLACEHOLDER_PARSERS[TK_L_BRACE] = func(p *Parser) *Expr { return clickhouseParseQueryParameter(p) }
 
-	// STATEMENT_PARSERS
 	s.STATEMENT_PARSERS[TK_DETACH] = func(p *Parser) *Expr { return clickhouseParseDetach(p) }
 
-	// Method overrides
 	s.h.parseCheckConstraint = clickhouseParseCheckConstraint
+	s.h.parseAlterTableAlter = clickhouseParseAlterTableAlter
 	s.h.parseUserDefinedFunctionExpression = clickhouseParseUserDefinedFunctionExpression
 	s.h.parseTypes = clickhouseParseTypes
 	s.h.parseExtract = clickhouseParseExtract
@@ -344,11 +333,6 @@ func customizeClickHouseParser(d *Dialect) {
 	s.h.parsePartitionedBy = clickhouseParsePartitionedBy
 }
 
-// ---------------------------------------------------------------------------------------------
-// Methods
-// ---------------------------------------------------------------------------------------------
-
-// clickhouseParseWrappedSelectOrAssignment mirrors _parse_wrapped_select_or_assignment.
 func clickhouseParseWrappedSelectOrAssignment(p *Parser) *Expr {
 	return p.parseWrapped(func() *Expr {
 		e := p.parseSelect(false, false, true, true, true, nil)
@@ -359,29 +343,26 @@ func clickhouseParseWrappedSelectOrAssignment(p *Parser) *Expr {
 	}, true)
 }
 
-// clickhouseParseCheckConstraint mirrors _parse_check_constraint.
 func clickhouseParseCheckConstraint(p *Parser) *Expr {
 	return p.expression(New(KCheckColumnConstraint, "this", clickhouseParseWrappedSelectOrAssignment(p)))
 }
 
-// clickhouseParseAssumeConstraint mirrors _parse_assume_constraint.
 func clickhouseParseAssumeConstraint(p *Parser) *Expr {
 	return p.expression(New(KAssumeColumnConstraint, "this", clickhouseParseWrappedSelectOrAssignment(p)))
 }
 
-// clickhouseParseEngineProperty mirrors _parse_engine_property.
 func clickhouseParseEngineProperty(p *Parser) *Expr {
 	p.match(TK_EQ)
 	return p.expression(New(KEngineProperty, "this", p.parseField(true, nil, true)))
 }
 
-// clickhouseParseUserDefinedFunctionExpression mirrors _parse_user_defined_function_expression.
+// clickhouseParseUserDefinedFunctionExpression parses a CREATE FUNCTION body, which ClickHouse
+// writes as a lambda.
 // https://clickhouse.com/docs/en/sql-reference/statements/create/function
 func clickhouseParseUserDefinedFunctionExpression(p *Parser) *Expr {
 	return p.parseLambda(false)
 }
 
-// clickhouseParseTypes mirrors _parse_types.
 func clickhouseParseTypes(p *Parser, checkFunc bool, schema bool, allowIdentifiers bool, withCollation bool) *Expr {
 	dtype := p.baseParseTypes(checkFunc, schema, allowIdentifiers, withCollation)
 	if dtype.IsA(KDataType) {
@@ -398,7 +379,8 @@ func clickhouseParseTypes(p *Parser, checkFunc bool, schema bool, allowIdentifie
 	return dtype
 }
 
-// clickhouseParseExtract mirrors _parse_extract.
+// clickhouseParseExtract parses EXTRACT(part FROM x) as usual and extract(haystack, pattern) as an
+// anonymous function.
 func clickhouseParseExtract(p *Parser) *Expr {
 	index := p.index
 	this := p.parseBitwise()
@@ -414,7 +396,8 @@ func clickhouseParseExtract(p *Parser) *Expr {
 	return p.expression(New(KAnonymous, "this", "extract", "expressions", []*Expr{this, p.parseBitwise()}))
 }
 
-// clickhouseParseAssignment mirrors _parse_assignment.
+// clickhouseParseAssignment parses an assignment and the ternary cond ? a : b. The ternary becomes
+// an If whose false branch is false, not nil, when ": b" is absent.
 func clickhouseParseAssignment(p *Parser) *Expr {
 	this := p.baseParseAssignment()
 
@@ -430,8 +413,8 @@ func clickhouseParseAssignment(p *Parser) *Expr {
 	return this
 }
 
-// clickhouseParseQueryParameter mirrors _parse_query_parameter.
-// Parse a placeholder expression like SELECT {abc: UInt32} or FROM {table: Identifier}
+// clickhouseParseQueryParameter parses a query parameter such as SELECT {abc: UInt32} or
+// FROM {table: Identifier}. Without a type it rewinds and returns nil.
 // https://clickhouse.com/docs/en/sql-reference/syntax#defining-and-using-query-parameters
 func clickhouseParseQueryParameter(p *Parser) *Expr {
 	index := p.index
@@ -459,7 +442,8 @@ func clickhouseParseQueryParameter(p *Parser) *Expr {
 	return p.expression(New(KPlaceholder, "this", this, "kind", kind))
 }
 
-// clickhouseParseBracket mirrors _parse_bracket.
+// clickhouseParseBracket handles two ClickHouse forms on top of the base bracket parser: x[][]...
+// becomes a JSONCast to nested arrays of JSON, and a {key: value} literal becomes a VarMap.
 func clickhouseParseBracket(p *Parser, this *Expr) *Expr {
 	if this != nil {
 		var bracketJSONType *Expr
@@ -467,7 +451,6 @@ func clickhouseParseBracket(p *Parser, this *Expr) *Expr {
 		for p.matchPair(TK_L_BRACKET, TK_R_BRACKET) {
 			inner := bracketJSONType
 			if inner == nil {
-				// exp.DType.JSON.into_expr(dialect=self.dialect, nullable=False)
 				inner = New(KDataType, "this", DT_JSON)
 				inner.Set("dialect", p.d)
 				inner.Set("nullable", false)
@@ -505,21 +488,24 @@ func clickhouseParseBracket(p *Parser, this *Expr) *Expr {
 	return bracket
 }
 
-// clickhouseParseGlobalIn mirrors _parse_global_in.
+// clickhouseParseGlobalIn parses the [NOT] IN that follows GLOBAL into an In flagged is_global.
+// When no IN follows, it rewinds to GLOBAL and returns nil, so GLOBAL can start a join.
 func clickhouseParseGlobalIn(p *Parser, this *Expr) *Expr {
+	index := p.index - 1
 	isNegated := p.match(TK_NOT)
-	var inExpr *Expr
-	if p.match(TK_IN) {
-		inExpr = p.parseIn(this, false)
-		inExpr.Set("is_global", true)
+	if !p.match(TK_IN) {
+		p.retreat(index)
+		return nil
 	}
+
+	inExpr := p.parseIn(this, false)
+	inExpr.Set("is_global", true)
 	if isNegated {
 		return p.expression(New(KNot, "this", inExpr))
 	}
 	return inExpr
 }
 
-// clickhouseParseTable mirrors _parse_table.
 func clickhouseParseTable(p *Parser, schema bool, joins bool, aliasTokens *TokenSet, parseBracket bool, isDbReference bool, parsePartition bool, consumePipe bool) *Expr {
 	this := p.baseParseTable(schema, joins, aliasTokens, parseBracket, isDbReference, false, false)
 
@@ -539,19 +525,18 @@ func clickhouseParseTable(p *Parser, schema bool, joins bool, aliasTokens *Token
 	return this
 }
 
-// clickhouseParsePosition mirrors _parse_position.
+// clickhouseParsePosition parses POSITION with the haystack as the first argument.
 func clickhouseParsePosition(p *Parser, haystackFirst bool) *Expr {
 	return p.baseParsePosition(true)
 }
 
-// clickhouseParseCte mirrors _parse_cte.
+// clickhouseParseCte parses a CTE in either form: WITH name AS (subquery) or the scalar
+// WITH expression AS name.
 // https://clickhouse.com/docs/en/sql-reference/statements/select/with/
 func clickhouseParseCte(p *Parser) *Expr {
-	// WITH <identifier> AS <subquery expression>
 	cte := p.tryParseExpr(func() *Expr { return p.baseParseCte() }, false)
 
 	if cte == nil {
-		// WITH <expression> AS <identifier>
 		this := p.parseAssignment()
 		alias := p.parseTableAlias(nil)
 		cte = p.expression(New(KCTE, "this", this, "alias", alias, "scalar", true))
@@ -560,11 +545,13 @@ func clickhouseParseCte(p *Parser) *Expr {
 	return cte
 }
 
-// clickhouseParseJoinParts mirrors _parse_join_parts.
+// clickhouseParseJoinParts reads the optional GLOBAL or NATURAL, side and kind tokens of a join
+// and returns them as (method, side, kind). The kind may come before or after the side (ANY LEFT
+// JOIN, LEFT ANY JOIN).
 func clickhouseParseJoinParts(p *Parser) (*Token, *Token, *Token) {
-	var isGlobal, kindPre, side, kind *Token
-	if p.match(TK_GLOBAL) {
-		isGlobal = p.prev
+	var method, kindPre, side, kind *Token
+	if p.match(TK_GLOBAL) || p.match(TK_NATURAL) {
+		method = p.prev
 	}
 
 	if p.matchSet(p.s.JOIN_KINDS) {
@@ -585,16 +572,16 @@ func clickhouseParseJoinParts(p *Parser) (*Token, *Token, *Token) {
 	if third == nil {
 		third = kind
 	}
-	return isGlobal, second, third
+	return method, second, third
 }
 
-// clickhouseParseJoin mirrors _parse_join.
 func clickhouseParseJoin(p *Parser, skipJoinToken bool, parseBracket bool, aliasTokens *TokenSet) *Expr {
 	join := p.baseParseJoin(skipJoinToken, true, aliasTokens)
 	if join != nil {
-		method := join.Arg("method")
-		join.Set("method", nil)
-		join.Set("global_", method)
+		if join.Text("method") == "GLOBAL" {
+			join.Set("method", nil)
+			join.Set("global_", "GLOBAL")
+		}
 
 		// tbl ARRAY JOIN arr <-- this should be a `Column` reference, not a `Table`
 		// https://clickhouse.com/docs/en/sql-reference/statements/select/array-join
@@ -608,7 +595,9 @@ func clickhouseParseJoin(p *Parser, skipJoinToken bool, parseBracket bool, alias
 	return join
 }
 
-// clickhouseParseFunction mirrors _parse_function.
+// clickhouseParseFunction parses a function call and turns aggregate names with combinator
+// suffixes or a parameter list, such as sumIf(x) or quantile(0.9)(x), into the combined and
+// parameterized aggregate kinds.
 func clickhouseParseFunction(p *Parser, functions map[string]FuncBuilder, anonymous bool, optionalParens bool, anyToken bool) *Expr {
 	expr := p.baseParseFunction(functions, anonymous, optionalParens, anyToken)
 
@@ -617,18 +606,10 @@ func clickhouseParseFunction(p *Parser, functions map[string]FuncBuilder, anonym
 		fn = expr.This()
 	}
 
-	// Aggregate functions can be split in 2 parts: <func_name><suffix[es]>
 	var suffixes []string
 	resolved := false
 	if fn.IsA(KAnonymous) {
-		switch name := fn.Arg("this").(type) {
-		case string:
-			_, suffixes, resolved = clickhouseResolveAgg(name)
-		case *Expr:
-			// Python calls name.endswith(...) on the (non-str) expression and raises AttributeError,
-			// e.g. for quoted function names such as `f`(x).
-			panic(&ValueError{Msg: fmt.Sprintf("'%s' object has no attribute 'endswith'", name.Kind().Name())})
-		}
+		_, suffixes, resolved = clickhouseResolveAgg(fn.Name())
 	}
 
 	if resolved {
@@ -661,8 +642,8 @@ func clickhouseParseFunction(p *Parser, functions map[string]FuncBuilder, anonym
 			// type to be ClickHouse style CombinedAnonymousAggFunc / AnonymousAggFunc
 			expr.Set("this", fn)
 		} else if len(params) > 0 {
-			// Params have blocked super()._parse_function() from parsing the following window
-			// (if that exists) as they're standing between the function call and the window spec
+			// Params kept the base parseFunction from parsing the following window (if any),
+			// as they stand between the function call and the window spec
 			expr = p.parseWindow(fn, false)
 		} else {
 			expr = fn
@@ -672,7 +653,8 @@ func clickhouseParseFunction(p *Parser, functions map[string]FuncBuilder, anonym
 	return expr
 }
 
-// clickhouseParseFuncParams mirrors _parse_func_params. A nil result is Python None.
+// clickhouseParseFuncParams parses the second argument list of a parameterized call such as
+// quantile(0.9)(x), after ")(" or "(". It returns nil when there is none.
 func clickhouseParseFuncParams(p *Parser, this *Expr) []*Expr {
 	if p.matchPair(TK_R_PAREN, TK_L_PAREN) {
 		return p.parseCSV(func() *Expr { return p.parseLambda(false) }, TK_COMMA)
@@ -687,7 +669,6 @@ func clickhouseParseFuncParams(p *Parser, this *Expr) []*Expr {
 	return nil
 }
 
-// clickhouseParseGroupConcat mirrors _parse_group_concat.
 func clickhouseParseGroupConcat(p *Parser) *Expr {
 	args := p.parseCSV(func() *Expr { return p.parseLambda(false) }, TK_COMMA)
 	params := clickhouseParseFuncParams(p, nil)
@@ -707,7 +688,7 @@ func clickhouseParseGroupConcat(p *Parser) *Expr {
 	return p.expression(New(KGroupConcat, "this", seqGet(args, 0)))
 }
 
-// clickhouseParseQuantile mirrors _parse_quantile.
+// clickhouseParseQuantile parses quantile(level)(x) and median(x); the level defaults to 0.5.
 func clickhouseParseQuantile(p *Parser) *Expr {
 	this := p.parseLambda(false)
 	params := clickhouseParseFuncParams(p, nil)
@@ -717,12 +698,11 @@ func clickhouseParseQuantile(p *Parser) *Expr {
 	return p.expression(New(KQuantile, "this", this, "quantile", LiteralNumber("0.5")))
 }
 
-// clickhouseParseWrappedIdVars mirrors _parse_wrapped_id_vars.
+// clickhouseParseWrappedIdVars parses an identifier list whose parentheses are always optional.
 func clickhouseParseWrappedIdVars(p *Parser, optional bool) []*Expr {
 	return p.baseParseWrappedIdVars(true)
 }
 
-// clickhouseParseColumnDef mirrors _parse_column_def.
 func clickhouseParseColumnDef(p *Parser, this *Expr, computedColumn bool) *Expr {
 	if p.match(TK_DOT) {
 		return New(KDot, "this", this, "expression", p.parseIdVar(true, nil))
@@ -731,12 +711,10 @@ func clickhouseParseColumnDef(p *Parser, this *Expr, computedColumn bool) *Expr 
 	return p.baseParseColumnDef(this, computedColumn)
 }
 
-// clickhouseParsePrimaryKey mirrors _parse_primary_key.
 func clickhouseParsePrimaryKey(p *Parser, wrappedOptional bool, inProps bool, namedPrimaryKey bool) *Expr {
 	return p.baseParsePrimaryKey(wrappedOptional || inProps, inProps, namedPrimaryKey)
 }
 
-// clickhouseParseOnProperty mirrors _parse_on_property.
 func clickhouseParseOnProperty(p *Parser) *Expr {
 	index := p.index
 	if p.matchTextSeq("CLUSTER") {
@@ -752,9 +730,7 @@ func clickhouseParseOnProperty(p *Parser) *Expr {
 	return nil
 }
 
-// clickhouseParseIndexConstraint mirrors _parse_index_constraint. kind "" means None.
 func clickhouseParseIndexConstraint(p *Parser, kind string) *Expr {
-	// INDEX name1 expr TYPE type1(args) GRANULARITY value
 	this := p.parseIdVar(true, nil)
 	expression := p.parseAssignment()
 
@@ -781,7 +757,7 @@ func clickhouseParseIndexConstraint(p *Parser, kind string) *Expr {
 	))
 }
 
-// clickhouseParsePartition mirrors _parse_partition.
+// clickhouseParsePartition parses PARTITION <expressions> or PARTITION ID '<id>'.
 // https://clickhouse.com/docs/en/sql-reference/statements/alter/partition#how-to-set-partition-expression
 func clickhouseParsePartition(p *Parser) *Expr {
 	if !p.match(TK_PARTITION) {
@@ -790,7 +766,6 @@ func clickhouseParsePartition(p *Parser) *Expr {
 
 	var expressions []*Expr
 	if p.matchTextSeq("ID") {
-		// Corresponds to the PARTITION ID <string_value> syntax
 		expressions = []*Expr{p.expression(New(KPartitionId, "this", p.parseString()))}
 	} else {
 		expressions = p.parseExpressions()
@@ -799,7 +774,6 @@ func clickhouseParsePartition(p *Parser) *Expr {
 	return p.expression(New(KPartition, "expressions", expressions))
 }
 
-// clickhouseParseAlterTableReplace mirrors _parse_alter_table_replace.
 func clickhouseParseAlterTableReplace(p *Parser) *Expr {
 	partition := p.parsePartition()
 
@@ -810,15 +784,25 @@ func clickhouseParseAlterTableReplace(p *Parser) *Expr {
 	return p.expression(New(KReplacePartition, "expression", partition, "source", p.parseTableParts(false, false, false, false)))
 }
 
-// clickhouseParseAlterTableModify mirrors _parse_alter_table_modify.
-func clickhouseParseAlterTableModify(p *Parser) *Expr {
-	if properties := p.parseProperties(false); properties != nil {
-		return p.expression(New(KAlterModifySqlSecurity, "expressions", properties.Expressions()))
+func clickhouseParseAlterTableAlter(p *Parser) *Expr {
+	// MODIFY forms other than MODIFY COLUMN (SQL SECURITY, ORDER BY, TTL, COMMENT, ...) are
+	// parsed as properties
+	if upperText(p.prev) == "MODIFY" && !p.matchNoAdvance(TK_COLUMN) {
+		if properties := p.parseProperties(false); properties != nil {
+			return p.expression(New(KAlterModifySqlSecurity, "expressions", properties.Expressions()))
+		}
+		return nil
 	}
-	return nil
+
+	// MODIFY COLUMN is ALTER COLUMN, but only as the whole action
+	// https://clickhouse.com/docs/sql-reference/statements/alter/column#modify-column
+	alter := p.baseParseAlterTableAlter()
+	if p.curr.ok() {
+		return nil
+	}
+	return alter
 }
 
-// clickhouseParseDefiner mirrors _parse_definer.
 func clickhouseParseDefiner(p *Parser) *Expr {
 	p.match(TK_EQ)
 	if p.match(TK_CURRENT_USER) {
@@ -827,7 +811,6 @@ func clickhouseParseDefiner(p *Parser) *Expr {
 	return New(KDefinerProperty, "this", p.parseString())
 }
 
-// clickhouseParseProjectionDef mirrors _parse_projection_def.
 func clickhouseParseProjectionDef(p *Parser) *Expr {
 	if !p.match(TK_PROJECTION) {
 		return nil
@@ -838,7 +821,6 @@ func clickhouseParseProjectionDef(p *Parser) *Expr {
 	return p.expression(New(KProjectionDef, "this", this, "expression", expression))
 }
 
-// clickhouseParseConstraint mirrors _parse_constraint.
 func clickhouseParseConstraint(p *Parser) *Expr {
 	if c := p.baseParseConstraint(); c != nil {
 		return c
@@ -846,7 +828,6 @@ func clickhouseParseConstraint(p *Parser) *Expr {
 	return clickhouseParseProjectionDef(p)
 }
 
-// clickhouseParseAlias mirrors _parse_alias.
 func clickhouseParseAlias(p *Parser, this *Expr, explicit bool) *Expr {
 	// In clickhouse "SELECT <expr> APPLY(...)" is a query modifier,
 	// so "APPLY" shouldn't be parsed as <expr>'s alias. However, "SELECT <expr> apply" is a valid alias
@@ -857,7 +838,6 @@ func clickhouseParseAlias(p *Parser, this *Expr, explicit bool) *Expr {
 	return p.baseParseAlias(this, explicit)
 }
 
-// clickhouseParseExpression mirrors _parse_expression.
 func clickhouseParseExpression(p *Parser) *Expr {
 	this := p.baseParseExpression()
 
@@ -870,7 +850,6 @@ func clickhouseParseExpression(p *Parser) *Expr {
 	return this
 }
 
-// clickhouseParseColumns mirrors _parse_columns.
 func clickhouseParseColumns(p *Parser) *Expr {
 	this := p.expression(New(KColumns, "this", p.parseLambda(false)))
 
@@ -881,7 +860,6 @@ func clickhouseParseColumns(p *Parser) *Expr {
 	return this
 }
 
-// clickhouseParseValue mirrors _parse_value.
 func clickhouseParseValue(p *Parser, values bool) *Expr {
 	value := p.baseParseValue(values)
 	if value == nil {
@@ -893,16 +871,18 @@ func clickhouseParseValue(p *Parser, values bool) *Expr {
 	// In INSERT INTO statements the same clause actually references multiple columns (opposite semantics),
 	// but the final result is not altered by the extra parentheses.
 	// Note: Clickhouse allows VALUES([structure], value, ...) so the branch checks for the last expression
+	// A single-value tuple is generated as "(x)", which is parsed back into a Paren
+	// rather than a Tuple, so it's unwrapped here to keep this rewrite idempotent
 	expressions := value.Expressions()
 	if values {
 		if len(expressions) == 0 {
-			// Python: expressions[-1] raises IndexError
+			// an empty list is an error; the message keeps its historical wording
 			panic(&ValueError{Msg: "list index out of range"})
 		}
 		if !expressions[len(expressions)-1].IsA(KTuple) {
 			wrapped := make([]*Expr, len(expressions))
 			for i, expr := range expressions {
-				wrapped[i] = p.expression(New(KTuple, "expressions", []*Expr{expr}))
+				wrapped[i] = p.expression(New(KTuple, "expressions", []*Expr{expr.Unnest()}))
 			}
 			value.Set("expressions", wrapped)
 		}
@@ -911,14 +891,12 @@ func clickhouseParseValue(p *Parser, values bool) *Expr {
 	return value
 }
 
-// clickhouseParsePartitionedBy mirrors _parse_partitioned_by.
-// ClickHouse allows custom expressions as partition key
+// clickhouseParsePartitionedBy accepts any expression as the partition key:
 // https://clickhouse.com/docs/engines/table-engines/mergetree-family/custom-partitioning-key
 func clickhouseParsePartitionedBy(p *Parser) *Expr {
 	return p.expression(New(KPartitionedByProperty, "this", p.parseAssignment()))
 }
 
-// clickhouseParseDetach mirrors _parse_detach.
 func clickhouseParseDetach(p *Parser) *Expr {
 	var kind any = false
 	if p.matchSet(p.s.DB_CREATABLES) {

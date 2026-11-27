@@ -1,9 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/generator.py (generator chunk A, part 1): L1120-L2011
-// cache/uncache, columns and column constraints, create, triggers, clone, describe, CTEs,
-// string literals, data types, delete/drop, set operations, fetch, hints, indexes, identifiers.
-
 import (
 	"fmt"
 	"math/big"
@@ -11,9 +7,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
-// uncache_sql (generator.py L1120).
 func (g *Generator) uncacheSQL(expression *Expr) string {
 	table := g.sqlKey(expression, "this")
 	existsSQL := ""
@@ -23,7 +19,6 @@ func (g *Generator) uncacheSQL(expression *Expr) string {
 	return "UNCACHE TABLE" + existsSQL + " " + table
 }
 
-// cache_sql (generator.py L1125).
 func (g *Generator) cacheSQL(expression *Expr) string {
 	lazy := ""
 	if expression.ArgB("lazy") {
@@ -42,7 +37,6 @@ func (g *Generator) cacheSQL(expression *Expr) string {
 	return g.prependCtes(expression, sql)
 }
 
-// characterset_sql (generator.py L1135).
 func (g *Generator) charactersetSQL(expression *Expr) string {
 	def := ""
 	if expression.ArgB("default") {
@@ -51,7 +45,6 @@ func (g *Generator) charactersetSQL(expression *Expr) string {
 	return def + "CHARACTER SET=" + g.sqlKey(expression, "this")
 }
 
-// column_parts (generator.py L1139).
 func (g *Generator) baseColumnParts(expression *Expr) string {
 	var parts []string
 	for _, k := range []string{"catalog", "db", "table", "this"} {
@@ -62,7 +55,6 @@ func (g *Generator) baseColumnParts(expression *Expr) string {
 	return strings.Join(parts, ".")
 }
 
-// column_sql (generator.py L1151).
 func (g *Generator) columnSQL(expression *Expr) string {
 	joinMark := ""
 	if expression.ArgB("join_mark") {
@@ -75,12 +67,10 @@ func (g *Generator) columnSQL(expression *Expr) string {
 	return g.columnParts(expression) + joinMark
 }
 
-// pseudocolumn_sql (generator.py L1160).
 func (g *Generator) pseudocolumnSQL(expression *Expr) string {
 	return g.columnSQL(expression)
 }
 
-// columnposition_sql (generator.py L1163).
 func (g *Generator) columnpositionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -90,7 +80,6 @@ func (g *Generator) columnpositionSQL(expression *Expr) string {
 	return position + this
 }
 
-// columndef_sql (generator.py L1169).
 func (g *Generator) baseColumndefSQL(expression *Expr, sep string) string {
 	column := g.sqlKey(expression, "this")
 	kind := g.sqlKey(expression, "kind")
@@ -117,7 +106,6 @@ func (g *Generator) baseColumndefSQL(expression *Expr, sep string) string {
 	return exists + column + kind + constraints + position
 }
 
-// columnconstraint_sql (generator.py L1184).
 func (g *Generator) columnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kindSQL := pyStrip(g.sqlKey(expression, "kind"))
@@ -127,7 +115,6 @@ func (g *Generator) columnconstraintSQL(expression *Expr) string {
 	return kindSQL
 }
 
-// computedcolumnconstraint_sql (generator.py L1189).
 func (g *Generator) baseComputedcolumnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	var persisted string
@@ -141,12 +128,10 @@ func (g *Generator) baseComputedcolumnconstraintSQL(expression *Expr) string {
 	return "AS " + this + persisted
 }
 
-// autoincrementcolumnconstraint_sql (generator.py L1200).
 func (g *Generator) baseAutoincrementcolumnconstraintSQL(expression *Expr) string {
 	return g.tokenSQL(TK_AUTO_INCREMENT)
 }
 
-// compresscolumnconstraint_sql (generator.py L1203).
 func (g *Generator) compresscolumnconstraintSQL(expression *Expr) string {
 	var this string
 	if _, ok := expression.Arg("this").([]*Expr); ok {
@@ -157,7 +142,6 @@ func (g *Generator) compresscolumnconstraintSQL(expression *Expr) string {
 	return "COMPRESS " + this
 }
 
-// generatedasidentitycolumnconstraint_sql (generator.py L1211).
 func (g *Generator) baseGeneratedasidentitycolumnconstraintSQL(expression *Expr) string {
 	this := ""
 	if thisV := expression.Arg("this"); thisV != nil {
@@ -218,7 +202,6 @@ func (g *Generator) baseGeneratedasidentitycolumnconstraintSQL(expression *Expr)
 	return "GENERATED" + this + " AS " + expr + sequenceOpts
 }
 
-// generatedasrowcolumnconstraint_sql (generator.py L1244).
 func (g *Generator) generatedasrowcolumnconstraintSQL(expression *Expr) string {
 	start := "END"
 	if expression.ArgB("start") {
@@ -231,12 +214,10 @@ func (g *Generator) generatedasrowcolumnconstraintSQL(expression *Expr) string {
 	return "GENERATED ALWAYS AS ROW " + start + hidden
 }
 
-// periodforsystemtimeconstraint_sql (generator.py L1251).
 func (g *Generator) periodforsystemtimeconstraintSQL(expression *Expr) string {
 	return "PERIOD FOR SYSTEM_TIME (" + g.sqlKey(expression, "this") + ", " + g.sqlKey(expression, "expression") + ")"
 }
 
-// notnullcolumnconstraint_sql (generator.py L1256).
 func (g *Generator) notnullcolumnconstraintSQL(expression *Expr) string {
 	if expression.ArgB("allow_null") {
 		return "NULL"
@@ -244,7 +225,6 @@ func (g *Generator) notnullcolumnconstraintSQL(expression *Expr) string {
 	return "NOT NULL"
 }
 
-// primarykeycolumnconstraint_sql (generator.py L1259).
 func (g *Generator) primarykeycolumnconstraintSQL(expression *Expr) string {
 	desc := expression.Arg("desc")
 	if desc != nil {
@@ -257,10 +237,10 @@ func (g *Generator) primarykeycolumnconstraintSQL(expression *Expr) string {
 	if options != "" {
 		options = " " + options
 	}
-	return "PRIMARY KEY" + options
+	include := g.sqlKey(expression, "include")
+	return "PRIMARY KEY" + include + options
 }
 
-// uniquecolumnconstraint_sql (generator.py L1267).
 func (g *Generator) uniquecolumnconstraintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if this != "" {
@@ -282,10 +262,10 @@ func (g *Generator) uniquecolumnconstraintSQL(expression *Expr) string {
 	if options != "" {
 		options = " " + options
 	}
-	return "UNIQUE" + nullsSQL + this + indexType + onConflict + options
+	include := g.sqlKey(expression, "include")
+	return "UNIQUE" + nullsSQL + this + indexType + onConflict + include + options
 }
 
-// inoutcolumnconstraint_sql (generator.py L1279).
 func (g *Generator) inoutcolumnconstraintSQL(expression *Expr) string {
 	input := expression.ArgB("input_")
 	output := expression.ArgB("output")
@@ -309,12 +289,10 @@ func (g *Generator) inoutcolumnconstraintSQL(expression *Expr) string {
 	return ""
 }
 
-// createable_sql (generator.py L1297).
 func (g *Generator) baseCreateableSQL(expression *Expr, locations propLocations) string {
 	return g.sqlKey(expression, "this")
 }
 
-// create_sql (generator.py L1300).
 func (g *Generator) baseCreateSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if mapped := g.d.S.INVERSE_CREATABLE_KIND_MAPPING[kind]; mapped != "" {
@@ -465,7 +443,6 @@ func (g *Generator) baseCreateSQL(expression *Expr) string {
 	return g.prependCtes(expression, expressionSQL)
 }
 
-// sequenceproperties_sql (generator.py L1421).
 func (g *Generator) sequencepropertiesSQL(expression *Expr) string {
 	start := g.sqlKey(expression, "start")
 	if start != "" {
@@ -506,9 +483,8 @@ func (g *Generator) sequencepropertiesSQL(expression *Expr) string {
 	return strings.TrimLeftFunc(start+increment+minvalue+maxvalue+cacheStr+options+owned, pyIsSpaceRune)
 }
 
-// triggerproperties_sql (generator.py L1446).
 func (g *Generator) triggerpropertiesSQL(expression *Expr) string {
-	// expression.args.get("timing", "")
+	// timing is "" when the arg is absent, but stays nil when it is set to nil.
 	var timing any = ""
 	if expression.HasArgKey("timing") {
 		timing = expression.Arg("timing")
@@ -554,7 +530,6 @@ func (g *Generator) triggerpropertiesSQL(expression *Expr) string {
 	return strings.Join(parts, g.sep1())
 }
 
-// triggerreferencing_sql (generator.py L1475).
 func (g *Generator) triggerreferencingSQL(expression *Expr) string {
 	var parts []string
 
@@ -569,7 +544,6 @@ func (g *Generator) triggerreferencingSQL(expression *Expr) string {
 	return "REFERENCING " + strings.Join(parts, " ")
 }
 
-// triggerevent_sql (generator.py L1486).
 func (g *Generator) triggereventSQL(expression *Expr) string {
 	if expression.ArgB("columns") {
 		return chunkAPyStr(expression.Arg("this")) + " OF " + g.expressions(expression, exprsOpts{key: "columns", flat: true})
@@ -578,7 +552,6 @@ func (g *Generator) triggereventSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this")
 }
 
-// clone_sql (generator.py L1493).
 func (g *Generator) cloneSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	shallow := ""
@@ -592,7 +565,6 @@ func (g *Generator) cloneSQL(expression *Expr) string {
 	return shallow + keyword + " " + this
 }
 
-// describe_sql (generator.py L1499).
 func (g *Generator) baseDescribeSQL(expression *Expr) string {
 	style := ""
 	if v := expression.Arg("style"); truthy(v) {
@@ -614,13 +586,11 @@ func (g *Generator) baseDescribeSQL(expression *Expr) string {
 	return "DESCRIBE" + style + format + " " + g.sqlKey(expression, "this") + partition + asJSON
 }
 
-// heredoc_sql (generator.py L1510).
 func (g *Generator) heredocSQL(expression *Expr) string {
 	tag := g.sqlKey(expression, "tag")
 	return "$" + tag + "$" + g.sqlKey(expression, "this") + "$" + tag + "$"
 }
 
-// prepend_ctes (generator.py L1514).
 func (g *Generator) prependCtes(expression *Expr, sql_ string) string {
 	with := g.sqlKey(expression, "with_")
 	if with != "" {
@@ -629,8 +599,13 @@ func (g *Generator) prependCtes(expression *Expr, sql_ string) string {
 	return sql_
 }
 
-// with_sql (generator.py L1520).
 func (g *Generator) withSQL(expression *Expr) string {
+	// Inline function specifications get their own WITH, before the CTEs'
+	udfs := g.expressions(expression, exprsOpts{key: "udfs", flat: true})
+	if udfs != "" {
+		udfs = "WITH " + udfs
+	}
+
 	sql := g.expressions(expression, exprsOpts{flat: true})
 	recursive := ""
 	if g.s.CTE_RECURSIVE_KEYWORD_REQUIRED && expression.ArgB("recursive") {
@@ -640,11 +615,20 @@ func (g *Generator) withSQL(expression *Expr) string {
 	if search != "" {
 		search = " " + search
 	}
+	cycle := g.sqlKey(expression, "cycle")
+	if cycle != "" {
+		cycle = " " + cycle
+	}
 
-	return "WITH " + recursive + sql + search
+	if sql != "" {
+		sql = "WITH " + recursive + sql + search + cycle
+	}
+	if udfs != "" && sql != "" {
+		return udfs + " " + sql
+	}
+	return udfs + sql
 }
 
-// cte_sql (generator.py L1532).
 func (g *Generator) baseCteSQL(expression *Expr) string {
 	alias := expression.ArgE("alias")
 	if alias != nil {
@@ -669,7 +653,6 @@ func (g *Generator) baseCteSQL(expression *Expr) string {
 	return aliasSQL + keyExpressions + " AS " + materialized + g.wrap(expression)
 }
 
-// tablealias_sql (generator.py L1550).
 func (g *Generator) tablealiasSQL(expression *Expr) string {
 	alias := g.sqlKey(expression, "this")
 	columns := g.expressions(expression, exprsOpts{key: "columns", flat: true})
@@ -691,7 +674,6 @@ func (g *Generator) tablealiasSQL(expression *Expr) string {
 	return alias + columns
 }
 
-// bitstring_sql (generator.py L1568).
 func (g *Generator) bitstringSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if g.d.S.BIT_START != "" {
@@ -700,7 +682,6 @@ func (g *Generator) bitstringSQL(expression *Expr) string {
 	return chunkAPyIntBase(this, 2)
 }
 
-// hexstring_sql (generator.py L1574). binaryFunctionRepr "" means None.
 func (g *Generator) baseHexstringSQL(expression *Expr, binaryFunctionRepr string) string {
 	this := g.sqlKey(expression, "this")
 	isIntegerType := expression.ArgB("is_integer")
@@ -728,12 +709,18 @@ func (g *Generator) baseHexstringSQL(expression *Expr, binaryFunctionRepr string
 	return g.d.S.HEX_START + this + g.d.S.HEX_END
 }
 
-// bytestring_sql (generator.py L1599).
+// bytestringSQL casts to BINARY or VARCHAR when the parsed literal and the target dialect disagree
+// on whether byte strings are bytes. The high bytes of a bytes literal are written as \xHH when
+// the dialect reads hex escapes, so they are not re-read as UTF-8.
 func (g *Generator) bytestringSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	if g.d.S.BYTE_START != "" {
-		escapedByteString := g.escapeStr(this, false, g.d.S.BYTE_END, g.escapedByteQuoteEnd, true)
+		escapeBackslash := len(g.d.T.NUMERIC_ESCAPES) > 0 || g.d.T.DROP_UNKNOWN_ESCAPES
+		escapedByteString := g.escapeStr(this, escapeBackslash, g.d.S.BYTE_END, g.escapedByteQuoteEnd, true)
 		isBytes := expression.ArgB("is_bytes")
+		if _, hex := g.d.T.NUMERIC_ESCAPES["x"]; isBytes && hex && g.d.S.BYTE_STRINGS_SUPPORT_ESCAPED_SEQUENCES {
+			escapedByteString = escapeHighBytes(escapedByteString)
+		}
 		delimitedByteString := g.d.S.BYTE_START + escapedByteString + g.d.S.BYTE_END
 		if isBytes && !g.d.S.BYTE_STRING_IS_BYTES_TYPE {
 			return g.sql(chunkACast(delimitedByteString, DT_BINARY, g.d))
@@ -753,10 +740,20 @@ func (g *Generator) bytestringSQL(expression *Expr) string {
 	return ""
 }
 
-// chunkAEscapedUnicodeRE mirrors generator.ESCAPED_UNICODE_RE = re.compile(r"\\(\d+)").
+func escapeHighBytes(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 0x80 && r <= 0xFF {
+			fmt.Fprintf(&b, "\\x%02x", r)
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 var chunkAEscapedUnicodeRE = regexp.MustCompile(`\\(\p{Nd}+)`)
 
-// unicodestring_sql (generator.py L1630).
 func (g *Generator) unicodestringSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	escape := expression.ArgE("escape")
@@ -764,11 +761,9 @@ func (g *Generator) unicodestringSQL(expression *Expr) string {
 	var escapeSubstitute func(groups []string) string
 	var leftQuote, rightQuote string
 	if g.d.S.UNICODE_START != "" {
-		// r"\\\1"
 		escapeSubstitute = func(groups []string) string { return "\\" + groups[1] }
 		leftQuote, rightQuote = g.d.S.UNICODE_START, g.d.S.UNICODE_END
 	} else {
-		// r"\\u\1"
 		escapeSubstitute = func(groups []string) string { return "\\u" + groups[1] }
 		leftQuote, rightQuote = g.d.S.QUOTE_START, g.d.S.QUOTE_END
 	}
@@ -776,7 +771,7 @@ func (g *Generator) unicodestringSQL(expression *Expr) string {
 	var escapePattern *regexp.Regexp
 	var escapeSQL string
 	if escape != nil {
-		// re.compile(rf"{escape.name}(\d+)"): escape.name is used as a raw regex fragment.
+		// The escape's name is used as a raw regex fragment, followed by the captured digits.
 		re, err := regexp.Compile(escape.Name() + `(\p{Nd}+)`)
 		if err != nil {
 			panic(&ValueError{Msg: err.Error()})
@@ -793,16 +788,22 @@ func (g *Generator) unicodestringSQL(expression *Expr) string {
 	if g.d.S.UNICODE_START == "" || (escape != nil && !g.s.SUPPORTS_UESCAPE) {
 		repl := escapeSubstitute
 		if g.s.UNICODE_SUBSTITUTE != nil {
-			// UNICODE_SUBSTITUTE receives m.group(1).
 			repl = func(groups []string) string { return g.s.UNICODE_SUBSTITUTE(g, groups[1]) }
 		}
 		this = chunkARegexSub(escapePattern, this, repl)
 	}
 
+	if g.d.S.UNICODE_START != "" {
+		// A Unicode literal only escapes its delimiter by doubling it; the escape character
+		// introduces a code point, so the dialect's ordinary string escapes don't apply here
+		this = strings.ReplaceAll(g.replaceLineBreaks(this), rightQuote, rightQuote+rightQuote)
+	} else {
+		this = g.escapeStr(this, false, "", "", false)
+	}
+
 	return leftQuote + this + rightQuote + escapeSQL
 }
 
-// rawstring_sql (generator.py L1653).
 func (g *Generator) rawstringSQL(expression *Expr) string {
 	str := expression.ThisS()
 	if slices.Contains(g.d.T.STRING_ESCAPES, "\\") {
@@ -813,7 +814,6 @@ func (g *Generator) rawstringSQL(expression *Expr) string {
 	return g.d.S.QUOTE_START + str + g.d.S.QUOTE_END
 }
 
-// datatypeparam_sql (generator.py L1661).
 func (g *Generator) datatypeparamSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	specifier := g.sqlKey(expression, "expression")
@@ -825,7 +825,6 @@ func (g *Generator) datatypeparamSQL(expression *Expr) string {
 	return this + specifier
 }
 
-// datatype_param_bound_limiter (generator.py L1667).
 func (g *Generator) datatypeParamBoundLimiter(expression *Expr, typeValue DType, defaults []int, bounds []int) *Expr {
 	params := expression.Expressions()
 
@@ -846,7 +845,6 @@ func (g *Generator) datatypeParamBoundLimiter(expression *Expr, typeValue DType,
 
 	for i, param := range params {
 		if i >= len(bounds) {
-			// bound is None
 			continue
 		}
 		bound := bounds[i]
@@ -866,7 +864,7 @@ func (g *Generator) datatypeParamBoundLimiter(expression *Expr, typeValue DType,
 					"%s parameter %s exceeds %s's maximum of %d; capping",
 					dtypeValues[typeValue], paramValue.Name(), g.d.ClassName, bound,
 				))
-				// Direct list assignment (no parent bookkeeping), like Python.
+				// Assigned straight into the slice: the new param's parent is not set.
 				params[i] = New(KDataTypeParam, "this", LiteralInt(bound))
 			}
 		}
@@ -875,7 +873,6 @@ func (g *Generator) datatypeParamBoundLimiter(expression *Expr, typeValue DType,
 	return expression
 }
 
-// datatype_sql (generator.py L1706).
 func (g *Generator) baseDatatypeSQL(expression *Expr) string {
 	nested := ""
 	values := ""
@@ -910,7 +907,11 @@ func (g *Generator) baseDatatypeSQL(expression *Expr) string {
 	if isDType && typeValue == DT_USERDEFINED && expression.ArgB("kind") {
 		typeSQL = g.sqlKey(expression, "kind")
 	} else if isDType && typeValue == DT_CHARACTER_SET {
-		return "CHAR CHARACTER SET " + g.sqlKey(expression, "kind")
+		char := "CHAR"
+		if interior != "" {
+			char = "CHAR(" + interior + ")"
+		}
+		return char + " CHARACTER SET " + g.sqlKey(expression, "kind")
 	} else if isDType {
 		if mapped, ok := g.s.TYPE_MAPPING[typeValue]; ok {
 			typeSQL = mapped
@@ -952,7 +953,6 @@ func (g *Generator) baseDatatypeSQL(expression *Expr) string {
 	return typeSQL
 }
 
-// directory_sql (generator.py L1770).
 func (g *Generator) directorySQL(expression *Expr) string {
 	local := ""
 	if expression.ArgB("local") {
@@ -965,7 +965,6 @@ func (g *Generator) directorySQL(expression *Expr) string {
 	return local + "DIRECTORY " + g.sqlKey(expression, "this") + rowFormat
 }
 
-// delete_sql (generator.py L1776).
 func (g *Generator) baseDeleteSQL(expression *Expr) string {
 	hint := g.sqlKey(expression, "hint")
 	this := g.sqlKey(expression, "this")
@@ -997,9 +996,11 @@ func (g *Generator) baseDeleteSQL(expression *Expr) string {
 	return g.prependCtes(expression, "DELETE"+hint+tables+expressionSQL)
 }
 
-// drop_sql (generator.py L1796).
 func (g *Generator) baseDropSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
+	if tables := g.expressions(expression, exprsOpts{key: "tables", flat: true}); tables != "" {
+		this += ", " + tables
+	}
 	expressions := g.expressions(expression, exprsOpts{flat: true})
 	if expressions != "" {
 		expressions = " (" + expressions + ")"
@@ -1055,11 +1056,14 @@ func (g *Generator) baseDropSQL(expression *Expr) string {
 	if expression.ArgB("sync") {
 		sync = " SYNC"
 	}
+	force := ""
+	if expression.ArgB("force") {
+		force = " FORCE"
+	}
 	return "DROP" + temporary + materialized + iceberg + " " + kind + concurrentlySQL + existsSQL + this +
-		onCluster + expressions + cascade + restrict + constraints + purge + sync
+		onCluster + expressions + cascade + restrict + constraints + purge + sync + force
 }
 
-// set_operation (generator.py L1820).
 func (g *Generator) setOperation(expression *Expr) string {
 	opType := expression.Kind()
 	opName := pyUpper(expression.Key())
@@ -1073,7 +1077,7 @@ func (g *Generator) setOperation(expression *Expr) string {
 
 	defaultDistinct, ok := g.d.S.SET_OP_DISTINCT_BY_DEFAULT[opType]
 	if !ok {
-		panic(&ValueError{Msg: kindClassRepr(opType)})
+		panic(&ValueError{Msg: opType.Name()})
 	}
 
 	if distinct == TriNone {
@@ -1115,25 +1119,16 @@ func (g *Generator) setOperation(expression *Expr) string {
 	return sideKind + opName + distinctOrAll + byName + on
 }
 
-// set_operations (generator.py L1853).
-func (g *Generator) setOperations(expression *Expr) string {
+// baseSetOperations renders a chain of set operations iteratively, so deeply nested chains do
+// not recurse.
+func (g *Generator) baseSetOperations(expression *Expr) string {
 	if !g.s.SET_OP_MODIFIERS {
-		limit := expression.ArgE("limit")
-		order := expression.ArgE("order")
-
-		if limit != nil || order != nil {
-			// exp.subquery(expression, "_l_0", copy=False).select("*", copy=False)
-			sub := New(KSubquery, "this", expression, "alias", New(KTableAlias, "this", ToIdentifier("_l_0", nil)))
-			sel := New(KSelect)
-			sel.Set("from_", New(KFrom, "this", sub))
-			sel.Set("expressions", []*Expr{Star()})
-			sel = g.moveCtesToTopLevel(sel)
-
-			if limit != nil {
-				sel = chunkASelectLimit(sel, limit.Pop())
-			}
-			if order != nil {
-				sel = chunkASelectOrderBy(sel, order.Pop())
+		if expression.ArgB("limit") || expression.ArgB("order") || expression.ArgB("offset") {
+			sel := g.wrapSetOperation(expression)
+			for _, arg := range []string{"limit", "order", "offset"} {
+				if value := expression.ArgE(arg); value != nil {
+					sel.Set(arg, value.Pop())
+				}
 			}
 			return g.sql(sel)
 		}
@@ -1146,11 +1141,22 @@ func (g *Generator) setOperations(expression *Expr) string {
 		node := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 
-		if n, ok := node.(*Expr); ok && n.IsA(KSetOperation) {
+		n, _ := node.(*Expr)
+		if n.IsA(KSetOperation) {
 			stack = append(stack, n.Arg("expression"))
 			stack = append(stack, g.maybeCommentFull(g.setOperation(n), nil, n.Comments(), true, true))
-			stack = append(stack, n.Arg("this"))
+			stack = append(stack, g.setOperationLeft(n))
 		} else {
+			if !g.s.SET_OP_LIMITS && n.IsA(KSelect) && n.ArgB("limit") {
+				n = n.QuerySubquery(nil, false)
+				if !g.s.SET_OP_PARENTHESIZED_OPERANDS {
+					n = SelectExpr(Star()).SelectFrom(n, false)
+				}
+				node = n
+			} else if !g.s.SET_OP_PARENTHESIZED_OPERANDS && n.IsA(KSubquery) && n.UnnestSubquery().IsA(KSetOperation) {
+				// Without parenthesized operands, a grouped set operation is selected from instead
+				node = SelectExpr(Star()).SelectFrom(n, false)
+			}
 			sqls = append(sqls, g.sql(node))
 		}
 	}
@@ -1160,7 +1166,46 @@ func (g *Generator) setOperations(expression *Expr) string {
 	return g.prependCtes(expression, this)
 }
 
-// fetch_sql (generator.py L1890).
+// setOperationLeft returns the left operand of a set operation to render. Where operands can't
+// be parenthesized but set operations associate left to right, the subqueries grouping a left
+// set operation are dropped (keeping their comments), as the grouping is implicit; one with CTEs
+// or modifiers of its own keeps them.
+func (g *Generator) setOperationLeft(expression *Expr) *Expr {
+	left := expression.This()
+	if g.s.SET_OP_PARENTHESIZED_OPERANDS || g.d.S.INTERSECT_BINDS_TIGHTER_THAN_UNION_AND_EXCEPT {
+		return left
+	}
+
+	var wrappers []*Expr
+	inner := left
+	for inner.IsA(KSubquery) && inner.IsWrapper() {
+		wrappers = append(wrappers, inner)
+		inner = inner.This()
+	}
+
+	if !inner.IsA(KSetOperation) || inner.ArgB("with_") {
+		return left
+	}
+	for _, key := range QUERY_MODIFIERS {
+		if inner.ArgB(key) {
+			return left
+		}
+	}
+	for _, wrapper := range wrappers {
+		inner.AddComments(wrapper.PopComments(), false)
+	}
+	return inner
+}
+
+// wrapSetOperation wraps expression, without copying it, in SELECT * FROM (...) AS _l_0.
+func (g *Generator) wrapSetOperation(expression *Expr) *Expr {
+	sub := New(KSubquery, "this", expression, "alias", New(KTableAlias, "this", ToIdentifier("_l_0", nil)))
+	sel := New(KSelect)
+	sel.Set("from_", New(KFrom, "this", sub))
+	sel.Set("expressions", []*Expr{Star()})
+	return g.moveCtesToTopLevel(sel)
+}
+
 func (g *Generator) fetchSQL(expression *Expr) string {
 	direction := ""
 	if v := expression.Arg("direction"); truthy(v) {
@@ -1177,7 +1222,6 @@ func (g *Generator) fetchSQL(expression *Expr) string {
 	return g.seg("FETCH") + direction + count + limitOptions
 }
 
-// limitoptions_sql (generator.py L1899).
 func (g *Generator) limitoptionsSQL(expression *Expr) string {
 	percent := ""
 	if expression.ArgB("percent") {
@@ -1197,14 +1241,24 @@ func (g *Generator) limitoptionsSQL(expression *Expr) string {
 	return percent + rows + withTies
 }
 
-// filter_sql (generator.py L1907).
 func (g *Generator) baseFilterSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	where := pyStrip(g.sqlKey(expression, "expression"))
 	return this + " FILTER(" + where + ")"
 }
 
-// hint_sql (generator.py L1912).
+func (g *Generator) perSQL(expression *Expr) string {
+	keys := make([]string, 0, len(expression.Expressions()))
+	for _, key := range expression.Expressions() {
+		if key.IsA(KOrdered) && key.ArgE("with_fill") != nil {
+			keys = append(keys, g.sqlKey(key, "this")+" "+g.sqlKey(key, "with_fill"))
+		} else {
+			keys = append(keys, g.sql(key))
+		}
+	}
+	return g.sqlKey(expression, "this") + " PER (" + strings.Join(keys, ", ") + ")"
+}
+
 func (g *Generator) baseHintSQL(expression *Expr) string {
 	if !g.s.QUERY_HINTS {
 		g.unsupported("Hints are not supported")
@@ -1214,7 +1268,6 @@ func (g *Generator) baseHintSQL(expression *Expr) string {
 	return " /*+ " + pyStrip(g.expressions(expression, exprsOpts{sep: strp2(g.s.QUERY_HINT_SEP)})) + " */"
 }
 
-// indexparameters_sql (generator.py L1919).
 func (g *Generator) indexparametersSQL(expression *Expr) string {
 	using := g.sqlKey(expression, "using")
 	if using != "" {
@@ -1239,7 +1292,12 @@ func (g *Generator) indexparametersSQL(expression *Expr) string {
 	}
 	tablespace := g.sqlKey(expression, "tablespace")
 	if tablespace != "" {
-		tablespace = " USING INDEX TABLESPACE " + tablespace
+		// an index's own parameters name the tablespace without USING INDEX
+		if expression.Parent().IsA(KIndex) {
+			tablespace = " TABLESPACE " + tablespace
+		} else {
+			tablespace = " USING INDEX TABLESPACE " + tablespace
+		}
 	}
 	on := g.sqlKey(expression, "on")
 	if on != "" {
@@ -1249,7 +1307,6 @@ func (g *Generator) indexparametersSQL(expression *Expr) string {
 	return using + columns + include + withStorage + tablespace + partitionBy + where + on
 }
 
-// index_sql (generator.py L1939).
 func (g *Generator) indexSQL(expression *Expr) string {
 	unique := ""
 	if expression.ArgB("unique") {
@@ -1281,11 +1338,9 @@ func (g *Generator) indexSQL(expression *Expr) string {
 	return unique + primary + amp + index + name + table + params
 }
 
-// dynamicidentifier_sql (generator.py L1953).
 func (g *Generator) baseDynamicidentifierSQL(expression *Expr) string {
 	this := expression.This()
 	if this != nil && this.IsString() {
-		// maybe_parse(this.name).sql(self.dialect)
 		parsed, err := MustDialect("").ParseOne(this.Name(), nil)
 		if err != nil {
 			panic(genPanic{err})
@@ -1305,7 +1360,6 @@ func (g *Generator) baseDynamicidentifierSQL(expression *Expr) string {
 	return g.fn("IDENTIFIER", this)
 }
 
-// identifier_sql (generator.py L1967).
 func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 	text := expression.Name()
 	lower := pyLower(text)
@@ -1313,7 +1367,13 @@ func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 	if g.normalize && !quoted {
 		text = lower
 	}
+	for _, seq := range g.d.S.IDENTIFIER_ESCAPED_SEQUENCES {
+		text = strings.ReplaceAll(text, seq[0], seq[1])
+	}
 	text = strings.ReplaceAll(text, g.identifierEnd, g.escapedIdentifierEnd)
+	if f := g.rawByteEscape(); f != "" && !utf8.ValidString(text) {
+		text = escapeRawBytes(text, f)
+	}
 	firstChar := ""
 	if r := []rune(text); len(r) > 0 {
 		firstChar = string(r[0])
@@ -1327,7 +1387,6 @@ func (g *Generator) baseIdentifierSQL(expression *Expr) string {
 	return text
 }
 
-// hex_sql (generator.py L1984).
 func (g *Generator) baseHexSQL(expression *Expr) string {
 	text := g.fn(g.s.HEX_FUNC, g.sqlKey(expression, "this"))
 	if g.d.S.HEX_LOWERCASE {
@@ -1337,7 +1396,6 @@ func (g *Generator) baseHexSQL(expression *Expr) string {
 	return text
 }
 
-// lowerhex_sql (generator.py L1991).
 func (g *Generator) lowerhexSQL(expression *Expr) string {
 	text := g.fn(g.s.HEX_FUNC, g.sqlKey(expression, "this"))
 	if !g.d.S.HEX_LOWERCASE {
@@ -1346,7 +1404,6 @@ func (g *Generator) lowerhexSQL(expression *Expr) string {
 	return text
 }
 
-// inputoutputformat_sql (generator.py L1997).
 func (g *Generator) inputoutputformatSQL(expression *Expr) string {
 	inputFormat := g.sqlKey(expression, "input_format")
 	if inputFormat != "" {
@@ -1359,13 +1416,11 @@ func (g *Generator) inputoutputformatSQL(expression *Expr) string {
 	return inputFormat + g.sep1() + outputFormat
 }
 
-// national_sql (generator.py L2004).
 func (g *Generator) nationalSQL(expression *Expr, prefix string) string {
 	str := g.sql(LiteralString(expression.Name()))
 	return prefix + str
 }
 
-// partition_sql (generator.py L2008).
 func (g *Generator) basePartitionSQL(expression *Expr) string {
 	partitionKeyword := "PARTITION"
 	if expression.ArgB("subpartition") {
@@ -1374,10 +1429,6 @@ func (g *Generator) basePartitionSQL(expression *Expr) string {
 	return partitionKeyword + "(" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// ---------------------------------------------------------------------------
-// Helpers for generator chunk A (ports of Python builtins / expression builders).
-
-// chunkAPyStr mirrors Python str(value) / f"{value}" for raw argument values.
 func chunkAPyStr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -1402,7 +1453,6 @@ func chunkAPyStr(v any) string {
 	return fmt.Sprint(v)
 }
 
-// chunkATri converts an optional bool argument (None/True/False) to a Tri.
 func chunkATri(v any) Tri {
 	switch x := v.(type) {
 	case nil:
@@ -1419,7 +1469,9 @@ func chunkATri(v any) Tri {
 	return TriFalse
 }
 
-// chunkAPyIntBase mirrors str(int(s, base)) for base 2 / 16, raising ValueError like Python.
+// chunkAPyIntBase parses s as a base-2 or base-16 integer (optional sign and 0b / 0x prefix,
+// single underscores between digits) and returns it in base 10. Invalid input panics with a
+// ValueError; the message keeps its historical wording ("invalid literal for int() with base N").
 func chunkAPyIntBase(s string, base int) string {
 	fail := func() {
 		panic(&ValueError{Msg: fmt.Sprintf("invalid literal for int() with base %d: %s", base, pyRepr(s))})
@@ -1455,7 +1507,8 @@ func chunkAPyIntBase(s string, base int) string {
 	return n.String()
 }
 
-// chunkARegexSub mirrors re.sub(pattern, repl_fn, s) where repl receives the match groups.
+// chunkARegexSub replaces every match of re in s with repl(groups), where groups[0] is the whole
+// match and groups that did not participate are "".
 func chunkARegexSub(re *regexp.Regexp, s string, repl func(groups []string) string) string {
 	var b strings.Builder
 	last := 0
@@ -1474,7 +1527,6 @@ func chunkARegexSub(re *regexp.Regexp, s string, repl func(groups []string) stri
 	return b.String()
 }
 
-// chunkAInDTypeSet mirrors `dtype in SOME_SET` for a generated settings set (DTypeSet or StrSet of values).
 func chunkAInDTypeSet(set any, d DType) bool {
 	switch s := set.(type) {
 	case DTypeSet:
@@ -1485,7 +1537,6 @@ func chunkAInDTypeSet(set any, d DType) bool {
 	return false
 }
 
-// chunkACast mirrors exp.cast(sql, to, dialect=d) for a SQL string and a DType target.
 func chunkACast(sql string, to DType, d *Dialect) *Expr {
 	expr, err := d.ParseOne(sql, nil)
 	if err != nil {
@@ -1502,7 +1553,7 @@ func chunkACast(sql string, to DType, d *Dialect) *Expr {
 			return dtypeValues[t]
 		}
 		existing := expr.ArgE("to").DTypeOf()
-		// expr.is_type(data_type) implies the types are equivalent for a plain DType target.
+		// For a plain DType target, types with the same rendered name are equivalent.
 		if typeName(existing) == typeName(to) {
 			return expr
 		}
@@ -1511,45 +1562,4 @@ func chunkACast(sql string, to DType, d *Dialect) *Expr {
 	c := New(KCast, "this", expr, "to", dataType)
 	c.SetType(dataType)
 	return c
-}
-
-// chunkASelectLimit mirrors select.limit(limit, copy=False).
-func chunkASelectLimit(sel *Expr, limit *Expr) *Expr {
-	if !limit.IsA(KLimit) {
-		limit = New(KLimit, "expression", limit)
-	}
-	sel.Set("limit", limit)
-	return sel
-}
-
-// chunkASelectOrderBy mirrors select.order_by(order, copy=False) (_apply_child_list_builder into Order).
-func chunkASelectOrderBy(sel *Expr, order *Expr) *Expr {
-	if !order.IsA(KOrder) {
-		order = New(KOrder, "expressions", []*Expr{order})
-	}
-	parsed := []*Expr{}
-	type kv struct {
-		k string
-		v any
-	}
-	var props []kv
-	for _, k := range order.ArgKeys() {
-		v := order.Arg(k)
-		if k == "expressions" {
-			if l, ok := v.([]*Expr); ok {
-				parsed = append(parsed, l...)
-			}
-		} else {
-			props = append(props, kv{k, v})
-		}
-	}
-	if existing := sel.ArgE("order"); existing != nil {
-		parsed = append(append([]*Expr{}, existing.Expressions()...), parsed...)
-	}
-	child := New(KOrder, "expressions", parsed)
-	for _, p := range props {
-		child.Set(p.k, p.v)
-	}
-	sel.Set("order", child)
-	return sel
 }

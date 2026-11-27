@@ -5,9 +5,6 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/dialects/clickhouse.py (ClickHouse dialect class body). The tokenizer and the
-// data-only class attributes are generated (zz_*_settings.go).
-
 func init() { registerCustomizer("clickhouse", customizeClickHouse) }
 
 func customizeClickHouse(d *Dialect) {
@@ -16,11 +13,11 @@ func customizeClickHouse(d *Dialect) {
 	customizeClickHouseGenerator(d)
 }
 
-// clickhouseGenerateValuesAliases mirrors ClickHouse.generate_values_aliases.
+// clickhouseGenerateValuesAliases returns the column aliases of a VALUES clause: the column names
+// of a leading structure string when there is one, otherwise c1, c2 and so on.
 func clickhouseGenerateValuesAliases(d *Dialect, e *Expr) []*Expr {
 	// Clickhouse allows VALUES to have an embedded structure e.g:
 	// VALUES('person String, place String', ('Noah', 'Paris'), ...)
-	// In this case, we don't want to qualify the columns
 	values := e.Expressions()[0].Expressions()
 
 	var structure *Expr
@@ -30,14 +27,11 @@ func clickhouseGenerateValuesAliases(d *Dialect, e *Expr) []*Expr {
 
 	var columnAliases []*Expr
 	if structure != nil {
-		// Split each column definition into the column name e.g:
-		// 'person String, place String' -> ['person', 'place']
 		for _, coldef := range strings.Split(structure.Name(), ",") {
 			coldef = pyStrip(coldef)
 			columnAliases = append(columnAliases, ToIdentifier(strings.Split(coldef, " ")[0], nil))
 		}
 	} else {
-		// Default column aliases in CH are "c1", "c2", etc.
 		for i := range values[0].Expressions() {
 			columnAliases = append(columnAliases, ToIdentifier(fmt.Sprintf("c%d", i+1), nil))
 		}

@@ -10,7 +10,7 @@ import (
 
 // stubHoister is a test double for DeclareHoister that captures the inputs
 // it was called with and returns the configured response. It does not parse
-// SQL — the real sqlglot-backed behavior is verified in pkg/sqlparser.
+// SQL; the real hoisting behavior is verified in pkg/sqlparser.
 type stubHoister struct {
 	capturedSQL     string
 	capturedList    []string
@@ -108,7 +108,7 @@ func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			// nil hoister: verifies the pure join behavior independent of sqlglot.
+			// nil hoister: verifies the pure join behavior independent of the SQL parser.
 			assert.Equal(t, tt.want, WrapHooks(tt.query, tt.hooks, nil, AssetTypeBigqueryQuery))
 		})
 	}

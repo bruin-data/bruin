@@ -1,7 +1,7 @@
 package sqlengine
 
-// Python date/datetime/timedelta and dateutil.relativedelta semantics needed by the port of
-// sqlglot/optimizer/simplify.py (CPython 3.13 `_datetime`, python-dateutil 2.9).
+// Value ranges (years 1-9999), parsing rules and error messages of the date helpers are kept
+// stable; tests pin them.
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-// smpDT mirrors a Python datetime.date (isDatetime=false) or datetime.datetime value.
+// smpDT is a calendar date (isDatetime=false) or a datetime with microsecond precision.
 // tz is the fixed UTC offset in microseconds of an aware datetime (nil when naive).
 type smpDT struct {
 	isDatetime                 bool
@@ -47,7 +47,7 @@ func smpDaysBeforeYear(year int) int {
 	return y*365 + y/4 - y/100 + y/400
 }
 
-// smpYmd2Ord mirrors datetime._ymd2ord.
+// smpYmd2Ord returns the proleptic Gregorian ordinal of a date (0001-01-01 is day 1).
 func smpYmd2Ord(year, month, day int) int {
 	dbm := smpDaysBeforeMonth[month]
 	if month > 2 && smpIsLeap(int64(year)) {
@@ -56,7 +56,6 @@ func smpYmd2Ord(year, month, day int) int {
 	return smpDaysBeforeYear(year) + dbm + day
 }
 
-// smpOrd2Ymd mirrors datetime._ord2ymd.
 func smpOrd2Ymd(n int) (int, int, int) {
 	n--
 	n400, n := n/146097, n%146097
@@ -87,18 +86,18 @@ func smpOrd2Ymd(n int) (int, int, int) {
 
 func (d smpDT) toordinal() int { return smpYmd2Ord(d.year, d.month, d.day) }
 
-// weekday mirrors date.weekday() (Monday == 0).
+// weekday returns the day of the week (Monday == 0).
 func (d smpDT) weekday() int { return (d.toordinal() + 6) % 7 }
 
-// date mirrors datetime.date().
 func (d smpDT) date() smpDT { return smpDT{year: d.year, month: d.month, day: d.day} }
 
-// smpDatetimeFromDate mirrors datetime(year=d.year, month=d.month, day=d.day).
+// smpDatetimeFromDate returns midnight of d's date as a naive datetime.
 func smpDatetimeFromDate(d smpDT) smpDT {
 	return smpDT{isDatetime: true, year: d.year, month: d.month, day: d.day}
 }
 
-// String mirrors str(date) / str(datetime) (isoformat with a " " separator).
+// String formats d in ISO 8601 with a " " separator; microseconds, and the seconds of the UTC
+// offset, appear only when non-zero.
 func (d smpDT) String() string {
 	s := fmt.Sprintf("%04d-%02d-%02d", d.year, d.month, d.day)
 	if !d.isDatetime {
@@ -129,7 +128,7 @@ func (d smpDT) String() string {
 	return s
 }
 
-// smpCheckDate mirrors the range checks of the date constructor / date.replace.
+// smpCheckDate panics when year (1-9999), month or day is out of range.
 func smpCheckDate(year int64, month, day int) {
 	if year < smpMinYear || year > smpMaxYear {
 		if year > math.MaxInt32 || year < math.MinInt32 {
@@ -145,14 +144,14 @@ func smpCheckDate(year int64, month, day int) {
 	}
 }
 
-// replaceYMD mirrors d.replace(year=..., month=..., day=...).
 func (d smpDT) replaceYMD(year int64, month, day int) smpDT {
 	smpCheckDate(year, month, day)
 	d.year, d.month, d.day = int(year), month, day
 	return d
 }
 
-// smpTimedelta mirrors a normalized datetime.timedelta.
+// smpTimedelta is a normalized duration: whole days plus the seconds and microseconds within a
+// day.
 type smpTimedelta struct {
 	days    int64
 	seconds int64 // 0 <= seconds < 86400
@@ -168,7 +167,8 @@ func smpFloorDivMod(a, b int64) (int64, int64) {
 	return q, r
 }
 
-// smpNewTimedelta mirrors timedelta(days=, hours=, minutes=, seconds=, microseconds=) for ints.
+// smpNewTimedelta builds a normalized duration from integer components; durations of more than
+// 999999999 days panic with an overflow error.
 func smpNewTimedelta(days, hours, minutes, seconds, usec int64) smpTimedelta {
 	if days > 2*999999999 || days < -2*999999999 {
 		smpRaise("OverflowError", fmt.Sprintf("days=%d; must have magnitude <= 999999999", days))
@@ -188,7 +188,8 @@ func (t smpTimedelta) neg() smpTimedelta {
 	return smpNewTimedelta(-t.days, 0, 0, -t.seconds, -t.usec)
 }
 
-// smpAddTimedelta mirrors date + timedelta / datetime + timedelta.
+// smpAddTimedelta adds t to a date (whole days only) or a datetime; results outside years
+// 1-9999 panic with an overflow error.
 func smpAddTimedelta(d smpDT, t smpTimedelta) smpDT {
 	if !d.isDatetime {
 		o := int64(d.toordinal()) + t.days
@@ -213,7 +214,8 @@ func smpAddTimedelta(d smpDT, t smpTimedelta) smpDT {
 	return smpDT{}
 }
 
-// smpDTEq mirrors Python's == between dates/datetimes.
+// smpDTEq reports whether a and b are equal: a date never equals a datetime, nor a naive datetime
+// an aware one, and aware datetimes compare in UTC.
 func smpDTEq(a, b smpDT) bool {
 	if a.isDatetime != b.isDatetime {
 		return false
@@ -236,7 +238,8 @@ func (d smpDT) utcMicros() int64 {
 	return v
 }
 
-// smpDTCmp mirrors Python's ordering comparisons between dates/datetimes.
+// smpDTCmp compares a and b (-1, 0 or 1). Comparing a date with a datetime, or a naive with an
+// aware datetime, panics with a type error naming op.
 func smpDTCmp(a, b smpDT, op string) int {
 	if a.isDatetime != b.isDatetime {
 		an, bn := "datetime.date", "datetime.date"
@@ -274,13 +277,9 @@ func smpCmpInts(a, b int) int {
 	return 0
 }
 
-// ---------------------------------------------------------------------------------------------
-// datetime.fromisoformat (CPython 3.13 Modules/_datetimemodule.c)
-// ---------------------------------------------------------------------------------------------
-
 type smpISOBuf []byte
 
-// at mirrors reading a NUL-terminated C string (0 past the end).
+// at returns b[i], or 0 outside b; the parser treats 0 as the end of input.
 func (b smpISOBuf) at(i int) byte {
 	if i < 0 || i >= len(b) {
 		return 0
@@ -290,7 +289,7 @@ func (b smpISOBuf) at(i int) byte {
 
 func smpIsDigitByte(c byte) bool { return c >= '0' && c <= '9' }
 
-// parseDigits mirrors parse_digits: returns the new position, or -1 on failure.
+// parseDigits reads exactly n digits at p into *v and returns the new position, or -1 on failure.
 func (b smpISOBuf) parseDigits(p int, v *int, n int) int {
 	for range n {
 		c := b.at(p)
@@ -313,7 +312,8 @@ func smpIsoWeek1Monday(year int) int {
 	return week1monday
 }
 
-// smpIsoToYmd mirrors iso_to_ymd.
+// smpIsoToYmd converts an ISO year, week and weekday to a calendar date. The first result is 0 on
+// success and -4 (year), -2 (week) or -3 (weekday) for an out-of-range component.
 func smpIsoToYmd(isoYear, isoWeek, isoDay int) (int, int, int, int) {
 	if isoYear < smpMinYear || isoYear > smpMaxYear {
 		return -4, 0, 0, 0
@@ -339,7 +339,8 @@ func smpIsoToYmd(isoYear, isoWeek, isoDay int) (int, int, int, int) {
 	return 0, y, m, d
 }
 
-// parseIsoformatDate mirrors parse_isoformat_date.
+// parseIsoformatDate parses a date (YYYY-MM-DD, YYYYMMDD or an ISO week date) from the first
+// length bytes. It returns 0 on success and a negative code on failure.
 func (b smpISOBuf) parseIsoformatDate(length int, year, month, day *int) int {
 	p := b.parseDigits(0, year, 4)
 	if p < 0 {
@@ -396,7 +397,8 @@ func (b smpISOBuf) parseIsoformatDate(length int, year, month, day *int) int {
 	return 0
 }
 
-// parseHhMmSsFf mirrors parse_hh_mm_ss_ff over b[p:pEnd].
+// parseHhMmSsFf parses hh[:mm[:ss[.ffffff]]] (separators optional) from b[p:pEnd]. It returns 0 on
+// success, 1 when unparsed bytes follow and a negative code on failure.
 func (b smpISOBuf) parseHhMmSsFf(p, pEnd int, hour, minute, second, usec *int) int {
 	*hour, *minute, *second, *usec = 0, 0, 0, 0
 	vals := []*int{hour, minute, second}
@@ -447,7 +449,9 @@ func (b smpISOBuf) parseHhMmSsFf(p, pEnd int, hour, minute, second, usec *int) i
 	return 0
 }
 
-// parseIsoformatTime mirrors parse_isoformat_time for the bytes b[start:start+dtlen].
+// parseIsoformatTime parses a time with an optional Z or +/-hh:mm[:ss[.ffffff]] offset from
+// b[start:start+dtlen]. It returns 0 without an offset, 1 with one (in tzoffset seconds plus
+// tzusec) and a negative code on failure.
 func (b smpISOBuf) parseIsoformatTime(start, dtlen int, hour, minute, second, usec *int, tzoffset, tzusec *int) int {
 	pEnd := start + dtlen
 	tzPos := start
@@ -493,7 +497,8 @@ func (b smpISOBuf) parseIsoformatTime(start, dtlen int, hour, minute, second, us
 	return 1
 }
 
-// findIsoformatDatetimeSeparator mirrors _find_isoformat_datetime_separator.
+// findIsoformatDatetimeSeparator returns the length of the date part, where the date/time
+// separator sits, or -1 when the date part is malformed.
 func (b smpISOBuf) findIsoformatDatetimeSeparator() int {
 	n := len(b)
 	if n == 7 {
@@ -535,7 +540,7 @@ func (b smpISOBuf) findIsoformatDatetimeSeparator() int {
 	return 8
 }
 
-// smpFromISOFormat mirrors datetime.fromisoformat(s). ok=false means ValueError.
+// smpFromISOFormat parses an ISO 8601 date or datetime string into a datetime.
 func smpFromISOFormat(s string) (dt smpDT, ok bool) {
 	if utf8.RuneCountInString(s) < 7 {
 		return smpDT{}, false
@@ -597,12 +602,9 @@ func smpFromISOFormat(s string) (dt smpDT, ok bool) {
 	}, true
 }
 
-// ---------------------------------------------------------------------------------------------
-// dateutil.relativedelta (relative fields only)
-// ---------------------------------------------------------------------------------------------
-
-// smpRelDelta mirrors dateutil.relativedelta.relativedelta with relative information only.
-// huge marks a value too large for int64: any date arithmetic with it overflows in Python too.
+// smpRelDelta is a calendar-relative delta: years and months move along the calendar, the other
+// fields are fixed durations. huge marks a value too large for int64: any date arithmetic with it
+// overflows.
 type smpRelDelta struct {
 	years, months, days, hours, minutes, seconds, microseconds int64
 	huge                                                       bool
@@ -615,7 +617,8 @@ func smpSign(x int64) int64 {
 	return 1
 }
 
-// fix mirrors relativedelta._fix.
+// fix carries overflowing fields into the next larger unit (microseconds up to days, months into
+// years), keeping each field's sign.
 func (r *smpRelDelta) fix() {
 	if r.microseconds > 999999 || r.microseconds < -999999 {
 		s := smpSign(r.microseconds)
@@ -653,13 +656,11 @@ func (r smpRelDelta) hasTime() bool {
 	return r.hours != 0 || r.minutes != 0 || r.seconds != 0 || r.microseconds != 0
 }
 
-// truthy mirrors relativedelta.__bool__.
 func (r smpRelDelta) truthy() bool {
 	return r.huge || r.years != 0 || r.months != 0 || r.days != 0 || r.hours != 0 || r.minutes != 0 ||
 		r.seconds != 0 || r.microseconds != 0
 }
 
-// neg mirrors relativedelta.__neg__.
 func (r smpRelDelta) neg() smpRelDelta {
 	n := smpRelDelta{
 		years: -r.years, months: -r.months, days: -r.days, hours: -r.hours, minutes: -r.minutes,
@@ -669,7 +670,9 @@ func (r smpRelDelta) neg() smpRelDelta {
 	return n
 }
 
-// addTo mirrors relativedelta.__add__(date) (also used for date + relativedelta).
+// addTo adds r to a date or datetime: years and months first (clamping the day to the month's
+// length), then the remaining fields as a duration. A date becomes a datetime when r has a time
+// part.
 func (r smpRelDelta) addTo(other smpDT) smpDT {
 	if r.huge {
 		smpRaise("OverflowError", "date value out of range")
@@ -697,10 +700,8 @@ func (r smpRelDelta) addTo(other smpDT) smpDT {
 	return smpAddTimedelta(ret, smpNewTimedelta(r.days, r.hours, r.minutes, r.seconds, r.microseconds))
 }
 
-// subFrom mirrors date - relativedelta.
 func (r smpRelDelta) subFrom(other smpDT) smpDT { return r.neg().addTo(other) }
 
-// smpCheckedMul multiplies n by k, reporting int64 overflow.
 func smpCheckedMul(n *big.Int, k int64) (int64, bool) {
 	v := new(big.Int).Mul(n, big.NewInt(k))
 	if !v.IsInt64() {
@@ -709,7 +710,9 @@ func smpCheckedMul(n *big.Int, k int64) (int64, bool) {
 	return v.Int64(), true
 }
 
-// smpInterval mirrors simplify.interval(unit, n).
+// smpInterval returns n units of unit as a delta (quarters as 3 months, weeks as 7 days,
+// milliseconds as 1000 microseconds). Values too large to compute safely are marked huge, and
+// unknown units panic.
 func smpInterval(unit string, n *big.Int) smpRelDelta {
 	var r smpRelDelta
 	var field *int64

@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOracleGeneratedSQLParsesWithSQLGlot(t *testing.T) {
+func TestOracleGeneratedSQLParsesWithSQLParser(t *testing.T) {
 	t.Parallel()
 
-	testBruinGeneratedSQLParsesWithSQLGlot(t, jinja.PlatformOracle, "oracle")
+	testBruinGeneratedSQLParsesWithSQLParser(t, jinja.PlatformOracle, "oracle")
 }
 
-func testBruinGeneratedSQLParsesWithSQLGlot(t *testing.T, platform jinja.Platform, dialect string) {
+func testBruinGeneratedSQLParsesWithSQLParser(t *testing.T, platform jinja.Platform, dialect string) {
 	t.Helper()
 
 	parser, err := sqlparser.NewSQLParserCached()

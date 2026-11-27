@@ -5,17 +5,8 @@ import (
 	"strings"
 )
 
-// Port of sqlglot/parser.py (chunk F, part 1): transactions, REFRESH, ALTER, ANALYZE, MERGE,
-// SHOW, SET, option vars, commands, dictionary properties, comprehensions, heredocs, lambda
-// replacement, TRUNCATE, COPY, misc function parsers, GRANT/REVOKE, DECLARE, build_cast,
-// JSON_VALUE, GROUP_CONCAT, INITCAP and OPERATOR. The pipe syntax lives in parser_pipe.go.
-
-// ---------------------------------------------------------------------------------------------
-// Small helpers mirroring Python value semantics used by this chunk.
-// ---------------------------------------------------------------------------------------------
-
-// chunkFAnd mirrors `cond and fn()` where cond is a bool returned by a _match* call:
-// the result is False when cond is false, otherwise fn()'s value (None when nil).
+// chunkFAnd returns false (not nil) when cond is false, and fn()'s result otherwise (nil when fn
+// returns nil). cond is usually the result of a match call.
 func chunkFAnd(cond bool, fn func() *Expr) any {
 	if !cond {
 		return false
@@ -26,7 +17,7 @@ func chunkFAnd(cond bool, fn func() *Expr) any {
 	return nil
 }
 
-// chunkFAndList mirrors `cond and fn()` for list-returning parse methods.
+// chunkFAndList is chunkFAnd for list-returning parse methods; a nil list becomes an empty one.
 func chunkFAndList(cond bool, fn func() []*Expr) any {
 	if !cond {
 		return false
@@ -38,7 +29,7 @@ func chunkFAndList(cond bool, fn func() []*Expr) any {
 	return l
 }
 
-// chunkFAndAny mirrors `cond and fn()` for parse methods returning Expr | list | None.
+// chunkFAndAny is chunkFAnd for parse methods returning an *Expr, a list or nil.
 func chunkFAndAny(cond bool, fn func() any) any {
 	if !cond {
 		return false
@@ -50,7 +41,6 @@ func chunkFAndAny(cond bool, fn func() any) any {
 	return v
 }
 
-// chunkFStrOrNil maps the Go "" (Python None) to nil.
 func chunkFStrOrNil(s string) any {
 	if s == "" {
 		return nil
@@ -58,7 +48,6 @@ func chunkFStrOrNil(s string) any {
 	return s
 }
 
-// chunkFIsNone reports whether a dynamically typed parse result is Python None.
 func chunkFIsNone(v any) bool {
 	switch x := v.(type) {
 	case nil:
@@ -69,7 +58,6 @@ func chunkFIsNone(v any) bool {
 	return false
 }
 
-// chunkFEnsureList mirrors helper.ensure_list for Expr | list | None values.
 func chunkFEnsureList(v any) []*Expr {
 	switch x := v.(type) {
 	case nil:
@@ -88,7 +76,6 @@ func chunkFEnsureList(v any) []*Expr {
 	panic(&ValueError{Msg: fmt.Sprintf("ensure_list: unexpected value %T", v)})
 }
 
-// chunkFPyStr mirrors str(expression) inside an f-string (None renders as "None").
 func chunkFPyStr(e *Expr) string {
 	if e == nil {
 		return "None"
@@ -96,23 +83,8 @@ func chunkFPyStr(e *Expr) string {
 	return exprSQL(e)
 }
 
-// chunkFParsePropertyCSV mirrors self._parse_csv(self._parse_property). Property parsers may
-// return a list; Python would nest it inside the result list, which an Expr argument cannot
-// represent, so list results are flattened in place.
-func (p *Parser) chunkFParsePropertyCSV() []*Expr {
-	items := parseCSVAny(p, p.parseProperty, TK_COMMA, chunkFIsNone)
-	out := []*Expr{}
-	for _, it := range items {
-		out = append(out, chunkFEnsureList(it)...)
-	}
-	return out
-}
-
-// ---------------------------------------------------------------------------------------------
-// Transactions
-// ---------------------------------------------------------------------------------------------
-
-// _parse_transaction (parser.py L8721).
+// baseParseTransaction parses the rest of BEGIN / START TRANSACTION: an optional kind and the
+// transaction modes.
 func (p *Parser) baseParseTransaction() *Expr {
 	var this any
 	if p.matchTextSet(p.s.TRANSACTION_KIND) {
@@ -139,7 +111,8 @@ func (p *Parser) baseParseTransaction() *Expr {
 	return p.expression(New(KTransaction, "this", this, "modes", modes))
 }
 
-// _parse_commit_or_rollback (parser.py L8741).
+// baseParseCommitOrRollback parses the rest of COMMIT or ROLLBACK: [TRANSACTION | WORK],
+// TO [SAVEPOINT] name and AND [NO] CHAIN.
 func (p *Parser) baseParseCommitOrRollback() *Expr {
 	var chain any
 	var savepoint *Expr
@@ -164,10 +137,13 @@ func (p *Parser) baseParseCommitOrRollback() *Expr {
 	return p.expression(New(KCommit, "chain", chain))
 }
 
-// _parse_refresh (parser.py L8761).
 func (p *Parser) parseRefresh() *Expr {
+	start := p.prev
+
 	var kind string
-	if p.match(TK_TABLE) {
+	if p.matchTextSeq("EXTERNAL", "TABLE") {
+		kind = "EXTERNAL TABLE"
+	} else if p.match(TK_TABLE) {
 		kind = "TABLE"
 	} else if p.matchTextSeq("MATERIALIZED", "VIEW") {
 		kind = "MATERIALIZED VIEW"
@@ -176,21 +152,15 @@ func (p *Parser) parseRefresh() *Expr {
 	}
 
 	this := p.parseString()
+	if kind == "" && !this.IsA(KLiteral) {
+		return p.parseAsCommand(start)
+	}
 	if this == nil {
 		this = p.parseTable(false, false, nil, false, false, false, false)
 	}
-	if kind == "" && !this.IsA(KLiteral) {
-		return p.parseAsCommand(p.prev)
-	}
-
 	return p.expression(New(KRefresh, "this", this, "kind", kind))
 }
 
-// ---------------------------------------------------------------------------------------------
-// ALTER
-// ---------------------------------------------------------------------------------------------
-
-// _parse_column_def_with_exists (parser.py L8775).
 func (p *Parser) parseColumnDefWithExists() *Expr {
 	start := p.index
 	p.match(TK_COLUMN)
@@ -208,7 +178,6 @@ func (p *Parser) parseColumnDefWithExists() *Expr {
 	return expression
 }
 
-// _parse_add_column (parser.py L8790).
 func (p *Parser) parseAddColumn() *Expr {
 	if !(upperText(p.prev) == "ADD") {
 		return nil
@@ -217,29 +186,33 @@ func (p *Parser) parseAddColumn() *Expr {
 	return p.parseColumnDefWithExists()
 }
 
-// _parse_drop_column (parser.py L8796).
+// baseParseDropColumn parses a DROP action of ALTER TABLE. Where the COLUMN keyword is optional,
+// a bare DROP [IF EXISTS] c [CASCADE | RESTRICT] drops a column.
 func (p *Parser) baseParseDropColumn() *Expr {
-	var drop *Expr
-	if p.match(TK_DROP) {
-		drop = p.parseDrop(false)
+	if !p.match(TK_DROP) {
+		return nil
 	}
-	if drop != nil && !drop.IsA(KCommand) {
-		// drop.args.get("kind", "COLUMN")
-		var kind any = "COLUMN"
-		if drop.HasArgKey("kind") {
-			kind = drop.Arg("kind")
+
+	kind := ""
+	if !p.s.ALTER_DROP_REQUIRES_COLUMN {
+		index := p.index
+		p.parseExists(false)
+		if p.curr.Type != TK_COLUMN && p.curr.Type != TK_CONSTRAINT && p.matchSet(p.s.ID_VAR_TOKENS) &&
+			(!p.curr.ok() || p.matchNoAdvance(TK_COMMA) ||
+				p.matchTextSeqNoAdvance("CASCADE") || p.matchTextSeqNoAdvance("RESTRICT")) {
+			kind = "COLUMN"
 		}
-		drop.Set("kind", kind)
+		p.retreat(index)
 	}
-	return drop
+
+	return p.parseDrop(false, kind)
 }
 
-// _parse_alter_drop_action (parser.py L8802).
 func (p *Parser) baseParseAlterDropAction() *Expr {
 	return p.parseDropColumn()
 }
 
-// _parse_drop_partition (parser.py L8806)
+// parseDropPartition parses the PARTITION (...) list of ALTER TABLE ... DROP [IF EXISTS].
 // https://docs.aws.amazon.com/athena/latest/ug/alter-table-drop-partition.html
 func (p *Parser) parseDropPartition(exists bool) *Expr {
 	return p.expression(New(
@@ -249,11 +222,11 @@ func (p *Parser) parseDropPartition(exists bool) *Expr {
 	))
 }
 
-// _parse_alter_table_add (parser.py L8811).
 func (p *Parser) parseAlterTableAdd() []*Expr {
 	parseAddAlteration := func() *Expr {
 		p.matchTextSeq("ADD")
-		if p.matchSetNoAdvance(p.s.ADD_CONSTRAINT_TOKENS) {
+		// constraint kinds that are plain words, e.g. FULLTEXT and SPATIAL indexes, also start one
+		if p.matchSetNoAdvance(p.s.ADD_CONSTRAINT_TOKENS) || p.matchTextSetNoAdvance(p.s.ADD_CONSTRAINT_KEYWORDS) {
 			return p.expression(New(
 				KAddConstraint,
 				"expressions", p.parseCSV(p.parseConstraint, TK_COMMA),
@@ -293,7 +266,6 @@ func (p *Parser) parseAlterTableAdd() []*Expr {
 	return p.parseCSV(parseAddAlteration, TK_COMMA)
 }
 
-// _parse_alter_table_alter (parser.py L8850).
 func (p *Parser) baseParseAlterTableAlter() *Expr {
 	if matchTextKeys(p, p.s.ALTER_ALTER_PARSERS) {
 		return p.s.ALTER_ALTER_PARSERS[upperText(p.prev)](p)
@@ -302,34 +274,43 @@ func (p *Parser) baseParseAlterTableAlter() *Expr {
 	// Many dialects support the ALTER [COLUMN] syntax, so if there is no
 	// keyword after ALTER we default to parsing this statement
 	p.match(TK_COLUMN)
+	var exists any
+	if p.parseExists(false) {
+		exists = true
+	}
 	column := p.parseField(true, nil, false)
 
 	if p.matchPair(TK_DROP, TK_DEFAULT) {
-		return p.expression(New(KAlterColumn, "this", column, "drop", true))
+		return p.expression(New(KAlterColumn, "this", column, "drop", true, "exists", exists))
 	}
 	if p.matchPair(TK_SET, TK_DEFAULT) {
-		return p.expression(New(KAlterColumn, "this", column, "default", p.parseDisjunction()))
+		return p.expression(New(KAlterColumn, "this", column, "default", p.parseDisjunction(), "exists", exists))
 	}
 	if p.match(TK_COMMENT) {
-		return p.expression(New(KAlterColumn, "this", column, "comment", p.parseString()))
+		return p.expression(New(KAlterColumn, "this", column, "comment", p.parseString(), "exists", exists))
 	}
 	if p.matchTextSeq("DROP", "NOT", "NULL") {
-		return p.expression(New(KAlterColumn, "this", column, "drop", true, "allow_null", true))
+		return p.expression(New(KAlterColumn, "this", column, "drop", true, "allow_null", true, "exists", exists))
 	}
 	if p.matchTextSeq("SET", "NOT", "NULL") {
-		return p.expression(New(KAlterColumn, "this", column, "allow_null", false))
+		return p.expression(New(KAlterColumn, "this", column, "allow_null", false, "exists", exists))
 	}
 
 	if p.matchTextSeq("SET", "VISIBLE") {
-		return p.expression(New(KAlterColumn, "this", column, "visible", "VISIBLE"))
+		return p.expression(New(KAlterColumn, "this", column, "visible", "VISIBLE", "exists", exists))
 	}
 	if p.matchTextSeq("SET", "INVISIBLE") {
-		return p.expression(New(KAlterColumn, "this", column, "visible", "INVISIBLE"))
+		return p.expression(New(KAlterColumn, "this", column, "visible", "INVISIBLE", "exists", exists))
 	}
 
 	p.matchTextSeq("SET", "DATA")
-	p.matchTextSeq("TYPE")
-	dtype := p.parseTypes(false, false, true, false)
+	var dtype *Expr
+	if p.matchTextSeq("TYPE") || !p.s.ALTER_COLUMN_TYPE_REQUIRES_KEYWORD {
+		dtype = p.parseTypes(false, false, true, false)
+	}
+	if dtype == nil {
+		return nil
+	}
 	collate := chunkFAnd(p.match(TK_COLLATE), p.parseTerm)
 	using := chunkFAnd(p.match(TK_USING), p.parseDisjunction)
 	return p.expression(New(
@@ -338,10 +319,10 @@ func (p *Parser) baseParseAlterTableAlter() *Expr {
 		"dtype", dtype,
 		"collate", collate,
 		"using", using,
+		"exists", exists,
 	))
 }
 
-// _parse_alter_diststyle (parser.py L8886).
 func (p *Parser) parseAlterDiststyle() *Expr {
 	if p.matchTexts("ALL", "EVEN", "AUTO") {
 		return p.expression(New(KAlterDistStyle, "this", VarExpr(upperText(p.prev))))
@@ -351,8 +332,8 @@ func (p *Parser) parseAlterDiststyle() *Expr {
 	return p.expression(New(KAlterDistStyle, "this", p.parseColumn()))
 }
 
-// _parse_alter_sortkey (parser.py L8893)
-// compound=false stands for the Python default None (callers never pass False explicitly).
+// parseAlterSortkey parses ALTER [COMPOUND] SORTKEY (columns) | AUTO | NONE.
+// compound=false leaves the compound arg unset (nil) rather than false.
 func (p *Parser) parseAlterSortkey(compound bool) *Expr {
 	var compoundV any
 	if compound {
@@ -376,7 +357,6 @@ func (p *Parser) parseAlterSortkey(compound bool) *Expr {
 	))
 }
 
-// _parse_alter_table_drop (parser.py L8907).
 func (p *Parser) parseAlterTableDrop() []*Expr {
 	index := p.index - 1
 
@@ -389,7 +369,6 @@ func (p *Parser) parseAlterTableDrop() []*Expr {
 	return p.parseCSV(p.parseAlterDropAction, TK_COMMA)
 }
 
-// _parse_alter_table_rename (parser.py L8917).
 func (p *Parser) baseParseAlterTableRename() *Expr {
 	if p.match(TK_COLUMN) ||
 		(!p.s.ALTER_RENAME_REQUIRES_COLUMN && !p.matchTextSeqNoAdvance("TO")) {
@@ -409,7 +388,6 @@ func (p *Parser) baseParseAlterTableRename() *Expr {
 	return p.expression(New(KAlterRename, "this", p.parseTable(true, false, nil, false, false, false, false)))
 }
 
-// _parse_alter_table_set (parser.py L8934).
 func (p *Parser) baseParseAlterTableSet() *Expr {
 	alterSet := p.expression(New(KAlterSet))
 
@@ -447,8 +425,6 @@ func (p *Parser) baseParseAlterTableSet() *Expr {
 	return alterSet
 }
 
-// _parse_alter_session (parser.py L8970)
-// Parse ALTER SESSION SET/UNSET statements.
 func (p *Parser) parseAlterSession() *Expr {
 	if p.match(TK_SET) {
 		expressions := p.parseCSV(func() *Expr { return p.parseSetItemAssignment("") }, TK_COMMA)
@@ -462,7 +438,8 @@ func (p *Parser) parseAlterSession() *Expr {
 	return p.expression(New(KAlterSession, "expressions", expressions, "unset", true))
 }
 
-// _parse_alter (parser.py L8982).
+// parseAlter parses ALTER statements through ALTER_PARSERS, falling back to a Command when the
+// statement is not fully understood.
 func (p *Parser) parseAlter() *Expr {
 	start := p.prev
 
@@ -504,13 +481,43 @@ func (p *Parser) parseAlter() *Expr {
 	if p.prev.ok() {
 		parser = p.s.ALTER_PARSERS[upperText(p.prev)]
 	}
+	var actions []*Expr
 	if parser != nil {
-		actions := chunkFEnsureList(parser(p))
+		actions = chunkFEnsureList(parser(p))
+	}
+	// without an action the statement is kept as a command
+	if len(actions) > 0 {
+		options := []*Expr{}
+		// Actions of different kinds and table options may alternate, e.g. MySQL's
+		// ADD c INT, AUTO_INCREMENT=5, DROP d. The comma before an item may have already been
+		// consumed by the previous action's parser.
+		for p.s.ALTER_TABLE_MIXED_ACTIONS && (p.match(TK_COMMA) || p.prev.Type == TK_COMMA) {
+			if !matchTextKeysNoAdvance(p, p.s.PROPERTY_PARSERS) && matchTextKeys(p, p.s.ALTER_PARSERS) {
+				actionParser := p.s.ALTER_PARSERS[upperText(p.prev)]
+				parsed := chunkFEnsureList(tryParse(p, func() any { return actionParser(p) }, false, func(v any) bool { return !truthy(v) }))
+				if len(parsed) == 0 {
+					return p.parseAsCommand(start)
+				}
+				for _, action := range parsed {
+					if action.IsA(KCommand) {
+						return p.parseAsCommand(start)
+					}
+				}
+				actions = append(actions, parsed...)
+			} else if properties := p.tryParseExpr(func() *Expr { return p.parseProperties(false) }, false); properties != nil {
+				options = append(options, properties.Expressions()...)
+			} else {
+				break
+			}
+		}
+
 		notValid := p.matchTextSeq("NOT", "VALID")
-		options := p.chunkFParsePropertyCSV()
+		if properties := p.parseProperties(false); properties != nil {
+			options = append(options, properties.Expressions()...)
+		}
 		cascade := p.d.S.ALTER_TABLE_SUPPORTS_CASCADE && p.matchTextSeq("CASCADE")
 
-		if !p.curr.ok() && len(actions) > 0 {
+		if !p.curr.ok() {
 			return p.expression(New(
 				KAlter,
 				"this", this,
@@ -531,11 +538,8 @@ func (p *Parser) parseAlter() *Expr {
 	return p.parseAsCommand(start)
 }
 
-// ---------------------------------------------------------------------------------------------
-// ANALYZE
-// ---------------------------------------------------------------------------------------------
-
-// _parse_analyze (parser.py L9034).
+// parseAnalyze parses ANALYZE in its dialect forms; an unsupported partition clause makes it a
+// Command.
 func (p *Parser) parseAnalyze() *Expr {
 	start := p.prev
 	// https://duckdb.org/docs/sql/statements/analyze
@@ -553,13 +557,23 @@ func (p *Parser) parseAnalyze() *Expr {
 	}
 
 	var this, innerExpression *Expr
+	// ANALYZE [TABLE] takes a list: the first table is this, the rest are tables
+	var tables any
+	parseTables := func() {
+		this = p.parseTableParts(false, false, false, false)
+		if p.match(TK_COMMA) {
+			tables = p.parseCSV(func() *Expr { return p.parseTableParts(false, false, false, false) }, TK_COMMA)
+		}
+	}
 
 	var kind any
 	if p.curr.ok() {
 		kind = upperText(p.curr)
 	}
 
-	if p.match(TK_TABLE) || p.match(TK_INDEX) {
+	if p.match(TK_TABLE) {
+		parseTables()
+	} else if p.match(TK_INDEX) {
 		this = p.parseTableParts(false, false, false, false)
 	} else if p.matchTextSeq("TABLES") {
 		if p.matchAny(TK_FROM, TK_IN) {
@@ -577,7 +591,7 @@ func (p *Parser) parseAnalyze() *Expr {
 	} else {
 		// Empty kind  https://prestodb.io/docs/current/sql/analyze.html
 		kind = nil
-		this = p.parseTableParts(false, false, false, false)
+		parseTables()
 	}
 
 	partition := p.tryParseExpr(p.parsePartition, false)
@@ -602,6 +616,7 @@ func (p *Parser) parseAnalyze() *Expr {
 		KAnalyze,
 		"kind", kind,
 		"this", this,
+		"tables", tables,
 		"mode", mode,
 		"partition", partition,
 		"properties", properties,
@@ -610,7 +625,6 @@ func (p *Parser) parseAnalyze() *Expr {
 	))
 }
 
-// chunkFPyStrAny mirrors str(v) for the simple values used in f-strings here.
 func chunkFPyStrAny(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -628,7 +642,8 @@ func chunkFPyStrAny(v any) string {
 	return fmt.Sprint(v)
 }
 
-// _parse_analyze_statistics (parser.py L9100)
+// parseAnalyzeStatistics parses COMPUTE | ESTIMATE [DELTA] STATISTICS [NOSCAN |
+// FOR [ALL] COLUMNS ... | SAMPLE n [PERCENT]].
 // https://spark.apache.org/docs/3.5.1/sql-ref-syntax-aux-analyze-table.html
 func (p *Parser) parseAnalyzeStatistics() *Expr {
 	var this any
@@ -673,7 +688,8 @@ func (p *Parser) parseAnalyzeStatistics() *Expr {
 	))
 }
 
-// _parse_analyze_validate (parser.py L9133)
+// parseAnalyzeValidate parses VALIDATE REF UPDATE [SET DANGLING TO NULL] or VALIDATE STRUCTURE
+// [CASCADE ...].
 // https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/ANALYZE.html
 func (p *Parser) parseAnalyzeValidate() *Expr {
 	var kind, this any
@@ -697,7 +713,7 @@ func (p *Parser) parseAnalyzeValidate() *Expr {
 	return p.expression(New(KAnalyzeValidate, "kind", kind, "this", this, "expression", expression))
 }
 
-// _parse_analyze_columns (parser.py L9154).
+// parseAnalyzeColumns parses ALL COLUMNS or PREDICATE COLUMNS; nil otherwise.
 func (p *Parser) parseAnalyzeColumns() *Expr {
 	this := upperText(p.prev)
 	if p.matchTextSeq("COLUMNS") {
@@ -706,7 +722,6 @@ func (p *Parser) parseAnalyzeColumns() *Expr {
 	return nil
 }
 
-// _parse_analyze_delete (parser.py L9160).
 func (p *Parser) parseAnalyzeDelete() *Expr {
 	var kind any
 	if p.matchTextSeq("SYSTEM") {
@@ -718,7 +733,7 @@ func (p *Parser) parseAnalyzeDelete() *Expr {
 	return nil
 }
 
-// _parse_analyze_list (parser.py L9166).
+// parseAnalyzeList parses LIST CHAINED ROWS [INTO ...]; nil otherwise.
 func (p *Parser) parseAnalyzeList() *Expr {
 	if p.matchTextSeq("CHAINED", "ROWS") {
 		return p.expression(New(KAnalyzeListChainedRows, "expression", p.parseInto()))
@@ -726,7 +741,8 @@ func (p *Parser) parseAnalyzeList() *Expr {
 	return nil
 }
 
-// _parse_analyze_histogram (parser.py L9172)
+// parseAnalyzeHistogram parses UPDATE | DROP HISTOGRAM ON columns with its WITH n BUCKETS,
+// WITH SYNC | ASYNC MODE, MANUAL | AUTO UPDATE and USING DATA options.
 // https://dev.mysql.com/doc/refman/8.4/en/analyze-table.html
 func (p *Parser) parseAnalyzeHistogram() *Expr {
 	this := upperText(p.prev)
@@ -772,11 +788,6 @@ func (p *Parser) parseAnalyzeHistogram() *Expr {
 	))
 }
 
-// ---------------------------------------------------------------------------------------------
-// MERGE
-// ---------------------------------------------------------------------------------------------
-
-// _parse_merge (parser.py L9211).
 func (p *Parser) parseMerge() *Expr {
 	p.match(TK_INTO)
 	target := p.parseTable(false, false, nil, false, false, false, false)
@@ -803,7 +814,8 @@ func (p *Parser) parseMerge() *Expr {
 	))
 }
 
-// _parse_when_matched (parser.py L9232).
+// parseWhenMatched parses the WHEN [NOT] MATCHED [BY TARGET | BY SOURCE] [AND cond] THEN action
+// clauses of MERGE.
 func (p *Parser) parseWhenMatched() *Expr {
 	whens := []*Expr{}
 
@@ -825,7 +837,12 @@ func (p *Parser) parseWhenMatched() *Expr {
 
 		var then *Expr
 		if p.match(TK_INSERT) {
-			this := p.parseStar()
+			var this *Expr
+			if p.matchTextSeq("ALL", "BY", "NAME") {
+				this = Star()
+			} else {
+				this = p.parseStar()
+			}
 			if this != nil {
 				then = p.expression(New(KInsert, "this", this))
 			} else {
@@ -848,9 +865,11 @@ func (p *Parser) parseWhenMatched() *Expr {
 			expressions := p.parseStar()
 			if expressions != nil {
 				then = p.expression(New(KUpdate, "expressions", expressions))
+			} else if p.matchTextSeq("ALL", "BY", "NAME") {
+				then = p.expression(New(KUpdate, "expressions", []*Expr{Star()}))
 			} else {
 				updExpressions := chunkFAndList(p.match(TK_SET), func() []*Expr {
-					return p.parseCSV(p.parseEquality, TK_COMMA)
+					return p.parseCSV(p.parseUpdateAssignment, TK_COMMA)
 				})
 				where := p.parseWhere(false)
 				then = p.expression(New(
@@ -876,11 +895,6 @@ func (p *Parser) parseWhenMatched() *Expr {
 	return p.expression(New(KWhens, "expressions", whens))
 }
 
-// ---------------------------------------------------------------------------------------------
-// SHOW / SET
-// ---------------------------------------------------------------------------------------------
-
-// _parse_show (parser.py L9285).
 func (p *Parser) parseShow() *Expr {
 	parser := p.findParser(p.s.SHOW_PARSERS, p.s.SHOW_TRIE)
 	if parser != nil {
@@ -889,8 +903,8 @@ func (p *Parser) parseShow() *Expr {
 	return p.parseAsCommand(p.prev)
 }
 
-// _parse_set_item_assignment (parser.py L9291)
-// kind "" stands for Python None.
+// parseSetItemAssignment parses one SET assignment (name [=] value), or SET [GLOBAL | SESSION]
+// TRANSACTION; nil (cursor restored) when no assignment follows. kind "" means no kind.
 func (p *Parser) parseSetItemAssignment(kind string) *Expr {
 	index := p.index
 
@@ -921,7 +935,6 @@ func (p *Parser) parseSetItemAssignment(kind string) *Expr {
 	return p.expression(New(KSetItem, "this", this, "kind", chunkFStrOrNil(kind)))
 }
 
-// _parse_set_transaction (parser.py L9311).
 func (p *Parser) parseSetTransaction(global bool) *Expr {
 	p.matchTextSeq("TRANSACTION")
 	characteristics := p.parseCSV(func() *Expr {
@@ -935,7 +948,6 @@ func (p *Parser) parseSetTransaction(global bool) *Expr {
 	))
 }
 
-// _parse_set_item (parser.py L9320).
 func (p *Parser) parseSetItem() *Expr {
 	parser := p.findParser(p.s.SET_PARSERS, p.s.SET_TRIE)
 	if parser != nil {
@@ -944,7 +956,6 @@ func (p *Parser) parseSetItem() *Expr {
 	return p.parseSetItemAssignment("")
 }
 
-// _parse_set (parser.py L9324).
 func (p *Parser) baseParseSet(unset bool, tag bool) *Expr {
 	index := p.index
 	set := p.expression(New(
@@ -962,7 +973,9 @@ func (p *Parser) baseParseSet(unset bool, tag bool) *Expr {
 	return set
 }
 
-// _parse_var_from_options (parser.py L9336).
+// parseVarFromOptions parses a keyword option from options, with its continuation keywords, into a
+// Var. An unknown or incomplete option returns nil (cursor restored), after a parse error when
+// raiseUnmatched is set.
 func (p *Parser) parseVarFromOptions(options OptionsType, raiseUnmatched bool) *Expr {
 	start := p.curr
 	if !start.ok() {
@@ -970,7 +983,8 @@ func (p *Parser) parseVarFromOptions(options OptionsType, raiseUnmatched bool) *
 	}
 
 	option := upperText(start)
-	// continuations is None when the token is excluded or the option is unknown.
+	// isNone marks an excluded token or an unknown option, as opposed to a known option without
+	// continuations.
 	var continuations [][]string
 	isNone := true
 	if !p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(start.Type) {
@@ -1004,7 +1018,8 @@ func (p *Parser) parseVarFromOptions(options OptionsType, raiseUnmatched bool) *
 	return VarChecked(option)
 }
 
-// _parse_as_command (parser.py L9367).
+// parseAsCommand consumes the rest of the statement into a Command: start's text, then the
+// remaining SQL.
 func (p *Parser) parseAsCommand(start *Token) *Expr {
 	for p.curr.ok() {
 		p.advance(1)
@@ -1018,11 +1033,7 @@ func (p *Parser) parseAsCommand(start *Token) *Expr {
 	return New(KCommand, "this", string(text[:size]), "expression", string(text[size:]))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Dictionary properties, comprehensions, heredocs
-// ---------------------------------------------------------------------------------------------
-
-// _parse_dict_property (parser.py L9375).
+// parseDictProperty parses a dictionary property: this(kind([key value ...])).
 func (p *Parser) parseDictProperty(this string) *Expr {
 	settings := []*Expr{}
 
@@ -1053,7 +1064,6 @@ func (p *Parser) parseDictProperty(this string) *Expr {
 	return p.expression(New(KDictProperty, "this", this, "kind", kindV, "settings", settings))
 }
 
-// _parse_dict_range (parser.py L9396).
 func (p *Parser) parseDictRange(this string) *Expr {
 	p.matchLParen(nil)
 	hasMin := p.matchTextSeq("MIN")
@@ -1079,7 +1089,8 @@ func (p *Parser) parseDictRange(this string) *Expr {
 	return p.expression(New(KDictRange, "this", this, "min", min, "max", max))
 }
 
-// _parse_comprehension (parser.py L9409).
+// parseComprehension parses a comprehension tail: expr [, position] IN iterator [IF cond]. It
+// returns nil, backing up one token before the start, when IN is missing.
 func (p *Parser) parseComprehension(this *Expr) *Expr {
 	index := p.index
 	expression := p.parseColumn()
@@ -1104,7 +1115,7 @@ func (p *Parser) parseComprehension(this *Expr) *Expr {
 	))
 }
 
-// _parse_heredoc (parser.py L9429).
+// parseHeredoc parses a heredoc string: a HEREDOC_STRING token or $[tag]$ ... $[tag]$.
 func (p *Parser) parseHeredoc() *Expr {
 	if p.match(TK_HEREDOC_STRING) {
 		return p.expression(New(KHeredoc, "this", p.prev.Text))
@@ -1149,13 +1160,13 @@ func (p *Parser) parseHeredoc() *Expr {
 	return nil
 }
 
-// _replace_lambda (parser.py L9497).
+// replaceLambda replaces column references to lambda parameters inside node with identifiers (or
+// dots), cast to the parameter's type when it declares one.
 func (p *Parser) replaceLambda(node *Expr, expressions []*Expr) *Expr {
 	if node == nil {
 		return node
 	}
 
-	// lambda_types = {e.name: e.args.get("to") or False}; a nil value stands for False.
 	lambdaTypes := map[string]*Expr{}
 	for _, e := range expressions {
 		lambdaTypes[e.Name()] = e.ArgE("to")
@@ -1197,11 +1208,6 @@ func (p *Parser) replaceLambda(node *Expr, expressions []*Expr) *Expr {
 	return node
 }
 
-// ---------------------------------------------------------------------------------------------
-// TRUNCATE, index columns, options, COPY
-// ---------------------------------------------------------------------------------------------
-
-// _parse_truncate_table (parser.py L9527).
 func (p *Parser) parseTruncateTable() *Expr {
 	start := p.prev
 
@@ -1245,7 +1251,6 @@ func (p *Parser) parseTruncateTable() *Expr {
 
 	partition := p.parsePartition()
 
-	// Fallback case
 	if p.curr.ok() {
 		return p.parseAsCommand(start)
 	}
@@ -1262,12 +1267,10 @@ func (p *Parser) parseTruncateTable() *Expr {
 	))
 }
 
-// _parse_indexed_column (parser.py L9578).
 func (p *Parser) parseIndexedColumn() *Expr {
 	return p.parseOrdered(p.parseOpclass)
 }
 
-// _parse_with_operator (parser.py L9581).
 func (p *Parser) parseWithOperator() *Expr {
 	this := p.parseIndexedColumn()
 
@@ -1280,7 +1283,6 @@ func (p *Parser) parseWithOperator() *Expr {
 	return p.expression(New(KWithOperator, "this", this, "op", op))
 }
 
-// _parse_wrapped_options (parser.py L9591).
 func (p *Parser) parseWrappedOptions() []*Expr {
 	p.match(TK_EQ)
 	p.match(TK_L_PAREN)
@@ -1306,7 +1308,6 @@ func (p *Parser) parseWrappedOptions() []*Expr {
 	return opts
 }
 
-// _parse_copy_parameters (parser.py L9612).
 func (p *Parser) parseCopyParameters() []*Expr {
 	hasSep := p.d.S.COPY_PARAMS_ARE_CSV
 	sep := TK_COMMA
@@ -1314,6 +1315,10 @@ func (p *Parser) parseCopyParameters() []*Expr {
 	options := []*Expr{}
 	for p.curr.ok() && !p.matchNoAdvance(TK_R_PAREN) {
 		option := p.parseVar(true, nil, false)
+		if option == nil {
+			break
+		}
+
 		prev := upperText(p.prev)
 
 		// Different dialects might separate options and values by white space, "=" and "AS"
@@ -1326,8 +1331,12 @@ func (p *Parser) parseCopyParameters() []*Expr {
 			// Snowflake FILE_FORMAT case, Databricks COPY & FORMAT options
 			param.Set("expressions", p.parseWrappedOptions())
 		} else if prev == "FILE_FORMAT" {
-			// T-SQL's external file format case
-			param.Set("expression", p.parseField(false, nil, false))
+			// T-SQL's external file format case, Snowflake's possibly qualified format name
+			expression := p.parseString()
+			if expression == nil {
+				expression = p.parseTableParts(false, false, false, false)
+			}
+			param.Set("expression", expression)
 		} else if prev == "FORMAT" && p.prev.Type == TK_ALIAS && p.matchTexts("AVRO", "JSON") {
 			param.Set("this", VarExpr("FORMAT AS "+upperText(p.prev)))
 			param.Set("expression", p.parseField(false, nil, false))
@@ -1349,7 +1358,6 @@ func (p *Parser) parseCopyParameters() []*Expr {
 	return options
 }
 
-// _parse_credentials (parser.py L9651).
 func (p *Parser) parseCredentials() *Expr {
 	expr := p.expression(New(KCredentials))
 
@@ -1385,12 +1393,10 @@ func (p *Parser) parseCredentials() *Expr {
 	return expr
 }
 
-// _parse_file_location (parser.py L9674).
 func (p *Parser) baseParseFileLocation() *Expr {
 	return p.parseField(false, nil, false)
 }
 
-// _parse_copy (parser.py L9677).
 func (p *Parser) parseCopy() *Expr {
 	start := p.prev
 
@@ -1409,7 +1415,7 @@ func (p *Parser) parseCopy() *Expr {
 	if p.matchNoAdvance(TK_EQ) {
 		// Backtrack one token since we've consumed the lhs of a parameter assignment here.
 		// This can happen for Snowflake dialect. Instead, we'd like to parse the parameter
-		// list via `_parse_wrapped(..)` below.
+		// list via parseWrappedList below.
 		p.advance(-1)
 		files = []*Expr{}
 	}
@@ -1420,7 +1426,6 @@ func (p *Parser) parseCopy() *Expr {
 
 	params := p.parseWrappedList(p.parseCopyParameters, true)
 
-	// Fallback case
 	if p.curr.ok() {
 		return p.parseAsCommand(start)
 	}
@@ -1435,18 +1440,12 @@ func (p *Parser) parseCopy() *Expr {
 	))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Misc function parsers
-// ---------------------------------------------------------------------------------------------
-
-// _parse_normalize (parser.py L9712).
 func (p *Parser) parseNormalize() *Expr {
 	this := p.parseBitwise()
 	form := chunkFAnd(p.match(TK_COMMA), func() *Expr { return p.parseVar(false, nil, false) })
 	return p.expression(New(KNormalize, "this", this, "form", form))
 }
 
-// _parse_ceil_floor (parser.py L9719).
 func (p *Parser) parseCeilFloor(exprType Kind) *Expr {
 	args := p.parseCSV(func() *Expr { return p.parseLambda(false) }, TK_COMMA)
 
@@ -1460,7 +1459,6 @@ func (p *Parser) parseCeilFloor(exprType Kind) *Expr {
 	return New(exprType, "this", this, "decimals", decimals, "to", to)
 }
 
-// _parse_star_ops (parser.py L9731).
 func (p *Parser) parseStarOps() *Expr {
 	starToken := p.prev
 
@@ -1491,7 +1489,7 @@ func (p *Parser) parseStarOps() *Expr {
 	return star
 }
 
-// chunkFListOrNone maps a nil list (Python None) to an untyped nil argument value.
+// chunkFListOrNone maps a nil list (absent) to an untyped nil argument value.
 func chunkFListOrNone(l []*Expr) any {
 	if l == nil {
 		return nil
@@ -1499,11 +1497,6 @@ func chunkFListOrNone(l []*Expr) any {
 	return l
 }
 
-// ---------------------------------------------------------------------------------------------
-// GRANT / REVOKE
-// ---------------------------------------------------------------------------------------------
-
-// _parse_grant_privilege (parser.py L9751).
 func (p *Parser) parseGrantPrivilege() *Expr {
 	privilegeParts := []string{}
 
@@ -1523,7 +1516,7 @@ func (p *Parser) parseGrantPrivilege() *Expr {
 	return p.expression(New(KGrantPrivilege, "this", this, "expressions", expressions))
 }
 
-// _parse_grant_principal (parser.py L9769).
+// parseGrantPrincipal parses [ROLE | GROUP] name; kind is false (not nil) without ROLE or GROUP.
 func (p *Parser) parseGrantPrincipal() *Expr {
 	var kind any = false
 	if p.matchTexts("ROLE", "GROUP") {
@@ -1538,8 +1531,8 @@ func (p *Parser) parseGrantPrincipal() *Expr {
 	return p.expression(New(KGrantPrincipal, "this", principal, "kind", kind))
 }
 
-// _parse_grant_revoke_common (parser.py L9778)
-// The kind result "" stands for Python None.
+// parseGrantRevokeCommon parses the privileges, ON [kind] and securable shared by GRANT and
+// REVOKE. The kind result "" means no kind.
 func (p *Parser) parseGrantRevokeCommon() ([]*Expr, string, *Expr) {
 	privileges := p.parseCSV(p.parseGrantPrivilege, TK_COMMA)
 
@@ -1556,7 +1549,6 @@ func (p *Parser) parseGrantRevokeCommon() ([]*Expr, string, *Expr) {
 	return privileges, kind, securable
 }
 
-// _parse_grant (parser.py L9792).
 func (p *Parser) parseGrant() *Expr {
 	start := p.prev
 
@@ -1584,7 +1576,6 @@ func (p *Parser) parseGrant() *Expr {
 	))
 }
 
-// _parse_revoke (parser.py L9817).
 func (p *Parser) parseRevoke() *Expr {
 	start := p.prev
 
@@ -1618,7 +1609,7 @@ func (p *Parser) parseRevoke() *Expr {
 	))
 }
 
-// _parse_overlay (parser.py L9847).
+// parseOverlay parses the arguments of OVERLAY(this PLACING x FROM n [FOR m]), commas allowed.
 func (p *Parser) parseOverlay() *Expr {
 	parseOverlayArg := func(text string) *Expr {
 		if p.match(TK_COMMA) || p.matchTextSeq(text) {
@@ -1640,7 +1631,6 @@ func (p *Parser) parseOverlay() *Expr {
 	))
 }
 
-// _parse_format_name (parser.py L9864).
 func (p *Parser) parseFormatName() *Expr {
 	// Note: Although not specified in the docs, Snowflake does accept a string/identifier
 	// for FILE_FORMAT = <format_name>
@@ -1651,7 +1641,8 @@ func (p *Parser) parseFormatName() *Expr {
 	return p.expression(New(KProperty, "this", VarExpr("FORMAT_NAME"), "value", value))
 }
 
-// _parse_distinct_arg_function (parser.py L9873).
+// parseDistinctArgFunction parses the arguments of func_ with an optional DISTINCT or ALL; with
+// DISTINCT, the argument at distinctIndex (negative counts from the end) is wrapped in a Distinct.
 func (p *Parser) parseDistinctArgFunction(func_ Kind, distinctIndex int) *Expr {
 	isDistinct := p.match(TK_DISTINCT)
 	if !isDistinct {
@@ -1675,11 +1666,8 @@ func (p *Parser) parseDistinctArgFunction(func_ Kind, distinctIndex int) *Expr {
 	return FromArgList(func_, args)
 }
 
-// ---------------------------------------------------------------------------------------------
-// DECLARE, casts, JSON_VALUE, GROUP_CONCAT, INITCAP, OPERATOR
-// ---------------------------------------------------------------------------------------------
-
-// _parse_declareitem (parser.py L10088).
+// parseDeclareitem parses one DECLARE item: [VAR | VARIABLE] names [AS] type | TABLE (...)
+// [DEFAULT | = value].
 func (p *Parser) parseDeclareitem() *Expr {
 	p.matchTexts("VAR", "VARIABLE")
 
@@ -1700,7 +1688,6 @@ func (p *Parser) parseDeclareitem() *Expr {
 	return p.expression(New(KDeclareItem, "this", vars, "kind", kind, "default", default_))
 }
 
-// _parse_declare (parser.py L10103).
 func (p *Parser) parseDeclare() *Expr {
 	start := p.prev
 	replace := p.matchTextSeq("OR", "REPLACE")
@@ -1715,8 +1702,6 @@ func (p *Parser) parseDeclare() *Expr {
 	return p.expression(New(KDeclare, "expressions", expressions, "replace", replace))
 }
 
-// build_cast (parser.py L10113)
-// kv holds the Python **kwargs as alternating key/value pairs.
 func (p *Parser) baseBuildCast(strict bool, kv ...any) *Expr {
 	expClass := KCast
 	if !strict {
@@ -1731,7 +1716,7 @@ func (p *Parser) baseBuildCast(strict bool, kv ...any) *Expr {
 		case TriFalse:
 			requiresString = false
 		}
-		// kwargs["requires_string"] = ... (overwrites in place when already present)
+		// Set requires_string, replacing an existing value in place.
 		out := make([]any, 0, len(kv)+2)
 		found := false
 		for i := 0; i+1 < len(kv); i += 2 {
@@ -1751,26 +1736,28 @@ func (p *Parser) baseBuildCast(strict bool, kv ...any) *Expr {
 	return p.expression(New(expClass, kv...))
 }
 
-// _parse_json_value (parser.py L10121).
-func (p *Parser) parseJsonValue() *Expr {
+func (p *Parser) parseJsonValue(jsonPath bool) *Expr {
 	this := p.parseBitwise()
 	p.match(TK_COMMA)
 	path := p.parseBitwise()
 
-	returning := chunkFAnd(p.match(TK_RETURNING), func() *Expr { return p.parseType(true, false) })
+	returning := chunkFAnd(p.match(TK_RETURNING), func() *Expr { return p.parseTypes(false, false, true, false) })
 
-	jsonPath := p.d.toJSONPath(path)
+	if jsonPath {
+		path = p.d.toJSONPath(path)
+	}
 	onCondition := p.parseOnCondition()
 	return p.expression(New(
 		KJSONValue,
 		"this", this,
-		"path", jsonPath,
+		"path", path,
 		"returning", returning,
 		"on_condition", onCondition,
 	))
 }
 
-// _parse_group_concat (parser.py L10137).
+// baseParseGroupConcat parses the arguments of GROUP_CONCAT: expressions (concatenated when there
+// are several) with optional ORDER BY and SEPARATOR.
 func (p *Parser) baseParseGroupConcat() *Expr {
 	var args []*Expr
 
@@ -1809,7 +1796,7 @@ func (p *Parser) baseParseGroupConcat() *Expr {
 
 		if order != nil {
 			// Order By is the last (or only) expression in the list and has consumed the 'expr' before it,
-			// remove 'expr' from exp.Order and add it back to args
+			// remove 'expr' from the Order and add it back to args
 			args[len(args)-1] = order.This()
 			order.Set("this", concatExprs(order.This(), args))
 		}
@@ -1830,11 +1817,10 @@ func (p *Parser) baseParseGroupConcat() *Expr {
 	return p.expression(New(KGroupConcat, "this", this, "separator", separator))
 }
 
-// _parse_initcap (parser.py L10176).
+// parseInitcap parses INITCAP, adding the dialect's default delimiters when none are given.
 func (p *Parser) parseInitcap() *Expr {
 	expr := FromArgList(KInitcap, p.parseFunctionArgs(false))
 
-	// attach dialect's default delimiters
 	if expr.Arg("expression") == nil {
 		expr.Set("expression", LiteralString(p.d.S.INITCAP_DEFAULT_DELIMITER_CHARS))
 	}
@@ -1842,28 +1828,21 @@ func (p *Parser) parseInitcap() *Expr {
 	return expr
 }
 
-// _parse_operator (parser.py L10185).
+// parseOperator parses OPERATOR(op) <operand> after this. Without the parenthesis it gives back
+// the OPERATOR token and returns nil, so OPERATOR can be an implicit alias.
 func (p *Parser) parseOperator(this *Expr) *Expr {
-	for {
-		if !p.match(TK_L_PAREN) {
-			break
-		}
-
-		var opText strings.Builder
-		for p.curr.ok() && !p.match(TK_R_PAREN) {
-			opText.WriteString(p.curr.Text)
-			p.advance(1)
-		}
-		op := opText.String()
-
-		comments := p.prevComments
-		e := New(KOperator, "this", this, "operator", op, "expression", p.parseBitwise())
-		this = p.expressionC(e, comments)
-
-		if !p.match(TK_OPERATOR) {
-			break
-		}
+	if !p.match(TK_L_PAREN) {
+		p.retreat(p.index - 1)
+		return nil
 	}
 
-	return this
+	var opText strings.Builder
+	for p.curr.ok() && !p.match(TK_R_PAREN) {
+		opText.WriteString(p.curr.Text)
+		p.advance(1)
+	}
+	op := opText.String()
+
+	comments := p.prevComments
+	return p.expressionC(New(KOperator, "this", this, "operator", op, "expression", p.parseBitwise()), comments)
 }

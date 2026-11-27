@@ -1,7 +1,7 @@
 package sqlengine
 
-// omap is an insertion-ordered map mirroring Python dict semantics: updating an existing
-// key keeps its position, deleting removes it, and re-adding appends at the end.
+// omap is an insertion-ordered map: updating an existing key keeps its position, deleting
+// removes it, and re-adding appends at the end.
 //
 // Entries live in parallel slices; small maps (the common case: scope sources, schema columns)
 // are searched linearly and an index is only built past omapIndexThreshold entries.
@@ -49,7 +49,6 @@ func (o *omap[V]) reindex() {
 	}
 }
 
-// reserve makes room for n more entries without changing contents.
 func (o *omap[V]) reserve(n int) {
 	if need := len(o.keys) + n; need > cap(o.keys) {
 		o.keys = append(make([]string, 0, need), o.keys...)
@@ -57,7 +56,6 @@ func (o *omap[V]) reserve(n int) {
 	}
 }
 
-// Len returns the number of entries.
 func (o *omap[V]) Len() int {
 	if o == nil {
 		return 0
@@ -65,7 +63,6 @@ func (o *omap[V]) Len() int {
 	return len(o.keys)
 }
 
-// Get returns the value for key.
 func (o *omap[V]) Get(key string) (V, bool) {
 	if o == nil {
 		var zero V
@@ -78,7 +75,6 @@ func (o *omap[V]) Get(key string) (V, bool) {
 	return zero, false
 }
 
-// Has reports whether key is present.
 func (o *omap[V]) Has(key string) bool {
 	if o == nil {
 		return false
@@ -86,7 +82,6 @@ func (o *omap[V]) Has(key string) bool {
 	return o.find(key) >= 0
 }
 
-// Set inserts or updates key.
 func (o *omap[V]) Set(key string, v V) {
 	if i := o.find(key); i >= 0 {
 		o.vals[i] = v
@@ -110,7 +105,6 @@ func (o *omap[V]) AppendNew(key string, v V) {
 	}
 }
 
-// Delete removes key (no-op when absent).
 func (o *omap[V]) Delete(key string) {
 	i := o.find(key)
 	if i < 0 {
@@ -131,7 +125,6 @@ func (o *omap[V]) Keys() []string {
 	return o.keys
 }
 
-// Values returns values in insertion order.
 func (o *omap[V]) Values() []V {
 	if o == nil {
 		return nil
@@ -150,7 +143,7 @@ func (o *omap[V]) Copy() *omap[V] {
 	return c
 }
 
-// Update mirrors dict.update(other).
+// Update sets every entry of other in o, in other's order (existing keys keep their position).
 func (o *omap[V]) Update(other *omap[V]) {
 	if other == nil {
 		return

@@ -1,12 +1,10 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/optimize_joins.py.
-
-// optimizeJoinsJoinAttrs mirrors optimize_joins.JOIN_ATTRS.
+// optimizeJoinsJoinAttrs lists the join arguments whose absence makes a join a CROSS JOIN.
 var optimizeJoinsJoinAttrs = []string{"on", "side", "kind", "using", "method"}
 
-// OptimizeJoins mirrors optimizer.optimize_joins.optimize_joins: removes cross joins if possible
-// and reorders joins based on predicate dependencies.
+// OptimizeJoins removes cross joins if possible and reorders joins based on predicate
+// dependencies.
 //
 // Example: "SELECT * FROM x CROSS JOIN y JOIN z ON x.a = z.a AND y.a = z.a"
 // -> "SELECT * FROM x JOIN z ON x.a = z.a AND TRUE JOIN y ON y.a = z.a".
@@ -65,8 +63,7 @@ func OptimizeJoins(expression *Expr) *Expr {
 	return expression
 }
 
-// ReorderJoins mirrors optimize_joins.reorder_joins: reorders joins by topological sort order
-// based on predicate references.
+// ReorderJoins reorders joins by topological sort order based on predicate references.
 func ReorderJoins(expression *Expr) *Expr {
 	for from := range expression.FindAll(KFrom) {
 		parent := from.Parent()
@@ -105,10 +102,12 @@ func ReorderJoins(expression *Expr) *Expr {
 	return expression
 }
 
-// optimizeJoinsNormalize mirrors optimize_joins.normalize: removes INNER and OUTER from joins as
-// they are optional.
 func optimizeJoinsNormalize(expression *Expr) *Expr {
 	for join := range expression.FindAll(KJoin) {
+		if join.ArgB("nearest") {
+			continue
+		}
+
 		hasAttr := false
 		for _, k := range optimizeJoinsJoinAttrs {
 			if join.ArgB(k) {
@@ -135,7 +134,6 @@ func optimizeJoinsNormalize(expression *Expr) *Expr {
 	return expression
 }
 
-// optimizeJoinsOtherTableNames mirrors optimize_joins.other_table_names.
 func optimizeJoinsOtherTableNames(join *Expr) StrSet {
 	if on := join.ArgE("on"); on != nil {
 		return ColumnTableNames(on, join.AliasOrName())
@@ -143,19 +141,21 @@ func optimizeJoinsOtherTableNames(join *Expr) StrSet {
 	return newStrSet()
 }
 
-// optimizeJoinsIsReorderable mirrors optimize_joins._is_reorderable: joins with a side (LEFT,
-// RIGHT, FULL) cannot be reordered easily.
+// optimizeJoinsIsReorderable reports whether joins can be reordered: joins with a side (LEFT,
+// RIGHT, FULL) cannot be reordered easily, and nearest joins select top-k matches, which depend
+// on the input rows.
 func optimizeJoinsIsReorderable(joins []*Expr) bool {
 	for _, join := range joins {
-		if join.SideText() != "" {
+		if join.SideText() != "" || join.ArgB("nearest") {
 			return false
 		}
 	}
 	return true
 }
 
-// optxTsort mirrors sqlglot.helper.tsort for a string DAG whose keys are given in insertion
-// order. Panics with a ValueError("Cycle error") when the graph has a cycle.
+// optxTsort topologically sorts a string DAG (deps maps each key to the keys it depends on),
+// emitting each level in sorted order. Panics with a ValueError("Cycle error") when the graph has a
+// cycle.
 func optxTsort(keys []string, deps map[string]StrSet) []string {
 	result := []string{}
 

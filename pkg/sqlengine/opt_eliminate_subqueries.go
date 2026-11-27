@@ -1,9 +1,6 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/eliminate_subqueries.py.
-
-// EliminateSubqueries mirrors optimizer.eliminate_subqueries.eliminate_subqueries: rewrites
-// derived tables as CTES, deduplicating if possible.
+// EliminateSubqueries rewrites derived tables as CTEs, deduplicating if possible.
 //
 // Example: "SELECT a FROM (SELECT * FROM x) AS y" -> "WITH y AS (SELECT * FROM x) SELECT a FROM y AS y".
 func EliminateSubqueries(expression *Expr) *Expr {
@@ -19,20 +16,15 @@ func EliminateSubqueries(expression *Expr) *Expr {
 		return expression
 	}
 
-	// Map of alias->Scope|Table
-	// These are all aliases that are already used in the expression.
-	// We don't want to create new CTEs that conflict with these names.
-	// (The values are always truthy in Python, so only the keys matter.)
+	// Names already taken in the expression, which new CTEs must not reuse.
 	taken := newStrSet()
 
-	// All CTE aliases in the root scope are taken
 	for _, scope := range root.CTEScopes {
 		if parent := scope.Expression.Parent(); parent != nil {
 			taken.Add(parent.Alias())
 		}
 	}
 
-	// All table names are taken
 	for _, scope := range root.Traverse() {
 		for _, source := range scope.Sources.Values() {
 			if !source.IsScope() {
@@ -41,8 +33,7 @@ func EliminateSubqueries(expression *Expr) *Expr {
 		}
 	}
 
-	// Map of Expr->alias
-	// Existing CTES in the root expression. We'll use this for deduplication.
+	// Existing CTEs in the root expression, for deduplication.
 	existingCTEs := &esExistingCTEs{}
 
 	with := root.Expression.ArgE("with_")
@@ -58,10 +49,8 @@ func EliminateSubqueries(expression *Expr) *Expr {
 	// We're adding more CTEs, but we want to maintain the DAG order.
 	// Derived tables within an existing CTE need to come before the existing CTE.
 	for _, cteScope := range root.CTEScopes {
-		// Append all the new CTEs from this existing CTE
 		for _, scope := range cteScope.Traverse() {
 			if scope == cteScope {
-				// Don't try to eliminate this CTE itself
 				continue
 			}
 			if newCTE := esEliminate(scope, existingCTEs, taken); newCTE != nil {
@@ -69,13 +58,11 @@ func EliminateSubqueries(expression *Expr) *Expr {
 			}
 		}
 
-		// Append the existing CTE itself
 		if cteParent := cteScope.Expression.Parent(); cteParent != nil {
 			newCTEs = append(newCTEs, cteParent)
 		}
 	}
 
-	// Now append the rest
 	var rest []*Scope
 	rest = append(rest, root.UnionScopes...)
 	rest = append(rest, root.SubqueryScopes...)
@@ -99,7 +86,8 @@ func EliminateSubqueries(expression *Expr) *Expr {
 	return expression
 }
 
-// esEliminate mirrors eliminate_subqueries._eliminate.
+// esEliminate turns a derived-table or CTE scope into a new CTE (nil when nothing is
+// eliminated or the CTE duplicates an existing one).
 func esEliminate(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) *Expr {
 	if scope.IsDerivedTable() {
 		return esEliminateDerivedTable(scope, existingCTEs, taken)
@@ -112,7 +100,6 @@ func esEliminate(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) *Expr
 	return nil
 }
 
-// esEliminateDerivedTable mirrors eliminate_subqueries._eliminate_derived_table.
 func esEliminateDerivedTable(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) *Expr {
 	// This makes sure that we don't:
 	// - drop the "pivot" arg from a pivoted subquery
@@ -127,7 +114,7 @@ func esEliminateDerivedTable(scope *Scope, existingCTEs *esExistingCTEs, taken S
 		return nil
 	}
 
-	// Get rid of redundant exp.Subquery expressions, i.e. those that are just used as wrappers
+	// Get rid of redundant Subquery expressions, i.e. those that are just used as wrappers
 	toReplace := exprParent.Unwrap()
 	name, cte := esNewCTE(scope, existingCTEs, taken)
 	aliasName := toReplace.Alias()
@@ -142,7 +129,8 @@ func esEliminateDerivedTable(scope *Scope, existingCTEs *esExistingCTEs, taken S
 	return cte
 }
 
-// esEliminateCTE mirrors eliminate_subqueries._eliminate_cte.
+// esEliminateCTE removes a CTE from its WITH clause (dropping an emptied WITH), renames the
+// references to it and returns its replacement CTE, or nil when it duplicates an existing one.
 func esEliminateCTE(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) *Expr {
 	parent := scope.Expression.Parent()
 	if parent == nil {
@@ -156,7 +144,6 @@ func esEliminateCTE(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) *E
 		with.Pop()
 	}
 
-	// Rename references to this CTE
 	if scope.Parent == nil {
 		return cte
 	}
@@ -173,10 +160,8 @@ func esEliminateCTE(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) *E
 	return cte
 }
 
-// esNewCTE mirrors eliminate_subqueries._new_cte.
-//
-// Returns (name, cte) where `name` is a new name for this CTE in the root scope and `cte` is a
-// new CTE instance. If this CTE duplicates an existing CTE, `cte` will be nil.
+// esNewCTE returns (name, cte) where `name` is a new name for this CTE in the root scope and
+// `cte` is a new CTE instance. If this CTE duplicates an existing CTE, `cte` will be nil.
 func esNewCTE(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) (string, *Expr) {
 	duplicateCTEAlias, _ := existingCTEs.get(scope.Expression)
 	parent := scope.Expression.Parent()
@@ -209,9 +194,9 @@ func esNewCTE(scope *Scope, existingCTEs *esExistingCTEs, taken StrSet) (string,
 	return name, cte
 }
 
-// esExistingCTEs mirrors a Python dict keyed by expressions (dict[exp.Expr, str]). Python stores
-// the key's hash at insertion time and compares candidates with `is` or `==` (same class and same
-// current hash), so keys mutated after insertion become unreachable, exactly as emulated here.
+// esExistingCTEs maps CTE bodies to CTE names. Keys match by identity or structural equality,
+// and each entry stores the key's hash at insertion time, so a key mutated after insertion is
+// no longer found.
 type esExistingCTEs struct {
 	entries []esExistingCTE
 }

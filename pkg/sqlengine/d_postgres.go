@@ -2,11 +2,9 @@ package sqlengine
 
 import (
 	"math/big"
+	"regexp"
 	"strings"
 )
-
-// Port of sqlglot/dialects/postgres.py (Postgres dialect) and sqlglot/parsers/postgres.py
-// (PostgresParser). The generator lives in d_postgres_generator.go.
 
 func init() { registerCustomizer("postgres", customizePostgres) }
 
@@ -15,11 +13,6 @@ func customizePostgres(d *Dialect) {
 	customizePostgresGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level builders (parsers/postgres.py)
-// ---------------------------------------------------------------------------------------------
-
-// postgresToInterval mirrors exp.to_interval(interval) for a str or an expression argument.
 func postgresToInterval(interval any) *Expr {
 	var s string
 	switch x := interval.(type) {
@@ -44,27 +37,61 @@ func postgresToInterval(interval any) *Expr {
 	return result
 }
 
-// postgresBuildGenerateSeries mirrors parsers.postgres._build_generate_series.
+// postgresSimpleIntervalRE matches a simple interval string such as '1 day', '+0.5 hours' or
+// '.5 seconds': a signed number and a unit, with optional surrounding whitespace.
+var postgresSimpleIntervalRE = func() *regexp.Regexp {
+	s := `[` + chunkDPySpace + `]*`
+	return regexp.MustCompile(`^` + s + `(?:[+-]?` + s + `[0-9]+(?:\.[0-9]*)?|\.[0-9]+)` + s + `[a-zA-Z]+` + s + `$`)
+}()
+
+// postgresBuildGenerateSeries builds GENERATE_SERIES, turning a simple interval string step such
+// as '1 day' into an INTERVAL. Any other step is kept as written: a bare number string like '1'
+// steps a numeric series and an INTERVAL is already one.
 func postgresBuildGenerateSeries(args []*Expr, d *Dialect) *Expr {
-	// The goal is to convert step values like '1 day' or INTERVAL '1 day' into INTERVAL '1' day
 	// Note: postgres allows calls with just two arguments -- the "step" argument defaults to 1
-	step := seqGet(args, 2)
-	if step != nil {
-		if step.IsString() {
-			args[2] = postgresToInterval(step.Arg("this"))
-		} else if step.IsA(KInterval) && !step.ArgB("unit") {
-			var inner any
-			if t := step.This(); t != nil {
-				inner = t.Arg("this")
-			}
-			args[2] = postgresToInterval(inner)
+	if step := seqGet(args, 2); step != nil && step.IsString() && postgresSimpleIntervalRE.MatchString(step.ThisS()) {
+		interval := postgresToInterval(step.Arg("this"))
+		var fraction any
+		if strings.Contains(interval.This().Name(), ".") {
+			fraction = true
 		}
+		interval.Set("fraction_in_string", fraction)
+		args[2] = interval
 	}
 
 	return FromArgList(KExplodingGenerateSeries, args)
 }
 
-// postgresBuildToTimestamp mirrors parsers.postgres._build_to_timestamp.
+var postgresMakeIntervalKwargs = map[string]string{
+	"years":  "year",
+	"months": "month",
+	"weeks":  "week",
+	"days":   "day",
+	"hours":  "hour",
+	"mins":   "minute",
+	"secs":   "second",
+}
+
+// postgresBuildMakeInterval builds MAKE_INTERVAL: positional arguments fill years, months, weeks,
+// days, hours, mins and secs in order, and named ones go to their own unit, e.g.
+// MAKE_INTERVAL(days => 3) is 3 days.
+func postgresBuildMakeInterval(args []*Expr, _ *Dialect) *Expr {
+	e := New(KMakeInterval)
+	for i, spec := range KMakeInterval.ArgTypes() {
+		if i >= len(args) {
+			break
+		}
+		key := spec.name
+		if value := args[i]; value.IsA(KKwarg) {
+			if k, ok := postgresMakeIntervalKwargs[pyLower(value.This().Name())]; ok {
+				key = k
+			}
+		}
+		e.Set(key, args[i])
+	}
+	return e
+}
+
 func postgresBuildToTimestamp(args []*Expr, d *Dialect) *Expr {
 	// TO_TIMESTAMP accepts either a single double argument or (text, text)
 	if len(args) == 1 {
@@ -76,7 +103,6 @@ func postgresBuildToTimestamp(args []*Expr, d *Dialect) *Expr {
 	return buildFormattedTime(KStrToTime, "", nil)(args, d)
 }
 
-// postgresBuildRegexpReplace mirrors parsers.postgres._build_regexp_replace.
 func postgresBuildRegexpReplace(args []*Expr, d *Dialect) *Expr {
 	// The signature of REGEXP_REPLACE is:
 	// regexp_replace(source, pattern, replacement [, start [, N ]] [, flags ])
@@ -106,7 +132,6 @@ func postgresBuildRegexpReplace(args []*Expr, d *Dialect) *Expr {
 	return regexpReplace
 }
 
-// postgresBuildLevenshteinLessEqual mirrors parsers.postgres._build_levenshtein_less_equal.
 func postgresBuildLevenshteinLessEqual(args []*Expr, d *Dialect) *Expr {
 	// Postgres has two signatures for levenshtein_less_equal function, but in both cases
 	// max_dist is the last argument
@@ -118,7 +143,7 @@ func postgresBuildLevenshteinLessEqual(args []*Expr, d *Dialect) *Expr {
 	maxDist := args[len(args)-1]
 	args = args[:len(args)-1]
 
-	// args.pop() mutates the caller's list: validate arity against the shortened list.
+	// Validate arity against the arguments without max_dist.
 	return WithValidateArgs(New(
 		KLevenshtein,
 		"this", seqGet(args, 0),
@@ -130,16 +155,15 @@ func postgresBuildLevenshteinLessEqual(args []*Expr, d *Dialect) *Expr {
 	), args)
 }
 
-// ---------------------------------------------------------------------------------------------
-// PostgresParser
-// ---------------------------------------------------------------------------------------------
-
 func customizePostgresParser(d *Dialect) {
 	P := d.P
 
 	delete(P.PROPERTY_PARSERS, "INPUT")
 	P.PROPERTY_PARSERS["SET"] = noKwargsE(func(p *Parser) *Expr {
 		return p.expression(New(KSetConfigProperty, "this", p.parseSet(false, false)))
+	})
+	P.PROPERTY_PARSERS["TABLESPACE"] = noKwargsE(func(p *Parser) *Expr {
+		return p.expression(New(KTableSpaceProperty, "this", p.parseIdVar(true, nil)))
 	})
 
 	P.PLACEHOLDER_PARSERS[TK_PLACEHOLDER] = func(p *Parser) *Expr {
@@ -153,6 +177,8 @@ func customizePostgresParser(d *Dialect) {
 	P.FUNCTIONS["BIT_AND"] = fromArgList(KBitwiseAndAgg)
 	P.FUNCTIONS["BIT_OR"] = fromArgList(KBitwiseOrAgg)
 	P.FUNCTIONS["BIT_XOR"] = fromArgList(KBitwiseXorAgg)
+	P.FUNCTIONS["BTRIM"] = fromArgList(KTrim)
+	P.FUNCTIONS["MAKE_INTERVAL"] = postgresBuildMakeInterval
 	P.FUNCTIONS["VERSION"] = fromArgList(KCurrentVersion)
 	P.FUNCTIONS["DATE_TRUNC"] = buildTimestampTrunc
 	P.FUNCTIONS["DIV"] = func(args []*Expr, d *Dialect) *Expr {
@@ -213,6 +239,8 @@ func customizePostgresParser(d *Dialect) {
 		return p.expression(New(KJSONArrayAgg, "this", this, "order", order))
 	}
 	P.FUNCTION_PARSERS["JSONB_EXISTS"] = func(p *Parser) *Expr { return postgresParseJSONBExists(p) }
+	// The path stays a plain expression: Postgres JSON paths are SQL/JSON path strings
+	P.FUNCTION_PARSERS["JSON_VALUE"] = func(p *Parser) *Expr { return p.parseJsonValue(false) }
 
 	P.RANGE_PARSERS[TK_DAMP] = binaryRangeParser(KArrayOverlaps, false)
 	P.RANGE_PARSERS[TK_DAT] = func(p *Parser, this *Expr) *Expr {
@@ -226,28 +254,45 @@ func customizePostgresParser(d *Dialect) {
 		return p.expression(New(KBitwiseNot, "this", p.parseUnary()))
 	}
 
-	P.COLUMN_OPERATORS[TK_ARROW] = func(p *Parser, this, path *Expr) *Expr {
-		return p.validateExpression(
-			buildJSONExtractPath(KJSONExtract, true, p.s.JSON_ARROWS_REQUIRE_JSON_TYPE, "")([]*Expr{this, path}, p.d),
-			nil,
-		)
+	// The JSON / JSONB operators are binary operators at the "any other operator" precedence tier
+	// (below + and -, level with ||), not column operators
+	for _, tok := range []TokenType{TK_ARROW, TK_DARROW, TK_HASH_ARROW, TK_DHASH_ARROW, TK_PLACEHOLDER} {
+		delete(P.COLUMN_OPERATORS, tok)
 	}
-	P.COLUMN_OPERATORS[TK_DARROW] = func(p *Parser, this, path *Expr) *Expr {
-		return p.validateExpression(
-			buildJSONExtractPath(KJSONExtractScalar, true, p.s.JSON_ARROWS_REQUIRE_JSON_TYPE, "")([]*Expr{this, path}, p.d),
-			nil,
-		)
+	P.JSON_OPERATORS = map[TokenType]columnOperatorFn{
+		TK_ARROW: func(p *Parser, this, path *Expr) *Expr {
+			return p.validateExpression(
+				buildJSONExtractPath(KJSONExtract, true, p.s.JSON_ARROWS_REQUIRE_JSON_TYPE, "")([]*Expr{this, path}, p.d),
+				nil,
+			)
+		},
+		TK_DARROW: func(p *Parser, this, path *Expr) *Expr {
+			return p.validateExpression(
+				buildJSONExtractPath(KJSONExtractScalar, true, p.s.JSON_ARROWS_REQUIRE_JSON_TYPE, "")([]*Expr{this, path}, p.d),
+				nil,
+			)
+		},
+		TK_HASH_ARROW: func(p *Parser, this, path *Expr) *Expr {
+			return p.expression(New(KJSONBExtract, "this", this, "expression", path))
+		},
+		TK_DHASH_ARROW: func(p *Parser, this, path *Expr) *Expr {
+			return p.expression(New(KJSONBExtractScalar, "this", this, "expression", path))
+		},
+		TK_PLACEHOLDER: func(p *Parser, this, key *Expr) *Expr {
+			return p.expression(New(KJSONBContainsTopKey, "this", this, "expression", key))
+		},
 	}
 
 	P.h.parseFunctionParameter = postgresParseFunctionParameter
-	P.h.parseUniqueKey = postgresParseUniqueKey
+	P.h.parseUnique = postgresParseUnique
+	P.h.parseConvert = postgresParseConvert
+	P.h.parsePrimaryKey = postgresParsePrimaryKey
 	P.h.parseGeneratedAsIdentity = postgresParseGeneratedAsIdentity
 	P.h.parseUserDefinedType = postgresParseUserDefinedType
 }
 
-// postgresParseParameterMode mirrors PostgresParser._parse_parameter_mode. ok=false means None.
-//
-// Parse PostgreSQL function parameter mode (IN, OUT, INOUT, VARIADIC).
+// postgresParseParameterMode reports the function parameter mode (IN, OUT, INOUT, VARIADIC) at
+// the current token without consuming it; ok=false means there is no mode.
 //
 // Disambiguates between mode keywords and identifiers with the same name:
 // - MODE TYPE      -> keyword is identifier (e.g., "out INT")
@@ -259,20 +304,16 @@ func postgresParseParameterMode(p *Parser) (TokenType, bool) {
 
 	modeToken := p.curr
 
-	// Check Pattern 1: MODE TYPE
-	// Try parsing next token as a built-in type (not UDT)
-	// If successful, the keyword is an identifier, not a mode
+	// MODE TYPE: a built-in type (not a UDT) after the keyword makes it an identifier.
 	isFollowedByBuiltinType := p.tryParseExpr(func() *Expr {
 		p.advance(1)
 		return p.parseTypes(false, false, false, false)
 	}, true)
 	if isFollowedByBuiltinType != nil {
-		return 0, false // Pattern: "out INT" -> out is parameter name
+		return 0, false
 	}
 
-	// Check Pattern 2: MODE NAME TYPE
-	// If next token is an identifier, check if there's a type after it
-	// The type can be built-in or user-defined (allow_identifiers=True)
+	// MODE NAME TYPE: the type can be built-in or user-defined (allowIdentifiers=true).
 	if !p.s.ID_VAR_TOKENS.Has(p.next.Type) {
 		return 0, false
 	}
@@ -283,13 +324,12 @@ func postgresParseParameterMode(p *Parser) (TokenType, bool) {
 	}, true)
 
 	if isFollowedByAnyType != nil {
-		return modeToken.Type, true // Pattern: "OUT x INT" -> OUT is mode
+		return modeToken.Type, true
 	}
 
 	return 0, false
 }
 
-// postgresCreateModeConstraint mirrors PostgresParser._create_mode_constraint.
 func postgresCreateModeConstraint(p *Parser, paramMode TokenType) *Expr {
 	return p.expression(New(
 		KInOutColumnConstraint,
@@ -299,7 +339,6 @@ func postgresCreateModeConstraint(p *Parser, paramMode TokenType) *Expr {
 	))
 }
 
-// postgresParseFunctionParameter mirrors PostgresParser._parse_function_parameter.
 func postgresParseFunctionParameter(p *Parser) *Expr {
 	paramMode, hasMode := postgresParseParameterMode(p)
 
@@ -307,17 +346,15 @@ func postgresParseFunctionParameter(p *Parser) *Expr {
 		p.advance(1)
 	}
 
-	// Parse parameter name and type
 	paramName := p.parseIdVar(true, nil)
 	columnDef := p.parseColumnDef(paramName, false)
 
-	// Attach mode as constraint
 	if hasMode && columnDef != nil {
 		constraint := postgresCreateModeConstraint(p, paramMode)
 		if !columnDef.ArgB("constraints") {
 			columnDef.Set("constraints", []*Expr{})
 		}
-		// Python inserts into the args list in place (no parent bookkeeping).
+		// Prepend in place, without parent bookkeeping.
 		constraints := append([]*Expr{constraint}, columnDef.ArgL("constraints")...)
 		columnDef.SetArgRaw("constraints", constraints)
 	}
@@ -325,7 +362,7 @@ func postgresParseFunctionParameter(p *Parser) *Expr {
 	return columnDef
 }
 
-// postgresParseQueryParameter mirrors PostgresParser._parse_query_parameter.
+// postgresParseQueryParameter parses a %s or %(name)s query parameter placeholder.
 func postgresParseQueryParameter(p *Parser) *Expr {
 	var this *Expr
 	if p.matchNoAdvance(TK_L_PAREN) {
@@ -335,29 +372,56 @@ func postgresParseQueryParameter(p *Parser) *Expr {
 	return p.expression(New(KPlaceholder, "this", this))
 }
 
-// postgresParseDatePart mirrors PostgresParser._parse_date_part.
 func postgresParseDatePart(p *Parser) *Expr {
 	part := p.parseType(true, false)
 	p.match(TK_COMMA)
 	value := p.parseBitwise()
 
 	if part != nil && part.IsA(KColumn, KLiteral) {
-		part = VarChecked(part.Name())
+		part = VarChecked(pyUpper(part.Name()))
 	}
 
 	return p.expression(New(KExtract, "this", part, "expression", value))
 }
 
-// postgresParseUniqueKey mirrors PostgresParser._parse_unique_key.
-func postgresParseUniqueKey(p *Parser) *Expr {
-	return nil
+func postgresParseConvert(p *Parser, _ bool, _ bool) *Expr {
+	args := p.parseCSV(p.parseAssignment, TK_COMMA)
+	return p.validateExpression(
+		New(KConvertToCharset, "this", seqGet(args, 0), "source", seqGet(args, 1), "dest", seqGet(args, 2)),
+		args,
+	)
 }
 
-// postgresParseJSONBExists mirrors PostgresParser._parse_jsonb_exists.
+// postgresParseUnique parses UNIQUE [NULLS NOT DISTINCT] [(columns)] followed by index
+// parameters (INCLUDE, WITH, USING INDEX TABLESPACE) and key constraint options.
+func postgresParseUnique(p *Parser) *Expr {
+	nulls := p.matchTextSeq("NULLS", "NOT", "DISTINCT")
+	this := p.parseSchema(nil)
+	include := p.parseIndexParams()
+	options := p.parseKeyConstraintOptions()
+	return p.expression(New(
+		KUniqueColumnConstraint,
+		"nulls", nulls,
+		"this", this,
+		"include", include,
+		"options", options,
+	))
+}
+
+func postgresParsePrimaryKey(p *Parser, wrappedOptional bool, inProps bool, namedPrimaryKey bool) *Expr {
+	this := p.baseParsePrimaryKey(wrappedOptional, inProps, namedPrimaryKey)
+	if this.IsA(KPrimaryKeyColumnConstraint) {
+		this.Set("include", p.parseIndexParams())
+		options, _ := this.Arg("options").([]string)
+		this.Set("options", append(append([]string{}, options...), p.parseKeyConstraintOptions()...))
+	}
+	return this
+}
+
 func postgresParseJSONBExists(p *Parser) *Expr {
 	this := p.parseBitwise()
-	// `self._match(...) and ...` yields False (not None) when there is no comma, which
-	// satisfies the required-arg validation.
+	// path is false (not nil) when there is no comma: false passes the required-argument
+	// validation.
 	var path any = false
 	if p.match(TK_COMMA) {
 		path = anyExpr(p.d.toJSONPath(p.parseBitwise()))
@@ -365,7 +429,6 @@ func postgresParseJSONBExists(p *Parser) *Expr {
 	return p.expression(New(KJSONBExists, "this", this, "path", path))
 }
 
-// postgresParseGeneratedAsIdentity mirrors PostgresParser._parse_generated_as_identity.
 func postgresParseGeneratedAsIdentity(p *Parser) *Expr {
 	this := p.baseParseGeneratedAsIdentity()
 
@@ -376,7 +439,6 @@ func postgresParseGeneratedAsIdentity(p *Parser) *Expr {
 	return this
 }
 
-// postgresParseUserDefinedType mirrors PostgresParser._parse_user_defined_type.
 func postgresParseUserDefinedType(p *Parser, identifier *Expr) *Expr {
 	udtType := identifier
 
@@ -390,8 +452,9 @@ func postgresParseUserDefinedType(p *Parser, identifier *Expr) *Expr {
 	return DataTypeBuild(udtType, nil, true, true)
 }
 
-// postgresPyInt mirrors int(literal.to_py()) for a Literal (string or number). Raises ValueError
-// like Python when the value cannot be converted.
+// postgresPyInt converts a string or number literal to an integer, truncating fractional
+// numbers. It panics with a ValueError when the value cannot be converted; the message keeps its
+// historical wording.
 func postgresPyInt(e *Expr) *big.Int {
 	text := e.ThisS()
 	if e.IsString() {

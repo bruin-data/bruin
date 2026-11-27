@@ -170,11 +170,10 @@ linters:
           - dupl
           - gosec
         path: (.+)_test.go
-      # pkg/sqlengine is a line-by-line port of sqlglot, kept structurally close to the Python
-      # source so that sqlglot upgrades can be ported by diffing the two side by side. Rewrites
-      # these linters ask for (if/elif chains to switches, De Morgan, renaming `copy=` parameters,
-      # changing signatures shared across dialects, errors.As instead of isinstance-style checks
-      # on errors that are never wrapped) would break that correspondence.
+      # pkg/sqlengine began as a line-by-line port of a Python library and still has its shape:
+      # if/elif-style chains, `copy` parameters, signatures shared across dialects and
+      # isinstance-style checks on errors that are never wrapped. These linters flag that style
+      # throughout the package; clean it up as code is reworked rather than in one sweep.
       - linters:
           - dogsled
           - dupword
@@ -193,8 +192,8 @@ linters:
           - unparam
           - wastedassign
         path: pkg/sqlengine/
-      # Style suggestions, and code paths that mirror sqlglot's own (a loop that returns its first
-      # item, an argument overwritten like the Python parameter, a value assigned and unused).
+      # Style suggestions, and inherited code paths (a loop that returns its first item, an
+      # argument overwritten in place, a value assigned and unused).
       - linters:
           - staticcheck
         path: pkg/sqlengine/
@@ -204,6 +203,13 @@ linters:
           - gosec
         path: pkg/sqlengine/
         text: "^G(115|602)"
+      # Keyword tables: MILLENIA is an accepted date-part alias, and READ UNCOMITTED is the
+      # spelling the transaction-characteristics table has always matched (changing it changes
+      # which statements parse).
+      - linters:
+          - misspell
+        path: pkg/sqlengine/
+        text: "`(MILLENIA|UNCOMITTED)` is a misspelling"
     paths:
       - vendor
       - .git

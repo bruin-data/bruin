@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// Cases from sqlglot tests/fixtures/optimizer/simplify.sql (dialect, sql, expected). Like the
-// Python test harness, each case is parsed, annotated with the test schema, simplified with
-// constant_propagation=True and coalesce_simplification=True, and generated.
+// simplifyFixtureCases are (dialect, sql, expected) cases. Each case is parsed, annotated with
+// the test schema, simplified with constant propagation and COALESCE simplification on, and
+// generated.
 var simplifyFixtureCases = [][3]string{
 	{"", "x AND x", "x AND TRUE"},
 	{"", "x AND NOT x", "NOT x AND x"},
@@ -149,7 +149,6 @@ var simplifyFixtureCases = [][3]string{
 	{"snowflake", "SELECT * FROM o ASOF JOIN e MATCH_CONDITION (o.observed_date >= e.metric_date) ON o.id = e.id", "SELECT * FROM o ASOF JOIN e MATCH_CONDITION (o.observed_date >= e.metric_date) ON e.id = o.id"},
 }
 
-// simplifyTestSchema mirrors TestOptimizer.schema in sqlglot's tests/test_optimizer.py.
 func simplifyTestSchema() *SchemaMap {
 	s := NewSchemaMap()
 	tbl := func(name string, kv ...string) {
@@ -236,7 +235,7 @@ func TestSimplifyAPI(t *testing.T) {
 		t.Errorf("TRUE AND TRUE AND TRUE did not simplify to TRUE")
 	}
 
-	// simplify_concat preserves the expression types
+	// CONCAT simplification preserves the expression types
 	presto, e := smpTestParse(t, "presto", "CONCAT('a', x, 'b', 'c')")
 	concat := Simplify(e, SimplifyOptions{})
 	d, e = smpTestParse(t, "", "CONCAT('a', x, 'b', 'c')")
@@ -260,7 +259,7 @@ func TestSimplifyAPI(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 
-	// Python exceptions escape simplify as panics
+	// Arithmetic errors escape Simplify as panics
 	func() {
 		defer func() {
 			if r, ok := recover().(*smpPyError); !ok || r.Type != "decimal.DivisionByZero" {

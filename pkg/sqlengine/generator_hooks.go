@@ -100,9 +100,11 @@ type generatorHooks struct {
 	respectnullsSQL                        func(g *Generator, expression *Expr) string
 	returningSQL                           func(g *Generator, expression *Expr) string
 	rollbackSQL                            func(g *Generator, expression *Expr) string
+	rootProperties                         func(g *Generator, properties *Expr) string
 	schemaSQL                              func(g *Generator, expression *Expr) string
 	scopeResolution                        func(g *Generator, rhs string, scopeName string) string
 	selectSQL                              func(g *Generator, expression *Expr) string
+	setOperations                          func(g *Generator, expression *Expr) string
 	setitemSQL                             func(g *Generator, expression *Expr) string
 	showSQL                                func(g *Generator, expression *Expr) string
 	spaceSQL                               func(g *Generator, expression *Expr) string
@@ -230,9 +232,11 @@ func defaultGeneratorHooks() generatorHooks {
 		respectnullsSQL:                        (*Generator).baseRespectnullsSQL,
 		returningSQL:                           (*Generator).baseReturningSQL,
 		rollbackSQL:                            (*Generator).baseRollbackSQL,
+		rootProperties:                         (*Generator).baseRootProperties,
 		schemaSQL:                              (*Generator).baseSchemaSQL,
 		scopeResolution:                        (*Generator).baseScopeResolution,
 		selectSQL:                              (*Generator).baseSelectSQL,
+		setOperations:                          (*Generator).baseSetOperations,
 		setitemSQL:                             (*Generator).baseSetitemSQL,
 		showSQL:                                (*Generator).baseShowSQL,
 		spaceSQL:                               (*Generator).baseSpaceSQL,
@@ -643,6 +647,10 @@ func (g *Generator) rollbackSQL(expression *Expr) string {
 	return g.s.h.rollbackSQL(g, expression)
 }
 
+func (g *Generator) rootProperties(properties *Expr) string {
+	return g.s.h.rootProperties(g, properties)
+}
+
 func (g *Generator) schemaSQL(expression *Expr) string {
 	return g.s.h.schemaSQL(g, expression)
 }
@@ -653,6 +661,10 @@ func (g *Generator) scopeResolution(rhs string, scopeName string) string {
 
 func (g *Generator) selectSQL(expression *Expr) string {
 	return g.s.h.selectSQL(g, expression)
+}
+
+func (g *Generator) setOperations(expression *Expr) string {
+	return g.s.h.setOperations(g, expression)
 }
 
 func (g *Generator) setitemSQL(expression *Expr) string {

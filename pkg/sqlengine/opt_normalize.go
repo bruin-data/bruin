@@ -1,18 +1,12 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/normalize_identifiers.py.
-
-// NormalizeIdentifiers mirrors normalize_identifiers(expression, dialect) (store_original_column_identifiers=False).
-//
-// Identifiers are converted to lower or upper case depending on the dialect, respecting
-// case-sensitivity. A node annotated with `/* sqlglot.meta case_sensitive */` (and its subtree)
-// is left untouched. A nil dialect means the default sqlglot dialect.
+// NormalizeIdentifiers folds every identifier in e to the dialect's case, in place. A node
+// annotated with a case_sensitive meta comment (one starting with metaCommentPrefix) is left
+// untouched, with its subtree.
 func NormalizeIdentifiers(e *Expr, d *Dialect) *Expr {
 	return NormalizeIdentifiersFull(e, d, false)
 }
 
-// NormalizeIdentifiersStr mirrors normalize_identifiers(<str>, dialect): the string is parsed into an
-// Identifier (exp.parse_identifier) and normalized.
 func NormalizeIdentifiersStr(name string, d *Dialect) *Expr {
 	if d == nil {
 		d = prototype("")
@@ -20,7 +14,8 @@ func NormalizeIdentifiersStr(name string, d *Dialect) *Expr {
 	return NormalizeIdentifiersFull(parseIdentifier(name, d), d, false)
 }
 
-// NormalizeIdentifiersFull mirrors normalize_identifiers(expression, dialect, store_original_column_identifiers).
+// NormalizeIdentifiersFull is NormalizeIdentifiers; with storeOriginalColumnIdentifiers each
+// column also records its pre-normalization dotted path in the "dot_parts" meta entry.
 func NormalizeIdentifiersFull(e *Expr, d *Dialect, storeOriginalColumnIdentifiers bool) *Expr {
 	if d == nil {
 		d = prototype("")

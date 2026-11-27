@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-// ErrorLevel mirrors sqlglot.errors.ErrorLevel.
+// ErrorLevel controls how the parser and generator report errors: raise the first one
+// immediately, ignore them, log them as warnings, or raise them together at the end.
 type ErrorLevel int
 
 const (
@@ -16,7 +17,8 @@ const (
 	ErrorLevelRaise
 )
 
-// ParseErrorDetail mirrors one entry of ParseError.errors.
+// ParseErrorDetail describes one error of a ParseError: its message, position and the SQL
+// around it.
 type ParseErrorDetail struct {
 	Description    string
 	Line           int
@@ -27,7 +29,6 @@ type ParseErrorDetail struct {
 	IntoExpression string
 }
 
-// ParseError mirrors sqlglot.errors.ParseError.
 type ParseError struct {
 	Msg    string
 	Errors []ParseErrorDetail
@@ -35,22 +36,20 @@ type ParseError struct {
 
 func (e *ParseError) Error() string { return e.Msg }
 
-// UnsupportedError mirrors sqlglot.errors.UnsupportedError.
+// UnsupportedError reports a construct that can't be generated for the target dialect.
 type UnsupportedError struct{ Msg string }
 
 func (e *UnsupportedError) Error() string { return e.Msg }
 
-// ValueError mirrors a Python ValueError raised by sqlglot.
 type ValueError struct{ Msg string }
 
 func (e *ValueError) Error() string { return e.Msg }
 
-// OptimizeError mirrors sqlglot.errors.OptimizeError.
 type OptimizeError struct{ Msg string }
 
 func (e *OptimizeError) Error() string { return e.Msg }
 
-// SchemaError mirrors sqlglot.errors.SchemaError.
+// SchemaError reports an invalid schema or a table that doesn't match it.
 type SchemaError struct{ Msg string }
 
 func (e *SchemaError) Error() string { return e.Msg }
@@ -61,7 +60,9 @@ const (
 	errorMessageContextDefault = 100
 )
 
-// highlightSQL mirrors sqlglot.errors.highlight_sql. Positions are inclusive rune offsets.
+// highlightSQL underlines the given positions of sql with ANSI codes. It returns the formatted
+// SQL along with the context before, the highlighted span and the context after. Positions are
+// inclusive rune offsets.
 func highlightSQL(sql []rune, positions [][2]int, contextLength int) (formatted, startContext, highlight, endContext string) {
 	sorted := append([][2]int{}, positions...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i][0] < sorted[j][0] })
@@ -118,7 +119,8 @@ func concatMessages(errs []error, maximum int) string {
 	return strings.Join(msgs, "\n\n")
 }
 
-// suggestClosestMatchAndFail mirrors sqlglot.helper.suggest_closest_match_and_fail.
+// suggestClosestMatchAndFail returns an "Unknown <kind> '<word>'." error that suggests the
+// closest of possibilities when one is similar enough.
 func suggestClosestMatchAndFail(kind, word string, possibilities []string) error {
 	similar := ""
 	if m := getCloseMatches(word, possibilities, 1, 0.6); len(m) > 0 {
@@ -127,7 +129,8 @@ func suggestClosestMatchAndFail(kind, word string, possibilities []string) error
 	return &ValueError{Msg: fmt.Sprintf("Unknown %s '%s'.%s", kind, word, similar)}
 }
 
-// getCloseMatches mirrors difflib.get_close_matches.
+// getCloseMatches returns up to n possibilities whose Ratcliff/Obershelp similarity to word is at
+// least cutoff, most similar first (ties in reverse string order).
 func getCloseMatches(word string, possibilities []string, n int, cutoff float64) []string {
 	type scored struct {
 		score float64
@@ -157,7 +160,8 @@ func getCloseMatches(word string, possibilities []string, n int, cutoff float64)
 	return out
 }
 
-// sequenceMatcher is a port of difflib.SequenceMatcher (autojunk enabled, no isjunk).
+// sequenceMatcher computes the Ratcliff/Obershelp similarity of two rune sequences. When b has
+// at least 200 elements, elements making up more than 1% of it are ignored as popular.
 type sequenceMatcher struct {
 	a, b     []rune
 	b2j      map[rune][]int
@@ -206,7 +210,7 @@ func (s *sequenceMatcher) findLongestMatch(alo, ahi, blo, bhi int) (int, int, in
 		}
 		j2len = newj2len
 	}
-	// No junk elements (isjunk is None), so only the non-junk extension loops apply.
+	// There are no junk elements, so just extend the match while neighboring elements are equal.
 	for besti > alo && bestj > blo && s.a[besti-1] == s.b[bestj-1] {
 		besti, bestj, bestsize = besti-1, bestj-1, bestsize+1
 	}

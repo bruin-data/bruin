@@ -1,7 +1,5 @@
 package sqlengine
 
-// Port of sqlglot/typing/spark2.py.
-
 // typingSpark2AnnotateBySimilarArgs is the type inference for CONCAT-family expressions
 // (CONCAT, LPAD, RPAD).
 //
@@ -63,20 +61,20 @@ func typingSpark2Metadata() ExprMetadataType {
 		KRight,
 	)
 	m.annotators(
-		"typing/spark2.py:63", func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
+		func(a *TypeAnnotator, e *Expr) { a.annotateByArgs(e, "this") },
 		KArrayFilter,
 		KSubstring,
 	)
 	m.returns(DT_DATE, KAddMonths)
-	m.annotators("typing/spark2.py:71", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		a.annotateByArgsFull(e, false, e.argKeyAttr("quantile", "is_type").IsTypeOf(DT_ARRAY), "this")
 	}, KApproxQuantile)
 	m.returns(DT_TIMESTAMP, KAtTimeZone)
-	m.annotators("typing/spark2.py:76", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		typingSpark2AnnotateBySimilarArgs(a, e, "expressions")
 	}, KConcat)
 	m.returns(DT_DATE, KNextDay)
-	m.annotators("typing/spark2.py:79", func(a *TypeAnnotator, e *Expr) {
+	m.annotators(func(a *TypeAnnotator, e *Expr) {
 		typingSpark2AnnotateBySimilarArgs(a, e, "this", "fill_pattern")
 	}, KPad)
 

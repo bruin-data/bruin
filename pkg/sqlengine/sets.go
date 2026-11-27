@@ -15,10 +15,8 @@ func newTokenSet(types ...TokenType) TokenSet {
 	return s
 }
 
-// Has reports whether t is in the set.
 func (s *TokenSet) Has(t TokenType) bool { return s.bits[t/64]&(1<<(t%64)) != 0 }
 
-// With returns a copy of s with types added.
 func (s TokenSet) With(types ...TokenType) TokenSet {
 	for _, t := range types {
 		s.bits[t/64] |= 1 << (t % 64)
@@ -26,7 +24,6 @@ func (s TokenSet) With(types ...TokenType) TokenSet {
 	return s
 }
 
-// Without returns a copy of s with types removed.
 func (s TokenSet) Without(types ...TokenType) TokenSet {
 	for _, t := range types {
 		s.bits[t/64] &^= 1 << (t % 64)
@@ -34,7 +31,6 @@ func (s TokenSet) Without(types ...TokenType) TokenSet {
 	return s
 }
 
-// Union returns s | o.
 func (s TokenSet) Union(o TokenSet) TokenSet {
 	for i := range s.bits {
 		s.bits[i] |= o.bits[i]
@@ -42,7 +38,6 @@ func (s TokenSet) Union(o TokenSet) TokenSet {
 	return s
 }
 
-// Minus returns s - o.
 func (s TokenSet) Minus(o TokenSet) TokenSet {
 	for i := range s.bits {
 		s.bits[i] &^= o.bits[i]
@@ -61,7 +56,6 @@ func (s TokenSet) Items() []TokenType {
 	return out
 }
 
-// DTypeSet is a bitset of data types.
 type DTypeSet struct{ bits [(numDTypes + 63) / 64]uint64 }
 
 func newDTypeSet(types ...DType) DTypeSet {
@@ -98,7 +92,6 @@ func (s DTypeSet) Items() []DType {
 	return out
 }
 
-// KindSet is a bitset of expression kinds.
 type KindSet struct{ bits [(numKinds + 63) / 64]uint64 }
 
 func newKindSet(kinds ...Kind) KindSet {
@@ -125,7 +118,6 @@ func (s KindSet) Without(kinds ...Kind) KindSet {
 	return s
 }
 
-// StrSet is a set of strings.
 type StrSet map[string]struct{}
 
 func newStrSet(items ...string) StrSet {
@@ -162,13 +154,14 @@ func (s StrSet) Sorted() []string {
 	return out
 }
 
-// formatString is an entry of a tokenizer's _FORMAT_STRINGS table.
+// formatString is an entry of TokenizerSettings._FORMAT_STRINGS: the closing delimiter and the
+// token type of the string literal that its key opens (hex, bit, heredoc, ...).
 type formatString struct {
 	end       string
 	tokenType TokenType
 }
 
-// Tri is a tri-state boolean (True / False / None in Python).
+// Tri is a tri-state boolean: true, false, or unset (TriNone).
 type Tri int8
 
 const (
@@ -177,5 +170,5 @@ const (
 	TriTrue
 )
 
-// OptionsType mirrors sqlglot.parser.OPTIONS_TYPE: keyword -> sequences of follow-up words.
+// OptionsType maps an option keyword to the word sequences that may follow it.
 type OptionsType map[string][][]string

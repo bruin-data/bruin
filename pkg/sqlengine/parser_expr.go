@@ -7,18 +7,18 @@ import (
 	"strings"
 )
 
-// Port of sqlglot.parser.Parser (chunk D, part 1): the expression precedence chain
-// (_parse_expression .. _parse_unary) and data types (_parse_type .. _parse_at_time_zone).
-
-// pySpaceClass mirrors Python's Unicode `\s` inside a character class.
+// chunkDPySpace lists the Unicode whitespace characters for use inside a character class
+// (Go's \s matches ASCII whitespace only).
 const chunkDPySpace = `\t\n\x0b\x0c\r\x1c-\x1f \x{85}\x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}`
 
-// chunkDIntervalStringRE mirrors exp.INTERVAL_STRING_RE.
+// chunkDIntervalStringRE matches an interval string such as '5 day': a number and a unit, with
+// optional surrounding whitespace.
 var chunkDIntervalStringRE = regexp.MustCompile(
 	`[` + chunkDPySpace + `]*(-?[0-9]+(?:\.[0-9]+)?)[` + chunkDPySpace + `]*([a-zA-Z]+)[` + chunkDPySpace + `]*`,
 )
 
-// chunkDIntervalDayTimeRE mirrors exp.INTERVAL_DAY_TIME_RE (used with re.match, hence anchored).
+// chunkDIntervalDayTimeRE matches, from the start of the string, a day-time interval without
+// units such as '1 2:03:04.5'.
 var chunkDIntervalDayTimeRE = func() *regexp.Regexp {
 	s := `[` + chunkDPySpace + `]`
 	d := `\p{Nd}`
@@ -28,10 +28,10 @@ var chunkDIntervalDayTimeRE = func() *regexp.Regexp {
 	)
 }()
 
-// chunkDTimeZoneRE mirrors sqlglot.parser.TIME_ZONE_RE (used with re.search).
+// chunkDTimeZoneRE detects a time zone in a timestamp literal: a colon followed later by a letter,
+// + or -, anywhere in the string.
 var chunkDTimeZoneRE = regexp.MustCompile(`:.*?[a-zA-Z\+\-]`)
 
-// chunkDMatchKey mirrors self._match_set(mapping) for token-keyed mappings.
 func chunkDMatchKey[V any](p *Parser, m map[TokenType]V) bool {
 	if !p.curr.ok() {
 		return false
@@ -43,12 +43,12 @@ func chunkDMatchKey[V any](p *Parser, m map[TokenType]V) bool {
 	return false
 }
 
-// _parse_expression (parser.py L5828).
 func (p *Parser) baseParseExpression() *Expr {
 	return p.parseAlias(p.parseAssignment(), false)
 }
 
-// _parse_assignment (parser.py L5831).
+// baseParseAssignment parses a disjunction followed by right-associative ASSIGNMENT operators
+// (such as :=). A single-part column on the left is replaced by its identifier.
 func (p *Parser) baseParseAssignment() *Expr {
 	this := p.parseDisjunction()
 	if this == nil {
@@ -75,7 +75,6 @@ func (p *Parser) baseParseAssignment() *Expr {
 	return this
 }
 
-// _parse_disjunction (parser.py L5853).
 func (p *Parser) parseDisjunction() *Expr {
 	this := p.parseConjunction()
 	for chunkDMatchKey(p, p.s.DISJUNCTION) {
@@ -86,7 +85,6 @@ func (p *Parser) parseDisjunction() *Expr {
 	return this
 }
 
-// _parse_conjunction (parser.py L5865).
 func (p *Parser) parseConjunction() *Expr {
 	this := p.parseEquality()
 	for chunkDMatchKey(p, p.s.CONJUNCTION) {
@@ -97,35 +95,129 @@ func (p *Parser) parseConjunction() *Expr {
 	return this
 }
 
-// _parse_equality (parser.py L5877).
+// buildPredicate builds a comparison or IS predicate, parenthesizing operands whose grouping the
+// operator's precedence would otherwise lose: a comparison operand of an IS predicate, or an IS
+// predicate operand of a comparison.
+func (p *Parser) buildPredicate(kind Kind, this, expression *Expr, comments []string) *Expr {
+	if kind == KIs || kind == KNullSafeEQ || kind == KNullSafeNEQ {
+		if this.IsA(KConnector, KNot, KNullSafeNEQ) ||
+			(this != nil && (hasKindValue(p.s.EQUALITY, this.kind) || hasKindValue(p.s.COMPARISON, this.kind))) ||
+			(kind != KIs && this.IsA(KIs)) {
+			this = New(KParen, "this", this)
+		}
+		if expression.IsA(KPredicate, KConnector, KNot, KEscape) {
+			expression = New(KParen, "this", expression)
+		}
+	} else {
+		if isIsPredicate(unwrapNot(this)) {
+			this = New(KParen, "this", this)
+		}
+		if isIsPredicate(unwrapNot(expression)) {
+			expression = New(KParen, "this", expression)
+		}
+	}
+	return p.expressionC(New(kind, "this", this, "expression", expression), comments)
+}
+
+func hasKindValue(m map[TokenType]Kind, k Kind) bool {
+	for _, v := range m {
+		if v == k {
+			return true
+		}
+	}
+	return false
+}
+
+// isIsPredicate reports whether e is an IS or IS [NOT] DISTINCT FROM predicate.
+func isIsPredicate(e *Expr) bool {
+	return e.IsA(KIs, KNullSafeEQ, KNullSafeNEQ)
+}
+
+func unwrapNot(e *Expr) *Expr {
+	if e.IsA(KNot) {
+		return e.This()
+	}
+	return e
+}
+
+// parseEquality parses left-associative EQUALITY operators (=, <>, ...) and, where the dialect
+// binds IS predicates below the comparisons, those predicates.
 func (p *Parser) parseEquality() *Expr {
-	this := p.parseComparison()
-	for chunkDMatchKey(p, p.s.EQUALITY) {
-		comments := p.prevComments
-		kind := p.s.EQUALITY[p.prev.Type]
-		this = p.expressionC(New(kind, "this", this, "expression", p.parseComparison()), comments)
+	return p.parseEqualityChain(true)
+}
+
+// parseEqualityChain is parseEquality; parseIs=false leaves IS predicates that bind below the
+// comparisons unparsed.
+func (p *Parser) parseEqualityChain(parseIs bool) *Expr {
+	this := p.parseComparison(nil)
+	for {
+		if chunkDMatchKey(p, p.s.EQUALITY) {
+			comments := p.prevComments
+			kind := p.s.EQUALITY[p.prev.Type]
+			this = p.buildPredicate(kind, this, p.parseComparison(nil), comments)
+		} else if parseIs && p.isPredicateAhead() {
+			index := p.index
+			// A postfix predicate can itself be an operand, e.g. x IS NULL = FALSE.
+			this = p.parseComparison(p.parseRange(this, true))
+			if p.index == index {
+				break
+			}
+		} else {
+			break
+		}
 	}
 	return this
 }
 
-// _parse_comparison (parser.py L5889).
-func (p *Parser) parseComparison() *Expr {
-	this := p.parseRange(nil)
+// parseComparison parses left-associative COMPARISON operators (<, >=, ...), starting from this
+// when it is given.
+func (p *Parser) parseComparison(this *Expr) *Expr {
+	if this == nil {
+		this = p.parseRange(nil, false)
+	}
 	for chunkDMatchKey(p, p.s.COMPARISON) {
 		comments := p.prevComments
 		kind := p.s.COMPARISON[p.prev.Type]
-		this = p.expressionC(New(kind, "this", this, "expression", p.parseRange(nil)), comments)
+		this = p.buildPredicate(kind, this, p.parseRange(nil, false), comments)
 	}
 	return this
 }
 
-// _parse_range (parser.py L5899).
-func (p *Parser) parseRange(this *Expr) *Expr {
+// IsPredicatePrecedence is where a dialect binds IS predicates relative to the comparisons.
+type IsPredicatePrecedence uint8
+
+const (
+	// IsPredicateHigh binds IS above all comparisons.
+	IsPredicateHigh IsPredicatePrecedence = iota
+	// IsPredicateComparison binds IS alongside the ordering comparisons (<, >=, ...).
+	IsPredicateComparison
+	// IsPredicateEquality binds IS alongside equality (=, <>, ...).
+	IsPredicateEquality
+	// IsPredicateLow binds IS below all comparisons.
+	IsPredicateLow
+)
+
+// isPredicateAhead reports whether an IS predicate (IS, ISNULL, NOTNULL or NOT NULL) follows and
+// the dialect binds it at or below the comparisons.
+func (p *Parser) isPredicateAhead() bool {
+	if p.s.IS_PREDICATE_PRECEDENCE == IsPredicateHigh || !p.s.IS_PREDICATE_TOKENS.Has(p.curr.Type) {
+		return false
+	}
+	return p.curr.Type != TK_NOT || p.next.Type == TK_NULL
+}
+
+// baseParseRange parses the predicates that follow a bitwise expression: RANGE_PARSERS operators
+// (BETWEEN, IN, LIKE, IS, ...), ISNULL and NOTNULL, each optionally negated with NOT. Unless
+// parseIs is set it stops at an IS predicate that binds below the comparisons.
+func (p *Parser) baseParseRange(this *Expr, parseIs bool) *Expr {
 	if this == nil {
 		this = p.parseBitwise()
 	}
 
 	for {
+		if !parseIs && p.isPredicateAhead() {
+			break
+		}
 		negate := p.match(TK_NOT)
 		if chunkDMatchKey(p, p.s.RANGE_PARSERS) {
 			expression := p.s.RANGE_PARSERS[p.prev.Type](p, this)
@@ -135,12 +227,16 @@ func (p *Parser) parseRange(this *Expr) *Expr {
 
 			this = expression
 		} else if p.match(TK_ISNULL) || (negate && p.match(TK_NULL)) {
-			this = p.expression(New(KIs, "this", this, "expression", Null()))
+			this = p.buildPredicate(KIs, this, Null(), nil)
 		} else if p.match(TK_NOTNULL) {
 			// Postgres supports ISNULL and NOTNULL for conditions.
 			// https://blog.andreiavram.ro/postgresql-null-composite-type/
-			this = p.expression(New(KIs, "this", this, "expression", Null()))
-			this = p.expression(New(KNot, "this", this))
+			this = p.buildPredicate(KIs, this, Null(), nil)
+			if p.d.S.NORMALIZE_NOT_NULL {
+				this = p.expression(New(KNot, "this", this))
+			} else {
+				this.Set("negate", true)
+			}
 		} else {
 			if negate {
 				p.retreat(p.index - 1)
@@ -150,11 +246,11 @@ func (p *Parser) parseRange(this *Expr) *Expr {
 
 		if negate {
 			this = p.negateRange(this)
-			if p.curr.ok() {
-				_, isRange := p.s.RANGE_PARSERS[p.curr.Type]
-				if p.curr.Type == TK_NOT || isRange {
-					this = p.expression(New(KParen, "this", this))
-				}
+		}
+		if negate || (this.IsA(KNot) && this.This().IsA(KIs)) {
+			_, isRange := p.s.RANGE_PARSERS[p.curr.Type]
+			if p.curr.Type == TK_NOT || isRange {
+				this = p.expression(New(KParen, "this", this))
 			}
 		}
 	}
@@ -162,7 +258,8 @@ func (p *Parser) parseRange(this *Expr) *Expr {
 	return this
 }
 
-// _negate_range (parser.py L5932).
+// baseNegateRange negates a range predicate: LIKE and ILIKE (also under ESCAPE) get negate set,
+// anything else is wrapped in Not.
 func (p *Parser) baseNegateRange(this *Expr) *Expr {
 	if this == nil {
 		return this
@@ -180,7 +277,9 @@ func (p *Parser) baseNegateRange(this *Expr) *Expr {
 	return p.expression(New(KNot, "this", this))
 }
 
-// _parse_is (parser.py L5943).
+// parseIs parses what follows IS: [NOT] DISTINCT FROM x, [NOT] JSON [kind] [WITH|WITHOUT]
+// [UNIQUE [KEYS]], or [NOT] NULL or another expression. Without any of these it rewinds to
+// before IS and returns nil.
 func (p *Parser) parseIs(this *Expr) *Expr {
 	index := p.index - 1
 	negate := p.match(TK_NOT)
@@ -190,7 +289,7 @@ func (p *Parser) parseIs(this *Expr) *Expr {
 		if negate {
 			klass = KNullSafeEQ
 		}
-		return p.expression(New(klass, "this", this, "expression", p.parseBitwise()))
+		return p.buildPredicate(klass, this, p.parseIsRhs(true), nil)
 	}
 
 	var expression *Expr
@@ -211,24 +310,44 @@ func (p *Parser) parseIs(this *Expr) *Expr {
 		p.matchTextSeq("KEYS")
 		expression = p.expression(New(KJSON, "this", kind, "with_", with, "unique", unique))
 	} else {
-		expression = p.parseNull()
-		if expression == nil {
-			expression = p.parseBitwise()
-		}
+		expression = p.parseIsRhs(false)
 		if expression == nil {
 			p.retreat(index)
 			return nil
 		}
 	}
 
-	this = p.expression(New(KIs, "this", this, "expression", expression))
-	if negate {
+	this = p.buildPredicate(KIs, this, expression, nil)
+	if negate && expression.Is(KNull) && !p.d.S.NORMALIZE_NOT_NULL {
+		this.Set("negate", true)
+	} else if negate {
 		this = p.expression(New(KNot, "this", this))
 	}
 	return p.parseColumnOps(this)
 }
 
-// _parse_in (parser.py L5976).
+// baseParseIsRhs parses the right operand of IS, or of IS [NOT] DISTINCT FROM when distinct is
+// set, which spans the operators that bind above IS in the dialect.
+func (p *Parser) baseParseIsRhs(distinct bool) *Expr {
+	if distinct {
+		switch p.s.IS_PREDICATE_PRECEDENCE {
+		case IsPredicateLow:
+			return p.parseEqualityChain(false)
+		case IsPredicateEquality:
+			return p.parseComparison(nil)
+		case IsPredicateComparison:
+			return p.parseRange(nil, false)
+		}
+		return p.parseBitwise()
+	}
+	if e := p.parseNull(); e != nil {
+		return e
+	}
+	return p.parseBitwise()
+}
+
+// parseIn parses what follows IN: an UNNEST, a parenthesized or bracketed list or subquery, or a
+// single field.
 func (p *Parser) parseIn(this *Expr, alias bool) *Expr {
 	unnest := p.parseUnnest(false)
 	if unnest != nil {
@@ -256,8 +375,12 @@ func (p *Parser) parseIn(this *Expr, alias bool) *Expr {
 	return this
 }
 
-// _parse_between (parser.py L6000).
 func (p *Parser) parseBetween(this *Expr) *Expr {
+	// Preserve grouping when BETWEEN is rewritten into comparisons.
+	if isIsPredicate(this) {
+		this = New(KParen, "this", this)
+	}
+
 	var symmetric any
 	if p.matchTextSeq("SYMMETRIC") {
 		symmetric = true
@@ -272,7 +395,6 @@ func (p *Parser) parseBetween(this *Expr) *Expr {
 	return p.expression(New(KBetween, "this", this, "low", low, "high", high, "symmetric", symmetric))
 }
 
-// _parse_escape (parser.py L6013).
 func (p *Parser) parseEscape(this *Expr) *Expr {
 	if !p.match(TK_ESCAPE) {
 		return this
@@ -284,16 +406,17 @@ func (p *Parser) parseEscape(this *Expr) *Expr {
 	return p.expression(New(KEscape, "this", this, "expression", expression))
 }
 
-// _parse_interval_span (parser.py L6020).
+// parseIntervalSpan parses the unit after an interval value, including spans such as
+// DAY TO SECOND, and normalizes the value to the canonical form INTERVAL '<n>' <unit>.
 func (p *Parser) parseIntervalSpan(this *Expr) *Expr {
 	// handle day-time format interval span with omitted units:
 	//   INTERVAL '<number days> hh[:][mm[:ss[.ff]]]' <maybe `unit TO unit`>
 	intervalSpanUnitsOmitted := false
+	var fractionInString any
 	if this != nil && this.IsString() && p.s.SUPPORTS_OMITTED_INTERVAL_SPAN_UNIT &&
 		chunkDIntervalDayTimeRE.MatchString(this.Name()) {
 		index := p.index
 
-		// Var "TO" Var
 		firstUnit := p.parseVar(true, nil, true)
 		var secondUnit *Expr
 		if firstUnit != nil && p.matchTextSeq("TO") {
@@ -305,11 +428,17 @@ func (p *Parser) parseIntervalSpan(this *Expr) *Expr {
 		p.retreat(index)
 	}
 
+	unitIndex := p.index
 	var unit *Expr
 	if !intervalSpanUnitsOmitted {
-		unit = p.parseFunction(nil, false, true, false)
-		if unit == nil && (p.curr.Type == TK_VAR || p.d.S.VALID_INTERVAL_UNITS.Has(upperText(p.curr))) {
-			unit = p.parseVar(true, nil, true)
+		// Only a token that can be a unit is parsed as one, so that a trailing operator or alias
+		// isn't swallowed, e.g. INTERVAL '1 day' AND (x)
+		isUnit := p.curr.ok() && (p.curr.Type == TK_VAR || p.d.S.VALID_INTERVAL_UNITS.Has(upperText(p.curr)))
+		if isUnit {
+			unit = p.parseFunction(nil, false, true, false)
+			if unit == nil {
+				unit = p.parseVar(true, nil, true)
+			}
 		}
 	}
 
@@ -322,12 +451,16 @@ func (p *Parser) parseIntervalSpan(this *Expr) *Expr {
 		if len(parts) > 0 && unit != nil {
 			// Unconsume the eagerly-parsed unit, since the real unit was part of the string
 			unit = nil
-			p.retreat(p.index - 1)
+			p.retreat(unitIndex)
 		}
 
 		if len(parts) == 1 {
 			this = LiteralString(parts[0][1])
 			unit = p.expression(New(KVar, "this", pyUpper(parts[0][2])))
+			// INTERVAL '1.5 DAY' differs from INTERVAL '1.5' DAY in e.g. DuckDB and Postgres
+			if strings.Contains(parts[0][1], ".") {
+				fractionInString = true
+			}
 		}
 	}
 
@@ -339,10 +472,11 @@ func (p *Parser) parseIntervalSpan(this *Expr) *Expr {
 		unit = p.expression(New(KIntervalSpan, "this", unit, "expression", expression))
 	}
 
-	return p.expression(New(KInterval, "this", this, "unit", unit))
+	return p.expression(New(KInterval, "this", this, "unit", unit, "fraction_in_string", fractionInString))
 }
 
-// _parse_interval (parser.py L6078).
+// parseInterval parses INTERVAL <value> [unit]; requireInterval makes the INTERVAL keyword
+// mandatory. A sequence such as INTERVAL '1' DAY '2' HOUR becomes a sum of intervals.
 func (p *Parser) parseInterval(requireInterval bool) *Expr {
 	index := p.index
 
@@ -369,10 +503,15 @@ func (p *Parser) parseInterval(requireInterval bool) *Expr {
 	interval := p.parseIntervalSpan(this)
 
 	index = p.index
-	p.match(TK_PLUS)
+	if p.s.SUPPORTS_MULTI_PART_INTERVAL_ADD {
+		p.match(TK_PLUS)
+	}
 
-	// Convert INTERVAL 'val_1' unit_1 [+] ... [+] 'val_n' unit_n into a sum of intervals
-	if p.matchAnyNoAdvance(TK_STRING, TK_NUMBER) {
+	// Convert INTERVAL 'val_1' unit_1 [+] ... [+] 'val_n' unit_n into a sum of intervals; the value
+	// must be followed by a valid unit
+	if p.matchAnyNoAdvance(TK_STRING, TK_NUMBER) &&
+		!p.s.TEXT_MATCH_EXCLUDED_TOKENS.Has(p.next.Type) &&
+		hasUpperText(p.d.S.VALID_INTERVAL_UNITS, p.next.Text) {
 		return p.expression(New(KAdd, "this", interval, "expression", p.parseInterval(false)))
 	}
 
@@ -380,7 +519,8 @@ func (p *Parser) parseInterval(requireInterval bool) *Expr {
 	return interval
 }
 
-// _parse_bitwise (parser.py L6111).
+// parseBitwise parses left-associative BITWISE operators, || when it means string concatenation,
+// ?? (Coalesce), << and >>, and the dialect's JSON_OPERATORS.
 func (p *Parser) parseBitwise() *Expr {
 	this := p.parseTerm()
 
@@ -401,6 +541,10 @@ func (p *Parser) parseBitwise() *Expr {
 			this = p.expression(New(KBitwiseLeftShift, "this", this, "expression", p.parseTerm()))
 		} else if p.matchPair(TK_GT, TK_GT) {
 			this = p.expression(New(KBitwiseRightShift, "this", this, "expression", p.parseTerm()))
+		} else if len(p.s.JSON_OPERATORS) > 0 && chunkDMatchKey(p, p.s.JSON_OPERATORS) {
+			// JSON operators of the binary-operator tier (Postgres, DuckDB), below + and -
+			op := p.s.JSON_OPERATORS[p.prev.Type]
+			this = op(p, this, p.parseTerm())
 		} else {
 			break
 		}
@@ -409,7 +553,6 @@ func (p *Parser) parseBitwise() *Expr {
 	return this
 }
 
-// _parse_term (parser.py L6144).
 func (p *Parser) parseTerm() *Expr {
 	this := p.parseFactor()
 
@@ -421,32 +564,34 @@ func (p *Parser) parseTerm() *Expr {
 		this = p.expressionC(New(klass, "this", this, "expression", expression), comments)
 
 		if this.IsA(KCollate) {
-			expr := this.Expression()
-
-			// Preserve collations such as pg_catalog."default" (Postgres) as columns, otherwise
-			// fallback to Identifier / Var
-			if expr.IsA(KColumn) && len(expr.Parts()) == 1 {
-				ident := expr.This()
-				if ident.IsA(KIdentifier) {
-					if ident.ArgB("quoted") {
-						this.Set("expression", ident)
-					} else {
-						this.Set("expression", VarExpr(ident.Name()))
-					}
-				}
-			}
+			normalizeCollate(this)
 		}
 	}
 
 	return this
 }
 
-// _parse_factor (parser.py L6166).
-func (p *Parser) parseFactor() *Expr {
-	parseMethod := p.parseUnary
-	if len(p.s.EXPONENT) > 0 {
-		parseMethod = p.parseExponent
+// normalizeCollate replaces a single-part column collation with its identifier when quoted, or a
+// Var otherwise; collations such as pg_catalog."default" (Postgres) stay columns.
+func normalizeCollate(collate *Expr) {
+	expr := collate.Expression()
+	if expr.IsA(KColumn) && len(expr.Parts()) == 1 {
+		ident := expr.This()
+		if ident.IsA(KIdentifier) {
+			if ident.ArgB("quoted") {
+				collate.Set("expression", ident)
+			} else {
+				collate.Set("expression", VarExpr(ident.Name()))
+			}
+		}
 	}
+}
+
+// parseFactor parses left-associative FACTOR operators (*, /, DIV, ...) over parseFactorOperand
+// operands, the first with an optional AT TIME ZONE. A word operator such as DIV without an
+// operand after it is given back, since it may be an alias.
+func (p *Parser) parseFactor() *Expr {
+	parseMethod := p.parseFactorOperand
 	this := p.parseAtTimeZone(parseMethod())
 
 	for chunkDMatchKey(p, p.s.FACTOR) {
@@ -470,7 +615,6 @@ func (p *Parser) parseFactor() *Expr {
 	return this
 }
 
-// chunkDIsAlpha mirrors str.isalpha().
 func chunkDIsAlpha(s string) bool {
 	if s == "" {
 		return false
@@ -483,7 +627,14 @@ func chunkDIsAlpha(s string) bool {
 	return true
 }
 
-// _parse_exponent (parser.py L6187).
+func (p *Parser) baseParseFactorOperand() *Expr {
+	if len(p.s.EXPONENT) > 0 {
+		return p.parseExponent()
+	}
+	return p.parseUnary()
+}
+
+// parseExponent parses left-associative EXPONENT operators over unary operands.
 func (p *Parser) parseExponent() *Expr {
 	this := p.parseUnary()
 	for chunkDMatchKey(p, p.s.EXPONENT) {
@@ -494,7 +645,6 @@ func (p *Parser) parseExponent() *Expr {
 	return this
 }
 
-// _parse_unary (parser.py L6197).
 func (p *Parser) parseUnary() *Expr {
 	if chunkDMatchKey(p, p.s.UNARY_PARSERS) {
 		return p.s.UNARY_PARSERS[p.prev.Type](p)
@@ -502,7 +652,9 @@ func (p *Parser) parseUnary() *Expr {
 	return p.parseType(true, false)
 }
 
-// _parse_type (parser.py L6202).
+// baseParseType parses an atom, an interval, a typed literal such as DATE '2020-01-01' (a cast)
+// or a type constructor, and otherwise falls back to a column, or to an identifier when
+// fallbackToIdentifier is set (atoms are then skipped).
 func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *Expr {
 	if !fallbackToIdentifier {
 		if atom := p.parseAtom(); atom != nil {
@@ -519,11 +671,12 @@ func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *E
 	index := p.index
 	dataType := p.parseTypes(true, false, false, false)
 
-	// parse_types() returns a Cast if we parsed BQ's inline constructor <type>(<values>) e.g.
+	// parseTypes returns a Cast if we parsed BQ's inline constructor <type>(<values>) e.g.
 	// STRUCT<a INT, b STRING>(1, 'foo'), which is canonicalized to CAST(<values> AS <type>)
 	if dataType.IsA(KCast) {
 		// This constructor can contain ops directly after it, for instance struct unnesting:
-		// STRUCT<a INT, b STRING>(1, 'foo').* --> CAST(STRUCT(1, 'foo') AS STRUCT<a iNT, b STRING).*
+		// STRUCT<a INT, b STRING>(1, 'foo').* -->
+		// CAST(STRUCT(1, 'foo') AS STRUCT<a INT, b STRING>).*
 		return p.parseColumnOps(dataType)
 	}
 
@@ -535,14 +688,16 @@ func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *E
 			literal := this.Name()
 			this = p.parseColumnOps(this)
 
-			if parser, ok := p.s.TYPE_LITERAL_PARSERS[dataType.DTypeOf()]; ok && parser != nil {
-				return parser(p, this, dataType)
+			if p.s.ZONE_AWARE_TIMESTAMP_CONSTRUCTOR && chunkDTimeZoneRE.MatchString(literal) {
+				if chunkDIsType(dataType, DT_TIMESTAMP) {
+					dataType = NewDataType(DT_TIMESTAMPTZ)
+				} else if chunkDIsType(dataType, DT_TIME) {
+					dataType = NewDataType(DT_TIMETZ)
+				}
 			}
 
-			if p.s.ZONE_AWARE_TIMESTAMP_CONSTRUCTOR &&
-				chunkDIsType(dataType, DT_TIMESTAMP) &&
-				chunkDTimeZoneRE.MatchString(literal) {
-				dataType = NewDataType(DT_TIMESTAMPTZ)
+			if parser, ok := p.s.TYPE_LITERAL_PARSERS[dataType.DTypeOf()]; ok && parser != nil {
+				return parser(p, this, dataType)
 			}
 
 			return p.expression(New(KCast, "this", this, "to", dataType))
@@ -556,7 +711,7 @@ func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *E
 		//
 		// If it's not greater than 1, then it must be 1, because we've consumed at least the type
 		// keyword, meaning that the expressions arg of the DataType must have gotten set by a
-		// callable in the TYPE_CONVERTERS mapping. For example, Snowflake converts DECIMAL to
+		// converter in the TYPE_CONVERTERS mapping. For example, Snowflake converts DECIMAL to
 		// DECIMAL(38, 0)) in order to facilitate the data type's transpilation.
 		//
 		// In these cases, we don't really want to return the converted type, but instead retreat
@@ -576,7 +731,8 @@ func (p *Parser) baseParseType(parseInterval bool, fallbackToIdentifier bool) *E
 	return p.parseColumn()
 }
 
-// _parse_type_size (parser.py L6266).
+// parseTypeSize parses one data type parameter, such as 10 in VARCHAR(10), with an optional
+// trailing keyword (VARCHAR2(10 BYTE)).
 func (p *Parser) parseTypeSize() *Expr {
 	this := p.parseType(true, false)
 	if this == nil {
@@ -590,7 +746,8 @@ func (p *Parser) parseTypeSize() *Expr {
 	return p.expression(New(KDataTypeParam, "this", this, "expression", p.parseVar(true, nil, false)))
 }
 
-// _parse_user_defined_type (parser.py L6278).
+// baseParseUserDefinedType parses a dotted user-defined type name that starts with identifier;
+// a missing part after a dot is written as None.
 func (p *Parser) baseParseUserDefinedType(identifier *Expr) *Expr {
 	typeName := identifier.Name()
 
@@ -605,12 +762,17 @@ func (p *Parser) baseParseUserDefinedType(identifier *Expr) *Expr {
 	return chunkDDataTypeFromStr(typeName, p.d, true)
 }
 
-// _parse_types (parser.py L6286).
+// baseParseTypes parses a data type: parameters, nested and struct types (ARRAY<INT>,
+// STRUCT<a INT>), inline constructors such as STRUCT<a INT>(1), time zone suffixes, UNSIGNED,
+// array suffixes (INT[3], INT ARRAY) and COLLATE (with withCollation). With checkFunc, a type
+// with parentheses counts only when a string literal follows, as in DECIMAL(10, 2) '1.5', so
+// that function calls are not taken for types. It returns nil, with the position restored,
+// when there is no type.
 func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bool, withCollation bool) *Expr {
 	index := p.index
 	var this *Expr
 
-	// TK_SENTINEL stands for Python's `type_token = None` (it is never a member of any type set).
+	// TK_SENTINEL means there is no type token (it is never a member of any type set).
 	var typeToken TokenType
 	if p.matchSet(p.s.TYPE_TOKENS) {
 		typeToken = p.prev.Type
@@ -620,7 +782,11 @@ func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bo
 		if allowIdentifiers {
 			identifier = p.parseIdVar(false, tsPtr(newTokenSet(TK_VAR)))
 		}
-		if identifier.IsA(KIdentifier) {
+		if identifier.IsA(KIdentifier) && identifier.ArgB("quoted") && p.s.QUOTED_TYPES_TO_PRESERVE.Has(identifier.Name()) {
+			// a quoted name that denotes another type than the built-in one of the same name,
+			// e.g. Postgres' one-byte "char", stays a user-defined type
+			this = DataTypeBuild(identifier, p.d, true, false)
+		} else if identifier.IsA(KIdentifier) {
 			tokens, err := p.d.Tokenize(identifier.Name())
 			if err != nil {
 				if _, ok := err.(*TokenError); !ok {
@@ -682,7 +848,7 @@ func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bo
 	nested := p.s.NESTED_TYPE_TOKENS.Has(typeToken)
 	isStruct := p.s.STRUCT_TYPE_TOKENS.Has(typeToken)
 	isAggregate := p.s.AGGREGATE_TYPE_TOKENS.Has(typeToken)
-	// expressions is None in Python until assigned (exprsNone tracks that).
+	// exprsNone tracks whether expressions is still unset; unset is stored as nil, not as [].
 	var expressions []*Expr
 	exprsNone := true
 	maybeFunc := false
@@ -738,7 +904,7 @@ func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bo
 		maybeFunc = true
 	}
 
-	// values is None in Python until assigned (valuesNone tracks that).
+	// valuesNone tracks whether values is still unset (no constructor values were parsed).
 	var values []*Expr
 	valuesNone := true
 
@@ -789,6 +955,10 @@ func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bo
 			this = New(KDataType, "this", DT_TIMESTAMPLTZ, "expressions", exprsArg())
 		} else if p.matchTextSeq("WITHOUT", "TIME", "ZONE") {
 			maybeFunc = false
+			// a TIMESTAMP that the dialect tokenizes as TIMESTAMPTZ (e.g. Databricks)
+			if typeToken == TK_TIMESTAMPTZ {
+				typeToken = TK_TIMESTAMPNTZ
+			}
 		}
 	} else if typeToken == TK_INTERVAL {
 		if p.d.S.VALID_INTERVAL_UNITS.Has(upperText(p.curr)) {
@@ -883,8 +1053,9 @@ func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bo
 			(!p.d.S.SUPPORTS_FIXED_SIZE_ARRAYS ||
 				datatypeToken == TK_ARRAY ||
 				!p.matchNoAdvance(TK_R_BRACKET)) {
-			// Retreating here means that we should not parse the following values as part of the data type, e.g. in DuckDB
-			// ARRAY[1] should retreat and instead be parsed into exp.Array in contrast to INT[x][y] which denotes a fixed-size array data type
+			// Retreating here means that we should not parse the following values as part of the
+			// data type, e.g. in DuckDB ARRAY[1] should retreat and instead be parsed into an
+			// Array, in contrast to INT[x][y] which denotes a fixed-size array data type
 			p.retreat(index)
 			break
 		}
@@ -918,8 +1089,7 @@ func (p *Parser) baseParseTypes(checkFunc bool, schema bool, allowIdentifiers bo
 	return this
 }
 
-// _parse_json_type_arg (parser.py L6541)
-// Parse a single argument to ClickHouse's JSON type.
+// parseJsonTypeArg parses a single argument to ClickHouse's JSON type.
 func (p *Parser) parseJsonTypeArg() *Expr {
 	// SKIP col or SKIP REGEXP 'pattern'
 	if p.matchTextSeq("SKIP") {
@@ -949,13 +1119,15 @@ func (p *Parser) parseJsonTypeArg() *Expr {
 	return p.expression(New(KColumnDef, "this", col, "kind", kind))
 }
 
-// _parse_vector_expressions (parser.py L6567).
+// parseVectorExpressions turns the first VECTOR parameter, the element type name, into a
+// DataType.
 func (p *Parser) parseVectorExpressions(expressions []*Expr) []*Expr {
 	out := []*Expr{chunkDDataTypeFromStr(expressions[0].Name(), p.d, false)}
 	return append(out, expressions[1:]...)
 }
 
-// _parse_struct_types (parser.py L6570).
+// baseParseStructTypes parses one struct field, name [:] type. With typeRequired, a field
+// without a type is parsed again as a bare type.
 func (p *Parser) baseParseStructTypes(typeRequired bool) *Expr {
 	index := p.index
 
@@ -986,7 +1158,6 @@ func (p *Parser) baseParseStructTypes(typeRequired bool) *Expr {
 	return p.parseColumnDef(this, true)
 }
 
-// _parse_at_time_zone (parser.py L6600).
 func (p *Parser) parseAtTimeZone(this *Expr) *Expr {
 	if !p.matchTextSeq("AT", "TIME", "ZONE") {
 		return this
@@ -994,10 +1165,6 @@ func (p *Parser) parseAtTimeZone(this *Expr) *Expr {
 	return p.parseAtTimeZone(p.expression(New(KAtTimeZone, "this", this, "zone", p.parseUnary())))
 }
 
-// ---------------------------------------------------------------------------
-// Helpers (ports of expression builders used by this chunk).
-
-// chunkDDTypeByName maps DType member names to values (exp.DType[name]).
 var chunkDDTypeByName = func() map[string]DType {
 	m := make(map[string]DType, numDTypes)
 	for i := 1; i < numDTypes; i++ {
@@ -1008,11 +1175,11 @@ var chunkDDTypeByName = func() map[string]DType {
 	return m
 }()
 
-// chunkDDTypeOfToken mirrors exp.DType[type_token.name] (raises KeyError if missing).
+// chunkDDTypeOfToken returns the DType named like the token type tt. TK_SENTINEL and names
+// without a DType panic.
 func chunkDDTypeOfToken(tt TokenType) DType {
 	name := tt.Name()
 	if tt == TK_SENTINEL {
-		// Python would fail the `assert type_token is not None` here.
 		panic(&ValueError{Msg: "AssertionError"})
 	}
 	dt, ok := chunkDDTypeByName[name]
@@ -1022,7 +1189,8 @@ func chunkDDTypeOfToken(tt TokenType) DType {
 	return dt
 }
 
-// chunkDIsType mirrors DataType.is_type(dtype) for a single DType argument.
+// chunkDIsType reports whether dataType has the given type; user-defined types must match
+// exactly.
 func chunkDIsType(dataType *Expr, dtype DType) bool {
 	other := NewDataType(dtype)
 	if dataType.DTypeOf() == DT_USERDEFINED {
@@ -1034,7 +1202,8 @@ func chunkDIsType(dataType *Expr, dtype DType) bool {
 	return false
 }
 
-// chunkDDataTypeFromStr mirrors exp.DataType.from_str(dtype, dialect=d, udt=udt).
+// chunkDDataTypeFromStr parses a type string with d. With udt, a string that does not parse
+// becomes a user-defined type instead of a parse error.
 func chunkDDataTypeFromStr(dtype string, d *Dialect, udt bool) *Expr {
 	if pyUpper(dtype) == "UNKNOWN" {
 		return New(KDataType, "this", DT_UNKNOWN)
@@ -1053,11 +1222,10 @@ func chunkDDataTypeFromStr(dtype string, d *Dialect, udt bool) *Expr {
 	return result
 }
 
-// chunkDCast mirrors exp.cast(expression, to, copy=False) where `expression` is not a Cast
-// and `to` is a DataType instance.
+// chunkDCast casts expression, which must not be a Cast, to the DataType to, without copying.
 func chunkDCast(expression *Expr, to *Expr) *Expr {
 	if expression.IsA(KCast) {
-		// sqlglot avoids re-casting here; this path is never taken by the parser call sites.
+		// re-casting a Cast is not supported; the parser call sites never get here.
 		panic(&ValueError{Msg: "chunkDCast: re-casting a Cast is not supported"})
 	}
 	cast := New(KCast, "this", expression, "to", to)
@@ -1065,12 +1233,12 @@ func chunkDCast(expression *Expr, to *Expr) *Expr {
 	return cast
 }
 
-// chunkDSubquery mirrors Query.subquery(copy=False) with no alias.
+// chunkDSubquery wraps query in a Subquery without an alias and without copying.
 func chunkDSubquery(query *Expr) *Expr {
 	return New(KSubquery, "this", query, "alias", nil)
 }
 
-// chunkDPyNum is a Python int or decimal.Decimal value produced by Literal.to_py().
+// chunkDPyNum is the value of a numeric literal: an arbitrary-precision integer or a decimal.
 type chunkDPyNum struct {
 	isInt bool
 	i     *big.Int
@@ -1080,14 +1248,15 @@ type chunkDPyNum struct {
 	exp   int
 }
 
-// chunkDToPyNumber mirrors Literal.to_py() / Neg.to_py() for numeric literals.
+// chunkDToPyNumber returns the value of a numeric literal, or of a negated one. A number that does
+// not parse panics; the message keeps its historical wording.
 func chunkDToPyNumber(e *Expr) chunkDPyNum {
 	if e.IsA(KNeg) {
 		v := chunkDToPyNumber(e.This())
 		if v.isInt {
 			return chunkDPyNum{isInt: true, i: new(big.Int).Neg(v.i)}
 		}
-		// Decimal * -1: flip sign, then round to the default context precision (28 digits).
+		// negating a decimal flips the sign, then rounds to 28 significant digits
 		v.neg = !v.neg
 		v.coeff, v.exp = chunkDDecimalRound(v.coeff, v.exp, 28)
 		return v
@@ -1106,7 +1275,8 @@ func chunkDToPyNumber(e *Expr) chunkDPyNum {
 	return v
 }
 
-// chunkDParseDecimal mirrors decimal.Decimal(str) for finite values.
+// chunkDParseDecimal parses a finite decimal number: optional sign, digits with an optional point
+// and an optional exponent. Surrounding whitespace and underscores are ignored.
 func chunkDParseDecimal(s string) (chunkDPyNum, bool) {
 	s = strings.ReplaceAll(pyStrip(s), "_", "")
 	v := chunkDPyNum{}
@@ -1147,7 +1317,8 @@ func chunkDParseDecimal(s string) (chunkDPyNum, bool) {
 	return v, true
 }
 
-// chunkDDecimalRound mirrors Decimal._fix rounding (ROUND_HALF_EVEN) to `prec` digits.
+// chunkDDecimalRound rounds a decimal coefficient to prec significant digits, half to even, and
+// adjusts the exponent.
 func chunkDDecimalRound(coeff string, exp int, prec int) (string, int) {
 	if len(coeff) <= prec {
 		return coeff, exp
@@ -1177,7 +1348,8 @@ func chunkDDecimalRound(coeff string, exp int, prec int) (string, int) {
 	return kept, exp
 }
 
-// String mirrors str() of the Python int / Decimal.
+// String formats the number: integers in full, decimals in plain notation or, when the exponent
+// is positive or the magnitude is below 1e-6, in scientific notation (1E+3, 1E-7).
 func (v chunkDPyNum) String() string {
 	if v.isInt {
 		return v.i.String()
@@ -1216,11 +1388,10 @@ func (v chunkDPyNum) String() string {
 	return sign + intpart + fracpart + exp
 }
 
-// chunkDPyNumberStr mirrors str(expression.to_py()) for a numeric literal.
 func chunkDPyNumberStr(e *Expr) string { return chunkDToPyNumber(e).String() }
 
-// chunkDLiteralToPy mirrors expression.to_py() for a numeric literal, as an arg value:
-// an int when it fits, otherwise the str() of the Python value.
+// chunkDLiteralToPy returns the value of a numeric literal as an arg value: an int when it is an
+// integer that fits, otherwise the formatted number.
 func chunkDLiteralToPy(e *Expr) any {
 	v := chunkDToPyNumber(e)
 	if v.isInt && v.i.IsInt64() {

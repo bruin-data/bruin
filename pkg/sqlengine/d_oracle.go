@@ -1,15 +1,10 @@
 package sqlengine
 
-// Port of sqlglot/dialects/oracle.py, sqlglot/parsers/oracle.py and sqlglot/generators/oracle.py
-// (sqlglot v30.13.0). Data-only class attributes live in the generated zz_*_settings.go files.
-
 func init() { registerCustomizer("oracle", customizeOracle) }
 
 func customizeOracle(d *Dialect) {
-	// ---- Dialect class ----
 	d.hooks.canQuote = oracleCanQuote
 
-	// ---- OracleParser ----
 	P := d.P
 
 	delete(P.FUNCTIONS, "TO_BOOLEAN")
@@ -21,9 +16,11 @@ func customizeOracle(d *Dialect) {
 	}
 	P.FUNCTIONS["TO_CHAR"] = buildTimetostrOrTochar
 	P.FUNCTIONS["TO_TIMESTAMP"] = oracleBuildToTimestamp
-	P.FUNCTIONS["TO_DATE"] = buildFormattedTime(KStrToDate, "", nil)
-	P.FUNCTIONS["TRUNC"] = func(args []*Expr, d *Dialect) *Expr {
-		return buildTrunc(args, d, false, "DD", true, false)
+	P.FUNCTIONS["TO_DATE"] = oracleBuildStrToTime(KStrToDate)
+	P.FUNCTIONS["TRUNC"] = oracleBuildFormattedTrunc
+	// Oracle's VARIANCE returns 0 instead of NULL for a single value, unlike VAR_SAMP
+	P.FUNCTIONS["VARIANCE"] = func(args []*Expr, _ *Dialect) *Expr {
+		return New(KVariance, "this", seqGet(args, 0), "single_value_returns_zero", true)
 	}
 
 	P.NO_PAREN_FUNCTION_PARSERS["NEXT"] = func(p *Parser) *Expr { return p.parseNextValueFor() }
@@ -39,6 +36,7 @@ func customizeOracle(d *Dialect) {
 	P.FUNCTION_PARSERS["JSON_ARRAY"] = oracleParseOracleJSONArray
 	P.FUNCTION_PARSERS["JSON_ARRAYAGG"] = oracleParseOracleJSONArrayagg
 	P.FUNCTION_PARSERS["JSON_EXISTS"] = oracleParseJSONExists
+	P.FUNCTION_PARSERS["JSON_VALUE"] = func(p *Parser) *Expr { return p.parseJsonValue(true) }
 	P.FUNCTION_PARSERS["LISTAGG"] = func(p *Parser) *Expr { return p.parseStringAgg() }
 	P.FUNCTION_PARSERS["TO_NUMBER"] = oracleParseToNumber
 
@@ -57,6 +55,15 @@ func customizeOracle(d *Dialect) {
 	P.PROPERTY_PARSERS["FORCE"] = noKwargsE(func(p *Parser) *Expr {
 		return p.expression(New(KForceProperty))
 	})
+	for _, name := range []string{"PCTFREE", "PCTUSED", "INITRANS", "MAXTRANS"} {
+		P.PROPERTY_PARSERS[name] = noKwargsE(oracleParsePhysicalProperty)
+	}
+	for _, name := range []string{"LOGGING", "NOLOGGING"} {
+		P.PROPERTY_PARSERS[name] = noKwargsE(func(p *Parser) *Expr {
+			return p.expression(New(KPhysicalProperty, "this", upperText(p.prev)))
+		})
+	}
+	P.PROPERTY_PARSERS["STORAGE"] = noKwargsE(oracleParseStorage)
 
 	P.QUERY_MODIFIER_PARSERS[TK_ORDER_SIBLINGS_BY] = func(p *Parser) (string, any) {
 		return "order", anyExpr(p.parseOrder(nil, false))
@@ -82,10 +89,8 @@ func customizeOracle(d *Dialect) {
 	P.h.parseColumnOps = oracleParseColumnOps
 	P.h.parseInsertTable = oracleParseInsertTable
 
-	// ---- OracleGenerator ----
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module level)
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
@@ -98,33 +103,44 @@ func customizeOracle(d *Dialect) {
 	G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS = keys
 
 	T := G.TRANSFORMS
+	T[KPivot] = transformPreprocess([]func(*Expr) *Expr{transformUnqualifyPivotFields}, nil)
 	T[KGroupConcat] = func(g *Generator, e *Expr) string {
 		return groupconcatSQL(g, e, "LISTAGG", ",", true, true)
 	}
 	T[KDateStrToDate] = func(g *Generator, e *Expr) string {
 		return g.fn("TO_DATE", e.Arg("this"), LiteralString("YYYY-MM-DD"))
 	}
-	T[KDateTrunc] = func(g *Generator, e *Expr) string {
-		return g.fn("TRUNC", e.Arg("this"), e.ArgE("unit"))
-	}
+	T[KDateTrunc] = oracleDateTruncSQL
 	T[KEuclideanDistance] = renameFunc("L2_DISTANCE")
+	// VARIANCE returns 0 for a single value, where VAR_SAMP returns NULL
+	T[KVariance] = func(g *Generator, e *Expr) string {
+		if e.ArgB("single_value_returns_zero") {
+			return g.fn("VARIANCE", e.This())
+		}
+		if e.This().IsA(KDistinct) {
+			g.unsupported("Oracle's VAR_SAMP does not support DISTINCT")
+		}
+		return g.fn("VAR_SAMP", e.This())
+	}
 	T[KILike] = noIlikeSQL
 	T[KLogicalOr] = renameFunc("MAX")
 	T[KLogicalAnd] = renameFunc("MIN")
 	T[KMod] = renameFunc("MOD")
+	T[KNthValue] = nthValueFromSQL
 	T[KRand] = renameFunc("DBMS_RANDOM.VALUE")
 	T[KSelect] = transformPreprocess([]func(*Expr) *Expr{
 		transformEliminateDistinctOn,
 		transformEliminateQualify,
+		transformEliminateSemiAndAntiJoins,
 	}, nil)
 	T[KStrPosition] = func(g *Generator, e *Expr) string {
 		return strpositionSQL(g, e, "INSTR", true, true, true)
 	}
 	T[KStrToTime] = func(g *Generator, e *Expr) string {
-		return g.fn("TO_TIMESTAMP", e.Arg("this"), oracleFormatTimeArg(g, e))
+		return g.fn("TO_TIMESTAMP", e.Arg("this"), oracleFormatTimeArg(g, e), e.Arg("nlsparam"))
 	}
 	T[KStrToDate] = func(g *Generator, e *Expr) string {
-		return g.fn("TO_DATE", e.Arg("this"), oracleFormatTimeArg(g, e))
+		return g.fn("TO_DATE", e.Arg("this"), oracleFormatTimeArg(g, e), e.Arg("nlsparam"))
 	}
 	T[KSubquery] = func(g *Generator, e *Expr) string { return g.subquerySQL(e, " ") }
 	T[KSubstring] = renameFunc("SUBSTR")
@@ -150,13 +166,20 @@ func customizeOracle(d *Dialect) {
 	}
 	T[KUtcTimestamp] = renameFunc("UTC_TIMESTAMP")
 	T[KUtcTime] = renameFunc("UTC_TIME")
+	T[KVariancePop] = renameFunc("VAR_POP")
+	T[KApproxDistinct] = approxCountDistinctSQL
 	T[KSystimestamp] = func(_ *Generator, _ *Expr) string { return "SYSTIMESTAMP" }
 
 	G.methods[KCurrentTimestamp] = oracleCurrenttimestampSQL
 	G.methods[KCoalesce] = oracleCoalesceSQL
 	G.methods[KIsAscii] = oracleIsasciiSQL
+	G.methods[KPhysicalProperty] = oraclePhysicalpropertySQL
+	G.methods[KStorageProperty] = func(g *Generator, e *Expr) string {
+		return "STORAGE (" + g.expressions(e, exprsOpts{sep: strp2(" "), flat: true}) + ")"
+	}
 
 	G.h.offsetSQL = oracleOffsetSQL
+	G.h.versionSQL = oracleVersionSQL
 	G.h.addColumnSQL = oracleAddColumnSQL
 	G.h.queryoptionSQL = oracleQueryoptionSQL
 	G.h.intoSQL = oracleIntoSQL
@@ -166,35 +189,202 @@ func customizeOracle(d *Dialect) {
 	G.h.columndefSQL = oracleColumndefSQL
 }
 
-// ---------------------------------------------------------------------------------------------
-// Dialect
+var oracleStorageOptions = []string{
+	"INITIAL", "NEXT", "MINEXTENTS", "MAXEXTENTS", "MAXSIZE", "PCTINCREASE", "FREELISTS", "FREELIST",
+	"BUFFER_POOL", "FLASH_CACHE", "CELL_FLASH_CACHE",
+}
 
-// oracleCanQuote mirrors Oracle.can_quote.
+func oracleParsePhysicalProperty(p *Parser) *Expr {
+	name := upperText(p.prev)
+	value := p.parseNumber()
+	if value == nil {
+		p.raiseError("Expected value for "+name, nil)
+	}
+	return p.expression(New(KPhysicalProperty, "this", name, "value", value))
+}
+
+// oracleParseStorage parses STORAGE (option value ...): sizes may carry a K, M, G, T, P or E
+// suffix, MAXEXTENTS and MAXSIZE may be UNLIMITED, FREELIST is followed by GROUPS and the cache
+// options take KEEP, DEFAULT and RECYCLE (BUFFER_POOL) or NONE.
+func oracleParseStorage(p *Parser) *Expr {
+	parseOptions := func() []*Expr {
+		var options []*Expr
+		for p.matchTexts(oracleStorageOptions...) {
+			name := upperText(p.prev)
+			if name == "FREELIST" {
+				if !p.matchTextSeq("GROUPS") {
+					p.raiseError("Expected GROUPS after FREELIST", nil)
+				}
+				name = "FREELIST GROUPS"
+			}
+
+			var value *Expr
+			switch {
+			case name == "BUFFER_POOL" || name == "FLASH_CACHE" || name == "CELL_FLASH_CACHE":
+				last := "NONE"
+				if name == "BUFFER_POOL" {
+					last = "RECYCLE"
+				}
+				value = p.parseVarFromOptions(OptionsType{"KEEP": {}, "DEFAULT": {}, last: {}}, true)
+			case (name == "MAXEXTENTS" || name == "MAXSIZE") && p.matchTextSeq("UNLIMITED"):
+				value = VarExpr("UNLIMITED")
+			default:
+				value = p.parseNumber()
+				if value != nil && (name == "INITIAL" || name == "NEXT" || name == "MAXSIZE") &&
+					p.matchTexts("K", "M", "G", "T", "P", "E") {
+					value = VarExpr(value.Name() + upperText(p.prev))
+				}
+			}
+			if value == nil {
+				p.raiseError("Expected value for "+name, nil)
+			}
+			options = append(options, p.expression(New(KPhysicalProperty, "this", name, "value", value)))
+		}
+		return options
+	}
+
+	return p.expression(New(KStorageProperty, "expressions", p.parseWrappedList(parseOptions, false)))
+}
+
+func oraclePhysicalpropertySQL(g *Generator, e *Expr) string {
+	if value := g.sqlKey(e, "value"); value != "" {
+		return e.Name() + " " + value
+	}
+	return e.Name()
+}
+
+// oracleDateTruncSQL renders a DateTrunc as TRUNC(this, format), turning its date part into the
+// matching format model (e.g. 'QUARTER' -> 'Q'). A week starting on Monday is 'IW', any other
+// week 'DAY'.
+func oracleDateTruncSQL(g *Generator, e *Expr) string {
+	dhUnsupportedArgs(g, e, "zone")
+	unit := e.ArgE("unit")
+	if unit.IsA(KWeekStart) {
+		if pyUpper(unit.This().Name()) == "MONDAY" {
+			unit = LiteralString("IW")
+		} else {
+			g.weekstartName(unit)
+			unit = LiteralString("DAY")
+		}
+	} else if unit.IsA(KLiteral, KVar) {
+		name := pyUpper(unit.Name())
+		if mapped, ok := oracleUnitToTruncFormat[name]; ok {
+			unit = LiteralString(mapped)
+		} else {
+			g.unsupported("Unexpected interval unit: " + name)
+		}
+	}
+
+	return g.fn("TRUNC", e.Arg("this"), unit)
+}
+
 func oracleCanQuote(d *Dialect, id *Expr, identify string) bool {
 	// Disable quoting for pseudocolumns as it may break queries e.g
 	// `WHERE "ROWNUM" = ...` does not work but `WHERE ROWNUM = ...` does
 	return (id.ArgB("quoted") || !id.Parent().IsA(KPseudocolumn)) && d.baseCanQuote(id, identify)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Parser
+var oracleTruncFormatToUnit = map[string]string{
+	"CC":    "CENTURY",
+	"SCC":   "CENTURY",
+	"SYYYY": "YEAR",
+	"SYYY":  "YEAR",
+	"YYYY":  "YEAR",
+	"YEAR":  "YEAR",
+	"SYEAR": "YEAR",
+	"YYY":   "YEAR",
+	"YY":    "YEAR",
+	"Y":     "YEAR",
+	"IYYY":  "ISOYEAR",
+	"IYY":   "ISOYEAR",
+	"IY":    "ISOYEAR",
+	"I":     "ISOYEAR",
+	"Q":     "QUARTER",
+	"MONTH": "MONTH",
+	"MON":   "MONTH",
+	"MM":    "MONTH",
+	"RM":    "MONTH",
+	"DAY":   "WEEK",
+	"DY":    "WEEK",
+	"D":     "WEEK",
+	"IW":    "ISOWEEK",
+	// These weeks are anchored to the first day of the month/year, not a fixed weekday.
+	"W":    "WEEK_OF_MONTH",
+	"WW":   "WEEK_OF_YEAR",
+	"DDD":  "DAY",
+	"DD":   "DAY",
+	"J":    "DAY",
+	"HH":   "HOUR",
+	"HH12": "HOUR",
+	"HH24": "HOUR",
+	"MI":   "MINUTE",
+	"SS":   "SECOND",
+}
 
-// oracleBuildToTimestamp mirrors parsers/oracle.py:_build_to_timestamp.
+var oracleUnitToTruncFormat = map[string]string{
+	"CENTURY":       "CC",
+	"YEAR":          "YEAR",
+	"YY":            "YEAR",
+	"YYYY":          "YEAR",
+	"ISOYEAR":       "IYYY",
+	"QUARTER":       "Q",
+	"MONTH":         "MONTH",
+	"MM":            "MONTH",
+	"MON":           "MONTH",
+	"WEEK":          "IW",
+	"WEEK_OF_MONTH": "W",
+	"WEEK_OF_YEAR":  "WW",
+	"ISOWEEK":       "IW",
+	"DAY":           "DD",
+	"HOUR":          "HH",
+	"MINUTE":        "MI",
+}
+
+// oracleWeekDays lists the week days in ISO order, Monday (1) to Sunday (7).
+var oracleWeekDays = []string{"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"}
+
+// oracleBuildFormattedTrunc builds TRUNC, turning a date TRUNC's format model into the date part
+// it truncates to (e.g. 'MM' -> 'MONTH'). The week formats become a WeekStart: IW weeks start on
+// Monday, DAY/DY/D weeks on the dialect's first week day.
+func oracleBuildFormattedTrunc(args []*Expr, d *Dialect) *Expr {
+	trunc := buildTrunc(args, d, false, "DD", true, false)
+	if unit := trunc.ArgE("unit"); trunc.IsA(KDateTrunc) && unit.IsString() {
+		mapped := oracleTruncFormatToUnit[pyUpper(unit.Name())]
+		if mapped == "ISOWEEK" || (mapped == "WEEK" && d.S.WEEK_OFFSET != 0) {
+			start := 1
+			if mapped == "WEEK" {
+				start = weekOffsetToDow(d.S.WEEK_OFFSET)
+			}
+			trunc.Set("unit", New(KWeekStart, "this", VarChecked(oracleWeekDays[start-1])))
+		} else if mapped != "" {
+			trunc.Set("unit", LiteralString(mapped))
+		}
+	}
+	return trunc
+}
+
 func oracleBuildToTimestamp(args []*Expr, d *Dialect) *Expr {
 	if len(args) == 1 {
 		return New(KAnonymous, "this", "TO_TIMESTAMP", "expressions", args)
 	}
 
-	return buildFormattedTime(KStrToTime, "", nil)(args, d)
+	return oracleBuildStrToTime(KStrToTime)(args, d)
 }
 
-// oracleBuildToTimestampFmtStr mirrors _build_to_timestamp([this, '"<fmt>"'], dialect), where the
-// format is a (quoted) Python string rather than an expression.
+func oracleBuildStrToTime(kind Kind) FuncBuilder {
+	return func(args []*Expr, d *Dialect) *Expr {
+		expression := buildFormattedTime(kind, "", nil)(args, d)
+		expression.Set("nlsparam", seqGet(args, 2))
+		return expression
+	}
+}
+
+// oracleBuildToTimestampFmtStr builds a StrToTime for this with a fixed format; quotedFmt is a
+// double-quoted format string rather than an expression.
 func oracleBuildToTimestampFmtStr(this *Expr, quotedFmt string, d *Dialect) *Expr {
 	return New(KStrToTime, "this", this, "format", d.formatTimeStr(quotedFmt))
 }
 
-// _parse_to_number (parsers/oracle.py L105).
 func oracleParseToNumber(p *Parser) *Expr {
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/TO_NUMBER.html
 	this := p.parseBitwise()
@@ -216,7 +406,8 @@ func oracleParseToNumber(p *Parser) *Expr {
 	return p.expression(New(KToNumber, "this", this, "format", fmt, "nlsparam", nlsparam, "default", def))
 }
 
-// _parse_dbms_random (parsers/oracle.py L125).
+// oracleParseDbmsRandom parses DBMS_RANDOM.VALUE[(lower, upper)] into a Rand; for anything else
+// it steps back over DBMS_RANDOM and returns nil.
 func oracleParseDbmsRandom(p *Parser) *Expr {
 	if p.matchTextSeq(".", "VALUE") {
 		var lower, upper *Expr
@@ -234,23 +425,20 @@ func oracleParseDbmsRandom(p *Parser) *Expr {
 	return nil
 }
 
-// _parse_oracle_json_array (parsers/oracle.py L138).
 func oracleParseOracleJSONArray(p *Parser) *Expr {
 	expressions := p.parseCSV(func() *Expr { return p.parseFormatJson(p.parseBitwise()) }, TK_COMMA)
 	return oracleParseJSONArray(p, KJSONArray, "expressions", expressions)
 }
 
-// _parse_oracle_json_arrayagg (parsers/oracle.py L144).
 func oracleParseOracleJSONArrayagg(p *Parser) *Expr {
 	this := p.parseFormatJson(p.parseBitwise())
 	order := p.parseOrder(nil, false)
 	return oracleParseJSONArray(p, KJSONArrayAgg, "this", this, "order", order)
 }
 
-// _parse_json_array (parsers/oracle.py L151). kwargs are key/value pairs evaluated by the caller.
 func oracleParseJSONArray(p *Parser, kind Kind, kwargs ...any) *Expr {
 	nullHandling := p.parseOnHandling("NULL", "NULL", "ABSENT")
-	// self._match_text_seq("RETURNING") and self._parse_type() -> False when unmatched
+	// false (not nil) when RETURNING is absent.
 	var returnType any = false
 	if p.matchTextSeq("RETURNING") {
 		returnType = p.parseType(true, false)
@@ -260,7 +448,6 @@ func oracleParseJSONArray(p *Parser, kind Kind, kwargs ...any) *Expr {
 	return p.expression(New(kind, args...))
 }
 
-// _parse_hint_function_call (parsers/oracle.py L161).
 func oracleParseHintFunctionCall(p *Parser) *Expr {
 	if !p.curr.ok() || !p.next.ok() || p.next.Type != TK_L_PAREN {
 		return nil
@@ -275,7 +462,6 @@ func oracleParseHintFunctionCall(p *Parser) *Expr {
 	return this
 }
 
-// _parse_hint_args (parsers/oracle.py L173).
 func oracleParseHintArgs(p *Parser) []*Expr {
 	args := []*Expr{}
 	result := p.parseVar(false, nil, false)
@@ -288,7 +474,6 @@ func oracleParseHintArgs(p *Parser) []*Expr {
 	return args
 }
 
-// _parse_query_restrictions (parsers/oracle.py L183).
 func oracleParseQueryRestrictions(p *Parser) *Expr {
 	kind := p.parseVarFromOptions(p.s.QUERY_RESTRICTIONS, false)
 
@@ -296,7 +481,7 @@ func oracleParseQueryRestrictions(p *Parser) *Expr {
 		return nil
 	}
 
-	// self._match(TokenType.CONSTRAINT) and self._parse_field() -> False when unmatched
+	// false (not nil) when CONSTRAINT is absent.
 	var expression any = false
 	if p.match(TK_CONSTRAINT) {
 		expression = p.parseField(false, nil, false)
@@ -304,12 +489,11 @@ func oracleParseQueryRestrictions(p *Parser) *Expr {
 	return p.expression(New(KQueryOption, "this", kind, "expression", expression))
 }
 
-// _parse_json_exists (parsers/oracle.py L195).
 func oracleParseJSONExists(p *Parser) *Expr {
 	this := p.parseFormatJson(p.parseBitwise())
 	p.match(TK_COMMA)
 	path := p.d.toJSONPath(p.parseBitwise())
-	// self._match_text_seq("PASSING") and self._parse_csv(...) -> False when unmatched
+	// false (not nil) when PASSING is absent.
 	var passing any = false
 	if p.matchTextSeq("PASSING") {
 		passing = p.parseCSV(func() *Expr { return p.parseAlias(p.parseBitwise(), false) }, TK_COMMA)
@@ -324,7 +508,6 @@ func oracleParseJSONExists(p *Parser) *Expr {
 	))
 }
 
-// _parse_into (parsers/oracle.py L208).
 func oracleParseInto(p *Parser) *Expr {
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/lnpls/SELECT-INTO-statement.html
 	bulkCollect := p.match(TK_BULK_COLLECT_INTO)
@@ -349,12 +532,12 @@ func oracleParseInto(p *Parser) *Expr {
 	return p.expression(New(KInto, "bulk_collect", bc, "expressions", expressions))
 }
 
-// _parse_connect_with_prior (parsers/oracle.py L226).
 func oracleParseConnectWithPrior(p *Parser) *Expr {
 	return p.parseAssignment()
 }
 
-// _parse_column_ops (parsers/oracle.py L229).
+// oracleParseColumnOps extends the base column operators with interval expressions such as
+// (a - b) DAY TO SECOND, keeping the result only when it is a full interval span.
 func oracleParseColumnOps(p *Parser, this *Expr) *Expr {
 	this = p.baseParseColumnOps(this)
 
@@ -374,7 +557,6 @@ func oracleParseColumnOps(p *Parser, this *Expr) *Expr {
 	return this
 }
 
-// _parse_insert_table (parsers/oracle.py L245).
 func oracleParseInsertTable(p *Parser) *Expr {
 	// Oracle does not use AS for INSERT INTO alias
 	// https://docs.oracle.com/en/database/oracle/oracle-database/18/sqlrf/INSERT.html
@@ -382,24 +564,20 @@ func oracleParseInsertTable(p *Parser) *Expr {
 	this := p.parseTableParts(true, false, false, false)
 
 	if this.IsA(KTable) {
+		this.Set("partition", p.parsePartition())
+
 		aliasName := p.parseIdVar(false, nil)
 		if aliasName != nil {
 			this.Set("alias", New(KTableAlias, "this", aliasName))
 		}
 
-		this.Set("partition", p.parsePartition())
-
-		// Now parse the schema (column list) if present
 		return p.parseSchema(this)
 	}
 
 	return this
 }
 
-// ---------------------------------------------------------------------------------------------
-// Generator
-
-// oracleFormatTimeArg returns self.format_time(e) as a g.fn argument (nil for Python None).
+// oracleFormatTimeArg returns nil when e has no format, so g.fn drops the argument.
 func oracleFormatTimeArg(g *Generator, e *Expr) any {
 	if s := g.formatTime(e, nil, nil); s != "" {
 		return s
@@ -407,7 +585,6 @@ func oracleFormatTimeArg(g *Generator, e *Expr) any {
 	return nil
 }
 
-// _trim_sql (generators/oracle.py L14).
 func oracleTrimSQL(g *Generator, e *Expr) string {
 	position := e.ArgS("position")
 
@@ -421,7 +598,6 @@ func oracleTrimSQL(g *Generator, e *Expr) string {
 	return trimSQL(g, e, "")
 }
 
-// currenttimestamp_sql (generators/oracle.py L112).
 func oracleCurrenttimestampSQL(g *Generator, e *Expr) string {
 	if e.ArgB("sysdate") {
 		return "SYSDATE"
@@ -434,17 +610,22 @@ func oracleCurrenttimestampSQL(g *Generator, e *Expr) string {
 	return "CURRENT_TIMESTAMP"
 }
 
-// offset_sql (generators/oracle.py L119).
+// oracleVersionSQL renders a flashback query as AS OF SCN | TIMESTAMP value.
+func oracleVersionSQL(g *Generator, e *Expr) string {
+	if e.Text("kind") == "AS OF" {
+		return "AS OF " + e.Name() + " " + g.sqlKey(e, "expression")
+	}
+	return g.baseVersionSQL(e)
+}
+
 func oracleOffsetSQL(g *Generator, e *Expr) string {
 	return g.baseOffsetSQL(e) + " ROWS"
 }
 
-// add_column_sql (generators/oracle.py L122).
 func oracleAddColumnSQL(g *Generator, e *Expr) string {
 	return "ADD " + g.sql(e)
 }
 
-// queryoption_sql (generators/oracle.py L125).
 func oracleQueryoptionSQL(g *Generator, e *Expr) string {
 	option := g.sqlKey(e, "this")
 	value := g.sqlKey(e, "expression")
@@ -455,7 +636,6 @@ func oracleQueryoptionSQL(g *Generator, e *Expr) string {
 	return option + value
 }
 
-// coalesce_sql (generators/oracle.py L132).
 func oracleCoalesceSQL(g *Generator, e *Expr) string {
 	funcName := "COALESCE"
 	if e.ArgB("is_nvl") {
@@ -464,7 +644,6 @@ func oracleCoalesceSQL(g *Generator, e *Expr) string {
 	return renameFunc(funcName)(g, e)
 }
 
-// into_sql (generators/oracle.py L136).
 func oracleIntoSQL(g *Generator, e *Expr) string {
 	into := "INTO"
 	if e.ArgB("bulk_collect") {
@@ -477,7 +656,7 @@ func oracleIntoSQL(g *Generator, e *Expr) string {
 	return g.seg(into) + " " + g.expressions(e, exprsOpts{})
 }
 
-// hint_sql (generators/oracle.py L143).
+// oracleHintSQL renders a /*+ ... */ hint; function-style hints keep space-separated arguments.
 func oracleHintSQL(g *Generator, e *Expr) string {
 	var expressions []any
 
@@ -511,12 +690,10 @@ func oracleHintSQL(g *Generator, e *Expr) string {
 	return " /*+ " + pyStrip(g.expressions(nil, exprsOpts{sqls: expressions, hasSqls: true, sep: strp2(g.s.QUERY_HINT_SEP)})) + " */"
 }
 
-// isascii_sql (generators/oracle.py L155).
 func oracleIsasciiSQL(g *Generator, e *Expr) string {
 	return "NVL(REGEXP_LIKE(" + g.sql(e.Arg("this")) + ", '^[' || CHR(1) || '-' || CHR(127) || ']*$'), TRUE)"
 }
 
-// interval_sql (generators/oracle.py L158).
 func oracleIntervalSQL(g *Generator, e *Expr) string {
 	prefix := ""
 	if e.This().IsA(KLiteral) {
@@ -525,7 +702,6 @@ func oracleIntervalSQL(g *Generator, e *Expr) string {
 	return prefix + g.sqlKey(e, "this") + " " + g.sqlKey(e, "unit")
 }
 
-// tonumber_sql (generators/oracle.py L161).
 func oracleTonumberSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	def := g.sqlKey(e, "default")
@@ -536,7 +712,8 @@ func oracleTonumberSQL(g *Generator, e *Expr) string {
 	return g.fn("TO_NUMBER", this, e.Arg("format"), e.Arg("nlsparam"))
 }
 
-// columndef_sql (generators/oracle.py L171).
+// oracleColumndefSQL renders a column definition, moving an IN/OUT parameter mode between the name
+// and the type.
 func oracleColumndefSQL(g *Generator, e *Expr, sep string) string {
 	paramConstraint := e.Find(KInOutColumnConstraint)
 	if paramConstraint != nil {

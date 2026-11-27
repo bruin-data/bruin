@@ -41,7 +41,7 @@ func TestFreezeTimeContract(t *testing.T) {
 		{"tsql getdate", "SELECT GETDATE(), SYSDATETIME()", "tsql", "2024-02-03 04:05:06", "SELECT CAST('2024-02-03 04:05:06' AS DATETIME2), CAST('2024-02-03 04:05:06' AS DATETIME2)"},
 		{"oracle sysdate alias", "SELECT SYSDATE, SYSTIMESTAMP FROM dual", "oracle", "2024-02-03 04:05:06", "SELECT CAST('2024-02-03 04:05:06' AS TIMESTAMP), SYSTIMESTAMP FROM dual"},
 		{"literal comment and nesting", "SELECT 'CURRENT_TIMESTAMP' AS s /* CURRENT_DATE */, COALESCE(CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "duckdb", "2024-02-03 04:05:06", "SELECT 'CURRENT_TIMESTAMP' AS s /* CURRENT_DATE */, COALESCE(CAST('2024-02-03 04:05:06' AS TIMESTAMP), CAST('2024-02-03 04:05:06' AS TIMESTAMP))"},
-		// SQLGlot parses this as a block and transforms both statements.
+		// The engine parses this as a block and transforms both statements.
 		{"all statements", "SELECT CURRENT_DATE; SELECT CURRENT_TIMESTAMP", "duckdb", "2024-02-03 04:05:06", "SELECT CAST('2024-02-03' AS DATE); SELECT CAST('2024-02-03 04:05:06' AS TIMESTAMP)"},
 		{"bigquery datetime unchanged and timezone discarded", "SELECT CURRENT_DATETIME(), CURRENT_DATE('Europe/Istanbul'), CURRENT_TIMESTAMP()", "bigquery", "2024-02-03T04:05:06Z", "SELECT CURRENT_DATETIME(), CAST('2024-02-03' AS DATE), CAST('2024-02-03T04:05:06Z' AS DATETIME)"},
 		{"snowflake aliases", "SELECT CURRENT_TIME(), LOCALTIMESTAMP(), SYSDATE()", "snowflake", "2024-02-03 04:05:06", "SELECT CURRENT_TIME, CAST('2024-02-03 04:05:06' AS TIMESTAMP), CAST('2024-02-03 04:05:06' AS TIMESTAMP)"},

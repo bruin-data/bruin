@@ -11,7 +11,7 @@ func TestSQLParserContractLifecycleAndErrorRecovery(t *testing.T) {
 	parser, err := NewSQLParserCached()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, parser.Close()) })
-	require.NoError(t, parser.Close()) // unused instances need not extract or start Python
+	require.NoError(t, parser.Close()) // unused instances need not be started
 
 	for range 2 {
 		// UsedTables starts lazily, including after Close. Start remains idempotent.
@@ -24,7 +24,7 @@ func TestSQLParserContractLifecycleAndErrorRecovery(t *testing.T) {
 		query, err := parser.RenameTables("SELECT * FROM t", "postgres", nil)
 		require.EqualError(t, err, "'NoneType' object has no attribute 'items'")
 		require.Empty(t, query)
-		// A command that raises in Python must not desynchronize the next response.
+		// A command that fails must not desynchronize the next response.
 		tables, err = parser.UsedTables("SELECT 'π\n; FROM fake' FROM actual_table", "postgres")
 		require.NoError(t, err)
 		require.Equal(t, []string{"actual_table"}, tables)

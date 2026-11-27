@@ -4,14 +4,10 @@ import (
 	"fmt"
 )
 
-// Generator chunk D (part 2): sqlglot/generator.py tag_sql .. lastday_sql, plus helpers.
-
-// tag_sql (generator.py L4721).
 func (g *Generator) tagSQL(expression *Expr) string {
 	return genDPyStr(expression.Arg("prefix")) + g.sql(expression.Arg("this")) + genDPyStr(expression.Arg("postfix"))
 }
 
-// token_sql (generator.py L4724).
 func (g *Generator) tokenSQL(tokenType TokenType) string {
 	if s, ok := g.s.TOKEN_MAPPING[tokenType]; ok {
 		return s
@@ -19,7 +15,6 @@ func (g *Generator) tokenSQL(tokenType TokenType) string {
 	return tokenType.Name()
 }
 
-// userdefinedfunction_sql (generator.py L4727).
 func (g *Generator) userdefinedfunctionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressions := g.noIdentify(func() string { return g.expressions(expression, exprsOpts{}) })
@@ -34,12 +29,10 @@ func (g *Generator) userdefinedfunctionSQL(expression *Expr) string {
 	return this
 }
 
-// macrooverloads_sql (generator.py L4735).
 func (g *Generator) macrooverloadsSQL(expression *Expr) string {
 	return g.expressions(expression, exprsOpts{flat: true})
 }
 
-// macrooverload_sql (generator.py L4738).
 func (g *Generator) macrooverloadSQL(expression *Expr) string {
 	params := g.noIdentify(func() string { return g.expressions(expression, exprsOpts{flat: true}) })
 	body := g.sqlKey(expression, "this")
@@ -50,19 +43,19 @@ func (g *Generator) macrooverloadSQL(expression *Expr) string {
 	return "(" + params + ") AS " + prefix + body
 }
 
-// joinhint_sql (generator.py L4744).
 func (g *Generator) joinhintSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressions := g.expressions(expression, exprsOpts{flat: true})
 	return this + "(" + expressions + ")"
 }
 
-// kwarg_sql (generator.py L4749).
 func (g *Generator) kwargSQL(expression *Expr) string {
 	return g.binary(expression, "=>")
 }
 
-// when_sql (generator.py L4752).
+// whenSQL generates a MERGE clause, WHEN [NOT] MATCHED [BY SOURCE] [AND cond] THEN action. A
+// WHERE on an INSERT/UPDATE action is dropped (with an unsupported warning) unless
+// SUPPORTS_MERGE_WHERE. With MERGE_ALL_BY_NAME, a star action is written as ALL BY NAME.
 func (g *Generator) whenSQL(expression *Expr) string {
 	matched := "NOT MATCHED"
 	if expression.ArgB("matched") {
@@ -81,7 +74,12 @@ func (g *Generator) whenSQL(expression *Expr) string {
 	thenExpression, _ := thenValue.(*Expr)
 	var then string
 	if thenExpression.IsA(KInsert) {
-		this := g.sqlKey(thenExpression, "this")
+		var this string
+		if g.s.MERGE_ALL_BY_NAME && thenExpression.This().IsA(KStar) {
+			this = "ALL BY NAME"
+		} else {
+			this = g.sqlKey(thenExpression, "this")
+		}
 		if this != "" {
 			this = "INSERT " + this
 		} else {
@@ -94,8 +92,15 @@ func (g *Generator) whenSQL(expression *Expr) string {
 			then = this
 		}
 	} else if thenExpression.IsA(KUpdate) {
+		updates := thenExpression.Expressions()
 		if thenExpression.ArgE("expressions").IsA(KStar) {
-			then = "UPDATE " + g.sqlKey(thenExpression, "expressions")
+			if g.s.MERGE_ALL_BY_NAME {
+				then = "UPDATE ALL BY NAME"
+			} else {
+				then = "UPDATE " + g.sqlKey(thenExpression, "expressions")
+			}
+		} else if g.s.MERGE_ALL_BY_NAME && len(updates) == 1 && updates[0].IsA(KStar) {
+			then = "UPDATE ALL BY NAME"
 		} else {
 			expressionsSQL := g.expressions(thenExpression, exprsOpts{})
 			if expressionsSQL != "" {
@@ -123,12 +128,13 @@ func (g *Generator) whenSQL(expression *Expr) string {
 	return "WHEN " + matched + source + condition + " THEN " + then
 }
 
-// whens_sql (generator.py L4782).
 func (g *Generator) whensSQL(expression *Expr) string {
 	return g.expressions(expression, exprsOpts{sep: strp2(" "), noIndent: true})
 }
 
-// merge_sql (generator.py L4785).
+// mergeSQL generates MERGE INTO target USING source ON cond WHEN ..., or USING (columns) when
+// there is no ON condition. When the target has a T-SQL table hint, its alias moves after the
+// hint.
 func (g *Generator) mergeSQL(expression *Expr) string {
 	table := expression.This()
 	tableAlias := ""
@@ -168,13 +174,11 @@ func (g *Generator) mergeSQL(expression *Expr) string {
 	)
 }
 
-// tochar_sql (generator.py L4816).
 func (g *Generator) tocharSQL(expression *Expr) string {
 	g.genDUnsupportedArgs(expression, "format")
 	return g.sql(genDCast(expression.This(), DT_TEXT, nil))
 }
 
-// tonumber_sql (generator.py L4820).
 func (g *Generator) baseTonumberSQL(expression *Expr) string {
 	g.genDUnsupportedArgs(expression, "default")
 	if !g.s.SUPPORTS_TO_NUMBER {
@@ -191,7 +195,6 @@ func (g *Generator) baseTonumberSQL(expression *Expr) string {
 	return g.fn("TO_NUMBER", expression.Arg("this"), fmtArg)
 }
 
-// dictproperty_sql (generator.py L4833).
 func (g *Generator) dictpropertySQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	kind := g.sqlKey(expression, "kind")
@@ -203,7 +206,6 @@ func (g *Generator) dictpropertySQL(expression *Expr) string {
 	return this + "(" + kind + args + ")"
 }
 
-// dictrange_sql (generator.py L4840).
 func (g *Generator) dictrangeSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	max := g.sqlKey(expression, "max")
@@ -211,23 +213,21 @@ func (g *Generator) dictrangeSQL(expression *Expr) string {
 	return this + "(MIN " + min + " MAX " + max + ")"
 }
 
-// dictsubproperty_sql (generator.py L4846).
 func (g *Generator) dictsubpropertySQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " " + g.sqlKey(expression, "value")
 }
 
-// duplicatekeyproperty_sql (generator.py L4849).
 func (g *Generator) duplicatekeypropertySQL(expression *Expr) string {
 	return "DUPLICATE KEY (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// uniquekeyproperty_sql (generator.py L4853)
+// baseUniquekeypropertySQL generates prefix (columns), e.g. UNIQUE KEY (...).
 // https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/CREATE_TABLE/
 func (g *Generator) baseUniquekeypropertySQL(expression *Expr, prefix string) string {
 	return prefix + " (" + g.expressions(expression, exprsOpts{flat: true}) + ")"
 }
 
-// distributedbyproperty_sql (generator.py L4859)
+// distributedbypropertySQL generates DISTRIBUTED BY kind [(columns)] [BUCKETS n] [order].
 // https://docs.starrocks.io/docs/sql-reference/sql-statements/data-definition/CREATE_TABLE/#distribution_desc
 func (g *Generator) distributedbypropertySQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{flat: true})
@@ -243,12 +243,11 @@ func (g *Generator) distributedbypropertySQL(expression *Expr) string {
 	return "DISTRIBUTED BY " + kind + expressions + buckets + order
 }
 
-// oncluster_sql (generator.py L4868).
+// baseOnclusterSQL returns "": ON CLUSTER is only generated by dialects that override it.
 func (g *Generator) baseOnclusterSQL(expression *Expr) string {
 	return ""
 }
 
-// clusteredbyproperty_sql (generator.py L4871).
 func (g *Generator) clusteredbypropertySQL(expression *Expr) string {
 	expressions := g.expressions(expression, exprsOpts{key: "expressions", flat: true})
 	sortedBy := g.expressions(expression, exprsOpts{key: "sorted_by", flat: true})
@@ -259,7 +258,6 @@ func (g *Generator) clusteredbypropertySQL(expression *Expr) string {
 	return "CLUSTERED BY (" + expressions + ")" + sortedBy + " INTO " + buckets + " BUCKETS"
 }
 
-// anyvalue_sql (generator.py L4878).
 func (g *Generator) baseAnyvalueSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	having := g.sqlKey(expression, "having")
@@ -275,7 +273,6 @@ func (g *Generator) baseAnyvalueSQL(expression *Expr) string {
 	return g.fn("ANY_VALUE", this)
 }
 
-// querytransform_sql (generator.py L4887).
 func (g *Generator) querytransformSQL(expression *Expr) string {
 	transform := g.fn("TRANSFORM", genDExprsToAny(expression.Expressions())...)
 	rowFormatBefore := g.sqlKey(expression, "row_format_before")
@@ -302,7 +299,8 @@ func (g *Generator) querytransformSQL(expression *Expr) string {
 	return transform + rowFormatBefore + recordWriter + using + schema + rowFormatAfter + recordReader
 }
 
-// indexconstraintoption_sql (generator.py L4902).
+// indexconstraintoptionSQL generates only the first index option that is set; an option with
+// none set is unsupported.
 func (g *Generator) indexconstraintoptionSQL(expression *Expr) string {
 	keyBlockSize := g.sqlKey(expression, "key_block_size")
 	if keyBlockSize != "" {
@@ -346,7 +344,6 @@ func (g *Generator) indexconstraintoptionSQL(expression *Expr) string {
 	return ""
 }
 
-// checkcolumnconstraint_sql (generator.py L4934).
 func (g *Generator) checkcolumnconstraintSQL(expression *Expr) string {
 	enforced := ""
 	if expression.ArgB("enforced") {
@@ -355,7 +352,6 @@ func (g *Generator) checkcolumnconstraintSQL(expression *Expr) string {
 	return "CHECK (" + g.sqlKey(expression, "this") + ")" + enforced
 }
 
-// indexcolumnconstraint_sql (generator.py L4938).
 func (g *Generator) baseIndexcolumnconstraintSQL(expression *Expr) string {
 	kind := g.sqlKey(expression, "kind")
 	if kind != "" {
@@ -382,7 +378,6 @@ func (g *Generator) baseIndexcolumnconstraintSQL(expression *Expr) string {
 	return kind + this + indexType + expressions + options
 }
 
-// nvl2_sql (generator.py L4951).
 func (g *Generator) nvl2SQL(expression *Expr) string {
 	if g.s.NVL2_SUPPORTED {
 		return g.functionFallbackSQL(expression)
@@ -402,7 +397,6 @@ func (g *Generator) nvl2SQL(expression *Expr) string {
 	return g.sql(caseExpr)
 }
 
-// comprehension_sql (generator.py L4966).
 func (g *Generator) comprehensionSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expr := g.sqlKey(expression, "expression")
@@ -418,22 +412,19 @@ func (g *Generator) comprehensionSQL(expression *Expr) string {
 	return this + " FOR " + expr + position + " IN " + iterator + condition
 }
 
-// columnprefix_sql (generator.py L4976).
 func (g *Generator) columnprefixSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + "(" + g.sqlKey(expression, "expression") + ")"
 }
 
-// opclass_sql (generator.py L4979).
 func (g *Generator) opclassSQL(expression *Expr) string {
 	return g.sqlKey(expression, "this") + " " + g.sqlKey(expression, "expression")
 }
 
-// _ml_sql (generator.py L4982).
 func (g *Generator) mlSQL(expression *Expr, name string) string {
 	model := g.sqlKey(expression, "this")
 	model = "MODEL " + model
 	expr := expression.Arg("expression")
-	var exprSQL any // None
+	var exprSQL any // nil: omitted
 	if truthy(expr) {
 		s := g.sqlKey(expression, "expression")
 		if x, ok := expr.(*Expr); ok && x.IsA(KTable) {
@@ -442,7 +433,7 @@ func (g *Generator) mlSQL(expression *Expr, name string) string {
 		exprSQL = s
 	}
 
-	var parameters any // None
+	var parameters any // nil: omitted
 	if p := g.sqlKey(expression, "params_struct"); p != "" {
 		parameters = p
 	}
@@ -450,12 +441,10 @@ func (g *Generator) mlSQL(expression *Expr, name string) string {
 	return g.fn(name, model, exprSQL, parameters)
 }
 
-// predict_sql (generator.py L4996).
 func (g *Generator) predictSQL(expression *Expr) string {
 	return g.mlSQL(expression, "PREDICT")
 }
 
-// generateembedding_sql (generator.py L4999).
 func (g *Generator) generateembeddingSQL(expression *Expr) string {
 	name := "GENERATE_EMBEDDING"
 	if expression.ArgB("is_text") {
@@ -464,42 +453,34 @@ func (g *Generator) generateembeddingSQL(expression *Expr) string {
 	return g.mlSQL(expression, name)
 }
 
-// generatetext_sql (generator.py L5003).
 func (g *Generator) generatetextSQL(expression *Expr) string {
 	return g.mlSQL(expression, "GENERATE_TEXT")
 }
 
-// generatetable_sql (generator.py L5006).
 func (g *Generator) generatetableSQL(expression *Expr) string {
 	return g.mlSQL(expression, "GENERATE_TABLE")
 }
 
-// generatebool_sql (generator.py L5009).
 func (g *Generator) generateboolSQL(expression *Expr) string {
 	return g.mlSQL(expression, "GENERATE_BOOL")
 }
 
-// generateint_sql (generator.py L5012).
 func (g *Generator) generateintSQL(expression *Expr) string {
 	return g.mlSQL(expression, "GENERATE_INT")
 }
 
-// generatedouble_sql (generator.py L5015).
 func (g *Generator) generatedoubleSQL(expression *Expr) string {
 	return g.mlSQL(expression, "GENERATE_DOUBLE")
 }
 
-// mltranslate_sql (generator.py L5018).
 func (g *Generator) mltranslateSQL(expression *Expr) string {
 	return g.mlSQL(expression, "TRANSLATE")
 }
 
-// mlforecast_sql (generator.py L5021).
 func (g *Generator) mlforecastSQL(expression *Expr) string {
 	return g.mlSQL(expression, "FORECAST")
 }
 
-// aiforecast_sql (generator.py L5024).
 func (g *Generator) aiforecastSQL(expression *Expr) string {
 	thisSQL := g.sqlKey(expression, "this")
 	if expression.This().IsA(KTable) {
@@ -521,7 +502,6 @@ func (g *Generator) aiforecastSQL(expression *Expr) string {
 	)
 }
 
-// featuresattime_sql (generator.py L5043).
 func (g *Generator) featuresattimeSQL(expression *Expr) string {
 	thisSQL := g.sqlKey(expression, "this")
 	if expression.This().IsA(KTable) {
@@ -537,7 +517,6 @@ func (g *Generator) featuresattimeSQL(expression *Expr) string {
 	)
 }
 
-// vectorsearch_sql (generator.py L5056).
 func (g *Generator) vectorsearchSQL(expression *Expr) string {
 	thisSQL := g.sqlKey(expression, "this")
 	if expression.This().IsA(KTable) {
@@ -561,15 +540,14 @@ func (g *Generator) vectorsearchSQL(expression *Expr) string {
 	)
 }
 
-// forin_sql (generator.py L5076).
 func (g *Generator) forinSQL(expression *Expr) string {
 	this := g.sqlKey(expression, "this")
 	expressionSQL := g.sqlKey(expression, "expression")
 	return "FOR " + this + " DO " + expressionSQL
 }
 
-// refresh_sql (generator.py L5081).
 func (g *Generator) refreshSQL(expression *Expr) string {
+	dhUnsupportedArgs(g, expression, "partition_start", "partition_end", "force", "mode")
 	this := g.sqlKey(expression, "this")
 	kind := ""
 	if !expression.This().IsA(KLiteral) {
@@ -578,7 +556,6 @@ func (g *Generator) refreshSQL(expression *Expr) string {
 	return "REFRESH " + kind + this
 }
 
-// toarray_sql (generator.py L5086).
 func (g *Generator) toarraySQL(expression *Expr) string {
 	arg := expression.This()
 	if arg.Type() == nil {
@@ -593,7 +570,6 @@ func (g *Generator) toarraySQL(expression *Expr) string {
 	return g.sql(genDFunc("IF", condForNull, Null(), New(KArray, "expressions", []*Expr{arg})))
 }
 
-// tsordstotime_sql (generator.py L5099).
 func (g *Generator) baseTsordstotimeSQL(expression *Expr) string {
 	this := expression.This()
 	timeFormat := g.formatTime(expression, nil, nil)
@@ -615,7 +591,6 @@ func (g *Generator) baseTsordstotimeSQL(expression *Expr) string {
 	return g.sql(genDCast(this, DT_TIME, nil))
 }
 
-// tsordstotimestamp_sql (generator.py L5116).
 func (g *Generator) tsordstotimestampSQL(expression *Expr) string {
 	this := expression.This()
 	if this.IsA(KTsOrDsToTimestamp) || genDIsType(this, DT_TIMESTAMP) {
@@ -625,7 +600,6 @@ func (g *Generator) tsordstotimestampSQL(expression *Expr) string {
 	return g.sql(genDCast(this, DT_TIMESTAMP, g.d))
 }
 
-// tsordstodatetime_sql (generator.py L5123).
 func (g *Generator) tsordstodatetimeSQL(expression *Expr) string {
 	this := expression.This()
 	if this.IsA(KTsOrDsToDatetime) || genDIsType(this, DT_DATETIME) {
@@ -635,7 +609,6 @@ func (g *Generator) tsordstodatetimeSQL(expression *Expr) string {
 	return g.sql(genDCast(this, DT_DATETIME, g.d))
 }
 
-// tsordstodate_sql (generator.py L5130).
 func (g *Generator) tsordstodateSQL(expression *Expr) string {
 	this := expression.This()
 	timeFormat := g.formatTime(expression, nil, nil)
@@ -661,7 +634,6 @@ func (g *Generator) tsordstodateSQL(expression *Expr) string {
 	return g.sql(genDCast(this, DT_DATE, nil))
 }
 
-// unixdate_sql (generator.py L5150).
 func (g *Generator) unixdateSQL(expression *Expr) string {
 	return g.sql(
 		genDFunc(
@@ -673,7 +645,6 @@ func (g *Generator) unixdateSQL(expression *Expr) string {
 	)
 }
 
-// lastday_sql (generator.py L5160).
 func (g *Generator) lastdaySQL(expression *Expr) string {
 	if g.s.LAST_DAY_SUPPORTS_DATE_PART {
 		return g.functionFallbackSQL(expression)
@@ -687,11 +658,6 @@ func (g *Generator) lastdaySQL(expression *Expr) string {
 	return g.fn("LAST_DAY", expression.Arg("this"))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Chunk D helpers (ports of sqlglot.expressions builders / Expr methods not yet in the package).
-// ---------------------------------------------------------------------------------------------
-
-// genDPyStr mirrors Python's str(value) as used inside f-strings.
 func genDPyStr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -709,14 +675,13 @@ func genDPyStr(v any) string {
 		if x == nil {
 			return "None"
 		}
-		// Expr.__str__ -> Expr.sql() (default dialect)
 		return exprSQL(x)
 	}
 	return fmt.Sprint(v)
 }
 
 // genDArgSqls converts a list argument (of expressions or strings) into the `sqls` input of
-// Generator.expressions, mirroring iteration over `expression.args.get(key)`.
+// Generator.expressions; other values yield nil.
 func genDArgSqls(v any) []any {
 	switch x := v.(type) {
 	case []*Expr:
@@ -737,7 +702,6 @@ func genDArgSqls(v any) []any {
 	return nil
 }
 
-// genDExprsToAny converts []*Expr to []any for *args splats.
 func genDExprsToAny(xs []*Expr) []any {
 	out := make([]any, 0, len(xs))
 	for _, x := range xs {
@@ -746,7 +710,6 @@ func genDExprsToAny(xs []*Expr) []any {
 	return out
 }
 
-// genDBaseDialect mirrors Dialect.get_or_raise(None).
 func genDBaseDialect() *Dialect {
 	d, err := GetDialect("")
 	if err != nil {
@@ -755,7 +718,6 @@ func genDBaseDialect() *Dialect {
 	return d
 }
 
-// genDMaybeParse mirrors exp.maybe_parse(value, dialect=dialect, copy=copy).
 func genDMaybeParse(v any, dialect *Dialect, copy bool) *Expr {
 	switch x := v.(type) {
 	case *Expr:
@@ -780,7 +742,6 @@ func genDMaybeParse(v any, dialect *Dialect, copy bool) *Expr {
 	return e
 }
 
-// genDWrap mirrors exp._wrap(expression, kind).
 func genDWrap(e *Expr, kind Kind) *Expr {
 	if e.IsA(kind) {
 		return New(KParen, "this", e)
@@ -788,7 +749,6 @@ func genDWrap(e *Expr, kind Kind) *Expr {
 	return e
 }
 
-// genDBinop mirrors Expr._binop(klass, other): both operands are copied (other via convert).
 func genDBinop(kind Kind, this, other *Expr) *Expr {
 	this = this.Copy()
 	other = other.Copy()
@@ -799,14 +759,11 @@ func genDBinop(kind Kind, this, other *Expr) *Expr {
 	return New(kind, "this", this, "expression", other)
 }
 
-// genDNot mirrors exp.not_(expression, copy=copy) (and Expr.not_(copy=copy)).
 func genDNot(e *Expr, copy bool) *Expr {
 	this := genDMaybeParse(e, nil, copy)
 	return New(KNot, "this", genDWrap(this, KConnector))
 }
 
-// genDCombine mirrors exp._combine(expressions, operator, copy=copy, wrap=wrap)
-// for expression inputs (used by exp.and_ / exp.or_).
 func genDCombine(exprs []*Expr, operator Kind, copy, wrap bool) *Expr {
 	var conditions []*Expr
 	for _, x := range exprs {
@@ -829,7 +786,6 @@ func genDCombine(exprs []*Expr, operator Kind, copy, wrap bool) *Expr {
 	return this
 }
 
-// genDCaseWhen mirrors Case.when(condition, then, copy=copy).
 func genDCaseWhen(c *Expr, condition, then any, copy bool) *Expr {
 	instance := c
 	if copy && c != nil {
@@ -843,7 +799,6 @@ func genDCaseWhen(c *Expr, condition, then any, copy bool) *Expr {
 	return instance
 }
 
-// genDCaseElse mirrors Case.else_(condition, copy=copy).
 func genDCaseElse(c *Expr, condition any, copy bool) *Expr {
 	instance := c
 	if copy && c != nil {
@@ -853,7 +808,8 @@ func genDCaseElse(c *Expr, condition any, copy bool) *Expr {
 	return instance
 }
 
-// genDDataTypeIsType mirrors DataType.is_type(*dtypes) for DType arguments (check_nullable=False).
+// genDDataTypeIsType reports whether the data type dt is one of dtypes, ignoring nullability.
+// User-defined types compare structurally.
 func genDDataTypeIsType(dt *Expr, dtypes ...DType) bool {
 	if dt == nil {
 		return false
@@ -874,7 +830,8 @@ func genDDataTypeIsType(dt *Expr, dtypes ...DType) bool {
 	return false
 }
 
-// genDIsType mirrors Expr.is_type(*dtypes) (with the Cast and DataType overrides).
+// genDIsType reports whether e is of one of dtypes: a cast's target type, a data type itself or
+// e's annotated type.
 func genDIsType(e *Expr, dtypes ...DType) bool {
 	if e == nil {
 		return false
@@ -889,18 +846,17 @@ func genDIsType(e *Expr, dtypes ...DType) bool {
 	return t != nil && genDDataTypeIsType(t, dtypes...)
 }
 
-// genDIsTypeSet mirrors Expr.is_type(*SOME_TYPES).
 func genDIsTypeSet(e *Expr, set DTypeSet) bool {
 	return genDIsType(e, set.Items()...)
 }
 
-// genDCast mirrors exp.cast(expression, to, copy=True, dialect=dialect) for a DType target.
-// dialect nil means None (the base dialect).
+// genDCast returns CAST(expression AS to) over a copy of expression, or just the copy when it
+// already is a cast to an equivalent type (the same type, or the same type name in the
+// dialect's TYPE_MAPPING). A nil dialect means the base dialect.
 func genDCast(expression *Expr, to DType, dialect *Dialect) *Expr {
 	expr := genDMaybeParse(expression, dialect, true)
 	dataType := NewDataType(to)
 
-	// dont re-cast if the expression is already a cast to the correct type
 	if expr.IsA(KCast) {
 		targetDialect := dialect
 		if targetDialect == nil {
@@ -930,19 +886,17 @@ func genDCast(expression *Expr, to DType, dialect *Dialect) *Expr {
 	return result
 }
 
-// genDTable mirrors exp.table_(table) where table is an Identifier (or None).
 func genDTable(table *Expr) *Expr {
 	var this *Expr
 	if table != nil {
 		if !table.IsA(KIdentifier) {
-			panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + table.classRepr()})
+			panic(&ValueError{Msg: "Name needs to be a string or an Identifier, got: " + table.Kind().Name()})
 		}
 		this = table.Copy()
 	}
 	return New(KTable, "this", this, "db", nil, "catalog", nil, "alias", nil)
 }
 
-// genDFunc mirrors exp.func(name, *args) with the default dialect (copy=True).
 func genDFunc(name string, args ...any) *Expr {
 	dialect := genDBaseDialect()
 
@@ -965,10 +919,8 @@ func genDFunc(name string, args ...any) *Expr {
 	return function
 }
 
-// genDAnnotateTypes mirrors sqlglot.optimizer.annotate_types.annotate_types(expression, dialect=...).
 func genDAnnotateTypes(e *Expr, dialect *Dialect) *Expr { return annotateTypes(e, dialect) }
 
-// genDTrieEmpty mirrors Python falsiness of a trie dict.
 func genDTrieEmpty(t *trie) bool {
 	return t == nil || (len(t.children) == 0 && !t.end)
 }

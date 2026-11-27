@@ -47,7 +47,6 @@ func TestIsSingleSelectQueryContractStatementShape(t *testing.T) {
 		{"array and lambda", "SELECT TRANSFORM(ARRAY(1, 2), x -> x + 1)", "", true},
 		{"table function", "SELECT * FROM TABLE(FLATTEN(INPUT => PARSE_JSON('[1,2]')))", "", true},
 		{"select into is still select", "SELECT * INTO backup FROM t", "", true},
-		{"write CTE is still select", "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x", "", true},
 		{"locking select is still select", "SELECT * FROM t FOR UPDATE", "", true},
 		{"show is not select", "SHOW TABLES", "", false},
 		{"describe is not select", "DESCRIBE orders", "", false},
@@ -85,9 +84,11 @@ func TestClassificationContractParserEdges(t *testing.T) {
 		{"executable comment", "mysql", "/*!50000 DROP TABLE t */", false, false, "", "cannot determine whether query is read-only: cannot parse empty query"},
 		{"user variable assignment", "mysql", "SET @x := 1", false, false, "", ""},
 		{"outfile rejected", "mysql", "SELECT * FROM t INTO OUTFILE \"/tmp/x\"", false, false, "Invalid expression / Unexpected token. Line 1, Col: 20.\n  SELECT * FROM t \x1b[4mINTO\x1b[0m OUTFILE \"/tmp/x\"", "cannot determine whether query is read-only: Invalid expression / Unexpected token. Line 1, Col: 20.\n  SELECT * FROM t \x1b[4mINTO\x1b[0m OUTFILE \"/tmp/x\""},
-		{"client delimiter rejected", "mysql", "DELIMITER //", false, false, "Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Div'>. Line 1, Col: 12.\n  DELIMITER /\x1b[4m/\x1b[0m", "cannot determine whether query is read-only: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Div'>. Line 1, Col: 12.\n  DELIMITER /\x1b[4m/\x1b[0m"},
+		{"client delimiter rejected", "mysql", "DELIMITER //", false, false, "Required keyword: 'expression' missing for Div. Line 1, Col: 12.\n  DELIMITER /\x1b[4m/\x1b[0m", "cannot determine whether query is read-only: Required keyword: 'expression' missing for Div. Line 1, Col: 12.\n  DELIMITER /\x1b[4m/\x1b[0m"},
 		{"plain nextval column", "postgres", "SELECT nextval FROM t", true, false, "", ""},
 		{"nextval function", "postgres", "SELECT nextval('s')", true, false, "", ""},
+		// A data-modifying CTE leaves the statement a single SELECT, but not a read-only one.
+		{"write CTE is still select", "postgres", "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x", true, false, "", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -180,7 +181,7 @@ func TestIsReadOnlyQueryContractPlatformStatements(t *testing.T) {
 		{"oracle hierarchy", "oracle", "SELECT LEVEL FROM nodes CONNECT BY PRIOR id=parent", true},
 		{"fabric openjson", "fabric", "SELECT value FROM OPENJSON('[1,2]')", true},
 		{"tsql sequence", "tsql", "SELECT NEXT VALUE FOR seq", false},
-		// A table hint is not an exp.Lock, so this currently passes the gate.
+		// A table hint is not a Lock node, so this currently passes the gate.
 		{"tsql update lock hint accepted", "tsql", "SELECT * FROM t WITH (UPDLOCK)", true},
 		{"postgres sequence function", "postgres", "SELECT nextval('seq')", false},
 		{"postgres shared lock", "postgres", "SELECT * FROM t FOR SHARE", false},

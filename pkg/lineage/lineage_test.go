@@ -1890,7 +1890,7 @@ func TestLineageError(t *testing.T) {
 				},
 			},
 			error: &LineageIssue{
-				Description: "Parse error: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Mul'>. Line 1, Col: 5.\n  SELE\x1b[4m*\x1b[0m",
+				Description: "Parse error: Required keyword: 'expression' missing for Mul. Line 1, Col: 5.\n  SELE\x1b[4m*\x1b[0m",
 			},
 		},
 	}

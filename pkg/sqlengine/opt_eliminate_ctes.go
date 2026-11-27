@@ -1,9 +1,6 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/eliminate_ctes.py.
-
-// EliminateCTEs mirrors optimizer.eliminate_ctes.eliminate_ctes: removes unused CTEs from an
-// expression.
+// EliminateCTEs removes unused CTEs from an expression in place and returns it.
 //
 // Example: "WITH y AS (SELECT a FROM x) SELECT a FROM z" -> "SELECT a FROM z".
 func EliminateCTEs(expression *Expr) *Expr {
@@ -26,12 +23,10 @@ func EliminateCTEs(expression *Expr) *Expr {
 					withNode := cteNode.Parent()
 					cteNode.Pop()
 
-					// Pop the entire WITH clause if this is the last CTE
 					if withNode != nil && len(withNode.Expressions()) <= 0 {
 						withNode.Pop()
 					}
 
-					// Decrement the ref count for all sources this CTE selects from
 					for _, selected := range scope.SelectedSources().Values() {
 						if selected.Source.IsScope() {
 							refCount[selected.Source.Scope]--

@@ -1,27 +1,21 @@
 package sqlengine
 
-// Port of sqlglot/dialects/mysql.py (class MySQL) and sqlglot/parsers/mysql.py (MySQLParser).
-// The generator part (sqlglot/generators/mysql.py) lives in d_mysql_generator.go.
-
 import (
 	"strings"
 )
 
 func init() { registerCustomizer("mysql", customizeMySQL) }
 
-// ---------------------------------------------------------------------------------------------
-// Virtual dispatch for dialect-only MySQLParser methods that subclasses (Doris, StarRocks)
+// Virtual dispatch for MySQL-only parser methods that derived dialects (Doris, StarRocks)
 // override. These methods have no hook in parserHooks, so the overrides are registered here
-// (in init functions) keyed by dialect name and resolved along the dialect's MRO.
-// ---------------------------------------------------------------------------------------------
+// (in init functions) keyed by dialect name and resolved along the dialect's ancestry.
 
-// mysqlPartitionPropertyImpls maps dialect name -> _parse_partition_property override.
 var mysqlPartitionPropertyImpls = map[string]func(p *Parser) any{}
 
-// mysqlPartitionRangeValueImpls maps dialect name -> _parse_partition_range_value override.
 var mysqlPartitionRangeValueImpls = map[string]func(p *Parser) *Expr{}
 
-// mysqlResolveImpl resolves a dialect-only method override along the dialect's MRO.
+// mysqlResolveImpl finds the override registered for d or, failing that, for its closest
+// ancestor dialect.
 func mysqlResolveImpl[F any](d *Dialect, impls map[string]F) (F, bool) {
 	if f, ok := impls[d.Name]; ok {
 		return f, true
@@ -35,7 +29,6 @@ func mysqlResolveImpl[F any](d *Dialect, impls map[string]F) (F, bool) {
 	return zero, false
 }
 
-// mysqlCallParsePartitionProperty mirrors the virtual call self._parse_partition_property().
 func mysqlCallParsePartitionProperty(p *Parser) any {
 	if f, ok := mysqlResolveImpl(p.d, mysqlPartitionPropertyImpls); ok {
 		return f(p)
@@ -43,7 +36,6 @@ func mysqlCallParsePartitionProperty(p *Parser) any {
 	return mysqlParsePartitionProperty(p)
 }
 
-// mysqlCallParsePartitionRangeValue mirrors the virtual call self._parse_partition_range_value().
 func mysqlCallParsePartitionRangeValue(p *Parser) *Expr {
 	if f, ok := mysqlResolveImpl(p.d, mysqlPartitionRangeValueImpls); ok {
 		return f(p)
@@ -51,27 +43,13 @@ func mysqlCallParsePartitionRangeValue(p *Parser) *Expr {
 	return mysqlParsePartitionRangeValue(p)
 }
 
-// mysqlNoKwargs wraps a PROPERTY_PARSERS entry defined as `lambda self: ...` in a dialect parser
-// class (accepts no kwargs). owner is the Python qualname prefix, e.g. "MySQLParser.<lambda>".
-func mysqlNoKwargs(owner string, fn func(p *Parser) any) propertyParseFn {
-	return func(p *Parser, kw propKwargs) any {
-		checkPropKwargs(kw, owner)
-		return fn(p)
-	}
-}
-
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers of sqlglot/parsers/mysql.py
-// ---------------------------------------------------------------------------------------------
-
-// mysqlTimeSpecifiers mirrors TIME_SPECIFIERS: all specifiers for time parts (as opposed to date parts).
+// mysqlTimeSpecifiers holds the format specifiers for time parts (as opposed to date parts).
 // https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_date-format
 var mysqlTimeSpecifiers = map[rune]bool{
 	'f': true, 'H': true, 'h': true, 'I': true, 'i': true, 'k': true,
 	'l': true, 'p': true, 'r': true, 'S': true, 's': true, 'T': true,
 }
 
-// mysqlHasTimeSpecifier mirrors _has_time_specifier.
 func mysqlHasTimeSpecifier(dateFormat string) bool {
 	r := []rune(dateFormat)
 	i := 0
@@ -89,7 +67,16 @@ func mysqlHasTimeSpecifier(dateFormat string) bool {
 	return false
 }
 
-// mysqlStrToDate mirrors _str_to_date.
+func mysqlBuildTimestampadd(args []*Expr, d *Dialect) *Expr {
+	expression := buildDateDelta(KTimestampAdd, nil, "DAY", false)(args, d)
+	name := "DAY"
+	if unit := expression.ArgE("unit"); unit != nil {
+		name = unit.Name()
+	}
+	expression.Set("unit", VarChecked(strings.TrimPrefix(pyUpper(name), "SQL_TSI_")))
+	return expression
+}
+
 func mysqlStrToDate(args []*Expr, d *Dialect) *Expr {
 	mysqlDateFormat := seqGet(args, 1)
 	dateFormat := MustDialect("mysql").formatTimeExpr(mysqlDateFormat)
@@ -102,26 +89,16 @@ func mysqlStrToDate(args []*Expr, d *Dialect) *Expr {
 	return New(KStrToDate, "this", this, "format", dateFormat)
 }
 
-// mysqlShowParser mirrors _show_parser(*args, **kwargs). target is nil/false, true or a string.
+// mysqlShowParser returns a parser for SHOW this. target is nil/false, true or a string.
 func mysqlShowParser(this string, target any, full any, global any) parseFn {
 	return func(p *Parser) *Expr {
 		return mysqlParseShowMySQL(p, this, target, full, global)
 	}
 }
 
-// ---------------------------------------------------------------------------------------------
-// Customizer (class body of MySQLParser + MySQL dialect)
-// ---------------------------------------------------------------------------------------------
-
 func customizeMySQL(d *Dialect) {
 	P := d.P
 
-	// RANGE_PARSERS
-	P.RANGE_PARSERS[TK_SOUNDS_LIKE] = func(p *Parser, this *Expr) *Expr {
-		left := p.expression(New(KSoundex, "this", this))
-		right := p.expression(New(KSoundex, "this", p.parseTerm()))
-		return p.expression(New(KEQ, "this", left, "expression", right))
-	}
 	P.RANGE_PARSERS[TK_MEMBER_OF] = func(p *Parser, this *Expr) *Expr {
 		return p.expression(New(
 			KJSONArrayContains,
@@ -130,7 +107,8 @@ func customizeMySQL(d *Dialect) {
 		))
 	}
 
-	// FUNCTIONS
+	P.UNARY_PARSERS[TK_NOT] = mysqlParseNot
+
 	tsOrDsToDate0 := func(args []*Expr) *Expr { return New(KTsOrDsToDate, "this", seqGet(args, 0)) }
 	P.FUNCTIONS["BIT_AND"] = fromArgList(KBitwiseAndAgg)
 	P.FUNCTIONS["BIT_OR"] = fromArgList(KBitwiseOrAgg)
@@ -182,7 +160,10 @@ func customizeMySQL(d *Dialect) {
 	}
 	P.FUNCTIONS["SCHEMA"] = fromArgList(KCurrentSchema)
 	P.FUNCTIONS["DATABASE"] = fromArgList(KCurrentSchema)
+	P.FUNCTIONS["STD"] = fromArgList(KStddevPop)
+	P.FUNCTIONS["STDDEV"] = fromArgList(KStddevPop)
 	P.FUNCTIONS["STR_TO_DATE"] = mysqlStrToDate
+	P.FUNCTIONS["TIMESTAMPADD"] = mysqlBuildTimestampadd
 	P.FUNCTIONS["TIMESTAMPDIFF"] = buildDateDelta(KTimestampDiff, nil, "DAY", false)
 	P.FUNCTIONS["TO_DAYS"] = func(args []*Expr, d *Dialect) *Expr {
 		diff := New(
@@ -191,9 +172,10 @@ func customizeMySQL(d *Dialect) {
 			"expression", New(KTsOrDsToDate, "this", LiteralString("0000-01-01")),
 			"unit", VarExpr("DAY"),
 		)
-		// exp.paren(DateDiff(...) + 1)
+		// (DATEDIFF(x, '0000-01-01') + 1)
 		return Paren(New(KAdd, "this", diff, "expression", LiteralInt(1)))
 	}
+	P.FUNCTIONS["VARIANCE"] = fromArgList(KVariancePop)
 	P.FUNCTIONS["VERSION"] = fromArgList(KCurrentVersion)
 	P.FUNCTIONS["WEEK"] = func(args []*Expr, d *Dialect) *Expr {
 		return New(KWeek, "this", tsOrDsToDate0(args), "mode", seqGet(args, 1))
@@ -203,19 +185,17 @@ func customizeMySQL(d *Dialect) {
 	}
 	P.FUNCTIONS["YEAR"] = func(args []*Expr, d *Dialect) *Expr { return New(KYear, "this", tsOrDsToDate0(args)) }
 
-	// FUNCTION_PARSERS
 	P.FUNCTION_PARSERS["GROUP_CONCAT"] = func(p *Parser) *Expr { return p.parseGroupConcat() }
 	// https://dev.mysql.com/doc/refman/5.7/en/miscellaneous-functions.html#function_values
 	P.FUNCTION_PARSERS["VALUES"] = func(p *Parser) *Expr {
 		return p.expression(New(KAnonymous, "this", "VALUES", "expressions", []*Expr{p.parseIdVar(true, nil)}))
 	}
-	P.FUNCTION_PARSERS["JSON_VALUE"] = func(p *Parser) *Expr { return p.parseJsonValue() }
+	P.FUNCTION_PARSERS["JSON_VALUE"] = func(p *Parser) *Expr { return p.parseJsonValue(true) }
 	P.FUNCTION_PARSERS["SUBSTR"] = func(p *Parser) *Expr { return p.parseSubstring() }
 
-	// STATEMENT_PARSERS
 	P.STATEMENT_PARSERS[TK_SHOW] = func(p *Parser) *Expr { return p.parseShow() }
 
-	// SHOW_PARSERS (a fresh dict, not merged with the parent's)
+	// A fresh map, not merged with the parent's.
 	P.SHOW_PARSERS = map[string]parseFn{
 		"BINARY LOGS":       mysqlShowParser("BINARY LOGS", nil, nil, nil),
 		"MASTER LOGS":       mysqlShowParser("BINARY LOGS", nil, nil, nil),
@@ -271,75 +251,121 @@ func customizeMySQL(d *Dialect) {
 		"WARNINGS":          mysqlShowParser("WARNINGS", nil, nil, nil),
 	}
 
-	// PROPERTY_PARSERS
-	P.PROPERTY_PARSERS["LOCK"] = mysqlNoKwargs("MySQLParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["LOCK"] = noKwargs(func(p *Parser) any {
 		return anyExpr(p.parsePropertyAssignment(KLockProperty))
 	})
-	P.PROPERTY_PARSERS["PARTITION BY"] = mysqlNoKwargs("MySQLParser.<lambda>", func(p *Parser) any {
+	P.PROPERTY_PARSERS["PARTITION BY"] = noKwargs(func(p *Parser) any {
 		return mysqlCallParsePartitionProperty(p)
 	})
 
-	// SET_PARSERS
 	P.SET_PARSERS["PERSIST"] = func(p *Parser) *Expr { return p.parseSetItemAssignment("PERSIST") }
 	P.SET_PARSERS["PERSIST_ONLY"] = func(p *Parser) *Expr { return p.parseSetItemAssignment("PERSIST_ONLY") }
 	P.SET_PARSERS["CHARACTER SET"] = func(p *Parser) *Expr { return mysqlParseSetItemCharset(p, "CHARACTER SET") }
 	P.SET_PARSERS["CHARSET"] = func(p *Parser) *Expr { return mysqlParseSetItemCharset(p, "CHARACTER SET") }
 	P.SET_PARSERS["NAMES"] = func(p *Parser) *Expr { return mysqlParseSetItemNames(p) }
 
-	// CONSTRAINT_PARSERS
+	P.CONSTRAINT_PARSERS["BINARY"] = func(p *Parser) *Expr { return p.expression(New(KBinaryColumnConstraint)) }
 	P.CONSTRAINT_PARSERS["FULLTEXT"] = func(p *Parser) *Expr { return mysqlParseIndexConstraint(p, "FULLTEXT") }
 	P.CONSTRAINT_PARSERS["INDEX"] = func(p *Parser) *Expr { return mysqlParseIndexConstraint(p, "") }
 	P.CONSTRAINT_PARSERS["KEY"] = func(p *Parser) *Expr { return mysqlParseIndexConstraint(p, "") }
 	P.CONSTRAINT_PARSERS["SPATIAL"] = func(p *Parser) *Expr { return mysqlParseIndexConstraint(p, "SPATIAL") }
 	P.CONSTRAINT_PARSERS["ZEROFILL"] = func(p *Parser) *Expr { return p.expression(New(KZeroFillColumnConstraint)) }
 	P.CONSTRAINT_PARSERS["INVISIBLE"] = func(p *Parser) *Expr { return p.expression(New(KInvisibleColumnConstraint)) }
+	// MySQL defines ASCII as latin1, not the ascii character set, and UNICODE as ucs2
+	P.CONSTRAINT_PARSERS["ASCII"] = func(p *Parser) *Expr {
+		return p.expression(New(KCharacterSetColumnConstraint, "this", VarExpr("latin1")))
+	}
+	P.CONSTRAINT_PARSERS["UNICODE"] = func(p *Parser) *Expr {
+		return p.expression(New(KCharacterSetColumnConstraint, "this", VarExpr("ucs2")))
+	}
 
-	// ALTER_PARSERS
 	P.ALTER_PARSERS["CHANGE"] = func(p *Parser) any { return anyExpr(mysqlParseAlterTableModify(p, true)) }
 	P.ALTER_PARSERS["MODIFY"] = func(p *Parser) any { return anyExpr(mysqlParseAlterTableModify(p, false)) }
 	P.ALTER_PARSERS["AUTO_INCREMENT"] = func(p *Parser) any {
 		return anyExpr(p.parsePropertyAssignment(KAutoIncrementProperty))
 	}
 
-	// ALTER_ALTER_PARSERS
 	P.ALTER_ALTER_PARSERS["INDEX"] = func(p *Parser) *Expr { return mysqlParseAlterTableAlterIndex(p) }
 
-	// Method overrides
 	P.h.parseAlterTableRename = mysqlParseAlterTableRename
+	P.h.parseRange = mysqlParseRange
+	P.h.parseColumnConstraint = mysqlParseColumnConstraint
 	P.h.parseAlterDropAction = mysqlParseAlterDropAction
 	P.h.parseGeneratedAsIdentity = mysqlParseGeneratedAsIdentity
 	P.h.parsePrimaryKeyPart = mysqlParsePrimaryKeyPart
 	P.h.parseCharsetName = mysqlParseCharsetName
 	P.h.parseType = mysqlParseType
 	P.h.parsePrimaryKey = mysqlParsePrimaryKey
+	P.h.parseUnique = mysqlParseUnique
+	P.h.parseForeignKey = mysqlParseForeignKey
 
 	customizeMySQLGenerator(d)
 }
 
-// ---------------------------------------------------------------------------------------------
-// MySQLParser methods
-// ---------------------------------------------------------------------------------------------
+// mysqlParseNot parses the operand of NOT or !. ! binds more tightly than NOT, so its operand is
+// a unary expression and the result is parenthesized to keep that grouping when generated as NOT.
+func mysqlParseNot(p *Parser) *Expr {
+	if p.prev.Text == "!" {
+		return p.expression(New(KParen, "this", p.expression(New(KNot, "this", p.parseUnary()))))
+	}
+	return p.expression(New(KNot, "this", p.parseEquality()))
+}
 
-// mysqlParseAlterTableRename mirrors MySQLParser._parse_alter_table_rename.
+// mysqlParseRange parses a SOUNDS LIKE b as SOUNDEX(a) = SOUNDEX(b), with bitwise operands, before
+// the base range operators.
+func mysqlParseRange(p *Parser, this *Expr, parseIs bool) *Expr {
+	if this == nil {
+		this = p.parseBitwise()
+	}
+
+	if p.matchTextSeq("SOUNDS", "LIKE") {
+		this = p.expression(New(
+			KEQ,
+			"this", p.expression(New(KSoundex, "this", this)),
+			"expression", p.expression(New(KSoundex, "this", p.parseBitwise())),
+		))
+		// MySQL evaluates = and IS left to right because they have the same precedence.
+		if p.matchNoAdvance(TK_IS) {
+			this = p.expression(New(KParen, "this", this))
+		}
+	}
+
+	return p.baseParseRange(this, parseIs)
+}
+
+// mysqlParseColumnConstraint parses a column constraint, skipping SIGNED (the default for numeric
+// types, which MySQL ignores) and reading a bare KEY as PRIMARY KEY.
+func mysqlParseColumnConstraint(p *Parser) *Expr {
+	p.matchTextSeq("SIGNED")
+	if p.match(TK_KEY) {
+		return p.expression(New(KColumnConstraint, "kind", p.parsePrimaryKey(false, false, false)))
+	}
+	return p.baseParseColumnConstraint()
+}
+
 func mysqlParseAlterTableRename(p *Parser) *Expr {
 	if p.matchTexts("INDEX", "KEY") {
-		old := p.parseField(true, nil, false)
+		old := p.parseIdVar(true, nil)
 		p.matchTextSeq("TO")
-		newName := p.parseField(true, nil, false)
+		newName := p.parseIdVar(true, nil)
 		return p.expression(New(KRenameIndex, "this", old, "to", newName))
 	}
 	return p.baseParseAlterTableRename()
 }
 
-// mysqlParseAlterDropAction mirrors MySQLParser._parse_alter_drop_action.
 func mysqlParseAlterDropAction(p *Parser) *Expr {
 	if p.matchPair(TK_DROP, TK_PRIMARY_KEY) {
 		return p.expression(New(KDropPrimaryKey))
 	}
+	if p.matchPair(TK_DROP, TK_KEY) {
+		return p.parseDrop(false, "INDEX")
+	}
+	if p.matchTextSeq("DROP", "CHECK") {
+		return p.parseDrop(false, "CHECK")
+	}
 	return p.baseParseAlterDropAction()
 }
 
-// mysqlParseAlterTableModify mirrors MySQLParser._parse_alter_table_modify.
 func mysqlParseAlterTableModify(p *Parser, rename bool) *Expr {
 	// MODIFY [COLUMN]            col_name      column_definition [FIRST | AFTER col_name]
 	// CHANGE [COLUMN] old_col_name new_col_name column_definition [FIRST | AFTER col_name]
@@ -367,7 +393,6 @@ func mysqlParseAlterTableModify(p *Parser, rename bool) *Expr {
 	return p.expression(New(KModifyColumn, "this", columnDef, "rename_from", renameFrom))
 }
 
-// mysqlParseGeneratedAsIdentity mirrors MySQLParser._parse_generated_as_identity.
 func mysqlParseGeneratedAsIdentity(p *Parser) *Expr {
 	this := p.baseParseGeneratedAsIdentity()
 
@@ -384,7 +409,6 @@ func mysqlParseGeneratedAsIdentity(p *Parser) *Expr {
 	return this
 }
 
-// mysqlParsePrimaryKeyPart mirrors MySQLParser._parse_primary_key_part.
 func mysqlParsePrimaryKeyPart(p *Parser) *Expr {
 	this := p.parseIdVar(true, nil)
 	if !p.match(TK_L_PAREN) {
@@ -396,7 +420,59 @@ func mysqlParsePrimaryKeyPart(p *Parser) *Expr {
 	return p.expression(New(KColumnPrefix, "this", this, "expression", expression))
 }
 
-// mysqlParseIndexConstraint mirrors MySQLParser._parse_index_constraint. kind "" means None.
+// mysqlParseIndexConstraintPart parses a key part, {col_name [(length)] | (expr)}: only a prefixed
+// column is followed by "(".
+func mysqlParseIndexConstraintPart(p *Parser) *Expr {
+	if !p.matchNoAdvance(TK_L_PAREN) && p.next.ok() && p.next.Type == TK_L_PAREN {
+		return p.parsePrimaryKeyPart()
+	}
+	return p.parseDisjunction()
+}
+
+// mysqlParseIndexKeyPart parses a key part with an optional ASC or DESC. The Ordered wrapper is
+// only kept for an explicit direction, since its implicit null ordering would otherwise show up
+// as NULLS FIRST in other dialects.
+func mysqlParseIndexKeyPart(p *Parser) *Expr {
+	ordered := p.parseOrdered(func() *Expr { return mysqlParseIndexConstraintPart(p) })
+	if ordered.IsA(KOrdered) && ordered.Arg("desc") == nil {
+		return ordered.This()
+	}
+	return ordered
+}
+
+// mysqlParseUnique parses UNIQUE [INDEX | KEY] [index_name] [index_type] (key_part, ...)
+// [index_option] ..., or a bare UNIQUE column constraint.
+func mysqlParseUnique(p *Parser) *Expr {
+	p.matchTexts("KEY", "INDEX")
+	this := p.parseUniqueKey()
+	indexType := mysqlParseIndexType(p)
+
+	if !p.matchNoAdvance(TK_L_PAREN) {
+		return p.expression(New(KUniqueColumnConstraint, "this", this, "index_type", indexType))
+	}
+
+	expressions := p.parseWrappedCSV(func() *Expr { return mysqlParseIndexKeyPart(p) }, TK_COMMA, false)
+	if indexType == nil {
+		indexType = mysqlParseIndexType(p)
+	}
+
+	return p.expression(New(
+		KUniqueColumnConstraint,
+		"this", p.expression(New(KSchema, "this", this, "expressions", expressions)),
+		"index_type", indexType,
+		"options", mysqlParseIndexConstraintOptions(p),
+	))
+}
+
+func mysqlParseIndexType(p *Parser) any {
+	if p.match(TK_USING) && p.advanceAny(false) != nil {
+		return p.prev.Text
+	}
+	return nil
+}
+
+// mysqlParseIndexConstraint parses an INDEX, KEY, FULLTEXT or SPATIAL column constraint with its
+// USING type and index options. kind "" means a plain index.
 func mysqlParseIndexConstraint(p *Parser, kind string) *Expr {
 	if kind != "" {
 		p.matchTexts("INDEX", "KEY")
@@ -404,7 +480,7 @@ func mysqlParseIndexConstraint(p *Parser, kind string) *Expr {
 
 	this := p.parseIdVar(false, nil)
 
-	// self._match(TokenType.USING) and self._advance_any() and self._prev.text
+	// false without USING, nil when nothing follows USING, otherwise the following token's text.
 	var indexType any = false
 	if p.match(TK_USING) {
 		if p.advanceAny(false) != nil {
@@ -413,8 +489,23 @@ func mysqlParseIndexConstraint(p *Parser, kind string) *Expr {
 			indexType = nil
 		}
 	}
-	expressions := p.parseWrappedCSV(func() *Expr { return p.parseOrdered(nil) }, TK_COMMA, false)
+	expressions := p.parseWrappedCSV(func() *Expr { return mysqlParseIndexKeyPart(p) }, TK_COMMA, false)
 
+	var kindArg any
+	if kind != "" {
+		kindArg = kind
+	}
+	return p.expression(New(
+		KIndexColumnConstraint,
+		"this", this,
+		"expressions", expressions,
+		"kind", kindArg,
+		"index_type", indexType,
+		"options", mysqlParseIndexConstraintOptions(p),
+	))
+}
+
+func mysqlParseIndexConstraintOptions(p *Parser) []*Expr {
 	options := []*Expr{}
 	for {
 		var opt *Expr
@@ -451,23 +542,11 @@ func mysqlParseIndexConstraint(p *Parser, kind string) *Expr {
 
 		options = append(options, opt)
 	}
-
-	var kindArg any
-	if kind != "" {
-		kindArg = kind
-	}
-	return p.expression(New(
-		KIndexColumnConstraint,
-		"this", this,
-		"expressions", expressions,
-		"kind", kindArg,
-		"index_type", indexType,
-		"options", options,
-	))
+	return options
 }
 
-// mysqlParseShowMySQL mirrors MySQLParser._parse_show_mysql. target is nil/false, true or a
-// string; full and global are nil (None) or true.
+// mysqlParseShowMySQL parses the remainder of a SHOW statement of kind this. target is nil/false,
+// true or a string; full and global are nil or true.
 func mysqlParseShowMySQL(p *Parser, this string, target any, full any, global any) *Expr {
 	json := p.matchTextSeq("JSON")
 
@@ -581,7 +660,7 @@ func mysqlParseShowMySQL(p *Parser, this string, target any, full any, global an
 	))
 }
 
-// mysqlParseOldstyleLimit mirrors MySQLParser._parse_oldstyle_limit; returns (offset, limit).
+// mysqlParseOldstyleLimit parses LIMIT n or LIMIT offset, n; returns (offset, limit).
 func mysqlParseOldstyleLimit(p *Parser) (*Expr, *Expr) {
 	var limit, offset *Expr
 	if p.matchTextSeq("LIMIT") {
@@ -597,7 +676,6 @@ func mysqlParseOldstyleLimit(p *Parser) (*Expr, *Expr) {
 	return offset, limit
 }
 
-// mysqlParseSetItemCharset mirrors MySQLParser._parse_set_item_charset.
 func mysqlParseSetItemCharset(p *Parser, kind string) *Expr {
 	this := p.parseString()
 	if this == nil {
@@ -606,10 +684,9 @@ func mysqlParseSetItemCharset(p *Parser, kind string) *Expr {
 	return p.expression(New(KSetItem, "this", this, "kind", kind))
 }
 
-// mysqlParseCharsetName mirrors MySQLParser._parse_charset_name.
-//
-// Preserve quoting when a charset name has characters that require it (e.g. spaces, as allowed
-// for custom XML-registered charsets). Safe names unwrap to a bare Var so roundtrips remain minimal.
+// mysqlParseCharsetName preserves quoting when a charset name has characters that require it
+// (e.g. spaces, as allowed for custom XML-registered charsets). Safe names unwrap to a bare Var
+// so roundtrips remain minimal.
 func mysqlParseCharsetName(p *Parser) *Expr {
 	identifier := p.parseIdentifier()
 	if identifier != nil {
@@ -622,7 +699,6 @@ func mysqlParseCharsetName(p *Parser) *Expr {
 	return p.parseVar(false, tsPtr(newTokenSet(TK_BINARY)), false)
 }
 
-// mysqlParseSetItemNames mirrors MySQLParser._parse_set_item_names.
 func mysqlParseSetItemNames(p *Parser) *Expr {
 	charset := p.parseString()
 	if charset == nil {
@@ -639,7 +715,6 @@ func mysqlParseSetItemNames(p *Parser) *Expr {
 	return p.expression(New(KSetItem, "this", charset, "collate", collate, "kind", "NAMES"))
 }
 
-// mysqlParseType mirrors MySQLParser._parse_type.
 func mysqlParseType(p *Parser, parseInterval bool, fallbackToIdentifier bool) *Expr {
 	// mysql binary is special and can work anywhere, even in order by operations
 	// it operates like a no paren func
@@ -654,7 +729,6 @@ func mysqlParseType(p *Parser, parseInterval bool, fallbackToIdentifier bool) *E
 	return p.baseParseType(parseInterval, fallbackToIdentifier)
 }
 
-// mysqlParseAlterTableAlterIndex mirrors MySQLParser._parse_alter_table_alter_index.
 func mysqlParseAlterTableAlterIndex(p *Parser) *Expr {
 	index := p.parseField(true, nil, false)
 
@@ -668,8 +742,8 @@ func mysqlParseAlterTableAlterIndex(p *Parser) *Expr {
 	return p.expression(New(KAlterIndex, "this", index, "visible", visible))
 }
 
-// mysqlParsePartitionProperty mirrors MySQLParser._parse_partition_property. It returns nil
-// (None), an *Expr or a []*Expr.
+// mysqlParsePartitionProperty parses PARTITION BY RANGE|LIST (...). It returns nil, an *Expr or a
+// []*Expr: the bare partition expressions unless partition definitions follow.
 func mysqlParsePartitionProperty(p *Parser) any {
 	var partitionCls Kind
 	var valueParser func() *Expr
@@ -702,7 +776,6 @@ func mysqlParsePartitionProperty(p *Parser) any {
 	))
 }
 
-// mysqlParsePartitionRangeValue mirrors MySQLParser._parse_partition_range_value.
 func mysqlParsePartitionRangeValue(p *Parser) *Expr {
 	p.matchTextSeq("PARTITION")
 	name := p.parseIdVar(true, nil)
@@ -721,7 +794,6 @@ func mysqlParsePartitionRangeValue(p *Parser) *Expr {
 	return p.expression(New(KPartition, "expressions", []*Expr{partRange}))
 }
 
-// mysqlParsePartitionListValue mirrors MySQLParser._parse_partition_list_value.
 func mysqlParsePartitionListValue(p *Parser) *Expr {
 	p.matchTextSeq("PARTITION")
 	name := p.parseIdVar(true, nil)
@@ -731,7 +803,46 @@ func mysqlParsePartitionListValue(p *Parser) *Expr {
 	return p.expression(New(KPartition, "expressions", []*Expr{partList}))
 }
 
-// mysqlParsePrimaryKey mirrors MySQLParser._parse_primary_key.
+// mysqlParseForeignKey parses FOREIGN KEY [index_name] (columns) REFERENCES ...
+func mysqlParseForeignKey(p *Parser) *Expr {
+	// MySQL only uses this name when CONSTRAINT has none and no existing index fits
+	var this *Expr
+	if p.next.Type == TK_L_PAREN {
+		this = p.parseIdVar(true, nil)
+	}
+	foreignKey := p.baseParseForeignKey()
+	foreignKey.Set("this", this)
+	return foreignKey
+}
+
+// mysqlParsePrimaryKey parses a primary key, always allowing a key name before the column list
+// (namedPrimaryKey is ignored). Index options after the key parts of a table-level key, such as
+// KEY_BLOCK_SIZE or COMMENT, belong to the key, not the table.
 func mysqlParsePrimaryKey(p *Parser, wrappedOptional bool, inProps bool, namedPrimaryKey bool) *Expr {
-	return p.baseParsePrimaryKey(wrappedOptional, inProps, true)
+	this := p.baseParsePrimaryKey(wrappedOptional, inProps, true)
+	if !this.IsA(KPrimaryKey) {
+		return this
+	}
+
+	indexOptions := mysqlParseIndexConstraintOptions(p)
+	if len(indexOptions) == 0 {
+		return this
+	}
+
+	// The key constraint options parsed so far are strings, e.g. NOT ENFORCED
+	keyOptions, _ := this.Arg("options").([]string)
+	if len(keyOptions) == 0 {
+		this.Set("options", indexOptions)
+		return this
+	}
+
+	options := make([]any, 0, len(keyOptions)+len(indexOptions))
+	for _, o := range keyOptions {
+		options = append(options, o)
+	}
+	for _, o := range indexOptions {
+		options = append(options, o)
+	}
+	this.Set("options", options)
+	return this
 }

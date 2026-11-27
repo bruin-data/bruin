@@ -7,13 +7,8 @@ import (
 	"time"
 )
 
-// Port of sqlglot/generators/clickhouse.py (ClickHouseGenerator).
-
-// ---------------------------------------------------------------------------------------------
-// Module-level helpers
-// ---------------------------------------------------------------------------------------------
-
-// clickhouseUnixToTimeSQL mirrors _unix_to_time_sql.
+// clickhouseUnixToTimeSQL renders UnixToTime with the fromUnixTimestamp variant for the scale
+// (seconds, milli, micro, nano); other scales divide by 10^scale first.
 func clickhouseUnixToTimeSQL(g *Generator, e *Expr) string {
 	scale := e.ArgE("scale")
 	timestamp := e.This()
@@ -37,7 +32,8 @@ func clickhouseUnixToTimeSQL(g *Generator, e *Expr) string {
 	)
 }
 
-// clickhouseLowerFunc mirrors _lower_func.
+// clickhouseLowerFunc lowercases the function name of a rendered call, the text before the first
+// "(". It panics with "substring not found" when sql has no "(".
 func clickhouseLowerFunc(sql string) string {
 	index := strings.Index(sql, "(")
 	if index < 0 {
@@ -46,7 +42,8 @@ func clickhouseLowerFunc(sql string) string {
 	return pyLower(sql[:index]) + sql[index:]
 }
 
-// clickhouseQuantileSQL mirrors _quantile_sql.
+// clickhouseQuantileSQL renders Quantile as quantile(level)(x), or quantiles(l1, l2, ...)(x) when
+// the level is an array.
 func clickhouseQuantileSQL(g *Generator, e *Expr) string {
 	quantile := e.ArgE("quantile")
 	args := "(" + g.sqlKey(e, "this") + ")"
@@ -66,7 +63,8 @@ func clickhouseQuantileSQL(g *Generator, e *Expr) string {
 	return fn + args
 }
 
-// clickhouseDatetimeDeltaSQL mirrors _datetime_delta_sql(name).
+// clickhouseDatetimeDeltaSQL returns a renderer for name(unit, expression, this[, zone]); without a
+// unit the function is only renamed.
 func clickhouseDatetimeDeltaSQL(name string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		if !e.ArgB("unit") {
@@ -83,24 +81,20 @@ func clickhouseDatetimeDeltaSQL(name string) GenFunc {
 	}
 }
 
-// clickhouseTimestrtotimeSQL mirrors _timestrtotime_sql.
+// clickhouseTimestrtotimeSQL renders TimeStrToTime as a cast to non-nullable DateTime64(6[, zone]).
+// With a zone, a literal timestamp loses its UTC offset first.
 func clickhouseTimestrtotimeSQL(g *Generator, e *Expr) string {
 	ts := e.This()
 
 	tz := e.ArgE("zone")
 	if tz != nil && ts.IsA(KLiteral) {
-		// Clickhouse will not accept timestamps that include a UTC offset, so we must remove them.
-		// The first step to removing is parsing the string with `datetime.datetime.fromisoformat`.
-		//
-		// In python <3.11, `fromisoformat()` can only parse timestamps of millisecond (3 digit)
-		// or microsecond (6 digit) precision. It will error if passed any other number of fractional
-		// digits, so we extract the fractional seconds and pad to 6 digits before parsing.
+		// ClickHouse encodes the zone as a type parameter and rejects timestamps that include a UTC
+		// offset, so '2020-01-01 12:13:14-08:00' becomes '2020-01-01 12:13:14'. Fractional seconds
+		// are padded to 6 digits before parsing.
 		tsString := pyStrip(ts.Name())
 
-		// separate [date and time] from [fractional seconds and UTC offset]
 		tsParts := strings.Split(tsString, ".")
 		if len(tsParts) == 2 {
-			// separate fractional seconds and UTC offset
 			offsetSep := "-"
 			if strings.Contains(tsParts[1], "+") {
 				offsetSep = "+"
@@ -108,7 +102,6 @@ func clickhouseTimestrtotimeSQL(g *Generator, e *Expr) string {
 			tsFracParts := strings.Split(tsParts[1], offsetSep)
 			numFracParts := len(tsFracParts)
 
-			// pad to 6 digits if fractional seconds present
 			if n := len([]rune(tsFracParts[0])); n < 6 {
 				tsFracParts[0] += strings.Repeat("0", 6-n)
 			}
@@ -120,9 +113,6 @@ func clickhouseTimestrtotimeSQL(g *Generator, e *Expr) string {
 			tsString = tsParts[0] + "." + tsFracParts[0] + sep + offset
 		}
 
-		// return literal with no timezone, eg turn '2020-01-01 12:13:14-08:00' into '2020-01-01 12:13:14'
-		// this is because Clickhouse encodes the timezone as a data type parameter and throws an error if
-		// it's part of the timestamp string
 		tsWithoutTz, ok := clickhouseISOFormatWithoutTz(tsString)
 		if !ok {
 			panic(&ValueError{Msg: "Invalid isoformat string: " + pyRepr(tsString)})
@@ -130,7 +120,6 @@ func clickhouseTimestrtotimeSQL(g *Generator, e *Expr) string {
 		ts = LiteralString(tsWithoutTz)
 	}
 
-	// Non-nullable DateTime64 with microsecond precision
 	expressions := []*Expr{New(KDataTypeParam, "this", LiteralNumber("6"))}
 	if tz != nil {
 		expressions = append(expressions, New(KDataTypeParam, "this", tz))
@@ -142,8 +131,8 @@ func clickhouseTimestrtotimeSQL(g *Generator, e *Expr) string {
 	return g.sql(CastExpr(ts, datatype, true, g.d))
 }
 
-// clickhouseISOFormatWithoutTz mirrors
-// datetime.datetime.fromisoformat(s).replace(tzinfo=None).isoformat(sep=" ").
+// clickhouseISOFormatWithoutTz parses s as an ISO 8601 date or timestamp and formats it as
+// "YYYY-MM-DD HH:MM:SS[.ffffff]", dropping any UTC offset. ok is false when s does not parse.
 func clickhouseISOFormatWithoutTz(s string) (string, bool) {
 	year, month, day, hour, minute, second, microsecond, ok := clickhouseFromISOFormat(s)
 	if !ok {
@@ -156,9 +145,9 @@ func clickhouseISOFormatWithoutTz(s string) (string, bool) {
 	return out, true
 }
 
-// clickhouseFromISOFormat mirrors CPython's datetime.fromisoformat (C implementation) and returns
-// the parsed datetime fields; ok=false where Python raises ValueError. It follows
-// dhFromISOFormatMicrosecond but keeps all components.
+// clickhouseFromISOFormat parses an ISO 8601 date or date-time (calendar or ISO week date, with an
+// optional time and UTC offset) and returns its fields without the offset; ok is false for invalid
+// input. It follows dhFromISOFormatMicrosecond but keeps all components.
 func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, microsecond int, ok bool) {
 	r := []rune(s)
 	n := len(r)
@@ -184,7 +173,6 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 		return v, p + num, true
 	}
 
-	// _find_isoformat_datetime_separator
 	var sep int
 	if n == 7 {
 		sep = 7
@@ -226,7 +214,6 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 		sep = 8
 	}
 
-	// parse_isoformat_date
 	var p int
 	var good bool
 	year, p, good = parseDigits(0, 4)
@@ -260,7 +247,8 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 		if !dhISOToYMD(year, isoWeek, isoDay) {
 			return
 		}
-		// iso_to_ymd: Monday of ISO week 1 is the Monday of the week containing Jan 4th.
+		// ISO week date to calendar date: Monday of ISO week 1 is the Monday of the week
+		// containing Jan 4th.
 		jan4 := time.Date(year, time.January, 4, 0, 0, 0, 0, time.UTC)
 		wd := (int(jan4.Weekday()) + 6) % 7 // Monday == 0
 		d := jan4.AddDate(0, 0, -wd+(isoWeek-1)*7+(isoDay-1))
@@ -290,7 +278,6 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 		return
 	}
 
-	// parse_isoformat_time
 	start := sep + 1
 	end := n
 	tzPos := start
@@ -322,7 +309,7 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 		if rv != 0 {
 			return
 		}
-		// timezone offsets must be strictly between -24h and 24h (timedelta normalizes the components)
+		// the total UTC offset must be strictly between -24h and 24h
 		total := ((tzh*3600+tzm*60+tzs)*1000000 + tzus)
 		if total >= 24*3600*1000000 {
 			return
@@ -337,7 +324,8 @@ func clickhouseFromISOFormat(s string) (year, month, day, hour, minute, second, 
 	return
 }
 
-// clickhouseMapSQL mirrors _map_sql.
+// clickhouseMapSQL renders Map and VarMap as a lowercase map(...) call, or as a {key: value, ...}
+// literal inside SETTINGS.
 func clickhouseMapSQL(g *Generator, e *Expr) string {
 	if !(e.Parent() != nil && e.Parent().ArgKey() == "settings") {
 		return clickhouseLowerFunc(varMapSQL(g, e, "MAP"))
@@ -364,7 +352,7 @@ func clickhouseMapSQL(g *Generator, e *Expr) string {
 	return "{" + csvArgs + "}"
 }
 
-// clickhouseJSONCastSQL mirrors _json_cast_sql.
+// clickhouseJSONCastSQL renders JSONCast as x.:Type, quoting parameterized types as identifiers.
 func clickhouseJSONCastSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	to := e.ArgE("to")
@@ -377,14 +365,9 @@ func clickhouseJSONCastSQL(g *Generator, e *Expr) string {
 	return this + ".:" + toSQL
 }
 
-// ---------------------------------------------------------------------------------------------
-// Generator customization
-// ---------------------------------------------------------------------------------------------
-
 func customizeClickHouseGenerator(d *Dialect) {
 	s := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS
 	delete(s.AFTER_HAVING_MODIFIER_TRANSFORMS, "cluster")
 	delete(s.AFTER_HAVING_MODIFIER_TRANSFORMS, "distribute")
 	delete(s.AFTER_HAVING_MODIFIER_TRANSFORMS, "sort")
@@ -396,7 +379,6 @@ func customizeClickHouseGenerator(d *Dialect) {
 	}
 	s.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS = keys
 
-	// TRANSFORMS
 	for k, f := range map[Kind]GenFunc{
 		KAnyValue:       renameFunc("any"),
 		KApproxDistinct: renameFunc("uniq"),
@@ -448,7 +430,7 @@ func customizeClickHouseGenerator(d *Dialect) {
 		KIsNan:                 renameFunc("isNaN"),
 		KJarowinklerSimilarity: jarowinklerSimilarity("jaroWinklerSimilarity"),
 		KJSONCast:              clickhouseJSONCastSQL,
-		KJSONExtract:           jsonExtractSegments("JSONExtractString", false, ""),
+		KJSONExtract:           jsonExtractSegments("JSONExtractRaw", false, ""),
 		KJSONExtractScalar:     jsonExtractSegments("JSONExtractString", false, ""),
 		KJSONPathKey:           jsonPathKeyOnlyName,
 		KJSONPathRoot:          func(g *Generator, e *Expr) string { return "" },
@@ -510,16 +492,11 @@ func customizeClickHouseGenerator(d *Dialect) {
 		KTrim: func(g *Generator, e *Expr) string {
 			return trimSQL(g, e, "BOTH")
 		},
-		KVariance:              renameFunc("varSamp"),
 		KSchemaCommentProperty: func(g *Generator, e *Expr) string { return g.nakedProperty(e) },
 		KStddev:                renameFunc("stddevSamp"),
 		KChr:                   renameFunc("CHAR"),
-		KLag: func(g *Generator, e *Expr) string {
-			return g.fn("lagInFrame", e.Arg("this"), e.Arg("offset"), e.Arg("default"))
-		},
-		KLead: func(g *Generator, e *Expr) string {
-			return g.fn("leadInFrame", e.Arg("this"), e.Arg("offset"), e.Arg("default"))
-		},
+		KLag:                   renameFunc("lag"),
+		KLead:                  renameFunc("lead"),
 		KLevenshtein: func(g *Generator, e *Expr) string {
 			dhUnsupportedArgs(g, e, "ins_cost", "del_cost", "sub_cost", "max_dist")
 			return renameFunc("editDistance")(g, e)
@@ -531,7 +508,7 @@ func customizeClickHouseGenerator(d *Dialect) {
 		s.TRANSFORMS[k] = f
 	}
 
-	// Dialect-only <key>_sql methods
+	// Renderers for kinds that only this dialect defines a method for
 	s.methods[KGroupConcat] = clickhouseGroupconcatSQL
 	s.methods[KRegexpILike] = clickhouseRegexpilikeSQL
 	s.methods[KPartitionId] = clickhousePartitionidSQL
@@ -543,6 +520,7 @@ func customizeClickHouseGenerator(d *Dialect) {
 
 	// Method overrides
 	s.h.offsetSQL = clickhouseOffsetSQL
+	s.h.selectSQL = clickhouseSelectSQL
 	s.h.strtodateSQL = clickhouseStrtodateSQL
 	s.h.castSQL = clickhouseCastSQL
 	s.h.trycastSQL = clickhouseTrycastSQL
@@ -566,11 +544,8 @@ func customizeClickHouseGenerator(d *Dialect) {
 	s.h.valuesSQL = clickhouseValuesSQL
 }
 
-// ---------------------------------------------------------------------------------------------
-// Methods
-// ---------------------------------------------------------------------------------------------
-
-// clickhouseGroupconcatSQL mirrors groupconcat_sql.
+// clickhouseGroupconcatSQL renders GroupConcat as groupConcat(x), or as the parameterized
+// groupConcat(sep[, limit])(x) when there is a separator.
 func clickhouseGroupconcatSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	separator := e.ArgE("separator")
@@ -598,7 +573,19 @@ func clickhouseGroupconcatSQL(g *Generator, e *Expr) string {
 	return g.fn("groupConcat", this)
 }
 
-// clickhouseOffsetSQL mirrors offset_sql.
+// clickhouseSelectSQL renders SELECT, turning a FETCH without ORDER BY into LIMIT (one row when
+// the FETCH has no count).
+func clickhouseSelectSQL(g *Generator, e *Expr) string {
+	if limit := e.ArgE("limit"); limit.IsA(KFetch) && !e.ArgB("order") {
+		count := limit.ArgE("count")
+		if count == nil {
+			count = LiteralInt(1)
+		}
+		e.Set("limit", New(KLimit, "expression", count))
+	}
+	return g.baseSelectSQL(e)
+}
+
 func clickhouseOffsetSQL(g *Generator, e *Expr) string {
 	offset := g.baseOffsetSQL(e)
 
@@ -612,7 +599,6 @@ func clickhouseOffsetSQL(g *Generator, e *Expr) string {
 	return offset
 }
 
-// clickhouseStrtodateSQL mirrors strtodate_sql.
 func clickhouseStrtodateSQL(g *Generator, e *Expr) string {
 	strtodateSQL := g.functionFallbackSQL(e)
 
@@ -625,7 +611,8 @@ func clickhouseStrtodateSQL(g *Generator, e *Expr) string {
 	return strtodateSQL
 }
 
-// clickhouseCastSQL mirrors cast_sql.
+// clickhouseCastSQL renders a cast; a StrToDate cast to DATETIME renders as the StrToDate alone,
+// and a JSON extraction cast to text as JSONExtract(..., 'Nullable(String)').
 func clickhouseCastSQL(g *Generator, e *Expr, safePrefix string) string {
 	this := e.This()
 
@@ -633,10 +620,16 @@ func clickhouseCastSQL(g *Generator, e *Expr, safePrefix string) string {
 		return g.sql(this)
 	}
 
+	// A JSON value cast to text is its string value, not its JSON text
+	this = this.Unnest()
+	to := e.ArgE("to")
+	if this.IsA(KJSONExtract) && this.ArgB("requires_json") && to.IsA(KDataType) && DataType_TEXT_TYPES.Has(to.DTypeOf()) {
+		return g.fn("JSONExtract", this, LiteralString("Nullable(String)"))
+	}
+
 	return g.baseCastSQL(e, safePrefix)
 }
 
-// clickhouseNonNullableTypes returns NON_NULLABLE_TYPES as is_type arguments.
 func clickhouseNonNullableTypes(g *Generator) []any {
 	items := g.s.NON_NULLABLE_TYPES.Items()
 	out := make([]any, len(items))
@@ -646,7 +639,6 @@ func clickhouseNonNullableTypes(g *Generator) []any {
 	return out
 }
 
-// clickhouseTrycastSQL mirrors trycast_sql.
 func clickhouseTrycastSQL(g *Generator, e *Expr) string {
 	dtype := e.ArgE("to")
 	if !DataTypeIsType(dtype, clickhouseNonNullableTypes(g), true) {
@@ -657,7 +649,8 @@ func clickhouseTrycastSQL(g *Generator, e *Expr) string {
 	return g.baseCastSQL(e, "")
 }
 
-// clickhouseJsonpathsubscriptSQL mirrors _jsonpathsubscript_sql.
+// clickhouseJsonpathsubscriptSQL renders a JSON path subscript, turning a 0-based integer index
+// into ClickHouse's 1-based one.
 func clickhouseJsonpathsubscriptSQL(g *Generator, e *Expr) string {
 	this := g.jsonPathPart(e.Arg("this"))
 	if isPyInt(this) {
@@ -669,12 +662,13 @@ func clickhouseJsonpathsubscriptSQL(g *Generator, e *Expr) string {
 	return this
 }
 
-// clickhouseLikepropertySQL mirrors likeproperty_sql.
+// clickhouseLikepropertySQL renders a LIKE table property as AS <table>.
 func clickhouseLikepropertySQL(g *Generator, e *Expr) string {
 	return "AS " + g.sqlKey(e, "this")
 }
 
-// clickhouseAnyToHas mirrors _any_to_has.
+// clickhouseAnyToHas renders x = ANY(arr) (either side) as has(arr, x), with prefix in front;
+// other comparisons go to def.
 func clickhouseAnyToHas(g *Generator, e *Expr, def func(g *Generator, e *Expr) string, prefix string) string {
 	var arr, this *Expr
 	if e.This().IsA(KAny) {
@@ -687,27 +681,26 @@ func clickhouseAnyToHas(g *Generator, e *Expr, def func(g *Generator, e *Expr) s
 		return def(g, e)
 	}
 
+	if arr.This().IsA(KQuery) {
+		return def(g, e)
+	}
+
 	return prefix + g.fn("has", arr.This().Unnest(), this)
 }
 
-// clickhouseEqSQL mirrors eq_sql.
 func clickhouseEqSQL(g *Generator, e *Expr) string {
 	return clickhouseAnyToHas(g, e, (*Generator).baseEqSQL, "")
 }
 
-// clickhouseNeqSQL mirrors neq_sql.
 func clickhouseNeqSQL(g *Generator, e *Expr) string {
 	return clickhouseAnyToHas(g, e, (*Generator).baseNeqSQL, "NOT ")
 }
 
-// clickhouseRegexpilikeSQL mirrors regexpilike_sql.
 func clickhouseRegexpilikeSQL(g *Generator, e *Expr) string {
-	// Manually add a flag to make the search case-insensitive
 	regex := g.fn("CONCAT", "'(?i)'", e.Arg("expression"))
 	return g.fn("match", e.Arg("this"), regex)
 }
 
-// clickhouseDatatypeSQL mirrors datatype_sql.
 func clickhouseDatatypeSQL(g *Generator, e *Expr) string {
 	// String is the standard ClickHouse type, every other variant is just an alias.
 	// Additionally, any supplied length parameter will be ignored.
@@ -748,7 +741,7 @@ func clickhouseDatatypeSQL(g *Generator, e *Expr) string {
 	return dtype
 }
 
-// clickhouseCteSQL mirrors cte_sql.
+// clickhouseCteSQL renders a CTE; a scalar CTE renders as <expression> AS <name>.
 func clickhouseCteSQL(g *Generator, e *Expr) string {
 	if e.ArgB("scalar") {
 		this := g.sqlKey(e, "this")
@@ -759,7 +752,6 @@ func clickhouseCteSQL(g *Generator, e *Expr) string {
 	return g.baseCteSQL(e)
 }
 
-// clickhouseAfterLimitModifiers mirrors after_limit_modifiers.
 func clickhouseAfterLimitModifiers(g *Generator, e *Expr) []string {
 	settings := ""
 	if e.ArgB("settings") {
@@ -772,17 +764,16 @@ func clickhouseAfterLimitModifiers(g *Generator, e *Expr) []string {
 	return append(g.baseAfterLimitModifiers(e), settings, format)
 }
 
-// clickhousePlaceholderSQL mirrors placeholder_sql.
 func clickhousePlaceholderSQL(g *Generator, e *Expr) string {
 	return "{" + e.Name() + ": " + g.sqlKey(e, "kind") + "}"
 }
 
-// clickhouseOnclusterSQL mirrors oncluster_sql.
 func clickhouseOnclusterSQL(g *Generator, e *Expr) string {
 	return "ON CLUSTER " + g.sqlKey(e, "this")
 }
 
-// clickhouseCreateableSQL mirrors createable_sql.
+// clickhouseCreateableSQL puts the post-name properties (ON CLUSTER) of ON_CLUSTER_TARGETS kinds
+// between the name and the column list.
 func clickhouseCreateableSQL(g *Generator, e *Expr, locations propLocations) string {
 	kind := pyUpper(e.ArgS("kind"))
 	if g.s.ON_CLUSTER_TARGETS.Has(kind) && len(locations[Loc_POST_NAME]) > 0 {
@@ -807,16 +798,18 @@ func clickhouseCreateableSQL(g *Generator, e *Expr, locations propLocations) str
 	return g.baseCreateableSQL(e, locations)
 }
 
-// clickhouseCreateSQL mirrors create_sql.
+// clickhouseCreateSQL renders CREATE, moving the table comment after the query in CTAS statements
+// and parenthesizing the query unless it already is.
 func clickhouseCreateSQL(g *Generator, e *Expr) string {
-	// The comment property comes last in CTAS statements, i.e. after the query
 	query := e.Expression()
 	var commentProp *Expr
 	if query.IsA(KQuery) {
 		commentProp = e.Find(KSchemaCommentProperty)
 		if commentProp != nil {
 			commentProp.Pop()
-			query.Replace(ParenExpr(query, true))
+			if !query.IsA(KSubquery) {
+				query.Replace(ParenExpr(query, true))
+			}
 		}
 	}
 
@@ -830,13 +823,11 @@ func clickhouseCreateSQL(g *Generator, e *Expr) string {
 	return createSQL + commentSQL
 }
 
-// clickhousePrewhereSQL mirrors prewhere_sql.
 func clickhousePrewhereSQL(g *Generator, e *Expr) string {
 	this := g.indentDefault(g.sqlKey(e, "this"))
 	return g.seg("PREWHERE") + g.sep(" ") + this
 }
 
-// clickhouseIndexcolumnconstraintSQL mirrors indexcolumnconstraint_sql.
 func clickhouseIndexcolumnconstraintSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	if this != "" {
@@ -858,32 +849,27 @@ func clickhouseIndexcolumnconstraintSQL(g *Generator, e *Expr) string {
 	return "INDEX" + this + expr + indexType + granularity
 }
 
-// clickhousePartitionSQL mirrors partition_sql.
+// clickhousePartitionSQL renders PARTITION <expressions> without parentheses.
 func clickhousePartitionSQL(g *Generator, e *Expr) string {
 	return "PARTITION " + g.expressions(e, exprsOpts{flat: true})
 }
 
-// clickhousePartitionidSQL mirrors partitionid_sql.
 func clickhousePartitionidSQL(g *Generator, e *Expr) string {
 	return "ID " + g.sql(e.Arg("this"))
 }
 
-// clickhouseReplacepartitionSQL mirrors replacepartition_sql.
 func clickhouseReplacepartitionSQL(g *Generator, e *Expr) string {
 	return "REPLACE " + g.sql(e.Arg("expression")) + " FROM " + g.sqlKey(e, "source")
 }
 
-// clickhouseProjectiondefSQL mirrors projectiondef_sql.
 func clickhouseProjectiondefSQL(g *Generator, e *Expr) string {
 	return "PROJECTION " + g.sql(e.Arg("this")) + " " + g.wrap(e.Expression())
 }
 
-// clickhouseNestedjsonselectSQL mirrors nestedjsonselect_sql.
 func clickhouseNestedjsonselectSQL(g *Generator, e *Expr) string {
 	return g.sqlKey(e, "this") + ".^" + g.sqlKey(e, "expression")
 }
 
-// clickhouseIsSQL mirrors is_sql.
 func clickhouseIsSQL(g *Generator, e *Expr) string {
 	isSQL := g.baseIsSQL(e)
 
@@ -895,7 +881,7 @@ func clickhouseIsSQL(g *Generator, e *Expr) string {
 	return isSQL
 }
 
-// clickhouseInSQL mirrors in_sql.
+// clickhouseInSQL renders IN; under NOT, GLOBAL IN becomes GLOBAL NOT IN.
 func clickhouseInSQL(g *Generator, e *Expr) string {
 	inSQL := g.baseInSQL(e)
 
@@ -906,11 +892,11 @@ func clickhouseInSQL(g *Generator, e *Expr) string {
 	return inSQL
 }
 
-// clickhouseNotSQL mirrors not_sql.
+// clickhouseNotSQL renders NOT, leaving the negation of GLOBAL IN to the IN renderer and
+// parenthesizing any other IN.
 func clickhouseNotSQL(g *Generator, e *Expr) string {
 	if e.This().IsA(KIn) {
 		if e.This().ArgB("is_global") {
-			// let `GLOBAL IN` child interpose `NOT`
 			return g.sqlKey(e, "this")
 		}
 
@@ -920,7 +906,6 @@ func clickhouseNotSQL(g *Generator, e *Expr) string {
 	return g.baseNotSQL(e)
 }
 
-// clickhouseValuesSQL mirrors values_sql.
 func clickhouseValuesSQL(g *Generator, e *Expr, valuesAsTable bool) string {
 	// If the VALUES clause contains tuples of expressions, we need to treat it
 	// as a table since Clickhouse will automatically alias it as such.
@@ -939,10 +924,23 @@ func clickhouseValuesSQL(g *Generator, e *Expr, valuesAsTable bool) string {
 		valuesAsTable = true
 	}
 
+	// An unparenthesized VALUES in FROM is the values() table function, which takes a single
+	// argument list, so a multi-row VALUES relation must be parenthesized to parse
+	if valuesAsTable && len(e.Expressions()) > 1 && (alias != nil || e.Parent().IsA(KFrom, KJoin, KTable)) {
+		values := "(VALUES" + g.seg("") + g.expressions(e, exprsOpts{}) + ")"
+		values = g.queryModifiers(e, values)
+		pivots := g.expressions(e, exprsOpts{key: "pivots", sep: strp2(""), flat: true})
+		if aliasSQL := g.sql(alias); aliasSQL != "" {
+			return values + " AS " + aliasSQL + pivots
+		}
+		return values + pivots
+	}
+
 	return g.baseValuesSQL(e, valuesAsTable)
 }
 
-// clickhouseTimestamptruncSQL mirrors timestamptrunc_sql.
+// clickhouseTimestamptruncSQL renders dateTrunc(unit, x[, zone]), lowercasing the unit before
+// ClickHouse 23.12.
 func clickhouseTimestamptruncSQL(g *Generator, e *Expr) string {
 	unit := unitToStr(e, "DAY")
 	// https://clickhouse.com/docs/whats-new/changelog/2023#improvement
@@ -953,7 +951,6 @@ func clickhouseTimestamptruncSQL(g *Generator, e *Expr) string {
 	return g.fn("dateTrunc", unit, e.Arg("this"), e.Arg("zone"))
 }
 
-// clickhouseDatetruncSQL mirrors datetrunc_sql.
 func clickhouseDatetruncSQL(g *Generator, e *Expr) string {
 	return clickhouseTimestamptruncSQL(g, e)
 }

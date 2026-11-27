@@ -3,6 +3,7 @@ package sqlengine
 import (
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,7 +11,6 @@ import (
 	"unicode/utf8"
 )
 
-// Normalization strategies mirror sqlglot.dialects.dialect.NormalizationStrategy values.
 const (
 	NormLowercase            = "LOWERCASE"
 	NormUppercase            = "UPPERCASE"
@@ -19,11 +19,11 @@ const (
 	NormCaseInsensitiveUpper = "CASE_INSENSITIVE_UPPERCASE"
 )
 
-// Dialect mirrors a sqlglot Dialect instance.
+// Dialect is a SQL dialect: settings, tokenizer/parser/generator tables and per-instance options.
 type Dialect struct {
-	// Name is the registry key ("" for the base sqlglot dialect).
+	// Name is the registry key ("" for the base dialect).
 	Name string
-	// ClassName is the sqlglot class name, e.g. "BigQuery".
+	// ClassName is the dialect's display name used in messages, e.g. "BigQuery".
 	ClassName string
 	// parents lists ancestor dialect names (closest first), excluding the base dialect.
 	parents []string
@@ -106,12 +106,17 @@ var (
 	dialectMu    sync.Mutex
 )
 
-// allSQLGlotDialectNames is used for "Did you mean" suggestions, mirroring DIALECT_MODULE_NAMES.
-var allSQLGlotDialectNames = []string{
-	"athena", "bigquery", "clickhouse", "databricks", "dax", "doris", "dremio", "drill", "druid",
-	"duckdb", "dune", "exasol", "fabric", "hive", "materialize", "mysql", "oracle", "postgres",
-	"presto", "prql", "redshift", "risingwave", "singlestore", "snowflake", "solr", "spark",
-	"spark2", "sqlite", "starrocks", "tableau", "teradata", "trino", "tsql",
+// registeredDialectNames returns the names of the registered dialects (without the base
+// dialect), sorted; they are the "Did you mean" suggestions for an unknown dialect.
+func registeredDialectNames() []string {
+	names := make([]string, 0, len(dialectDefs))
+	for name := range dialectDefs {
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func registerDialect(def *dialectDef) { dialectDefs[def.name] = def }
@@ -166,8 +171,9 @@ func mapKeys(m map[string]string) []string {
 	return out
 }
 
-// GetDialect mirrors Dialect.get_or_raise for string inputs. Settings may follow the name,
-// e.g. "mysql, normalization_strategy = case_sensitive".
+// GetDialect returns the dialect named by spec ("" for the base dialect). Settings may follow
+// the name, e.g. "mysql, normalization_strategy = case_sensitive"; version and
+// normalization_strategy are supported, and unknown settings fail with a suggestion.
 func GetDialect(spec string) (*Dialect, error) {
 	if spec == "" {
 		return prototype(""), nil
@@ -189,7 +195,7 @@ func GetDialect(spec string) (*Dialect, error) {
 	}
 	proto := prototype(name)
 	if proto == nil {
-		return nil, suggestClosestMatchAndFail("dialect", name, allSQLGlotDialectNames)
+		return nil, suggestClosestMatchAndFail("dialect", name, registeredDialectNames())
 	}
 	if len(kwargs) == 0 {
 		return proto, nil
@@ -242,7 +248,7 @@ func MustDialect(name string) *Dialect {
 	return d
 }
 
-// Tokenize mirrors Dialect.tokenize.
+// Tokenize splits sql into tokens with the dialect's tokenizer (or its tokenize hook).
 func (d *Dialect) Tokenize(sql string) ([]*Token, error) {
 	if d.hooks.tokenize != nil {
 		return d.hooks.tokenize(d, sql)
@@ -250,7 +256,6 @@ func (d *Dialect) Tokenize(sql string) ([]*Token, error) {
 	return newTokenizerCore(d.tok).tokenize(sql)
 }
 
-// NormalizeIdentifier mirrors Dialect.normalize_identifier.
 func (d *Dialect) NormalizeIdentifier(e *Expr) *Expr {
 	if d.hooks.normalizeIdentifier != nil {
 		return d.hooks.normalizeIdentifier(d, e)
@@ -272,7 +277,8 @@ func (d *Dialect) baseNormalizeIdentifier(e *Expr) *Expr {
 	return e
 }
 
-// CaseSensitive mirrors Dialect.case_sensitive.
+// CaseSensitive reports whether normalizing text would change its case; always false for
+// case-insensitive dialects.
 func (d *Dialect) CaseSensitive(text string) bool {
 	if d.NormalizationStrategy == NormCaseInsensitive {
 		return false
@@ -289,7 +295,6 @@ func (d *Dialect) CaseSensitive(text string) bool {
 	return false
 }
 
-// SAFE_IDENTIFIER_RE mirrors sqlglot.expressions.SAFE_IDENTIFIER_RE.
 var SAFE_IDENTIFIER_RE = regexp.MustCompile(`^[_a-zA-Z][\p{L}\p{N}_]*\n?$`)
 
 // isSafeIdentifier is SAFE_IDENTIFIER_RE.MatchString(s) without the regexp engine.
@@ -319,7 +324,9 @@ func isSafeIdentifier(s string) bool {
 	return true
 }
 
-// CanQuote mirrors Dialect.can_quote. identify is "true", "false", "safe" or "unsafe".
+// CanQuote reports whether id should be quoted for the identify mode ("true", "false", "safe" or
+// "unsafe"). Quoted identifiers stay quoted and function names are never quoted; "safe" quotes
+// only simple, case-insensitive identifiers and "unsafe" only the others.
 func (d *Dialect) CanQuote(id *Expr, identify string) bool {
 	if d.hooks.canQuote != nil {
 		return d.hooks.canQuote(d, id, identify)
@@ -350,7 +357,8 @@ func (d *Dialect) baseCanQuote(id *Expr, identify string) bool {
 	panic(&ValueError{Msg: "Unexpected argument for identify: '" + identify + "'"})
 }
 
-// QuoteIdentifier mirrors Dialect.quote_identifier.
+// QuoteIdentifier sets the quoted flag of an identifier: always with identify, otherwise only
+// when it is not a simple, case-insensitive identifier.
 func (d *Dialect) QuoteIdentifier(e *Expr, identify bool) *Expr {
 	if e.IsA(KIdentifier) {
 		mode := "unsafe"

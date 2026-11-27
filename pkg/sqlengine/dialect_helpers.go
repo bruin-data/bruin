@@ -1,15 +1,7 @@
 package sqlengine
 
-// Ports of the module-level helper functions of sqlglot/dialects/dialect.py (rename_func and
-// friends), plus `_with_strict_time_inverse` and the `Dialect.format_time` classmethod.
-//
-// Conventions:
-//   - generator helpers `def x(self: Generator, expression)` -> `func x(g *Generator, e *Expr) string` (GenFunc);
-//     extra parameters become extra Go parameters (Python defaults are noted in /* */).
-//   - generator factories returning a callable -> return GenFunc.
-//   - parser builders -> `func x(args []*Expr, d *Dialect) *Expr` (FuncBuilder); builder factories return FuncBuilder.
-//   - Python `str | None` parameters are Go strings where "" means None (documented per function).
-//   - helpers prefixed `dh` are local ports of sqlglot builders / helpers not (yet) available elsewhere.
+// Extra helper parameters note their conventional values in /* */; optional string parameters
+// use "" for unset.
 
 import (
 	"fmt"
@@ -18,34 +10,14 @@ import (
 	"time"
 )
 
-// STRICT_TIME_FORMATS mirrors dialect.STRICT_TIME_FORMATS (ordered).
-// "Strict" dialects (e.g. modern Hive, Spark 3+) map their zero-padded MM/dd to these in TIME_MAPPING so they
-// roundtrip, since a lax %m/%d renders non-padded there for parse expressions (see HiveGenerator.format_time).
+// STRICT_TIME_FORMATS lists the strict month/day format tokens with their plain equivalents, in
+// order. "Strict" dialects (e.g. modern Hive, Spark 3+) map their zero-padded MM/dd to these in
+// TIME_MAPPING so they roundtrip, since a lax %m/%d renders non-padded there for parse
+// expressions (see hiveFormatTime).
 var STRICT_TIME_FORMATS = [][2]string{{"%mstrict", "%m"}, {"%dstrict", "%d"}}
 
-// withStrictTimeInverse mirrors dialect._with_strict_time_inverse (mutates and returns the mapping).
-func withStrictTimeInverse(inverseMapping map[string]string) map[string]string {
-	for _, pair := range STRICT_TIME_FORMATS {
-		strictFormat, laxFormat := pair[0], pair[1]
-		if v, ok := inverseMapping[strictFormat]; ok {
-			// In strict dialects, a foreign lax %m formats the same padded way as %mstrict (MM)
-			if _, has := inverseMapping[laxFormat]; !has {
-				inverseMapping[laxFormat] = v
-			}
-		} else {
-			// Elsewhere, the strict format degrades to its lax counterpart so it never leaks
-			v, has := inverseMapping[laxFormat]
-			if !has {
-				v = laxFormat
-			}
-			inverseMapping[strictFormat] = v
-		}
-	}
-	return inverseMapping
-}
-
-// dhFormatTimeLiteral mirrors exp.Literal.string(format_time(...)); a None result becomes 'None'
-// because Literal.string calls str() on its argument.
+// dhFormatTimeLiteral returns a formatTime result as a string literal; a missing result
+// (ok=false) becomes the literal 'None'.
 func dhFormatTimeLiteral(s string, ok bool) *Expr {
 	if !ok {
 		return LiteralString("None")
@@ -53,9 +25,9 @@ func dhFormatTimeLiteral(s string, ok bool) *Expr {
 	return LiteralString(s)
 }
 
-// formatTimeStr mirrors Dialect.format_time(expression) for a (quoted) string argument.
+// formatTimeStr maps a quoted format string (quotes included) through the dialect's
+// TIME_MAPPING and returns it as a string literal.
 func (d *Dialect) formatTimeStr(s string) *Expr {
-	// the time formats are quoted
 	r := []rune(s)
 	inner := ""
 	if len(r) >= 2 {
@@ -64,7 +36,6 @@ func (d *Dialect) formatTimeStr(s string) *Expr {
 	return dhFormatTimeLiteral(formatTime(inner, d.S.TIME_MAPPING, d.timeTrie))
 }
 
-// formatTimeExpr mirrors Dialect.format_time(expression) for an expression (or None) argument.
 func (d *Dialect) formatTimeExpr(e *Expr) *Expr {
 	if e != nil && e.IsString() {
 		return dhFormatTimeLiteral(formatTime(e.ThisS(), d.S.TIME_MAPPING, d.timeTrie))
@@ -72,7 +43,6 @@ func (d *Dialect) formatTimeExpr(e *Expr) *Expr {
 	return e
 }
 
-// dhFlattenArgs mirrors helper.flatten(expression.args.values()) as arguments for Generator.func.
 func dhFlattenArgs(e *Expr) []any {
 	out := make([]any, 0, len(e.args))
 	for _, a := range e.args {
@@ -86,7 +56,7 @@ func dhFlattenArgs(e *Expr) []any {
 				out = append(out, x)
 			}
 		case int:
-			// Generator.sql(0) returns "" (falsy); other ints raise like Python.
+			// 0 generates as nothing; other ints are passed on and rejected by Generator.sql.
 			if v == 0 {
 				out = append(out, "")
 			} else {
@@ -99,7 +69,6 @@ func dhFlattenArgs(e *Expr) []any {
 	return out
 }
 
-// dhUnsupportedArgs mirrors the @unsupported_args(...) decorator for plain argument names.
 func dhUnsupportedArgs(g *Generator, e *Expr, args ...string) {
 	for _, arg := range args {
 		if e.ArgB(arg) {
@@ -108,16 +77,14 @@ func dhUnsupportedArgs(g *Generator, e *Expr, args ...string) {
 	}
 }
 
-// renameFunc mirrors dialect.rename_func.
 func renameFunc(name string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		return g.fn(name, dhFlattenArgs(e)...)
 	}
 }
 
-// bracketToElementAtSQL mirrors dialect.bracket_to_element_at_sql.
 func bracketToElementAtSQL(g *Generator, e *Expr) string {
-	// Python: `1 - expression.args.get("offset", 0)`; offset may be an int or a bool (True == 1).
+	// The index is shifted by 1 - offset; offset may be an int or a bool (true counts as 1).
 	offset := 0
 	switch v := e.Arg("offset").(type) {
 	case int:
@@ -131,14 +98,14 @@ func bracketToElementAtSQL(g *Generator, e *Expr) string {
 	return g.fn("ELEMENT_AT", e.Arg("this"), index)
 }
 
-// approxCountDistinctSQL mirrors dialect.approx_count_distinct_sql.
 func approxCountDistinctSQL(g *Generator, e *Expr) string {
 	dhUnsupportedArgs(g, e, "accuracy")
 	return g.fn("APPROX_COUNT_DISTINCT", e.Arg("this"))
 }
 
-// ifSQL mirrors dialect.if_sql(name="IF", false_value=None). falseValue may be nil, a string or an *Expr.
-func ifSQL(name string /*="IF"*/, falseValue any /*=None*/) GenFunc {
+// ifSQL returns a GenFunc generating name(cond, true[, false]); falseValue (nil, a string or an
+// *Expr) replaces a missing false branch.
+func ifSQL(name string /*="IF"*/, falseValue any /*=nil*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		f := e.Arg("false")
 		if !truthy(f) {
@@ -148,34 +115,288 @@ func ifSQL(name string /*="IF"*/, falseValue any /*=None*/) GenFunc {
 	}
 }
 
-// arrowJSONExtractSQL mirrors dialect.arrow_json_extract_sql.
 func arrowJSONExtractSQL(g *Generator, e *Expr) string {
+	return arrowJSONExtractOpSQL(g, e, "")
+}
+
+// arrowJSONExtractOpSQL is arrowJSONExtractSQL with the operator op ("" picks -> or ->>). A path
+// that is an operation is parenthesized, since it would bind looser than the arrow; CONCAT counts
+// as one because it may be generated as a chain of ||. A path that is itself a JSON extraction
+// stays unparenthesized, continuing the arrow chain.
+func arrowJSONExtractOpSQL(g *Generator, e *Expr, op string) string {
 	this := e.This()
 	if g.s.JSON_TYPE_REQUIRED_FOR_EXTRACTION && this.IsA(KLiteral) && this.IsString() {
 		this.Replace(CastExpr(this, DT_JSON, true, nil))
 	}
-	op := "->>"
-	if e.IsA(KJSONExtract) {
-		op = "->"
+	if path := e.Expression(); path.IsA(KBinary, KPredicate, KNot, KConcat) &&
+		!path.IsA(KJSONExtract, KJSONExtractScalar) {
+		e.Set("expression", New(KParen, "this", path))
+	}
+	if op == "" {
+		op = "->>"
+		if e.IsA(KJSONExtract) {
+			op = "->"
+		}
 	}
 	return g.binary(e, op)
 }
 
-// inlineArraySQL mirrors dialect.inline_array_sql.
 func inlineArraySQL(g *Generator, e *Expr) string {
 	return "[" + g.expressions(e, exprsOpts{dynamic: true, newLine: true, skipFirst: true, skipLast: true}) + "]"
 }
 
-// inlineArrayUnlessQuery mirrors dialect.inline_array_unless_query.
+func regexpCaptureGroupCount(pattern *Expr) (int, bool) {
+	if pattern != nil && (pattern.IsString() || pattern.IsA(KRawString)) {
+		return pyRegexGroups(pattern.Name())
+	}
+	return 0, false
+}
+
+// pyRegexGroups returns the number of capturing groups in pattern, or ok=false when the
+// pattern is invalid: bad escapes, unbalanced parentheses, unterminated sets, unknown (?...)
+// extensions, misplaced global flags, invalid group references and nothing-to-repeat or
+// multiple-repeat errors.
+func pyRegexGroups(pattern string) (int, bool) {
+	rs := []rune(pattern)
+	n := len(rs)
+	groups := 0       // capturing groups opened so far
+	closedGroups := 0 // capturing groups closed so far (for backreference validation)
+	names := map[string]bool{}
+	var stack []bool // per open paren: is it a capturing group?
+	isASCIILetter := func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }
+	isDigit := func(r rune) bool { return r >= '0' && r <= '9' }
+	const validEscapes = "abBdDfnrsStvwWZAxuUN"
+	const validClassEscapes = "abdDfnrsStvwWxuUN"
+	const flagChars = "aiLmsux-"
+	// canRepeat reports whether a repeat operator is allowed at this point (i.e. there is an item).
+	canRepeat := false
+	lastWasRepeat := false
+	for i := 0; i < n; i++ {
+		c := rs[i]
+		wasRepeat := lastWasRepeat
+		lastWasRepeat = false
+		switch c {
+		case '\\':
+			if i+1 >= n {
+				return 0, false // bad escape (end of pattern)
+			}
+			i++
+			e := rs[i]
+			if isASCIILetter(e) && !strings.ContainsRune(validEscapes, e) {
+				return 0, false // bad escape
+			}
+			if e >= '1' && e <= '9' {
+				num := int(e - '0')
+				if i+1 < n && isDigit(rs[i+1]) {
+					num = num*10 + int(rs[i+1]-'0')
+					i++
+				}
+				if num > closedGroups {
+					return 0, false // invalid group reference
+				}
+			}
+			canRepeat = !(e == 'b' || e == 'B' || e == 'A' || e == 'Z')
+		case '[':
+			i++
+			if i < n && rs[i] == '^' {
+				i++
+			}
+			if i < n && rs[i] == ']' {
+				i++
+			}
+			closed := false
+			for ; i < n; i++ {
+				if rs[i] == '\\' {
+					if i+1 >= n {
+						return 0, false
+					}
+					i++
+					if isASCIILetter(rs[i]) && !strings.ContainsRune(validClassEscapes, rs[i]) {
+						return 0, false
+					}
+					continue
+				}
+				if rs[i] == ']' {
+					closed = true
+					break
+				}
+			}
+			if !closed {
+				return 0, false // unterminated character set
+			}
+			canRepeat = true
+		case '(':
+			capturing := true
+			if i+1 < n && rs[i+1] == '?' {
+				capturing = false
+				if i+2 >= n {
+					return 0, false // unexpected end of pattern
+				}
+				switch x := rs[i+2]; {
+				case x == ':' || x == '=' || x == '!' || x == '>':
+					i += 2
+				case x == '(':
+					// conditional (?(id)yes|no): skip the condition
+					j := i + 3
+					for j < n && rs[j] != ')' {
+						j++
+					}
+					if j >= n {
+						return 0, false
+					}
+					i = j
+				case x == '#':
+					// comment group: skip to the closing parenthesis
+					j := i + 3
+					for j < n && rs[j] != ')' {
+						j++
+					}
+					if j >= n {
+						return 0, false // missing ), unterminated comment
+					}
+					i = j
+					continue
+				case x == '<':
+					if i+3 >= n || (rs[i+3] != '=' && rs[i+3] != '!') {
+						return 0, false // unknown extension ?<x
+					}
+					i += 3
+				case x == 'P':
+					if i+3 < n && rs[i+3] == '<' {
+						j := i + 4
+						for j < n && rs[j] != '>' {
+							j++
+						}
+						if j >= n || j == i+4 {
+							return 0, false // missing >, unterminated name / missing group name
+						}
+						names[string(rs[i+4:j])] = true
+						capturing = true
+						i = j
+					} else if i+3 < n && rs[i+3] == '=' {
+						j := i + 4
+						for j < n && rs[j] != ')' {
+							j++
+						}
+						if j >= n || !names[string(rs[i+4:j])] {
+							return 0, false // unknown group name
+						}
+						i = j
+						canRepeat = true
+						continue
+					} else {
+						return 0, false // unknown extension ?P
+					}
+				case strings.ContainsRune(flagChars, x):
+					j := i + 2
+					for j < n && strings.ContainsRune(flagChars, rs[j]) {
+						j++
+					}
+					if j >= n {
+						return 0, false // missing -, : or )
+					}
+					if rs[j] == ')' {
+						// global flags must be at the start of the expression
+						if i != 0 {
+							return 0, false
+						}
+						i = j
+						canRepeat = false
+						continue
+					}
+					if rs[j] != ':' {
+						return 0, false // missing :
+					}
+					i = j
+				default:
+					return 0, false // unknown extension
+				}
+			}
+			if capturing {
+				groups++
+			}
+			stack = append(stack, capturing)
+			canRepeat = false
+		case ')':
+			if len(stack) == 0 {
+				return 0, false // unbalanced parenthesis
+			}
+			if stack[len(stack)-1] {
+				closedGroups++
+			}
+			stack = stack[:len(stack)-1]
+			canRepeat = true
+		case '|':
+			canRepeat = false
+		case '*', '+', '?':
+			if wasRepeat {
+				if c == '*' {
+					return 0, false // multiple repeat
+				}
+				// lazy (`*?`) / possessive (`*+`) modifiers
+				canRepeat = false
+				continue
+			}
+			if !canRepeat {
+				return 0, false // nothing to repeat
+			}
+			lastWasRepeat = true
+			canRepeat = false
+		case '{':
+			// {m}, {m,}, {,n}, {m,n} is a repeat; anything else is a literal "{"
+			j := i + 1
+			for j < n && (isDigit(rs[j]) || rs[j] == ',') {
+				j++
+			}
+			body := string(rs[i+1 : min(j, n)])
+			if j < n && rs[j] == '}' && body != "" && body != "," && strings.Count(body, ",") <= 1 {
+				if wasRepeat {
+					return 0, false // multiple repeat
+				}
+				if !canRepeat {
+					return 0, false // nothing to repeat
+				}
+				i = j
+				lastWasRepeat = true
+				canRepeat = false
+				continue
+			}
+			canRepeat = true
+		case '^', '$':
+			canRepeat = false
+		default:
+			canRepeat = true
+		}
+	}
+	if len(stack) != 0 {
+		return 0, false // missing ), unterminated subpattern
+	}
+	return groups, true
+}
+
+func nthValueFromSQL(g *Generator, e *Expr) string {
+	result := g.fn("NTH_VALUE", e.Arg("this"), e.Arg("offset"))
+
+	fromFirst := e.Arg("from_first")
+	if fromFirst == nil {
+		return result
+	}
+
+	if truthy(fromFirst) {
+		return result + " FROM FIRST"
+	}
+	return result + " FROM LAST"
+}
+
 func inlineArrayUnlessQuery(g *Generator, e *Expr) string {
 	elem := seqGet(e.Expressions(), 0)
-	if elem != nil && elem.Find(KQuery) != nil {
+	// A value constructor's single query is a scalar element, e.g. [(SELECT ...)]
+	if len(e.Expressions()) == 1 && elem.IsA(KQuery) && !e.ArgB("value_constructor") {
 		return g.fn("ARRAY", elem)
 	}
 	return inlineArraySQL(g, e)
 }
 
-// noIlikeSQL mirrors dialect.no_ilike_sql.
 func noIlikeSQL(g *Generator, e *Expr) string {
 	return g.likeSQL_(New(
 		KLike,
@@ -185,7 +406,6 @@ func noIlikeSQL(g *Generator, e *Expr) string {
 	))
 }
 
-// noParenCurrentDateSQL mirrors dialect.no_paren_current_date_sql.
 func noParenCurrentDateSQL(g *Generator, e *Expr) string {
 	zone := g.sqlKey(e, "this")
 	if zone != "" {
@@ -194,7 +414,6 @@ func noParenCurrentDateSQL(g *Generator, e *Expr) string {
 	return "CURRENT_DATE"
 }
 
-// noRecursiveCteSQL mirrors dialect.no_recursive_cte_sql.
 func noRecursiveCteSQL(g *Generator, e *Expr) string {
 	if e.ArgB("recursive") {
 		g.unsupported("Recursive CTEs are unsupported")
@@ -203,48 +422,45 @@ func noRecursiveCteSQL(g *Generator, e *Expr) string {
 	return g.withSQL(e)
 }
 
-// noTablesampleSQL mirrors dialect.no_tablesample_sql.
 func noTablesampleSQL(g *Generator, e *Expr) string {
 	g.unsupported("TABLESAMPLE unsupported")
 	return g.sql(e.Arg("this"))
 }
 
-// noPivotSQL mirrors dialect.no_pivot_sql.
 func noPivotSQL(g *Generator, e *Expr) string {
 	g.unsupported("PIVOT unsupported")
 	return ""
 }
 
-// noTrycastSQL mirrors dialect.no_trycast_sql.
 func noTrycastSQL(g *Generator, e *Expr) string {
 	return g.castSQL(e, "")
 }
 
-// noCommentColumnConstraintSQL mirrors dialect.no_comment_column_constraint_sql.
 func noCommentColumnConstraintSQL(g *Generator, e *Expr) string {
 	g.unsupported("CommentColumnConstraint unsupported")
 	return ""
 }
 
-// noMapFromEntriesSQL mirrors dialect.no_map_from_entries_sql.
 func noMapFromEntriesSQL(g *Generator, e *Expr) string {
 	g.unsupported("MAP_FROM_ENTRIES unsupported")
 	return ""
 }
 
-// propertySQL mirrors dialect.property_sql.
 func propertySQL(g *Generator, e *Expr) string {
 	return g.propertyName(e, true) + "=" + g.sqlKey(e, "value")
 }
 
-// strpositionSQL mirrors dialect.strposition_sql.
+// strpositionSQL generates a substring search as funcName(...). LOCATE and CHARINDEX take the
+// substring first; POSITION becomes POSITION(substr IN str) with useAnsiPosition. A start
+// position the function does not support is emulated with SUBSTRING and an offset correction;
+// an unsupported occurrence is dropped with a warning.
 func strpositionSQL(
 	g *Generator,
 	e *Expr,
 	funcName string, /*="STRPOS"*/
-	supportsPosition bool, /*=False*/
-	supportsOccurrence bool, /*=False*/
-	useAnsiPosition bool, /*=True*/
+	supportsPosition bool, /*=false*/
+	supportsOccurrence bool, /*=false*/
+	useAnsiPosition bool, /*=true*/
 ) string {
 	str := e.This()
 	substr := e.ArgE("substr")
@@ -294,16 +510,13 @@ func strpositionSQL(
 	return g.sql(fn)
 }
 
-// structExtractSQL mirrors dialect.struct_extract_sql.
 func structExtractSQL(g *Generator, e *Expr) string {
 	return g.sqlKey(e, "this") + "." + g.sql(ToIdentifier(e.Expression().Name(), nil))
 }
 
-// arrayAppendSQL mirrors dialect.array_append_sql(name, swap_params=False).
-//
-// Transpile ARRAY_APPEND/ARRAY_PREPEND between dialects with different NULL propagation semantics.
-// Dialects that propagate NULLs need to set `ARRAY_FUNCS_PROPAGATES_NULLS` to True.
-func arrayAppendSQL(name string, swapParams bool /*=False*/) GenFunc {
+// arrayAppendSQL transpiles ARRAY_APPEND/ARRAY_PREPEND between dialects with different NULL
+// propagation semantics; dialects that propagate NULLs set ARRAY_FUNCS_PROPAGATES_NULLS.
+func arrayAppendSQL(name string, swapParams bool /*=false*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		this := e.This()
 		element := e.Expression()
@@ -341,9 +554,9 @@ func arrayAppendSQL(name string, swapParams bool /*=False*/) GenFunc {
 	}
 }
 
-// generateSeriesSQL mirrors dialect.generate_series_sql(func_name, exclusive_func_name=None).
-// exclusiveFuncName "" means None.
-func generateSeriesSQL(funcName string, exclusiveFuncName string /*=None*/) GenFunc {
+// generateSeriesSQL returns a GenFunc generating funcName(start, end, step). An end-exclusive
+// series uses exclusiveFuncName when set ("" means none), otherwise end - 1.
+func generateSeriesSQL(funcName string, exclusiveFuncName string /*=""*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		start := e.Arg("start")
 		end := e.Arg("end")
@@ -361,12 +574,9 @@ func generateSeriesSQL(funcName string, exclusiveFuncName string /*=None*/) GenF
 	}
 }
 
-// arrayConcatSQL mirrors dialect.array_concat_sql(name).
-//
-// Transpile ARRAY_CONCAT/ARRAY_CAT between dialects with different NULL propagation semantics.
-// Dialects that propagate NULLs need to set `ARRAY_FUNCS_PROPAGATES_NULLS` to True.
+// arrayConcatSQL transpiles ARRAY_CONCAT/ARRAY_CAT between dialects with different NULL
+// propagation semantics; dialects that propagate NULLs set ARRAY_FUNCS_PROPAGATES_NULLS.
 func arrayConcatSQL(name string) GenFunc {
-	// Build ARRAY_CONCAT call from a list of arguments, handling variadic vs binary nesting.
 	buildFuncCall := func(g *Generator, funcName string, args []*Expr) string {
 		if g.s.ARRAY_CONCAT_IS_VAR_LEN {
 			return g.fn(funcName, dhExprsToAny(args)...)
@@ -387,8 +597,8 @@ func arrayConcatSQL(name string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		this := e.This()
 		if x, ok := e.Arg("expressions").(*Expr); ok && x != nil {
-			// A single node in `expressions` (ClickHouse arrayConcat): `[this] + exprs` falls back to
-			// Expr.__radd__ and builds an Add, which later fails as a list.
+			// A single node instead of a list in `expressions` (ClickHouse arrayConcat) is
+			// rejected; the messages keep their historical wording.
 			if e.ArgB("null_propagation") == g.d.S.ARRAY_FUNCS_PROPAGATES_NULLS || this.IsA(KArray) {
 				if g.s.ARRAY_CONCAT_IS_VAR_LEN {
 					panic(&ValueError{Msg: "'Add' object is not iterable"})
@@ -413,7 +623,6 @@ func arrayConcatSQL(name string) GenFunc {
 		// Case 1: Source propagates NULLs, target doesn't (Snowflake → DuckDB)
 		// Check if ANY argument is NULL and return NULL explicitly
 		if sourceNullPropagation {
-			// Build OR-chain: a IS NULL OR b IS NULL OR c IS NULL
 			nullChecks := make([]*Expr, 0, len(allArgs))
 			for _, arg := range allArgs {
 				nullChecks = append(nullChecks, New(KIs, "this", arg.Copy(), "expression", New(KNull)))
@@ -439,7 +648,6 @@ func arrayConcatSQL(name string) GenFunc {
 	}
 }
 
-// dhExprsToAny converts an expression list into Generator.func arguments.
 func dhExprsToAny(list []*Expr) []any {
 	out := make([]any, len(list))
 	for i, x := range list {
@@ -448,7 +656,6 @@ func dhExprsToAny(list []*Expr) []any {
 	return out
 }
 
-// varMapSQL mirrors dialect.var_map_sql(self, expression, map_func_name="MAP").
 func varMapSQL(g *Generator, e *Expr, mapFuncName string /*="MAP"*/) string {
 	keys := e.Arg("keys")
 	values := e.Arg("values")
@@ -470,56 +677,49 @@ func varMapSQL(g *Generator, e *Expr, mapFuncName string /*="MAP"*/) string {
 	return g.fn(mapFuncName, args...)
 }
 
-// monthsBetweenSQL mirrors dialect.months_between_sql.
-//
-// Transpile MONTHS_BETWEEN to dialects that don't have native support.
-// Formula: DATEDIFF('month', date2, date1) + (DAY(date1) - DAY(date2)) / 31.0.
+// monthsBetweenSQL transpiles MONTHS_BETWEEN to dialects that don't have native support.
+// Formula: DATEDIFF('month', date2, date1) + (DAY(date1) - DAY(date2)) / 31.0, with the
+// fraction 0 when both dates are the last day of their month.
 func monthsBetweenSQL(g *Generator, e *Expr) string {
 	date1 := e.This()
 	date2 := e.Expression()
 
-	// Cast to DATE to ensure consistent behavior
 	date1Cast := CastExpr(date1, DT_DATE, false, nil)
 	date2Cast := CastExpr(date2, DT_DATE, false, nil)
 
-	// Whole months: DATEDIFF('month', date2, date1)
 	wholeMonths := New(KDateDiff, "this", date1Cast, "expression", date2Cast, "unit", VarChecked("month"))
 
-	// Day components
 	day1 := New(KDay, "this", date1Cast.Copy())
 	day2 := New(KDay, "this", date2Cast.Copy())
 
-	// Last day of month components
 	lastDayOfMonth1 := New(KLastDay, "this", date1Cast.Copy())
 	lastDayOfMonth2 := New(KLastDay, "this", date2Cast.Copy())
 
 	dayOfLastDay1 := New(KDay, "this", lastDayOfMonth1)
 	dayOfLastDay2 := New(KDay, "this", lastDayOfMonth2)
 
-	// Check if both are last day of month
 	lastDay1 := New(KEQ, "this", day1.Copy(), "expression", dayOfLastDay1)
 	lastDay2 := New(KEQ, "this", day2.Copy(), "expression", dayOfLastDay2)
 	bothLastDay := New(KAnd, "this", lastDay1, "expression", lastDay2)
 
-	// Fractional part: (DAY(date1) - DAY(date2)) / 31.0
 	fractional := New(
 		KDiv,
 		"this", New(KParen, "this", New(KSub, "this", day1.Copy(), "expression", day2.Copy())),
 		"expression", LiteralNumber("31.0"),
 	)
 
-	// If both are last day of month, fractional = 0, else calculate fractional
 	fractionalWithCheck := New(KIf, "this", bothLastDay, "true", LiteralNumber("0"), "false", fractional)
 
-	// Final result: whole_months + fractional
 	result := New(KAdd, "this", wholeMonths, "expression", fractionalWithCheck)
 
 	return g.sql(result)
 }
 
-// buildFormattedTime mirrors dialect.build_formatted_time(exp_class, dialect_override=None, default=None).
-// dialectOverride "" means None; def is nil (None), true, false or a string.
-func buildFormattedTime(kind Kind, dialectOverride string /*=None*/, def any /*=None*/) FuncBuilder {
+// buildFormattedTime returns a builder for kind(this, format), mapping the format through the
+// TIME_MAPPING of the dialect (or of dialectOverride; "" means none). Without a format
+// argument, def selects one: true for the dialect's TIME_FORMAT, a string for that format,
+// nil or false for none.
+func buildFormattedTime(kind Kind, dialectOverride string /*=""*/, def any /*=nil*/) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		targetDialect := d
 		if dialectOverride != "" {
@@ -530,7 +730,6 @@ func buildFormattedTime(kind Kind, dialectOverride string /*=None*/, def any /*=
 		if fmtArg := seqGet(args, 1); fmtArg != nil {
 			format = targetDialect.formatTimeExpr(fmtArg)
 		} else {
-			// fmt = target_dialect.TIME_FORMAT if default is True else default or None
 			if b, ok := def.(bool); ok && b {
 				format = targetDialect.formatTimeStr(targetDialect.S.TIME_FORMAT)
 			} else if s, ok := def.(string); ok && s != "" {
@@ -542,12 +741,11 @@ func buildFormattedTime(kind Kind, dialectOverride string /*=None*/, def any /*=
 	}
 }
 
-// timeFormat mirrors dialect.time_format(dialect=None). The returned callable yields either a string
-// or nil (Python None) so that it can be passed straight to g.fn. dialect "" means None.
-func timeFormat(dialect string /*=None*/) func(g *Generator, e *Expr) any {
+// timeFormat returns a callable yielding an expression's time format, or nil when it equals
+// the TIME_FORMAT of the given dialect ("" means the base dialect), so that the result can be
+// passed straight to g.fn.
+func timeFormat(dialect string /*=""*/) func(g *Generator, e *Expr) any {
 	return func(g *Generator, e *Expr) any {
-		// Returns the time format for a given expression, unless it's equivalent
-		// to the default time format of the dialect of interest.
 		tf := g.formatTime(e, nil, nil)
 		if tf == "" || tf == MustDialect(dialect).S.TIME_FORMAT {
 			return nil
@@ -556,13 +754,14 @@ func timeFormat(dialect string /*=None*/) func(g *Generator, e *Expr) any {
 	}
 }
 
-// buildDateDelta mirrors dialect.build_date_delta(exp_class, unit_mapping=None, default_unit="DAY",
-// supports_timezone=False). defaultUnit "" means None.
+// buildDateDelta returns a builder for kind(this, expression, unit). With three or more
+// arguments the unit comes first (and with four and supportsTimezone the last one is the
+// zone); otherwise defaultUnit is used ("" means none). unitMapping renames lowercased units.
 func buildDateDelta(
 	kind Kind,
-	unitMapping map[string]string, /*=None*/
+	unitMapping map[string]string, /*=nil*/
 	defaultUnit string, /*="DAY"*/
-	supportsTimezone bool, /*=False*/
+	supportsTimezone bool, /*=false*/
 ) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		unitBased := len(args) >= 3
@@ -596,9 +795,10 @@ func buildDateDelta(
 	}
 }
 
-// buildDateDeltaWithInterval mirrors dialect.build_date_delta_with_interval(expression_class, default_unit=None).
-// defaultUnit "" means None. Returns nil (None) when fewer than 2 args are given.
-func buildDateDeltaWithInterval(kind Kind, defaultUnit string /*=None*/) FuncBuilder {
+// buildDateDeltaWithInterval returns a builder for kind(this, n, unit) that takes n and the unit
+// from an INTERVAL argument. A non-interval argument uses defaultUnit, or is a parse error when
+// defaultUnit is "". Returns nil when fewer than 2 args are given.
+func buildDateDeltaWithInterval(kind Kind, defaultUnit string /*=""*/) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		if len(args) < 2 {
 			return nil
@@ -617,7 +817,6 @@ func buildDateDeltaWithInterval(kind Kind, defaultUnit string /*=None*/) FuncBui
 	}
 }
 
-// dateTruncToTime mirrors dialect.date_trunc_to_time.
 func dateTruncToTime(args []*Expr, d *Dialect) *Expr {
 	unit := seqGet(args, 0)
 	this := seqGet(args, 1)
@@ -628,7 +827,6 @@ func dateTruncToTime(args []*Expr, d *Dialect) *Expr {
 	return New(KTimestampTrunc, "this", this, "unit", unit)
 }
 
-// dateAddIntervalSQL mirrors dialect.date_add_interval_sql(data_type, kind).
 func dateAddIntervalSQL(dataType string, kind string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		this := g.sqlKey(e, "this")
@@ -637,8 +835,7 @@ func dateAddIntervalSQL(dataType string, kind string) GenFunc {
 	}
 }
 
-// timestamptruncSQL mirrors dialect.timestamptrunc_sql(func="DATE_TRUNC", zone=False).
-func timestamptruncSQL(fn string /*="DATE_TRUNC"*/, zone bool /*=False*/) GenFunc {
+func timestamptruncSQL(fn string /*="DATE_TRUNC"*/, zone bool /*=false*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		args := []any{unitToStr(e, "DAY"), e.This()}
 		if zone {
@@ -648,7 +845,6 @@ func timestamptruncSQL(fn string /*="DATE_TRUNC"*/, zone bool /*=False*/) GenFun
 	}
 }
 
-// noTimestampSQL mirrors dialect.no_timestamp_sql.
 func noTimestampSQL(g *Generator, e *Expr) string {
 	zone := e.ArgE("zone")
 	if zone == nil {
@@ -668,7 +864,6 @@ func noTimestampSQL(g *Generator, e *Expr) string {
 	return g.fn("TIMESTAMP", e.Arg("this"), zone)
 }
 
-// noTimeSQL mirrors dialect.no_time_sql.
 func noTimeSQL(g *Generator, e *Expr) string {
 	// Transpile BQ's TIME(timestamp, zone) to CAST(TIMESTAMPTZ <timestamp> AT TIME ZONE <zone> AS TIME)
 	this := CastExpr(e.This(), DT_TIMESTAMPTZ, true, nil)
@@ -676,7 +871,6 @@ func noTimeSQL(g *Generator, e *Expr) string {
 	return g.sql(expr)
 }
 
-// noDatetimeSQL mirrors dialect.no_datetime_sql.
 func noDatetimeSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	expr := e.Expression()
@@ -694,12 +888,10 @@ func noDatetimeSQL(g *Generator, e *Expr) string {
 	return g.sql(CastExpr(New(KAdd, "this", this, "expression", expr), DT_TIMESTAMP, true, nil))
 }
 
-// leftToSubstringSQL mirrors dialect.left_to_substring_sql.
 func leftToSubstringSQL(g *Generator, e *Expr) string {
 	return g.sql(New(KSubstring, "this", e.This(), "start", LiteralInt(1), "length", e.Expression()))
 }
 
-// rightToSubstringSQL mirrors dialect.right_to_substring_sql.
 func rightToSubstringSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	start := dhBinop(
@@ -710,8 +902,7 @@ func rightToSubstringSQL(g *Generator, e *Expr) string {
 	return g.sql(New(KSubstring, "this", this, "start", start))
 }
 
-// timestrtotimeSQL mirrors dialect.timestrtotime_sql(self, expression, include_precision=False).
-func timestrtotimeSQL(g *Generator, e *Expr, includePrecision bool /*=False*/) string {
+func timestrtotimeSQL(g *Generator, e *Expr, includePrecision bool /*=false*/) string {
 	builder := DT_TIMESTAMP
 	if e.ArgB("zone") {
 		builder = DT_TIMESTAMPTZ
@@ -729,14 +920,13 @@ func timestrtotimeSQL(g *Generator, e *Expr, includePrecision bool /*=False*/) s
 	return g.sql(CastExpr(e.This(), datatype, true, g.d))
 }
 
-// datestrtodateSQL mirrors dialect.datestrtodate_sql.
 func datestrtodateSQL(g *Generator, e *Expr) string {
 	return g.sql(CastExpr(e.This(), DT_DATE, true, nil))
 }
 
-// encodeDecodeSQL mirrors dialect.encode_decode_sql(self, expression, name, replace=True).
-// Used for Presto and Duckdb which use functions that don't support charset, and assume utf-8.
-func encodeDecodeSQL(g *Generator, e *Expr, name string, replace bool /*=True*/) string {
+// encodeDecodeSQL generates name(this[, replace]) for Presto and DuckDB, whose functions take no
+// charset and assume UTF-8; any other charset is unsupported.
+func encodeDecodeSQL(g *Generator, e *Expr, name string, replace bool /*=true*/) string {
 	charset := e.ArgE("charset")
 	if charset != nil {
 		if n := pyLower(charset.Name()); n != "utf-8" && n != "utf8" {
@@ -751,7 +941,6 @@ func encodeDecodeSQL(g *Generator, e *Expr, name string, replace bool /*=True*/)
 	return g.fn(name, e.Arg("this"), r)
 }
 
-// minOrLeast mirrors dialect.min_or_least.
 func minOrLeast(g *Generator, e *Expr) string {
 	name := "MIN"
 	if len(e.Expressions()) > 0 {
@@ -760,7 +949,6 @@ func minOrLeast(g *Generator, e *Expr) string {
 	return renameFunc(name)(g, e)
 }
 
-// maxOrGreatest mirrors dialect.max_or_greatest.
 func maxOrGreatest(g *Generator, e *Expr) string {
 	name := "MAX"
 	if len(e.Expressions()) > 0 {
@@ -769,7 +957,6 @@ func maxOrGreatest(g *Generator, e *Expr) string {
 	return renameFunc(name)(g, e)
 }
 
-// countIfToSum mirrors dialect.count_if_to_sum.
 func countIfToSum(g *Generator, e *Expr) string {
 	cond := e.This()
 
@@ -781,11 +968,12 @@ func countIfToSum(g *Generator, e *Expr) string {
 	return g.fn("sum", dhFunc("if", cond, 1, 0))
 }
 
-// trimSQL mirrors dialect.trim_sql(self, expression, default_trim_type="").
+// trimSQL generates TRIM([position ][chars ]FROM target[ COLLATE c]) when characters to remove
+// are given, otherwise the dialect's trim function. defaultTrimType applies when no position is
+// set.
 func trimSQL(g *Generator, e *Expr, defaultTrimType string /*=""*/) string {
 	removeChars := g.sqlKey(e, "expression")
 
-	// Use TRIM/LTRIM/RTRIM syntax if the expression isn't database-specific
 	if removeChars == "" {
 		return g.trimSQL(e)
 	}
@@ -813,10 +1001,9 @@ func trimSQL(g *Generator, e *Expr, defaultTrimType string /*=""*/) string {
 	return "TRIM(" + trimType + removeChars + fromPart + target + collation + ")"
 }
 
-// concatToDpipeSQL mirrors dialect.concat_to_dpipe_sql.
 func concatToDpipeSQL(g *Generator, e *Expr) string {
-	exprs := e.Expressions()
-	// reduce() without an initializer raises on an empty sequence
+	exprs := g.convertConcatArgs(e)
+	// At least one argument is required
 	acc := exprs[0]
 	for _, y := range exprs[1:] {
 		acc = New(KDPipe, "this", acc, "expression", y)
@@ -824,11 +1011,10 @@ func concatToDpipeSQL(g *Generator, e *Expr) string {
 	return g.sql(acc)
 }
 
-// concatWsToDpipeSQL mirrors dialect.concat_ws_to_dpipe_sql.
 func concatWsToDpipeSQL(g *Generator, e *Expr) string {
 	exprs := e.Expressions()
 	delim, restArgs := exprs[0], exprs[1:]
-	// reduce() without an initializer raises on an empty sequence
+	// At least one argument after the delimiter is required
 	acc := restArgs[0]
 	for _, y := range restArgs[1:] {
 		acc = New(KDPipe, "this", acc, "expression", New(KDPipe, "this", delim, "expression", y))
@@ -836,12 +1022,10 @@ func concatWsToDpipeSQL(g *Generator, e *Expr) string {
 	return g.sql(acc)
 }
 
-// regexpExtractSQL mirrors dialect.regexp_extract_sql.
 func regexpExtractSQL(g *Generator, e *Expr) string {
 	dhUnsupportedArgs(g, e, "position", "occurrence", "parameters")
 	group := e.ArgE("group")
 
-	// Do not render group if it's the default value for this dialect
 	if group != nil && group.Name() == strconv.Itoa(g.d.S.REGEXP_EXTRACT_DEFAULT_GROUP) {
 		group = nil
 	}
@@ -849,17 +1033,18 @@ func regexpExtractSQL(g *Generator, e *Expr) string {
 	return g.fn(e.Kind().SQLName(), e.Arg("this"), e.Arg("expression"), group)
 }
 
-// regexpReplaceSQL mirrors dialect.regexp_replace_sql.
 func regexpReplaceSQL(g *Generator, e *Expr) string {
 	dhUnsupportedArgs(g, e, "position", "occurrence", "modifiers")
 	if !e.HasArgKey("replacement") {
-		// expression.args["replacement"] raises KeyError
+		// A missing replacement is an error (the message is the quoted key)
 		panic(&ValueError{Msg: "'replacement'"})
 	}
 	return g.fn("REGEXP_REPLACE", e.Arg("this"), e.Arg("expression"), e.Arg("replacement"))
 }
 
-// pivotColumnNames mirrors dialect.pivot_column_names(aggregations, dialect). d nil means None.
+// pivotColumnNames returns the column name suffixes of pivot aggregations: the alias, or the
+// aggregation's SQL (lowercase function names, identifiers unquoted). d nil means the default
+// dialect.
 func pivotColumnNames(aggregations []*Expr, d *Dialect) []string {
 	names := []string{}
 	for _, agg := range aggregations {
@@ -868,7 +1053,7 @@ func pivotColumnNames(aggregations []*Expr, d *Dialect) []string {
 		} else {
 			// This case corresponds to aggregations without aliases being used as suffixes
 			// (e.g. col_avg(foo)). We need to unquote identifiers because they're going to
-			// be quoted in the base parser's `_parse_pivot` method, due to `to_identifier`.
+			// be quoted by the parser's parsePivot, due to ToIdentifier.
 			// Otherwise, we'd end up with `col_avg(`foo`)` (notice the double quotes).
 			aggAllUnquoted := agg.Transform(func(node *Expr) *Expr {
 				if node.IsA(KIdentifier) {
@@ -890,33 +1075,26 @@ func pivotColumnNames(aggregations []*Expr, d *Dialect) []string {
 	return names
 }
 
-// binaryFromFunction mirrors dialect.binary_from_function(expr_type).
 func binaryFromFunction(kind Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		return New(kind, "this", seqGet(args, 0), "expression", seqGet(args, 1))
 	}
 }
 
-// buildTimestampTrunc mirrors dialect.build_timestamp_trunc.
-// Used to represent DATE_TRUNC in Doris, Postgres and Starrocks dialects.
 func buildTimestampTrunc(args []*Expr, d *Dialect) *Expr {
-	return New(KTimestampTrunc, "this", seqGet(args, 1), "unit", seqGet(args, 0))
+	return New(KTimestampTrunc, "this", seqGet(args, 1), "unit", seqGet(args, 0), "zone", seqGet(args, 2))
 }
 
-// buildTrunc mirrors dialect.build_trunc(args, dialect, date_trunc_unabbreviate=True,
-// default_date_trunc_unit=None, date_trunc_requires_part=True, fractions_supported=False).
-// defaultDateTruncUnit "" means None.
-//
-// Builder for dialects with overloaded TRUNC (Oracle, Snowflake, etc).
+// buildTrunc builds TRUNC for dialects with overloaded TRUNC (Oracle, Snowflake, etc).
 // Uses type annotation to distinguish date vs numeric truncation.
-// Returns Anonymous if type cannot be determined.
+// Returns Anonymous if type cannot be determined. defaultDateTruncUnit "" means none.
 func buildTrunc(
 	args []*Expr,
 	d *Dialect,
-	dateTruncUnabbreviate bool, /*=True*/
-	defaultDateTruncUnit string, /*=None*/
-	dateTruncRequiresPart bool, /*=True*/
-	fractionsSupported bool, /*=False*/
+	dateTruncUnabbreviate bool, /*=true*/
+	defaultDateTruncUnit string, /*=""*/
+	dateTruncRequiresPart bool, /*=true*/
+	fractionsSupported bool, /*=false*/
 ) *Expr {
 	this := seqGet(args, 0)
 	second := seqGet(args, 1)
@@ -935,7 +1113,7 @@ func buildTrunc(
 		if unit == nil {
 			unit = LiteralString(defaultDateTruncUnit)
 		}
-		// DateTrunc.__init__ pops `unabbreviate` (see report: New() must implement DateTrunc/TimeUnit init).
+		// New consumes `unabbreviate` for DateTrunc (see dateTruncCtorArgs); it is not stored.
 		return New(KDateTrunc, "this", this, "unit", unit, "unabbreviate", dateTruncUnabbreviate)
 	}
 
@@ -949,29 +1127,28 @@ func buildTrunc(
 	return New(KAnonymous, "this", "TRUNC", "expressions", args)
 }
 
-// anyValueToMaxSQL mirrors dialect.any_value_to_max_sql.
 func anyValueToMaxSQL(g *Generator, e *Expr) string {
 	return g.fn("MAX", e.Arg("this"))
 }
 
-// boolXorSQL mirrors dialect.bool_xor_sql.
 func boolXorSQL(g *Generator, e *Expr) string {
 	a := g.sql(e.Left())
 	b := g.sql(e.Right())
 	return "(" + a + " AND (NOT " + b + ")) OR ((NOT " + a + ") AND " + b + ")"
 }
 
-// isParseJSON mirrors dialect.is_parse_json.
 func isParseJSON(e *Expr) bool {
 	return e.IsA(KParseJSON) || (e.IsA(KCast) && dhIsType(e, DT_JSON))
 }
 
-// isnullToIsNull mirrors dialect.isnull_to_is_null.
 func isnullToIsNull(args []*Expr, d *Dialect) *Expr {
-	return New(KParen, "this", New(KIs, "this", seqGet(args, 0), "expression", Null()))
+	this := seqGet(args, 0)
+	if this.IsA(KPredicate, KConnector, KNot) {
+		this = New(KParen, "this", this)
+	}
+	return New(KParen, "this", New(KIs, "this", this, "expression", Null()))
 }
 
-// generatedasidentitycolumnconstraintSQL mirrors dialect.generatedasidentitycolumnconstraint_sql.
 func generatedasidentitycolumnconstraintSQL(g *Generator, e *Expr) string {
 	start := g.sqlKey(e, "start")
 	if start == "" {
@@ -984,7 +1161,6 @@ func generatedasidentitycolumnconstraintSQL(g *Generator, e *Expr) string {
 	return "IDENTITY(" + start + ", " + increment + ")"
 }
 
-// argMaxOrMinNoCount mirrors dialect.arg_max_or_min_no_count(name).
 func argMaxOrMinNoCount(name string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		dhUnsupportedArgs(g, e, "count")
@@ -992,8 +1168,6 @@ func argMaxOrMinNoCount(name string) GenFunc {
 	}
 }
 
-// dhTsOrDsReturnType mirrors the TsOrDsAdd.return_type property:
-// DataType.build(self.args.get("return_type") or DType.DATE).
 func dhTsOrDsReturnType(e *Expr) *Expr {
 	rt := e.Arg("return_type")
 	if !truthy(rt) {
@@ -1002,7 +1176,6 @@ func dhTsOrDsReturnType(e *Expr) *Expr {
 	return DataTypeBuild(rt, nil, false, true)
 }
 
-// tsOrDsAddCast mirrors dialect.ts_or_ds_add_cast.
 func tsOrDsAddCast(e *Expr) *Expr {
 	this := e.This().Copy()
 
@@ -1017,8 +1190,7 @@ func tsOrDsAddCast(e *Expr) *Expr {
 	return e
 }
 
-// dateDeltaSQL mirrors dialect.date_delta_sql(name, cast=False).
-func dateDeltaSQL(name string, cast bool /*=False*/) GenFunc {
+func dateDeltaSQL(name string, cast bool /*=false*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		if cast && e.IsA(KTsOrDsAdd) {
 			e = tsOrDsAddCast(e)
@@ -1028,14 +1200,28 @@ func dateDeltaSQL(name string, cast bool /*=False*/) GenFunc {
 	}
 }
 
-// dateDeltaToBinaryIntervalOp mirrors dialect.date_delta_to_binary_interval_op(cast=True).
-func dateDeltaToBinaryIntervalOp(cast bool /*=True*/) GenFunc {
+// dateDeltaToBinarySQL generates binary, the +/- form of the date delta e. It is parenthesized
+// when e is an operand of an operator or of AT TIME ZONE, except inside parentheses or as the left
+// side of + or -.
+func dateDeltaToBinarySQL(g *Generator, e *Expr, binary *Expr) string {
+	parent := e.Parent()
+	if parent.IsA(KBinary, KUnary, KAtTimeZone) &&
+		!(parent.IsA(KParen) || (parent.IsA(KAdd, KSub) && parent.This() == e)) {
+		return g.sql(Paren(binary))
+	}
+	return g.sql(binary)
+}
+
+// dateDeltaToBinaryIntervalOp returns a GenFunc generating a date delta as this +/- INTERVAL
+// (see dateDeltaToBinarySQL). With cast, a TS_OR_DS_ADD operand is cast to its return type and a
+// string operand to DATE (DATETIME for DATETIME_ADD/SUB and TIMESTAMP_ADD/SUB).
+func dateDeltaToBinaryIntervalOp(cast bool /*=true*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		this := e.This()
 		unit := unitToVar(e, "DAY")
-		op := "-"
+		op := KSub
 		if e.IsA(KDateAdd, KTimeAdd, KDatetimeAdd, KTsOrDsAdd, KTimestampAdd) {
-			op = "+"
+			op = KAdd
 		}
 
 		var toType any
@@ -1043,8 +1229,7 @@ func dateDeltaToBinaryIntervalOp(cast bool /*=True*/) GenFunc {
 			if e.IsA(KTsOrDsAdd) {
 				toType = dhTsOrDsReturnType(e)
 			} else if this.IsString() {
-				// Cast string literals (i.e function parameters) to the appropriate type for +/- interval to work
-				if e.IsA(KDatetimeAdd, KDatetimeSub) {
+				if e.IsA(KDatetimeAdd, KDatetimeSub, KTimestampAdd, KTimestampSub) {
 					toType = DT_DATETIME
 				} else {
 					toType = DT_DATE
@@ -1062,11 +1247,12 @@ func dateDeltaToBinaryIntervalOp(cast bool /*=True*/) GenFunc {
 			interval = New(KInterval, "this", expr, "unit", unit)
 		}
 
-		return g.sql(this) + " " + op + " " + g.sql(interval)
+		return dateDeltaToBinarySQL(g, e, dhBinop(op, this, interval))
 	}
 }
 
-// unitToStr mirrors dialect.unit_to_str(expression, default="DAY"). def "" means None.
+// unitToStr returns the unit of e as a string literal; placeholders and units that are neither a
+// Var nor a Literal are returned as is. A missing unit becomes def ("" means nil).
 func unitToStr(e *Expr, def string /*="DAY"*/) *Expr {
 	unit := e.ArgE("unit")
 	if unit == nil {
@@ -1083,7 +1269,8 @@ func unitToStr(e *Expr, def string /*="DAY"*/) *Expr {
 	return LiteralString(unit.Name())
 }
 
-// unitToVar mirrors dialect.unit_to_var(expression, default="DAY"). def "" means None.
+// unitToVar returns the unit of e as a Var; Var, placeholder, WEEK(day) and column units are
+// returned as is. A missing unit becomes def ("" means nil).
 func unitToVar(e *Expr, def string /*="DAY"*/) *Expr {
 	unit := e.ArgE("unit")
 
@@ -1101,9 +1288,7 @@ func unitToVar(e *Expr, def string /*="DAY"*/) *Expr {
 	return nil
 }
 
-// WEEK_START_DAY_TO_DOW mirrors dialect.WEEK_START_DAY_TO_DOW.
-// Days of week to ISO 8601 day-of-week numbers
-// ISO 8601 standard: Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6, Sunday=7.
+// WEEK_START_DAY_TO_DOW maps day names to ISO 8601 day-of-week numbers (Monday=1, Sunday=7).
 var WEEK_START_DAY_TO_DOW = map[string]int{
 	"MONDAY":    1,
 	"TUESDAY":   2,
@@ -1114,9 +1299,14 @@ var WEEK_START_DAY_TO_DOW = map[string]int{
 	"SUNDAY":    7,
 }
 
-// weekUnitToDow mirrors dialect.week_unit_to_dow. ok=false means None.
-//
-// Compute the week start day for a week-ish diff unit, e.g BigQuery's WEEK(<day>) or ISOWEEK unit parts.
+// weekOffsetToDow converts a dialect's WEEK_OFFSET (days relative to Monday) to the ISO day number
+// of its week's first day.
+func weekOffsetToDow(offset int) int {
+	return ((offset%7)+7)%7 + 1
+}
+
+// weekUnitToDow computes the week start day for a week-ish diff unit, e.g BigQuery's WEEK(<day>)
+// or ISOWEEK unit parts. ok=false when the unit is not week-based.
 func weekUnitToDow(unit *Expr) (int, bool) {
 	if unit.IsA(KVar) {
 		if n := pyUpper(unit.Name()); n == "WEEK" || n == "ISOWEEK" {
@@ -1124,7 +1314,6 @@ func weekUnitToDow(unit *Expr) (int, bool) {
 		}
 	}
 
-	// Handle WeekStart expressions with explicit day
 	if unit.IsA(KWeekStart) {
 		v, ok := WEEK_START_DAY_TO_DOW[pyUpper(unit.Name())]
 		return v, ok
@@ -1133,7 +1322,8 @@ func weekUnitToDow(unit *Expr) (int, bool) {
 	return 0, false
 }
 
-// mapDatePart mirrors dialect.map_date_part(part, dialect=Dialect). d nil means the base Dialect.
+// mapDatePart renames part through the dialect's DATE_PART_MAPPING (string literals stay
+// strings); d nil means the base dialect. Qualified columns are returned as is.
 func mapDatePart(part *Expr, d *Dialect) *Expr {
 	mapped := ""
 	if part != nil && !(part.IsA(KColumn) && len(part.Parts()) != 1) {
@@ -1152,7 +1342,6 @@ func mapDatePart(part *Expr, d *Dialect) *Expr {
 	return part
 }
 
-// noLastDaySQL mirrors dialect.no_last_day_sql.
 func noLastDaySQL(g *Generator, e *Expr) string {
 	truncCurrDate := dhFunc("date_trunc", "month", e.This())
 	plusOneMonth := dhFunc("date_add", truncCurrDate, 1, "month")
@@ -1161,12 +1350,10 @@ func noLastDaySQL(g *Generator, e *Expr) string {
 	return g.sql(CastExpr(minusOneDay, DT_DATE, true, nil))
 }
 
-// mergeWithoutTargetSQL mirrors dialect.merge_without_target_sql.
-// Remove table refs from columns in when statements.
+// mergeWithoutTargetSQL generates MERGE for dialects that reject target-qualified columns.
 func mergeWithoutTargetSQL(g *Generator, e *Expr) string {
 	alias := e.This().argForAttr("alias", "this")
 
-	// normalize returns (name, false) for None
 	normalize := func(identifier *Expr) (string, bool) {
 		if identifier == nil {
 			return "", false
@@ -1226,16 +1413,18 @@ func mergeWithoutTargetSQL(g *Generator, e *Expr) string {
 	return g.mergeSQL(e)
 }
 
-// buildJSONExtractPath mirrors dialect.build_json_extract_path(expr_type, zero_based_indexing=True,
-// arrow_req_json_type=False, json_type=None). jsonType "" means None.
+// buildJSONExtractPath returns a builder for kind(json, path...) that turns literal path
+// arguments into a JSON path: integers become subscripts (shifted when !zeroBasedIndexing),
+// other values keys. Non-literal path arguments fall back to FromArgList. jsonType "" means
+// unset.
 //
-// Python's `del args[2:]` truncates the caller's list (affecting the parser's argument-count
-// validation); this is reported to the caller through WithValidateArgs.
+// Only the first two arguments are kept so argument-count validation passes; WithValidateArgs
+// reports the truncated list to the caller.
 func buildJSONExtractPath(
 	kind Kind,
-	zeroBasedIndexing bool, /*=True*/
-	arrowReqJSONType bool, /*=False*/
-	jsonType string, /*=None*/
+	zeroBasedIndexing bool, /*=true*/
+	arrowReqJSONType bool, /*=false*/
+	jsonType string, /*=""*/
 ) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		segments := []*Expr{New(KJSONPathRoot)}
@@ -1243,7 +1432,11 @@ func buildJSONExtractPath(
 			for _, arg := range args[1:] {
 				if !arg.IsA(KLiteral) {
 					// We use the fallback parser because we can't really transpile non-literals safely
-					return FromArgList(kind, args)
+					var rest any
+					if len(args) > 2 {
+						rest = args[2:]
+					}
+					return New(kind, "this", seqGet(args, 0), "expression", seqGet(args, 1), "expressions", rest)
 				}
 
 				text := arg.Name()
@@ -1281,8 +1474,10 @@ func buildJSONExtractPath(
 	}
 }
 
-// jsonExtractSegments mirrors dialect.json_extract_segments(name, quoted_index=True, op=None). op "" means None.
-func jsonExtractSegments(name string, quotedIndex bool /*=True*/, op string /*=None*/) GenFunc {
+// jsonExtractSegments returns a GenFunc generating name(json, 'seg1', ...) from a JSON path, or
+// json op 'seg1' op ... when op is set ("" means none). quotedIndex quotes subscripts too;
+// other path arguments go through renameFunc.
+func jsonExtractSegments(name string, quotedIndex bool /*=true*/, op string /*=""*/) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		path := e.Expression()
 		if !path.IsA(KJSONPath) {
@@ -1291,15 +1486,10 @@ func jsonExtractSegments(name string, quotedIndex bool /*=True*/, op string /*=N
 
 		var segments []string
 		for _, segment := range path.Expressions() {
-			escape := segment.ArgB("quoted")
 			p := g.sql(segment)
 			if p != "" {
 				if segment.IsA(KJSONPathPart) && (quotedIndex || !segment.IsA(KJSONPathSubscript)) {
-					if escape {
-						p = g.escapeStr(p, true, "", "", false)
-					}
-
-					p = g.d.S.QUOTE_START + p + g.d.S.QUOTE_END
+					p = g.d.S.QUOTE_START + g.escapeStr(p, true, "", "", false) + g.d.S.QUOTE_END
 				}
 
 				segments = append(segments, p)
@@ -1317,7 +1507,6 @@ func jsonExtractSegments(name string, quotedIndex bool /*=True*/, op string /*=N
 	}
 }
 
-// jsonPathKeyOnlyName mirrors dialect.json_path_key_only_name.
 func jsonPathKeyOnlyName(g *Generator, e *Expr) string {
 	if e.This().IsA(KJSONPathWildcard) {
 		g.unsupported("Unsupported wildcard in JSONPathKey expression")
@@ -1326,7 +1515,8 @@ func jsonPathKeyOnlyName(g *Generator, e *Expr) string {
 	return e.Name()
 }
 
-// filterArrayUsingUnnest mirrors dialect.filter_array_using_unnest.
+// filterArrayUsingUnnest generates an array filter (or ARRAY_REMOVE) as
+// ARRAY(SELECT x FROM UNNEST(array) AS (x) WHERE cond), with x the lambda parameter or _u.
 func filterArrayUsingUnnest(g *Generator, e *Expr) string {
 	cond := e.Expression()
 	var alias any
@@ -1348,7 +1538,6 @@ func filterArrayUsingUnnest(g *Generator, e *Expr) string {
 	if a, ok := alias.(*Expr); ok {
 		selectAlias = a
 	} else {
-		// exp.select("_u") parses the string (into=exp.Expr)
 		selectAlias = MaybeParse(alias.(string), KExpr, "", nil)
 	}
 	filtered := SelectExpr(selectAlias).
@@ -1357,7 +1546,6 @@ func filterArrayUsingUnnest(g *Generator, e *Expr) string {
 	return g.sql(New(KArray, "expressions", []*Expr{filtered}))
 }
 
-// arrayCompactSQL mirrors dialect.array_compact_sql.
 func arrayCompactSQL(g *Generator, e *Expr) string {
 	lambdaID := ToIdentifier("_u", nil)
 	cond := NotExpr(New(KIs, "this", lambdaID, "expression", Null()), true)
@@ -1368,7 +1556,6 @@ func arrayCompactSQL(g *Generator, e *Expr) string {
 	))
 }
 
-// removeFromArrayUsingFilter mirrors dialect.remove_from_array_using_filter.
 func removeFromArrayUsingFilter(g *Generator, e *Expr) string {
 	lambdaID := ToIdentifier("_u", nil)
 	cond := New(KNEQ, "this", lambdaID, "expression", e.Expression())
@@ -1379,7 +1566,6 @@ func removeFromArrayUsingFilter(g *Generator, e *Expr) string {
 		"expression", New(KLambda, "this", cond, "expressions", []*Expr{lambdaID}),
 	))
 
-	// Handle NULL propagation for ArrayRemove
 	sourceNullPropagation := e.ArgB("null_propagation")
 	targetNullPropagation := g.d.S.ARRAY_FUNCS_PROPAGATES_NULLS
 
@@ -1405,14 +1591,7 @@ func removeFromArrayUsingFilter(g *Generator, e *Expr) string {
 	return filterSQL
 }
 
-// toNumberWithNlsParam mirrors dialect.to_number_with_nls_param.
-func toNumberWithNlsParam(g *Generator, e *Expr) string {
-	return g.fn("TO_NUMBER", e.Arg("this"), e.Arg("format"), e.Arg("nlsparam"))
-}
-
-// buildDefaultDecimalType mirrors dialect.build_default_decimal_type(precision=None, scale=None).
-// Negative precision / scale mean None.
-func buildDefaultDecimalType(precision int /*=None (<0)*/, scale int /*=None (<0)*/) typeConverterFn {
+func buildDefaultDecimalType(precision int /*=-1 (unset)*/, scale int /*=-1 (unset)*/) typeConverterFn {
 	return func(dtype *Expr) *Expr {
 		if len(dtype.Expressions()) > 0 || precision < 0 {
 			return dtype
@@ -1426,18 +1605,6 @@ func buildDefaultDecimalType(precision int /*=None (<0)*/, scale int /*=None (<0
 	}
 }
 
-// buildTimestampFromParts mirrors dialect.build_timestamp_from_parts.
-func buildTimestampFromParts(args []*Expr, d *Dialect) *Expr {
-	if len(args) == 2 {
-		// Other dialects don't have the TIMESTAMP_FROM_PARTS(date, time) concept,
-		// so we parse this into Anonymous for now instead of introducing complexity
-		return New(KAnonymous, "this", "TIMESTAMP_FROM_PARTS", "expressions", args)
-	}
-
-	return FromArgList(KTimestampFromParts, args)
-}
-
-// sha256SQL mirrors dialect.sha256_sql.
 func sha256SQL(g *Generator, e *Expr) string {
 	length := e.Text("length")
 	if length == "" {
@@ -1446,7 +1613,6 @@ func sha256SQL(g *Generator, e *Expr) string {
 	return g.fn("SHA"+length, e.Arg("this"))
 }
 
-// sha2DigestSQL mirrors dialect.sha2_digest_sql.
 func sha2DigestSQL(g *Generator, e *Expr) string {
 	length := e.Text("length")
 	if length == "" {
@@ -1455,7 +1621,8 @@ func sha2DigestSQL(g *Generator, e *Expr) string {
 	return g.fn("SHA"+length, e.Arg("this"))
 }
 
-// sequenceSQL mirrors dialect.sequence_sql.
+// sequenceSQL generates SEQUENCE(start, end[, step]). A DATE/TIMESTAMP cast on one bound is applied
+// to the other; an end-exclusive sequence becomes an empty array or SEQUENCE(start, end - step).
 func sequenceSQL(g *Generator, e *Expr) string {
 	start := e.ArgE("start")
 	end := e.ArgE("end")
@@ -1516,9 +1683,8 @@ func sequenceSQL(g *Generator, e *Expr) string {
 	return g.fn("SEQUENCE", start, end, step)
 }
 
-// dialectBuildLike mirrors dialect.build_like(expr_type, not_like=False).
-// (Named with a `dialect` prefix because parser.py's module-level build_like already owns `buildLike`.)
-func dialectBuildLike(kind Kind, notLike bool /*=False*/) FuncBuilder {
+// dialectBuildLike has a `dialect` prefix because the parser's buildLike already exists.
+func dialectBuildLike(kind Kind, notLike bool /*=false*/) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		likeExpr := New(kind, "this", seqGet(args, 0), "expression", seqGet(args, 1))
 
@@ -1534,13 +1700,12 @@ func dialectBuildLike(kind Kind, notLike bool /*=False*/) FuncBuilder {
 	}
 }
 
-// buildRegexpExtract mirrors dialect.build_regexp_extract(expr_type).
 func buildRegexpExtract(kind Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		// The "position" argument specifies the index of the string character to start matching from.
 		// `null_if_pos_overflow` reflects the dialect's behavior when position is greater than the string
 		// length. If true, returns NULL. If false, returns an empty string. `null_if_pos_overflow` is
-		// only needed for exp.RegexpExtract - exp.RegexpExtractAll always returns an empty array if
+		// only needed for KRegexpExtract - KRegexpExtractAll always returns an empty array if
 		// position overflows.
 		group := seqGet(args, 2)
 		if group == nil {
@@ -1559,7 +1724,8 @@ func buildRegexpExtract(kind Kind) FuncBuilder {
 	}
 }
 
-// explodeToUnnestSQL mirrors dialect.explode_to_unnest_sql.
+// explodeToUnnestSQL generates LATERAL VIEW EXPLODE as CROSS JOIN UNNEST, and POSEXPLODE as a
+// CROSS JOIN of a LATERAL subquery over UNNEST WITH ORDINALITY; other laterals use lateralSQL.
 func explodeToUnnestSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	alias := e.ArgE("alias")
@@ -1594,12 +1760,10 @@ func explodeToUnnestSQL(g *Generator, e *Expr) string {
 	return g.lateralSQL(e)
 }
 
-// timestampdiffSQL mirrors dialect.timestampdiff_sql.
 func timestampdiffSQL(g *Generator, e *Expr) string {
 	return g.fn("TIMESTAMPDIFF", e.Arg("unit"), e.Arg("expression"), e.Arg("this"))
 }
 
-// noMakeIntervalSQL mirrors dialect.no_make_interval_sql(self, expression, sep=", ").
 func noMakeIntervalSQL(g *Generator, e *Expr, sep string /*=", "*/) string {
 	var args []any
 	for _, a := range e.args {
@@ -1608,13 +1772,22 @@ func noMakeIntervalSQL(g *Generator, e *Expr, sep string /*=", "*/) string {
 			value = v.Expression()
 		}
 
-		args = append(args, dhPyStr(value)+" "+a.key)
+		if chunkAIsNone(value) {
+			continue
+		}
+
+		var valueSQL string
+		if v, ok := value.(*Expr); ok && v.IsString() {
+			valueSQL = v.Name()
+		} else {
+			valueSQL = g.sql(value)
+		}
+		args = append(args, valueSQL+" "+a.key)
 	}
 
-	return "INTERVAL '" + g.formatArgs(sep, args...) + "'"
+	return "INTERVAL " + g.sql(LiteralString(g.formatArgs(sep, args...)))
 }
 
-// lengthOrCharLengthSQL mirrors dialect.length_or_char_length_sql.
 func lengthOrCharLengthSQL(g *Generator, e *Expr) string {
 	lengthFunc := "CHAR_LENGTH"
 	if e.ArgB("binary") {
@@ -1623,15 +1796,16 @@ func lengthOrCharLengthSQL(g *Generator, e *Expr) string {
 	return g.fn(lengthFunc, e.Arg("this"))
 }
 
-// groupconcatSQL mirrors dialect.groupconcat_sql(self, expression, func_name="LISTAGG", sep=",",
-// within_group=True, on_overflow=False). sep "" means None.
+// groupconcatSQL generates GROUP_CONCAT as funcName(this, sep[ ON OVERFLOW ...]), with the
+// ordering as WITHIN GROUP (ORDER BY ...) or inside the call, followed by any LIMIT. sep is
+// the default separator ("" means none).
 func groupconcatSQL(
 	g *Generator,
 	e *Expr,
 	funcName string, /*="LISTAGG"*/
 	sep string, /*=","*/
-	withinGroup bool, /*=True*/
-	onOverflow bool, /*=False*/
+	withinGroup bool, /*=true*/
+	onOverflow bool, /*=false*/
 ) string {
 	this := e.This()
 	var sepExpr any = e.Arg("separator")
@@ -1668,7 +1842,7 @@ func groupconcatSQL(
 	}
 	args := g.formatArgs(", ", this, sepArg)
 
-	// Python stores raw SQL strings in Anonymous.expressions; a Var renders its text verbatim.
+	// The arguments are kept as raw SQL; a Var renders its text verbatim.
 	listagg := New(KAnonymous, "this", funcName, "expressions", []*Expr{dhRawSQL(args)})
 
 	modifiers := g.sql(limit)
@@ -1688,11 +1862,10 @@ func groupconcatSQL(
 	return g.sql(listagg)
 }
 
-// dhRawSQL stands in for a raw SQL string stored inside an expression list (Python allows str
-// elements there); Var renders its `this` verbatim.
+// dhRawSQL wraps a raw SQL string so it can be stored in an expression list; Var renders its
+// `this` verbatim.
 func dhRawSQL(s string) *Expr { return New(KVar, "this", s) }
 
-// buildTimetostrOrTochar mirrors dialect.build_timetostr_or_tochar.
 func buildTimetostrOrTochar(args []*Expr, d *Dialect) *Expr {
 	if len(args) == 2 {
 		this := args[0]
@@ -1708,7 +1881,6 @@ func buildTimetostrOrTochar(args []*Expr, d *Dialect) *Expr {
 	return FromArgList(KToChar, args)
 }
 
-// buildReplaceWithOptionalReplacement mirrors dialect.build_replace_with_optional_replacement.
 func buildReplaceWithOptionalReplacement(args []*Expr, d *Dialect) *Expr {
 	replacement := seqGet(args, 2)
 	if replacement == nil {
@@ -1717,7 +1889,6 @@ func buildReplaceWithOptionalReplacement(args []*Expr, d *Dialect) *Expr {
 	return New(KReplace, "this", seqGet(args, 0), "expression", seqGet(args, 1), "replacement", replacement)
 }
 
-// regexpReplaceGlobalModifier mirrors dialect.regexp_replace_global_modifier.
 func regexpReplaceGlobalModifier(e *Expr) *Expr {
 	modifiers := e.ArgE("modifiers")
 	singleReplace := e.ArgB("single_replace")
@@ -1739,15 +1910,12 @@ func regexpReplaceGlobalModifier(e *Expr) *Expr {
 	return modifiers
 }
 
-// dhIsZero mirrors `expr.to_py() == 0` for an integer literal.
 func dhIsZero(e *Expr) bool {
 	v, _ := e.toPyNumber()
 	return v != nil && v.Sign() == 0
 }
 
-// getbitSQL mirrors dialect.getbit_sql.
-//
-// Generates SQL for Getbit according to DuckDB and Postgres, transpiling it if either:
+// getbitSQL generates SQL for Getbit according to DuckDB and Postgres, transpiling it if either:
 // 1. The zero index corresponds to the least-significant bit
 // 2. The input type is an integer value.
 func getbitSQL(g *Generator, e *Expr) string {
@@ -1756,7 +1924,6 @@ func getbitSQL(g *Generator, e *Expr) string {
 
 	intTypes := append(DataType_SIGNED_INTEGER_TYPES.Items(), DataType_UNSIGNED_INTEGER_TYPES.Items()...)
 	if !e.ArgB("zero_is_msb") && dhIsType(e, intTypes...) {
-		// Use bitwise operations: (value >> position) & 1
 		shifted := New(KBitwiseRightShift, "this", value, "expression", position)
 		masked := New(KBitwiseAnd, "this", shifted, "expression", LiteralInt(1))
 		return g.sql(masked)
@@ -1765,7 +1932,8 @@ func getbitSQL(g *Generator, e *Expr) string {
 	return g.fn("GET_BIT", value, position)
 }
 
-// jarowinklerSimilarity mirrors dialect.jarowinkler_similarity(func).
+// jarowinklerSimilarity returns a GenFunc generating fn(a, b), uppercasing both sides for a
+// case-insensitive comparison.
 func jarowinklerSimilarity(fn string) GenFunc {
 	return func(g *Generator, e *Expr) string {
 		this := e.This()
@@ -1779,11 +1947,8 @@ func jarowinklerSimilarity(fn string) GenFunc {
 	}
 }
 
-// ---------------------------------------------------------------------------------------------
-// Local ports of sqlglot builders / helpers used above (prefixed `dh`).
-// ---------------------------------------------------------------------------------------------
-
-// dhPyStr mirrors Python's str(value) / f"{value}" (expressions render with the default dialect).
+// dhPyStr formats an argument value for messages and SQL text: nil as None, booleans as
+// True/False, expressions as default-dialect SQL, DTypes as DType.NAME.
 func dhPyStr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -1808,7 +1973,8 @@ func dhPyStr(v any) string {
 	return fmt.Sprint(v)
 }
 
-// dhPyIntValue mirrors int(text) for a string accepted by isPyInt.
+// dhPyIntValue parses a string accepted by isPyInt (surrounding whitespace and underscores
+// allowed). Anything else panics with a ValueError whose message keeps its historical wording.
 func dhPyIntValue(text string) int {
 	s := strings.ReplaceAll(pyStrip(text), "_", "")
 	n, err := strconv.Atoi(s)
@@ -1818,7 +1984,6 @@ func dhPyIntValue(text string) int {
 	return n
 }
 
-// dhIsType mirrors Expr.is_type(*dtypes) (DataType, Cast and generic `_type` variants).
 func dhIsType(e *Expr, dtypes ...DType) bool {
 	args := make([]any, len(dtypes))
 	for i, d := range dtypes {
@@ -1842,7 +2007,8 @@ func dhIsTypeAny(e *Expr, dtypes ...any) bool {
 	return t != nil && DataTypeIsType(t, dtypes, false)
 }
 
-// dhConvert mirrors exp.convert(value, copy) for the value types used by the helpers.
+// dhConvert converts a value (expression, string, bool, int or nil) into an expression; other
+// types panic with a ValueError.
 func dhConvert(v any, copy bool) *Expr {
 	switch x := v.(type) {
 	case *Expr:
@@ -1865,7 +2031,8 @@ func dhConvert(v any, copy bool) *Expr {
 	panic(&ValueError{Msg: fmt.Sprintf("Cannot convert %v", v)})
 }
 
-// dhBinop mirrors Expr._binop(klass, other) (i.e. the Python operator overloads `a + b`, `a.eq(b)`...).
+// dhBinop builds a binary node of klass over a copy of self and the converted other,
+// parenthesizing binary operands unless one of them already is of klass.
 func dhBinop(klass Kind, self *Expr, other any) *Expr {
 	this := self.Copy()
 	o := dhConvert(other, true)
@@ -1876,7 +2043,9 @@ func dhBinop(klass Kind, self *Expr, other any) *Expr {
 	return New(klass, "this", this, "expression", o)
 }
 
-// dhFunc mirrors exp.func(name, *args) with the default dialect (args: *Expr, string or int).
+// dhFunc builds a function call in the default dialect (args: *Expr, string or int; strings and
+// ints are parsed as SQL): a known function through its builder, otherwise an anonymous one. A
+// known function needs at least one argument; validation errors panic with a ValueError.
 func dhFunc(name string, args ...any) *Expr {
 	d := MustDialect("")
 
@@ -1888,7 +2057,6 @@ func dhFunc(name string, args ...any) *Expr {
 		case string:
 			converted = append(converted, MaybeParse(x, KNone, "", d))
 		default:
-			// maybe_parse(1) parses str(1)
 			converted = append(converted, MaybeParse(dhPyStr(x), KNone, "", d))
 		}
 	}
@@ -1913,7 +2081,8 @@ func dhFunc(name string, args ...any) *Expr {
 	return function
 }
 
-// dhApplyIndexOffset mirrors exp.apply_index_offset(this, expressions, offset, dialect).
+// dhApplyIndexOffset adds offset to a single integer subscript of an array (or untyped)
+// expression and simplifies it. Other subscripts are returned unchanged.
 func dhApplyIndexOffset(this *Expr, expressions []*Expr, offset int, d *Dialect) []*Expr {
 	if offset == 0 || len(expressions) != 1 {
 		return expressions
@@ -1941,10 +2110,8 @@ func dhApplyIndexOffset(this *Expr, expressions []*Expr, offset int, d *Dialect)
 	return expressions
 }
 
-// dhSubsecondPrecision mirrors sqlglot.time.subsecond_precision (datetime.fromisoformat semantics).
-//
-// Given an ISO-8601 timestamp literal, eg '2023-01-01 12:13:14.123456+00:00'
-// figure out its subsecond precision so we can construct types like DATETIME(6).
+// dhSubsecondPrecision returns the subsecond precision of a timestamp literal: 6 for
+// microseconds, 3 for milliseconds, 0 for none or an invalid literal.
 func dhSubsecondPrecision(timestampLiteral string) int {
 	microsecond, ok := dhFromISOFormatMicrosecond(timestampLiteral)
 	if !ok {
@@ -1960,8 +2127,9 @@ func dhSubsecondPrecision(timestampLiteral string) int {
 	return precision
 }
 
-// dhFromISOFormatMicrosecond mirrors CPython's datetime.fromisoformat (C implementation) and returns
-// the parsed microsecond; ok=false where Python raises ValueError.
+// dhFromISOFormatMicrosecond strictly parses an ISO-8601 date or date-time (calendar or week
+// dates, optional time with fraction and UTC offset) and returns its microsecond; ok=false
+// for invalid input.
 func dhFromISOFormatMicrosecond(s string) (int, bool) {
 	r := []rune(s)
 	n := len(r)
@@ -1987,7 +2155,6 @@ func dhFromISOFormatMicrosecond(s string) (int, bool) {
 		return v, p + num, true
 	}
 
-	// _find_isoformat_datetime_separator
 	var sep int
 	if n == 7 {
 		sep = 7
@@ -2029,7 +2196,6 @@ func dhFromISOFormatMicrosecond(s string) (int, bool) {
 		sep = 8
 	}
 
-	// parse_isoformat_date
 	year, p, ok := parseDigits(0, 4)
 	if !ok {
 		return 0, false
@@ -2086,7 +2252,6 @@ func dhFromISOFormatMicrosecond(s string) (int, bool) {
 		return 0, true
 	}
 
-	// parse_isoformat_time
 	start := sep + 1
 	end := n
 	tzPos := start
@@ -2118,7 +2283,7 @@ func dhFromISOFormatMicrosecond(s string) (int, bool) {
 		if rv != 0 {
 			return 0, false
 		}
-		// timezone offsets must be strictly between -24h and 24h (timedelta normalizes the components)
+		// timezone offsets must be strictly between -24h and 24h
 		total := ((tzh*3600+tzm*60+tzs)*1000000 + tzus)
 		if total >= 24*3600*1000000 {
 			return 0, false
@@ -2131,8 +2296,8 @@ func dhFromISOFormatMicrosecond(s string) (int, bool) {
 	return microsecond, true
 }
 
-// dhParseHHMMSSFF mirrors CPython's parse_hh_mm_ss_ff over runes [p, pEnd). Returns rv < 0 on error,
-// 1 when trailing characters remain and 0 on a clean parse.
+// dhParseHHMMSSFF parses hh[:mm[:ss[.ffffff]]] (separators optional) over runes [p, pEnd).
+// Returns rv < 0 on error, 1 when trailing characters remain and 0 on a clean parse.
 func dhParseHHMMSSFF(at func(int) rune, p, pEnd int) (hour, minute, second, microsecond, rv int) {
 	isDigit := func(c rune) bool { return c >= '0' && c <= '9' }
 	vals := [3]int{}
@@ -2174,7 +2339,6 @@ func dhParseHHMMSSFF(at func(int) rune, p, pEnd int) (hour, minute, second, micr
 		}
 	}
 
-	// Parse fractional components
 	lenRemains := pEnd - p
 	toParse := lenRemains
 	if lenRemains >= 6 {
@@ -2202,12 +2366,12 @@ func dhParseHHMMSSFF(at func(int) rune, p, pEnd int) (hour, minute, second, micr
 	return vals[0], vals[1], vals[2], us, 0
 }
 
-// dhDaysInMonth returns the number of days of the given month (proleptic Gregorian).
 func dhDaysInMonth(year, month int) int {
 	return time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
-// dhISOToYMD validates an ISO calendar date (mirrors datetime's iso_to_ymd range checks).
+// dhISOToYMD validates an ISO calendar date (year 1-9999, week 1-52 or 53 in long years, day
+// 1-7) and checks that the resulting date is in range.
 func dhISOToYMD(isoYear, isoWeek, isoDay int) bool {
 	if isoYear < 1 || isoYear > 9999 {
 		return false
@@ -2239,7 +2403,7 @@ func dhISOToYMD(isoYear, isoWeek, isoDay int) bool {
 	return result.Year() >= 1 && result.Year() <= 9999
 }
 
-// dhTIMEZONES mirrors sqlglot.time.TIMEZONES (lowercased IANA names).
+// dhTIMEZONES is the set of known time zone names (lowercased IANA names).
 var dhTIMEZONES = newStrSet(
 	"africa/abidjan", "africa/accra", "africa/addis_ababa", "africa/algiers", "africa/asmara", "africa/asmera",
 	"africa/bamako", "africa/bangui", "africa/banjul", "africa/bissau", "africa/blantyre", "africa/brazzaville",

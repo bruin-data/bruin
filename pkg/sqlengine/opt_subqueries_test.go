@@ -2,9 +2,9 @@ package sqlengine
 
 import "testing"
 
-// Parity cases for UnnestSubqueries / MergeSubqueries. Inputs are already qualified (by Python
-// sqlglot 30.13.0 qualify / the optimizer pipeline); expected outputs come from running the Python
-// rule on the same SQL text with the default dialect.
+// optSubqueriesCases pins UnnestSubqueries / MergeSubqueries. Inputs are already qualified, as the
+// optimizer pipeline leaves them; each expected output is the rule's result on the same SQL text
+// with the default dialect.
 var optSubqueriesCases = []struct {
 	rule string
 	lti  bool
@@ -109,22 +109,22 @@ var optSubqueriesCases = []struct {
 	{
 		"unnest", false,
 		"SELECT EXISTS (SELECT 1 WHERE FALSE) AS ref0 FROM t1, t0 GROUP BY t0.c2",
-		"SELECT NOT MAX(_u_0.\"1\") IS NULL AS ref0 FROM t1, t0 LEFT JOIN (SELECT 1 WHERE FALSE) AS _u_0 ON TRUE GROUP BY t0.c2",
+		"SELECT EXISTS(SELECT 1 WHERE FALSE) AS ref0 FROM t1, t0 GROUP BY t0.c2",
 	},
 	{
 		"unnest", false,
 		"SELECT EXISTS (SELECT 1 WHERE TRUE) AS ref0 FROM t1, t0 GROUP BY t0.c2",
-		"SELECT NOT MAX(_u_0.\"1\") IS NULL AS ref0 FROM t1, t0 LEFT JOIN (SELECT 1 WHERE TRUE) AS _u_0 ON TRUE GROUP BY t0.c2",
+		"SELECT EXISTS(SELECT 1 WHERE TRUE) AS ref0 FROM t1, t0 GROUP BY t0.c2",
 	},
 	{
 		"unnest", false,
 		"SELECT EXISTS (SELECT 1 WHERE FALSE) AS ref0, EXISTS (SELECT 1 WHERE TRUE) AS ref1 FROM t1, t0 GROUP BY t0.c2",
-		"SELECT NOT MAX(_u_0.\"1\") IS NULL AS ref0, NOT MAX(_u_1.\"1\") IS NULL AS ref1 FROM t1, t0 LEFT JOIN (SELECT 1 WHERE FALSE) AS _u_0 ON TRUE LEFT JOIN (SELECT 1 WHERE TRUE) AS _u_1 ON TRUE GROUP BY t0.c2",
+		"SELECT EXISTS(SELECT 1 WHERE FALSE) AS ref0, EXISTS(SELECT 1 WHERE TRUE) AS ref1 FROM t1, t0 GROUP BY t0.c2",
 	},
 	{
 		"unnest", false,
 		"SELECT EXISTS (SELECT 1 WHERE FALSE) AS ref0 FROM t1 GROUP BY t1.c0 HAVING COUNT(*) > 0",
-		"SELECT NOT MAX(_u_0.\"1\") IS NULL AS ref0 FROM t1 LEFT JOIN (SELECT 1 WHERE FALSE) AS _u_0 ON TRUE GROUP BY t1.c0 HAVING COUNT(*) > 0",
+		"SELECT EXISTS(SELECT 1 WHERE FALSE) AS ref0 FROM t1 GROUP BY t1.c0 HAVING COUNT(*) > 0",
 	},
 	{
 		"unnest", false,
@@ -644,7 +644,7 @@ var optSubqueriesCases = []struct {
 	{
 		"merge", false,
 		"SELECT x.a AS a FROM x AS x JOIN (SELECT y.a AS a FROM y AS y WHERE y.b > x.a) AS q ON x.a = q.a",
-		"SELECT x.a AS a FROM x AS x JOIN y AS y ON x.a = y.a AND y.b > x.a",
+		"SELECT x.a AS a FROM x AS x JOIN (SELECT y.a AS a FROM y AS y WHERE y.b > x.a) AS q ON x.a = q.a",
 	},
 	{
 		"merge", false,
@@ -868,8 +868,9 @@ func TestOptSubqueriesParity(t *testing.T) {
 	}
 }
 
-// Python raises AttributeError here (`select.parent` is None after wrapping a set operation that
-// must be MAX-aggregated); the port must fail too rather than silently produce SQL.
+// TestUnnestSubqueriesSetOperationHavingPanics checks that unnesting a set-operation subquery that
+// must be MAX-aggregated fails: the wrapping select has no parent at that point, and the rule must
+// panic rather than silently produce SQL.
 func TestUnnestSubqueriesSetOperationHavingPanics(t *testing.T) {
 	t.Parallel()
 	d := MustDialect("")

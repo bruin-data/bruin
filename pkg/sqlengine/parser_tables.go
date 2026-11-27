@@ -6,34 +6,34 @@ import (
 	"strings"
 )
 
-// Port of the module-level builder functions of sqlglot/parser.py (build_var_map, build_like, ...)
-// and of the class-level callable tables of sqlglot.parser.Parser (FUNCTIONS, LAMBDAS, ...).
-
-// ---------------------------------------------------------------------------------------------
-// Func.from_arg_list
-// ---------------------------------------------------------------------------------------------
-
-// FromArgList mirrors Func.from_arg_list: positional args are mapped onto the class arg_types
-// in order. If the class has is_var_len_args, the last arg type receives the remaining args as
-// a list (possibly empty). Extra args of non var-len functions are dropped (zip semantics).
+// FromArgList builds a kind function from positional args mapped onto its argument types in
+// order. If the function takes variable-length arguments, its variable-length argument
+// ("expressions", or "values" for VarMap) receives the remaining args as a list (possibly empty)
+// and the arg types after it (dialect flags) are left unset. Extra args of other functions are
+// dropped.
 func FromArgList(kind Kind, args []*Expr) *Expr {
 	argTypes := kind.ArgTypes()
 	kv := make([]any, 0, 2*len(argTypes))
 	if kind.isVarLenArgs() {
-		// If this function supports variable length argument treat the last argument as such.
-		nonVarLen := argTypes[:len(argTypes)-1]
-		numNonVar := len(nonVarLen)
-		for i, a := range nonVarLen {
+		varLenKey := "expressions"
+		if kind == KVarMap {
+			varLenKey = "values"
+		}
+		varLenIndex := 0
+		for varLenIndex < len(argTypes) && argTypes[varLenIndex].name != varLenKey {
+			varLenIndex++
+		}
+		for i, a := range argTypes[:varLenIndex] {
 			if i >= len(args) {
 				break
 			}
 			kv = append(kv, a.name, args[i])
 		}
 		rest := []*Expr{}
-		if len(args) > numNonVar {
-			rest = append(rest, args[numNonVar:]...)
+		if len(args) > varLenIndex {
+			rest = append(rest, args[varLenIndex:]...)
 		}
-		kv = append(kv, argTypes[len(argTypes)-1].name, rest)
+		kv = append(kv, varLenKey, rest)
 	} else {
 		for i, a := range argTypes {
 			if i >= len(args) {
@@ -45,16 +45,11 @@ func FromArgList(kind Kind, args []*Expr) *Expr {
 	return New(kind, kv...)
 }
 
-// fromArgList returns the FuncBuilder for `Func.from_arg_list` of the given class.
 func fromArgList(kind Kind) FuncBuilder {
 	return func(args []*Expr, _ *Dialect) *Expr { return FromArgList(kind, args) }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Module-level builders of sqlglot/parser.py
-// ---------------------------------------------------------------------------------------------
-
-// argsFrom mirrors the Python slice args[i:] (always a fresh, non-nil list).
+// argsFrom returns args[i:] as a fresh, non-nil list (empty when i is out of range).
 func argsFrom(args []*Expr, i int) []*Expr {
 	out := []*Expr{}
 	if i < len(args) {
@@ -63,7 +58,6 @@ func argsFrom(args []*Expr, i int) []*Expr {
 	return out
 }
 
-// buildVarMap mirrors build_var_map.
 func buildVarMap(args []*Expr) *Expr {
 	if len(args) == 1 && args[0].IsStar() {
 		return New(KStarMap, "this", args[0])
@@ -74,7 +68,7 @@ func buildVarMap(args []*Expr) *Expr {
 	for i := 0; i < len(args); i += 2 {
 		keys = append(keys, args[i])
 		if i+1 >= len(args) {
-			// Python: args[i + 1] raises IndexError
+			// Odd argument count; the message keeps its historical wording
 			panic(&ValueError{Msg: "list index out of range"})
 		}
 		values = append(values, args[i+1])
@@ -83,7 +77,7 @@ func buildVarMap(args []*Expr) *Expr {
 	return New(KVarMap, "keys", New(KArray, "expressions", keys), "values", New(KArray, "expressions", values))
 }
 
-// buildLike mirrors build_like.
+// buildLike builds LIKE(pattern, str[, escape]) as str LIKE pattern [ESCAPE escape].
 func buildLike(args []*Expr) *Expr {
 	like := New(KLike, "this", seqGet(args, 1), "expression", seqGet(args, 0))
 	if len(args) > 2 {
@@ -92,7 +86,6 @@ func buildLike(args []*Expr) *Expr {
 	return like
 }
 
-// binaryRangeParser mirrors binary_range_parser.
 func binaryRangeParser(exprType Kind, reverseArgs bool) rangeParseFn {
 	return func(p *Parser, this *Expr) *Expr {
 		expression := p.parseBitwise()
@@ -103,9 +96,7 @@ func binaryRangeParser(exprType Kind, reverseArgs bool) rangeParseFn {
 	}
 }
 
-// buildLogarithm mirrors build_logarithm.
 func buildLogarithm(args []*Expr, d *Dialect) *Expr {
-	// Default argument order is base, expression
 	this := seqGet(args, 0)
 	expression := seqGet(args, 1)
 
@@ -122,7 +113,6 @@ func buildLogarithm(args []*Expr, d *Dialect) *Expr {
 	return New(KLog, "this", this)
 }
 
-// buildHex mirrors build_hex.
 func buildHex(args []*Expr, d *Dialect) *Expr {
 	arg := seqGet(args, 0)
 	if d.S.HEX_LOWERCASE {
@@ -131,7 +121,6 @@ func buildHex(args []*Expr, d *Dialect) *Expr {
 	return New(KHex, "this", arg)
 }
 
-// buildLower mirrors build_lower.
 func buildLower(args []*Expr) *Expr {
 	// LOWER(HEX(..)) can be simplified to LowerHex to simplify its transpilation
 	arg := seqGet(args, 0)
@@ -141,7 +130,6 @@ func buildLower(args []*Expr) *Expr {
 	return New(KLower, "this", arg)
 }
 
-// buildUpper mirrors build_upper.
 func buildUpper(args []*Expr) *Expr {
 	// UPPER(HEX(..)) can be simplified to Hex to simplify its transpilation
 	arg := seqGet(args, 0)
@@ -151,7 +139,6 @@ func buildUpper(args []*Expr) *Expr {
 	return New(KUpper, "this", arg)
 }
 
-// buildExtractJSONWithPath mirrors build_extract_json_with_path.
 func buildExtractJSONWithPath(exprType Kind) FuncBuilder {
 	return func(args []*Expr, d *Dialect) *Expr {
 		expression := New(exprType, "this", seqGet(args, 0), "expression", d.toJSONPath(seqGet(args, 1)))
@@ -165,7 +152,6 @@ func buildExtractJSONWithPath(exprType Kind) FuncBuilder {
 	}
 }
 
-// buildMod mirrors build_mod.
 func buildMod(args []*Expr) *Expr {
 	this := seqGet(args, 0)
 	expression := seqGet(args, 1)
@@ -181,7 +167,6 @@ func buildMod(args []*Expr) *Expr {
 	return New(KMod, "this", this, "expression", expression)
 }
 
-// buildPad mirrors build_pad (is_left defaults to True in Python).
 func buildPad(args []*Expr, isLeft bool) *Expr {
 	return New(
 		KPad,
@@ -192,7 +177,8 @@ func buildPad(args []*Expr, isLeft bool) *Expr {
 	)
 }
 
-// buildConvertTimezone mirrors build_convert_timezone. defaultSourceTz "" means None.
+// buildConvertTimezone builds CONVERT_TIMEZONE. With two arguments (target zone, timestamp) the
+// source zone is defaultSourceTz ("" means none).
 func buildConvertTimezone(args []*Expr, defaultSourceTz string) *Expr {
 	if len(args) == 2 {
 		var sourceTz *Expr
@@ -210,7 +196,6 @@ func buildConvertTimezone(args []*Expr, defaultSourceTz string) *Expr {
 	return FromArgList(KConvertTimezone, args)
 }
 
-// buildTrim mirrors build_trim (Python defaults: is_left=True, reverse_args=False).
 func buildTrim(args []*Expr, isLeft bool, reverseArgs bool) *Expr {
 	this, expression := seqGet(args, 0), seqGet(args, 1)
 
@@ -225,8 +210,7 @@ func buildTrim(args []*Expr, isLeft bool, reverseArgs bool) *Expr {
 	return New(KTrim, "this", this, "expression", expression, "position", position)
 }
 
-// buildCoalesce mirrors build_coalesce. isNvl / isNull are the Python `bool | None` values
-// (pass nil for None).
+// buildCoalesce builds COALESCE(a, rest...). isNvl / isNull are nil (unset), true or false.
 func buildCoalesce(args []*Expr, isNvl, isNull any) *Expr {
 	return New(
 		KCoalesce,
@@ -237,7 +221,6 @@ func buildCoalesce(args []*Expr, isNvl, isNull any) *Expr {
 	)
 }
 
-// buildLocateStrposition mirrors build_locate_strposition.
 func buildLocateStrposition(args []*Expr) *Expr {
 	return New(
 		KStrPosition,
@@ -247,7 +230,6 @@ func buildLocateStrposition(args []*Expr) *Expr {
 	)
 }
 
-// buildArrayAppend mirrors build_array_append.
 func buildArrayAppend(args []*Expr, d *Dialect) *Expr {
 	return New(
 		KArrayAppend,
@@ -257,7 +239,6 @@ func buildArrayAppend(args []*Expr, d *Dialect) *Expr {
 	)
 }
 
-// buildArrayPrepend mirrors build_array_prepend.
 func buildArrayPrepend(args []*Expr, d *Dialect) *Expr {
 	return New(
 		KArrayPrepend,
@@ -267,7 +248,6 @@ func buildArrayPrepend(args []*Expr, d *Dialect) *Expr {
 	)
 }
 
-// buildArrayConcat mirrors build_array_concat.
 func buildArrayConcat(args []*Expr, d *Dialect) *Expr {
 	return New(
 		KArrayConcat,
@@ -277,7 +257,6 @@ func buildArrayConcat(args []*Expr, d *Dialect) *Expr {
 	)
 }
 
-// buildArrayRemove mirrors build_array_remove.
 func buildArrayRemove(args []*Expr, d *Dialect) *Expr {
 	return New(
 		KArrayRemove,
@@ -287,10 +266,6 @@ func buildArrayRemove(args []*Expr, d *Dialect) *Expr {
 	)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers for the tables below
-// ---------------------------------------------------------------------------------------------
-
 // anyExpr converts an expression into an `any`, mapping a nil pointer to an untyped nil.
 func anyExpr(e *Expr) any {
 	if e == nil {
@@ -299,7 +274,7 @@ func anyExpr(e *Expr) any {
 	return e
 }
 
-// chunkGVar mirrors exp.var(name) for a string name.
+// chunkGVar returns a Var named name; an empty name panics with a ValueError.
 func chunkGVar(name string) *Expr {
 	if name == "" {
 		panic(&ValueError{Msg: "Cannot convert empty name into var."})
@@ -307,7 +282,6 @@ func chunkGVar(name string) *Expr {
 	return VarExpr(name)
 }
 
-// chunkGWrapConnector mirrors exp._wrap(expression, exp.Connector).
 func chunkGWrapConnector(e *Expr) *Expr {
 	if e.IsA(KConnector) {
 		return New(KParen, "this", e)
@@ -315,7 +289,8 @@ func chunkGWrapConnector(e *Expr) *Expr {
 	return e
 }
 
-// chunkGAnd mirrors exp.and_(*expressions, copy=False) for expression operands.
+// chunkGAnd joins the non-nil expressions with AND, without copying them, parenthesizing
+// connector operands when there is more than one. No operands panics with a ValueError.
 func chunkGAnd(expressions []*Expr) *Expr {
 	conditions := []*Expr{}
 	for _, e := range expressions {
@@ -324,7 +299,7 @@ func chunkGAnd(expressions []*Expr) *Expr {
 		}
 	}
 	if len(conditions) == 0 {
-		// Python: `this, *rest = conditions` on an empty list
+		// No conditions; the message keeps its historical wording
 		panic(&ValueError{Msg: "not enough values to unpack (expected at least 1, got 0)"})
 	}
 
@@ -338,7 +313,8 @@ func chunkGAnd(expressions []*Expr) *Expr {
 	return this
 }
 
-// chunkGQueryWhere mirrors Query.where(*expressions, copy=False) (append=True).
+// chunkGQueryWhere ANDs the given conditions (WHERE nodes unwrapped, nils skipped) into the
+// query's WHERE clause in place.
 func chunkGQueryWhere(instance *Expr, expressions ...*Expr) *Expr {
 	filtered := []*Expr{}
 	for _, e := range expressions {
@@ -362,7 +338,8 @@ func chunkGQueryWhere(instance *Expr, expressions ...*Expr) *Expr {
 	return instance
 }
 
-// chunkGQueryOrderBy mirrors Query.order_by(*expressions, append=append_, copy=False).
+// chunkGQueryOrderBy sets the query's ORDER BY in place from expressions (wrapped in Order
+// nodes as needed, their other arguments merged); append_ keeps the existing ordering first.
 func chunkGQueryOrderBy(instance *Expr, append_ bool, expressions ...*Expr) *Expr {
 	parsed := []*Expr{}
 	var propKeys []string
@@ -401,10 +378,9 @@ func chunkGQueryOrderBy(instance *Expr, append_ bool, expressions ...*Expr) *Exp
 	return instance
 }
 
-// chunkGSelectDistinct mirrors Select.distinct(copy=False) with no ON expressions.
 func chunkGSelectDistinct(instance *Expr) *Expr {
 	if !instance.IsA(KSelect) {
-		// Python: only exp.Select defines .distinct()
+		// Only a SELECT can be made DISTINCT; the message keeps its historical wording
 		name := "NoneType"
 		if instance != nil {
 			name = instance.Kind().Name()
@@ -415,15 +391,14 @@ func chunkGSelectDistinct(instance *Expr) *Expr {
 	return instance
 }
 
-// propKwargsTypeError mirrors the Python TypeError raised when a PROPERTY_PARSERS entry is
-// called with keyword arguments it does not accept. Parser._parse_property_before catches it
-// (and calls raise_error); elsewhere it propagates like any non-ParseError exception.
+// propKwargsTypeError is raised (as a panic) when a PROPERTY_PARSERS entry is called with a
+// modifier it does not accept. callPropertyParser turns it into "Cannot parse property".
 type propKwargsTypeError struct{ Msg string }
 
 func (e *propKwargsTypeError) Error() string { return e.Msg }
 
-// pyKwargs returns the kwargs that Python would pass (only truthy ones, in the insertion order
-// of the kwargs dict built in Parser._parse_property_before) as alternating key/value pairs.
+// pyKwargs returns the modifiers that are set (true flags and a non-empty local), in the order
+// parsePropertyBefore matches them, as alternating key/value pairs.
 func (kw propKwargs) pyKwargs() []any {
 	var kv []any
 	if kw.no {
@@ -453,35 +428,30 @@ func (kw propKwargs) pyKwargs() []any {
 	return kv
 }
 
-// checkPropKwargs panics with a propKwargsTypeError if kw carries a kwarg not in allowed
-// (mirrors calling a Python function with an unexpected keyword argument).
-func checkPropKwargs(kw propKwargs, fn string, allowed ...string) {
+func checkPropKwargs(kw propKwargs, allowed ...string) {
 	kv := kw.pyKwargs()
 	for i := 0; i < len(kv); i += 2 {
 		k := kv[i].(string)
 		if !slices.Contains(allowed, k) {
-			panic(&propKwargsTypeError{Msg: fn + "() got an unexpected keyword argument '" + k + "'"})
+			panic(&propKwargsTypeError{Msg: "unsupported property modifier '" + k + "'"})
 		}
 	}
 }
 
-// noKwargs wraps a PROPERTY_PARSERS entry defined as `lambda self: ...` (accepts no kwargs).
 func noKwargs(fn func(p *Parser) any) propertyParseFn {
 	return func(p *Parser, kw propKwargs) any {
-		checkPropKwargs(kw, "Parser.<lambda>")
+		checkPropKwargs(kw)
 		return fn(p)
 	}
 }
 
-// noKwargsE is noKwargs for expression-returning entries.
 func noKwargsE(fn func(p *Parser) *Expr) propertyParseFn {
 	return func(p *Parser, kw propKwargs) any {
-		checkPropKwargs(kw, "Parser.<lambda>")
+		checkPropKwargs(kw)
 		return anyExpr(fn(p))
 	}
 }
 
-// parserKeysTrie mirrors new_trie(key.split(" ") for key in parsers).
 func parserKeysTrie[V any](parsers map[string]V) *trie {
 	keys := make([][]string, 0, len(parsers))
 	for k := range parsers {
@@ -490,17 +460,12 @@ func parserKeysTrie[V any](parsers map[string]V) *trie {
 	return newTrieFromWords(keys...)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Parser class-level tables
-// ---------------------------------------------------------------------------------------------
-
 func newBaseParserSettings() *ParserSettings {
 	s := &ParserSettings{
 		ParserData: parserSettings_base(),
 		h:          defaultParserHooks(),
 	}
 
-	// FUNCTIONS
 	functions := make(map[string]FuncBuilder, len(FUNCTION_BY_NAME)+64)
 	for name, kind := range FUNCTION_BY_NAME {
 		functions[name] = fromArgList(kind)
@@ -641,7 +606,7 @@ func newBaseParserSettings() *ParserSettings {
 			)
 		},
 		"UNNEST": func(args []*Expr, _ *Dialect) *Expr {
-			return New(KUnnest, "expressions", ensureList(seqGet(args, 0)))
+			return New(KUnnest, "expressions", args)
 		},
 		"UPPER": func(args []*Expr, _ *Dialect) *Expr { return buildUpper(args) },
 		"UUID": func(args []*Expr, d *Dialect) *Expr {
@@ -659,7 +624,6 @@ func newBaseParserSettings() *ParserSettings {
 	})
 	s.FUNCTIONS = functions
 
-	// LAMBDAS
 	s.LAMBDAS = map[TokenType]lambdaParseFn{
 		TK_ARROW: func(p *Parser, expressions []*Expr) *Expr {
 			this := p.replaceLambda(p.parseDisjunction(), expressions)
@@ -667,11 +631,15 @@ func newBaseParserSettings() *ParserSettings {
 		},
 		TK_FARROW: func(p *Parser, expressions []*Expr) *Expr {
 			this := chunkGVar(expressions[0].Name())
-			return p.expression(New(KKwarg, "this", this, "expression", p.parseDisjunction()))
+			// the value may also be a query, e.g. input => SELECT ...
+			expression := p.parseDisjunction()
+			if expression == nil {
+				expression = p.parseSelect(false, false, true, true, true, nil)
+			}
+			return p.expression(New(KKwarg, "this", this, "expression", expression))
 		},
 	}
 
-	// COLUMN_OPERATORS
 	s.COLUMN_OPERATORS = map[TokenType]columnOperatorFn{
 		TK_DOT: nil,
 		TK_DOTCOLON: func(p *Parser, this, to *Expr) *Expr {
@@ -704,11 +672,10 @@ func newBaseParserSettings() *ParserSettings {
 			return p.expression(New(KJSONBExtractScalar, "this", this, "expression", path))
 		},
 		TK_PLACEHOLDER: func(p *Parser, this, key *Expr) *Expr {
-			return p.expression(New(KJSONBContains, "this", this, "expression", key))
+			return p.expression(New(KJSONBContainsTopKey, "this", this, "expression", key))
 		},
 	}
 
-	// EXPRESSION_PARSERS
 	s.EXPRESSION_PARSERS = map[Kind]parseFn{
 		KCluster:   func(p *Parser) *Expr { return p.parseSort(KCluster, TK_CLUSTER_BY) },
 		KColumn:    func(p *Parser) *Expr { return p.parseColumn() },
@@ -749,7 +716,6 @@ func newBaseParserSettings() *ParserSettings {
 		KWith:       func(p *Parser) *Expr { return p.parseWith(false) },
 	}
 
-	// STATEMENT_PARSERS
 	s.STATEMENT_PARSERS = map[TokenType]parseFn{
 		TK_ALTER:    func(p *Parser) *Expr { return p.parseAlter() },
 		TK_ANALYZE:  func(p *Parser) *Expr { return p.parseAnalyze() },
@@ -759,17 +725,18 @@ func newBaseParserSettings() *ParserSettings {
 		TK_COMMIT:   func(p *Parser) *Expr { return p.parseCommitOrRollback() },
 		TK_COPY:     func(p *Parser) *Expr { return p.parseCopy() },
 		TK_CREATE:   func(p *Parser) *Expr { return p.parseCreate() },
+		TK_DECLARE:  func(p *Parser) *Expr { return p.parseDeclare() },
 		TK_DELETE:   func(p *Parser) *Expr { return p.parseDelete() },
 		TK_DESC:     func(p *Parser) *Expr { return p.parseDescribe() },
 		TK_DESCRIBE: func(p *Parser) *Expr { return p.parseDescribe() },
-		TK_DROP:     func(p *Parser) *Expr { return p.parseDrop(false) },
+		TK_DROP:     func(p *Parser) *Expr { return p.parseDrop(false, "") },
 		TK_GRANT:    func(p *Parser) *Expr { return p.parseGrant() },
 		TK_REVOKE:   func(p *Parser) *Expr { return p.parseRevoke() },
 		TK_INSERT:   func(p *Parser) *Expr { return p.parseInsert() },
 		TK_KILL:     func(p *Parser) *Expr { return p.parseKill() },
 		TK_LOAD:     func(p *Parser) *Expr { return p.parseLoad() },
 		TK_MERGE:    func(p *Parser) *Expr { return p.parseMerge() },
-		// Python passes is_unpivot=None here
+		// PIVOT leaves is_unpivot unset (nil) rather than false
 		TK_PIVOT: func(p *Parser) *Expr { return p.parseSimplifiedPivot(nil) },
 		TK_PRAGMA: func(p *Parser) *Expr {
 			return p.expression(New(KPragma, "this", p.parseExpression()))
@@ -785,7 +752,6 @@ func newBaseParserSettings() *ParserSettings {
 		TK_SEMICOLON: func(p *Parser) *Expr { return New(KSemicolon) },
 	}
 
-	// UNARY_PARSERS
 	s.UNARY_PARSERS = map[TokenType]parseFn{
 		TK_PLUS: func(p *Parser) *Expr { return p.parseUnary() }, // Unary + is handled as a no-op
 		TK_NOT: func(p *Parser) *Expr {
@@ -805,13 +771,15 @@ func newBaseParserSettings() *ParserSettings {
 		},
 	}
 
-	// STRING_PARSERS
 	stringParsers := func() map[TokenType]tokenParseFn {
 		return map[TokenType]tokenParseFn{
 			TK_HEREDOC_STRING: func(p *Parser, token *Token) *Expr {
 				return p.expressionTok(New(KRawString, "this", token.Text), token)
 			},
 			TK_NATIONAL_STRING: func(p *Parser, token *Token) *Expr {
+				return p.expressionTok(New(KNational, "this", token.Text), token)
+			},
+			TK_NATIONAL_RAW_STRING: func(p *Parser, token *Token) *Expr {
 				return p.expressionTok(New(KNational, "this", token.Text), token)
 			},
 			TK_RAW_STRING: func(p *Parser, token *Token) *Expr {
@@ -822,7 +790,7 @@ func newBaseParserSettings() *ParserSettings {
 			},
 			TK_UNICODE_STRING: func(p *Parser, token *Token) *Expr {
 				this := token.Text
-				// self._match_text_seq("UESCAPE") and self._parse_string() -> False when unmatched
+				// false (not nil) when UESCAPE is absent
 				var escape any = false
 				if p.matchTextSeq("UESCAPE") {
 					escape = p.parseString()
@@ -833,7 +801,6 @@ func newBaseParserSettings() *ParserSettings {
 	}
 	s.STRING_PARSERS = stringParsers()
 
-	// NUMERIC_PARSERS
 	numericParsers := func() map[TokenType]tokenParseFn {
 		return map[TokenType]tokenParseFn{
 			TK_BIT_STRING: func(p *Parser, token *Token) *Expr {
@@ -860,7 +827,7 @@ func newBaseParserSettings() *ParserSettings {
 	}
 	s.NUMERIC_PARSERS = numericParsers()
 
-	// PRIMARY_PARSERS = {**STRING_PARSERS, **NUMERIC_PARSERS, ...}
+	// PRIMARY_PARSERS: STRING_PARSERS and NUMERIC_PARSERS plus the entries below
 	s.PRIMARY_PARSERS = map[TokenType]tokenParseFn{}
 	maps.Copy(s.PRIMARY_PARSERS, stringParsers())
 	maps.Copy(s.PRIMARY_PARSERS, numericParsers())
@@ -875,7 +842,6 @@ func newBaseParserSettings() *ParserSettings {
 		TK_STAR: func(p *Parser, _ *Token) *Expr { return p.parseStarOps() },
 	})
 
-	// PLACEHOLDER_PARSERS
 	s.PLACEHOLDER_PARSERS = map[TokenType]parseFn{
 		TK_PLACEHOLDER: func(p *Parser) *Expr { return p.expression(New(KPlaceholder)) },
 		TK_PARAMETER:   func(p *Parser) *Expr { return p.parseParameter() },
@@ -887,7 +853,6 @@ func newBaseParserSettings() *ParserSettings {
 		},
 	}
 
-	// RANGE_PARSERS
 	s.RANGE_PARSERS = map[TokenType]rangeParseFn{
 		TK_AT_GT:      binaryRangeParser(KArrayContainsAll, false),
 		TK_BETWEEN:    func(p *Parser, this *Expr) *Expr { return p.parseBetween(this) },
@@ -910,9 +875,9 @@ func newBaseParserSettings() *ParserSettings {
 		TK_OPERATOR:   func(p *Parser, this *Expr) *Expr { return p.parseOperator(this) },
 		TK_AMP_LT:     binaryRangeParser(KExtendsLeft, false),
 		TK_AMP_GT:     binaryRangeParser(KExtendsRight, false),
+		TK_CARET_AT:   binaryRangeParser(KStartsWith, false),
 	}
 
-	// PIPE_SYNTAX_TRANSFORM_PARSERS
 	s.PIPE_SYNTAX_TRANSFORM_PARSERS = map[string]pipeTransformFn{
 		"AGGREGATE": func(p *Parser, query *Expr) *Expr { return p.parsePipeSyntaxAggregate(query) },
 		"AS": func(p *Parser, query *Expr) *Expr {
@@ -920,7 +885,6 @@ func newBaseParserSettings() *ParserSettings {
 			return p.buildPipeCte(query, expressions, p.parseTableAlias(nil))
 		},
 		"DISTINCT": func(p *Parser, query *Expr) *Expr {
-			// self._advance() or query.distinct(copy=False)
 			p.advance(1)
 			return chunkGSelectDistinct(query)
 		},
@@ -938,7 +902,6 @@ func newBaseParserSettings() *ParserSettings {
 		},
 	}
 
-	// PROPERTY_PARSERS
 	stability := func(v string) propertyParseFn {
 		return noKwargsE(func(p *Parser) *Expr {
 			return p.expression(New(KStabilityProperty, "this", LiteralString(v)))
@@ -951,7 +914,7 @@ func newBaseParserSettings() *ParserSettings {
 		return noKwargsE(func(p *Parser) *Expr { return p.expression(New(k)) })
 	}
 	characterSet := func(p *Parser, kw propKwargs) any {
-		checkPropKwargs(kw, "Parser._parse_character_set", "default")
+		checkPropKwargs(kw, "default")
 		return anyExpr(p.parseCharacterSet(kw.default_))
 	}
 	partitionedBy := noKwargsE(func(p *Parser) *Expr { return p.parsePartitionedBy() })
@@ -973,7 +936,6 @@ func newBaseParserSettings() *ParserSettings {
 		"BLOCKCOMPRESSION": noKwargsE(func(p *Parser) *Expr { return p.parseBlockcompression() }),
 		"CALLED":           noKwargsE(func(p *Parser) *Expr { return p.parseCalledOnNullInputProperty() }),
 		"CHARSET":          characterSet,
-		"CHARACTER SET":    characterSet,
 		"CHECKSUM":         noKwargsE(func(p *Parser) *Expr { return p.parseChecksum() }),
 		"CLUSTER BY":       noKwargsE(func(p *Parser) *Expr { return p.parseClusterProperty() }),
 		"CLUSTERED":        noKwargsE(func(p *Parser) *Expr { return p.parseClusteredBy() }),
@@ -984,7 +946,7 @@ func newBaseParserSettings() *ParserSettings {
 		"CONTAINS": noKwargsE(func(p *Parser) *Expr { return p.parseContainsProperty() }),
 		"COPY":     noKwargsE(func(p *Parser) *Expr { return p.parseCopyProperty() }),
 		"DATABLOCKSIZE": func(p *Parser, kw propKwargs) any {
-			checkPropKwargs(kw, "Parser._parse_datablocksize", "default", "minimum", "maximum")
+			checkPropKwargs(kw, "default", "minimum", "maximum")
 			return anyExpr(p.parseDatablocksize(kw.default_, kw.minimum, kw.maximum))
 		},
 		"DATA_DELETION": noKwargsE(func(p *Parser) *Expr { return p.parseDataDeletionProperty() }),
@@ -1009,7 +971,7 @@ func newBaseParserSettings() *ParserSettings {
 		"EXECUTE":  assignment(KExecuteAsProperty),
 		"EXTERNAL": simple(KExternalProperty),
 		"FALLBACK": func(p *Parser, kw propKwargs) any {
-			checkPropKwargs(kw, "Parser._parse_fallback", "no")
+			checkPropKwargs(kw, "no")
 			return anyExpr(p.parseFallback(kw.no))
 		},
 		"FORMAT":    assignment(KFileFormatProperty),
@@ -1040,12 +1002,12 @@ func newBaseParserSettings() *ParserSettings {
 		"LOCK":     locking,
 		"LOCKING":  locking,
 		"LOG": func(p *Parser, kw propKwargs) any {
-			checkPropKwargs(kw, "Parser._parse_log", "no")
+			checkPropKwargs(kw, "no")
 			return anyExpr(p.parseLog(kw.no))
 		},
 		"MATERIALIZED": simple(KMaterializedProperty),
 		"MERGEBLOCKRATIO": func(p *Parser, kw propKwargs) any {
-			checkPropKwargs(kw, "Parser._parse_mergeblockratio", "no", "default")
+			checkPropKwargs(kw, "no", "default")
 			return anyExpr(p.parseMergeblockratio(kw.no, kw.default_))
 		},
 		"MODIFIES": noKwargsE(func(p *Parser) *Expr { return p.parseModifiesProperty() }),
@@ -1074,7 +1036,7 @@ func newBaseParserSettings() *ParserSettings {
 		"ROW":        noKwargsE(func(p *Parser) *Expr { return p.parseRow() }),
 		"ROW_FORMAT": assignment(KRowFormatProperty),
 		"SAMPLE": noKwargsE(func(p *Parser) *Expr {
-			// self._match_text_seq("BY") and self._parse_bitwise() -> False when unmatched
+			// false (not nil) when BY is absent
 			var this any = false
 			if p.matchTextSeq("BY") {
 				this = p.parseBitwise()
@@ -1116,7 +1078,6 @@ func newBaseParserSettings() *ParserSettings {
 		}),
 	}
 
-	// CONSTRAINT_PARSERS
 	autoIncrement := func(p *Parser) *Expr { return p.parseAutoIncrement() }
 	bucketOrTruncate := func(p *Parser) *Expr { return p.parsePartitionedByBucketOrTruncate() }
 	s.CONSTRAINT_PARSERS = map[string]parseFn{
@@ -1124,9 +1085,6 @@ func newBaseParserSettings() *ParserSettings {
 		"AUTO_INCREMENT": autoIncrement,
 		"CASESPECIFIC": func(p *Parser) *Expr {
 			return p.expression(New(KCaseSpecificColumnConstraint, "not_", false))
-		},
-		"CHARACTER SET": func(p *Parser) *Expr {
-			return p.expression(New(KCharacterSetColumnConstraint, "this", p.parseVarOrString(false)))
 		},
 		"CHECK": func(p *Parser) *Expr { return p.parseCheckConstraint() },
 		"COLLATE": func(p *Parser) *Expr {
@@ -1197,7 +1155,7 @@ func newBaseParserSettings() *ParserSettings {
 			return p.expression(New(KTitleColumnConstraint, "this", p.parseVarOrString(false)))
 		},
 		"TTL": func(p *Parser) *Expr {
-			// [self._parse_bitwise()] may hold a None element, like in Python
+			// The list holds a nil element when no expression follows
 			return p.expression(New(KMergeTreeTTL, "expressions", []*Expr{p.parseBitwise()}))
 		},
 		"UNIQUE": func(p *Parser) *Expr { return p.parseUnique() },
@@ -1211,7 +1169,6 @@ func newBaseParserSettings() *ParserSettings {
 		"TRUNCATE": bucketOrTruncate,
 	}
 
-	// ALTER_PARSERS
 	s.ALTER_PARSERS = map[string]parseAnyFn{
 		"ADD": func(p *Parser) any { return p.parseAlterTableAdd() },
 		"AS": func(p *Parser) any {
@@ -1226,7 +1183,7 @@ func newBaseParserSettings() *ParserSettings {
 		"RENAME": func(p *Parser) any { return anyExpr(p.parseAlterTableRename()) },
 		"SET":    func(p *Parser) any { return anyExpr(p.parseAlterTableSet()) },
 		"SWAP": func(p *Parser) any {
-			// self._match(TokenType.WITH) and self._parse_table(schema=True) -> False when unmatched
+			// false (not nil) when WITH is absent
 			var this any = false
 			if p.match(TK_WITH) {
 				this = p.parseTable(true, false, nil, false, false, false, false)
@@ -1235,16 +1192,14 @@ func newBaseParserSettings() *ParserSettings {
 		},
 	}
 
-	// ALTER_ALTER_PARSERS
 	s.ALTER_ALTER_PARSERS = map[string]parseFn{
 		"DISTKEY":   func(p *Parser) *Expr { return p.parseAlterDiststyle() },
 		"DISTSTYLE": func(p *Parser) *Expr { return p.parseAlterDiststyle() },
-		// Python passes compound=None here
+		// A plain SORTKEY is not compound
 		"SORTKEY":  func(p *Parser) *Expr { return p.parseAlterSortkey(false) },
 		"COMPOUND": func(p *Parser) *Expr { return p.parseAlterSortkey(true) },
 	}
 
-	// NO_PAREN_FUNCTION_PARSERS
 	s.NO_PAREN_FUNCTION_PARSERS = map[string]parseFn{
 		"ANY": func(p *Parser) *Expr {
 			return p.expression(New(KAny, "this", p.parseBitwise()))
@@ -1256,7 +1211,6 @@ func newBaseParserSettings() *ParserSettings {
 		"IF": func(p *Parser) *Expr { return p.parseIf() },
 	}
 
-	// FUNCTION_PARSERS
 	s.FUNCTION_PARSERS = map[string]parseFn{}
 	for _, name := range KArgMax.SQLNames() {
 		s.FUNCTION_PARSERS[name] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KArgMax, 0) }
@@ -1265,7 +1219,7 @@ func newBaseParserSettings() *ParserSettings {
 		s.FUNCTION_PARSERS[name] = func(p *Parser) *Expr { return p.parseDistinctArgFunction(KArgMin, 0) }
 	}
 	maps.Copy(s.FUNCTION_PARSERS, map[string]parseFn{
-		// Python passes safe=None for CAST / CONVERT
+		// CAST / CONVERT leave safe unset (false maps to nil in parseCast / parseConvert)
 		"CAST":           func(p *Parser) *Expr { return p.parseCast(p.s.STRICT_CAST, false) },
 		"CEIL":           func(p *Parser) *Expr { return p.parseCeilFloor(KCeil) },
 		"CONVERT":        func(p *Parser) *Expr { return p.parseConvert(p.s.STRICT_CAST, false) },
@@ -1290,11 +1244,11 @@ func newBaseParserSettings() *ParserSettings {
 		"TRIM":           func(p *Parser) *Expr { return p.parseTrim() },
 		"TRY_CAST":       func(p *Parser) *Expr { return p.parseCast(false, true) },
 		"TRY_CONVERT":    func(p *Parser) *Expr { return p.parseConvert(false, true) },
+		"WEIGHT_STRING":  func(p *Parser) *Expr { return p.parseWeightString() },
 		"XMLELEMENT":     func(p *Parser) *Expr { return p.parseXmlElement() },
 		"XMLTABLE":       func(p *Parser) *Expr { return p.parseXmlTable() },
 	})
 
-	// QUERY_MODIFIER_PARSERS
 	limit := func(p *Parser) (string, any) { return "limit", anyExpr(p.parseLimit(nil, false, false)) }
 	locks := func(p *Parser) (string, any) { return "locks", p.parseLocks() }
 	sample := func(p *Parser) (string, any) { return "sample", anyExpr(p.parseTableSample(true)) }
@@ -1324,10 +1278,8 @@ func newBaseParserSettings() *ParserSettings {
 			return "sort", anyExpr(p.parseSort(KSort, TK_SORT_BY))
 		},
 		TK_CONNECT_BY: func(p *Parser) (string, any) { return "connect", anyExpr(p.parseConnect(true)) },
-		TK_START_WITH: func(p *Parser) (string, any) { return "connect", anyExpr(p.parseConnect(false)) },
 	}
 
-	// SET_PARSERS
 	s.SET_PARSERS = map[string]parseFn{
 		"GLOBAL":      func(p *Parser) *Expr { return p.parseSetItemAssignment("GLOBAL") },
 		"LOCAL":       func(p *Parser) *Expr { return p.parseSetItemAssignment("LOCAL") },
@@ -1335,20 +1287,16 @@ func newBaseParserSettings() *ParserSettings {
 		"TRANSACTION": func(p *Parser) *Expr { return p.parseSetTransaction(false) },
 	}
 
-	// SHOW_PARSERS
 	s.SHOW_PARSERS = map[string]parseFn{}
 
-	// TYPE_LITERAL_PARSERS
 	s.TYPE_LITERAL_PARSERS = map[DType]typeLiteralParseFn{
 		DT_JSON: func(p *Parser, this, _ *Expr) *Expr {
-			return p.expression(New(KParseJSON, "this", this))
+			return p.expression(New(KParseJSON, "this", this, "is_literal", true))
 		},
 	}
 
-	// TYPE_CONVERTERS
 	s.TYPE_CONVERTERS = map[DType]typeConverterFn{}
 
-	// ANALYZE_EXPRESSION_PARSERS
 	s.ANALYZE_EXPRESSION_PARSERS = map[string]parseFn{
 		"ALL":       func(p *Parser) *Expr { return p.parseAnalyzeColumns() },
 		"COMPUTE":   func(p *Parser) *Expr { return p.parseAnalyzeStatistics() },
@@ -1372,10 +1320,9 @@ func newBaseParserSettings() *ParserSettings {
 }
 
 // cloneParserSettings returns a copy of s whose callable tables can be modified without
-// affecting s (mirrors subclassing a Parser and overriding table entries). The ParserData struct
-// is copied shallowly (its inner sets/maps are shared), tries are shared like inherited
-// class attributes (dialects that change SHOW_PARSERS / SET_PARSERS must rebuild them, as in
-// Python), and the hooks are copied by value.
+// affecting s, so a child dialect can override table entries. The ParserData struct is copied
+// shallowly (its inner sets/maps are shared), tries are shared (dialects that change
+// SHOW_PARSERS / SET_PARSERS must rebuild them), and the hooks are copied by value.
 func cloneParserSettings(s *ParserSettings) *ParserSettings {
 	c := *s
 	if s.ParserData != nil {
@@ -1385,6 +1332,7 @@ func cloneParserSettings(s *ParserSettings) *ParserSettings {
 	c.FUNCTIONS = maps.Clone(s.FUNCTIONS)
 	c.LAMBDAS = maps.Clone(s.LAMBDAS)
 	c.COLUMN_OPERATORS = maps.Clone(s.COLUMN_OPERATORS)
+	c.JSON_OPERATORS = maps.Clone(s.JSON_OPERATORS)
 	c.EXPRESSION_PARSERS = maps.Clone(s.EXPRESSION_PARSERS)
 	c.STATEMENT_PARSERS = maps.Clone(s.STATEMENT_PARSERS)
 	c.UNARY_PARSERS = maps.Clone(s.UNARY_PARSERS)

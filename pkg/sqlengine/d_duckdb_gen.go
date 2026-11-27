@@ -1,10 +1,8 @@
 package sqlengine
 
-// Port of the DuckDBGenerator class of sqlglot/generators/duckdb.py (sqlglot v30.13.0):
-// TRANSFORMS table and method overrides. Methods continue in d_duckdb_gen2.go.
-
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -12,17 +10,19 @@ import (
 func duckdbCustomizeGenerator(d *Dialect) {
 	G := d.G
 
-	// AFTER_HAVING_MODIFIER_TRANSFORMS = generator.AFTER_HAVING_MODIFIER_TRANSFORMS (module level)
+	// Only the base after-HAVING modifiers apply: CLUSTER BY, DISTRIBUTE BY and SORT BY are
+	// dropped. USING SAMPLE follows them, after QUALIFY and before ORDER BY and LIMIT.
 	for _, k := range []string{"cluster", "distribute", "sort"} {
 		delete(G.AFTER_HAVING_MODIFIER_TRANSFORMS, k)
 	}
-	keys := make([]string, 0, len(G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS))
+	keys := make([]string, 0, len(G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS)+1)
 	for _, k := range G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS {
 		if k != "cluster" && k != "distribute" && k != "sort" {
 			keys = append(keys, k)
 		}
 	}
-	G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS = keys
+	G.AFTER_HAVING_MODIFIER_TRANSFORMS["sample"] = func(g *Generator, e *Expr) string { return g.sqlKey(e, "sample") }
+	G.AFTER_HAVING_MODIFIER_TRANSFORMS_KEYS = append(keys, "sample")
 
 	dateDelta := duckdbDateDeltaToBinaryIntervalOp(true)
 
@@ -173,6 +173,8 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	T[KBoolxorAgg] = duckdbBoolxorAggSQL
 	T[KMakeInterval] = func(g *Generator, e *Expr) string { return noMakeIntervalSQL(g, e, " ") }
 	T[KInitcap] = duckdbInitcapSQL
+	T[KMax] = renameFunc("MAX")
+	T[KMin] = renameFunc("MIN")
 	T[KMD5Digest] = func(g *Generator, e *Expr) string { return g.fn("UNHEX", g.fn("MD5", e.This())) }
 	T[KSHA] = func(g *Generator, e *Expr) string { return duckdbShaSQL(g, e, "SHA1", false) }
 	T[KSHA1Digest] = func(g *Generator, e *Expr) string { return duckdbShaSQL(g, e, "SHA1", true) }
@@ -240,7 +242,7 @@ func duckdbCustomizeGenerator(d *Dialect) {
 		}
 		return g.fn(
 			"DATE_DIFF",
-			"'"+unit+"'",
+			LiteralString(unit),
 			CastExpr(e.Expression(), DT_TIMESTAMP, true, nil),
 			CastExpr(e.This(), DT_TIMESTAMP, true, nil),
 		)
@@ -278,7 +280,7 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	T[KDateBin] = renameFunc("TIME_BUCKET")
 	T[KLastDay] = duckdbLastDaySQL
 
-	// Dialect-only <key>_sql methods
+	// Per-kind methods that only DuckDB defines (dispatched after TRANSFORMS).
 	M := G.methods
 	M[KTimeSlice] = duckdbTimesliceSQL
 	M[KBitmapBucketNumber] = duckdbBitmapbucketnumberSQL
@@ -333,7 +335,6 @@ func duckdbCustomizeGenerator(d *Dialect) {
 		return g.functionFallbackSQL(e)
 	}
 	M[KJarowinklerSimilarity] = duckdbJarowinklersimilaritySQL
-	M[KNthValue] = duckdbNthvalueSQL
 	M[KRandstr] = duckdbRandstrSQL
 	M[KReduce] = duckdbReduceSQL
 	M[KZipf] = duckdbZipfSQL
@@ -373,6 +374,7 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	M[KRegexpCount] = duckdbRegexpcountSQL
 	M[KRegexpReplace] = duckdbRegexpreplaceSQL
 	M[KRegexpLike] = duckdbRegexplikeSQL
+	M[KRegexpFullMatch] = duckdbRegexpfullmatchSQL
 	M[KLevenshtein] = duckdbLevenshteinSQL
 	M[KMinhash] = duckdbMinhashSQL
 	M[KMinhashCombine] = duckdbMinhashcombineSQL
@@ -435,12 +437,7 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	M[KNumberToStr] = duckdbNumbertostrSQL
 	M[KPosexplode] = duckdbPosexplodeSQL
 	M[KAddMonths] = duckdbAddmonthsSQL
-	M[KFormat] = func(g *Generator, e *Expr) string {
-		if pyLower(e.Name()) == "%s" && len(e.Expressions()) == 1 {
-			return g.fn("FORMAT", "'{}'", e.Expressions()[0])
-		}
-		return g.functionFallbackSQL(e)
-	}
+	M[KFormat] = duckdbFormatSQL
 	M[KDateTrunc] = duckdbDatetruncSQL
 	M[KTimestampTrunc] = duckdbTimestamptruncSQL
 	M[KRound] = duckdbRoundSQL
@@ -450,10 +447,10 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	M[KApproxQuantiles] = duckdbApproxquantilesSQL
 	M[KJSONExtractScalar] = duckdbJsonextractscalarSQL
 
-	// Method overrides of the base Generator
 	H := &G.h
 	H.tonumberSQL = duckdbTonumberSQL
 	H.lambdaSQL = duckdbLambdaSQL
+	H.afterLimitModifiers = duckdbAfterLimitModifiers
 	H.showSQL = duckdbShowSQL
 	H.installSQL = duckdbInstallSQL
 	H.strtotimeSQL = duckdbStrtotimeSQL
@@ -465,6 +462,7 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	H.extractSQL = duckdbExtractSQL
 	H.tablesampleSQL = duckdbTablesampleSQL
 	H.joinSQL = duckdbJoinSQL
+	H.intervalSQL = duckdbIntervalSQL
 	H.bracketSQL = duckdbBracketSQL
 	H.withingroupSQL = duckdbWithingroupSQL
 	H.chrSQL = duckdbChrSQL
@@ -491,12 +489,13 @@ func duckdbCustomizeGenerator(d *Dialect) {
 	H.trimSQL = duckdbTrimSQL
 	H.trycastSQL = duckdbTrycastSQL
 	H.bitwisenotSQL = duckdbBitwisenotSQL
+	H.notSQL = duckdbNotSQL
 	H.windowSQL = duckdbWindowSQL
 	H.filterSQL = duckdbFilterSQL
 	H.uuidSQL = duckdbUuidSQL
+	H.placeholderSQL = duckdbPlaceholderSQL
 }
 
-// duckdbUnsupportedArgs mirrors the @unsupported_args(...) decorator for plain argument names.
 func duckdbUnsupportedArgs(g *Generator, e *Expr, args ...string) {
 	for _, arg := range args {
 		if e.ArgB(arg) {
@@ -505,7 +504,8 @@ func duckdbUnsupportedArgs(g *Generator, e *Expr, args ...string) {
 	}
 }
 
-// duckdbOptStr maps a Generator.format_time result ("" = None) to a Generator.func argument.
+// duckdbOptStr maps a formatTime result to a Generator.fn argument: "" (no format) becomes nil,
+// so the argument is omitted.
 func duckdbOptStr(s string) any {
 	if s == "" {
 		return nil
@@ -513,7 +513,6 @@ func duckdbOptStr(s string) any {
 	return s
 }
 
-// duckdbPyStr mirrors f"{value}" for an arg value (expressions render with the default dialect).
 func duckdbPyStr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -531,18 +530,14 @@ func duckdbPyStr(v any) string {
 	return fmt.Sprint(v)
 }
 
-// duckdbTimeUnitName mirrors TimeUnit.unit (via `e.unit`) rendered as Literal.string(e.unit):
-// sqlglot calls str() on the unit expression.
 func duckdbTimeUnitName(e *Expr) string {
 	return duckdbPyStr(e.Arg("unit"))
 }
 
-// duckdbRaw wraps an already generated SQL string so it can be placed in an expression list
-// (Python puts the string itself in the list; Var renders its text verbatim).
+// duckdbRaw wraps an already generated SQL string in a Var so it can be placed in an expression
+// list; a Var renders its text verbatim.
 func duckdbRaw(sql string) *Expr { return New(KVar, "this", sql) }
 
-// duckdbCastAny mirrors exp.cast(x, to, copy, dialect) where x may be a SQL string (parsed with
-// the default dialect, like maybe_parse).
 func duckdbCastAny(x any, to any, copy bool, d *Dialect) *Expr {
 	switch v := x.(type) {
 	case string:
@@ -553,8 +548,6 @@ func duckdbCastAny(x any, to any, copy bool, d *Dialect) *Expr {
 	panic(parsePanic{&ParseError{Msg: "SQL cannot be None"}})
 }
 
-// duckdbNonNil drops nil entries (Python Anonymous expressions lists containing None are
-// skipped by Generator.func).
 func duckdbNonNil(xs ...*Expr) []*Expr {
 	out := make([]*Expr, 0, len(xs))
 	for _, x := range xs {
@@ -565,7 +558,9 @@ func duckdbNonNil(xs ...*Expr) []*Expr {
 	return out
 }
 
-// duckdbArrayBagSQL mirrors DuckDBGenerator._array_bag_sql.
+// duckdbArrayBagSQL renders a multiset (bag) array operation shared by ARRAY_EXCEPT and
+// ARRAY_INTERSECTION: the elements of arr1 for which condition holds, or NULL when either array
+// is NULL.
 func duckdbArrayBagSQL(g *Generator, condition *Expr, arr1, arr2 *Expr) string {
 	cond := New(KParen, "this", duckdbReplacePlaceholders(condition, map[string]*Expr{"arr1": arr1, "arr2": arr2}))
 	return g.sql(duckdbReplacePlaceholders(duckdbArrayBagTemplate.get(), map[string]*Expr{
@@ -573,28 +568,34 @@ func duckdbArrayBagSQL(g *Generator, condition *Expr, arr1, arr2 *Expr) string {
 	}))
 }
 
-// duckdbTimesliceSQL mirrors timeslice_sql.
-//
-// Transform Snowflake's TIME_SLICE to DuckDB's time_bucket.
+// duckdbTimesliceSQL transforms Snowflake's TIME_SLICE into DuckDB's time_bucket, with an
+// explicit origin (the slice's own, or Snowflake's epoch).
 func duckdbTimesliceSQL(g *Generator, e *Expr) string {
 	dateExpr := e.This()
 	sliceLength := e.Expression()
-	unit := e.ArgE("unit")
+	// Normalize unit aliases (e.g. W/WK/WOY -> WEEK) so the interval and origin agree
+	unit := mapDatePart(e.ArgE("unit"), g.d)
 	kind := pyUpper(e.Text("kind"))
 
-	// Create INTERVAL expression: INTERVAL 'N' UNIT
 	intervalExpr := New(KInterval, "this", sliceLength, "unit", unit)
 
-	// Create base time_bucket expression
-	timeBucketExpr := duckdbFunc("time_bucket", intervalExpr, dateExpr)
+	origin := e.ArgE("origin")
+	if origin == nil {
+		// Snowflake aligns to 1970-01-01; WEEK to the Monday of the epoch week (WEEK_START=0)
+		if unit != nil && pyUpper(unit.Name()) == "WEEK" {
+			origin = LiteralString("1969-12-29")
+		} else {
+			origin = LiteralString("1970-01-01")
+		}
+	}
 
-	// Check if we need the end of the slice (default is start)
+	// A DATE origin keeps a DATE input a DATE; DuckDB widens it for TIMESTAMP inputs
+	timeBucketExpr := duckdbFunc("time_bucket", intervalExpr, dateExpr, CastExpr(origin, DT_DATE, true, nil))
+
 	if kind != "END" {
-		// For 'START', return time_bucket directly
 		return g.sql(timeBucketExpr)
 	}
 
-	// For 'END', add the interval to get end of slice
 	addExpr := New(KAdd, "this", timeBucketExpr, "expression", intervalExpr.Copy())
 
 	// If input is DATE type, cast result back to DATE to preserve type
@@ -606,20 +607,21 @@ func duckdbTimesliceSQL(g *Generator, e *Expr) string {
 	return g.sql(addExpr)
 }
 
-// duckdbBitmapbucketnumberSQL mirrors bitmapbucketnumber_sql.
+// duckdbBitmapbucketnumberSQL renders BITMAP_BUCKET_NUMBER as integer arithmetic over
+// 32768-bit buckets.
 func duckdbBitmapbucketnumberSQL(g *Generator, e *Expr) string {
 	value := e.This()
 
 	positiveFormula := duckdbAdd(duckdbIntDiv(duckdbSub(value, 1), 32768), 1)
 	nonPositiveFormula := duckdbIntDiv(value, 32768)
 
-	// CASE WHEN value > 0 THEN ((value - 1) // 32768) + 1 ELSE value // 32768 END
 	caseExpr := duckdbWhen(duckdbCase(), New(KGT, "this", value, "expression", LiteralInt(0)), positiveFormula, true)
 	caseExpr = duckdbElse(caseExpr, nonPositiveFormula, true)
 	return g.sql(caseExpr)
 }
 
-// duckdbBitmapbitpositionSQL mirrors bitmapbitposition_sql.
+// duckdbBitmapbitpositionSQL renders BITMAP_BIT_POSITION as the value's offset within its
+// 32768-bit bucket.
 func duckdbBitmapbitpositionSQL(g *Generator, e *Expr) string {
 	this := e.This()
 
@@ -635,13 +637,11 @@ func duckdbBitmapbitpositionSQL(g *Generator, e *Expr) string {
 	))
 }
 
-// duckdbBitmapconstructaggSQL mirrors bitmapconstructagg_sql.
 func duckdbBitmapconstructaggSQL(g *Generator, e *Expr) string {
 	arg := e.This()
 	return "(" + g.sql(duckdbReplacePlaceholders(duckdbBitmapConstructAggTemplate.get(), map[string]*Expr{"arg": arg})) + ")"
 }
 
-// duckdbJarowinklersimilaritySQL mirrors jarowinklersimilarity_sql.
 func duckdbJarowinklersimilaritySQL(g *Generator, e *Expr) string {
 	this := e.This()
 	expr := e.Expression()
@@ -660,22 +660,8 @@ func duckdbJarowinklersimilaritySQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbNthvalueSQL mirrors nthvalue_sql.
-func duckdbNthvalueSQL(g *Generator, e *Expr) string {
-	fromFirst := true
-	if e.HasArgKey("from_first") {
-		fromFirst = truthy(e.Arg("from_first"))
-	}
-	if !fromFirst {
-		g.unsupported("DuckDB's NTH_VALUE doesn't support starting from the end ")
-	}
-
-	return g.functionFallbackSQL(e)
-}
-
-// duckdbRandstrSQL mirrors randstr_sql.
-//
-// Transpile Snowflake's RANDSTR to DuckDB equivalent using deterministic hash-based random.
+// duckdbRandstrSQL transpiles Snowflake's RANDSTR to a DuckDB equivalent using deterministic
+// hash-based randomness.
 func duckdbRandstrSQL(g *Generator, e *Expr) string {
 	length := e.This()
 	generator := e.ArgE("generator")
@@ -683,13 +669,11 @@ func duckdbRandstrSQL(g *Generator, e *Expr) string {
 	var seedValue *Expr
 	if generator != nil {
 		if generator.IsA(KRand) {
-			// If it's RANDOM(), use its seed if available, otherwise use RANDOM() itself
 			seedValue = generator.This()
 			if seedValue == nil {
 				seedValue = generator
 			}
 		} else {
-			// Const/int or other expression - use as seed directly
 			seedValue = generator
 		}
 	} else {
@@ -702,23 +686,16 @@ func duckdbRandstrSQL(g *Generator, e *Expr) string {
 	})) + ")"
 }
 
-// duckdbReduceSQL mirrors reduce_sql.
 func duckdbReduceSQL(g *Generator, e *Expr) string {
 	duckdbUnsupportedArgs(g, e, "finish")
 	arrayArg := e.This()
 	initialValue := e.ArgE("initial")
 	mergeLambda := e.ArgE("merge")
 
-	if mergeLambda != nil {
-		mergeLambda.Set("colon", true)
-	}
-
 	return g.fn("list_reduce", arrayArg, mergeLambda, initialValue)
 }
 
-// duckdbZipfSQL mirrors zipf_sql.
-//
-// Transpile Snowflake's ZIPF to DuckDB using CDF-based inverse sampling.
+// duckdbZipfSQL transpiles Snowflake's ZIPF to DuckDB using CDF-based inverse sampling.
 func duckdbZipfSQL(g *Generator, e *Expr) string {
 	s := e.This()
 	n := e.ArgE("elementcount")
@@ -737,7 +714,6 @@ func duckdbZipfSQL(g *Generator, e *Expr) string {
 			"expression", LiteralNumber("1000000.0"),
 		)
 	} else {
-		// Use RANDOM() for non-deterministic output
 		randomExpr = New(KRand)
 	}
 
@@ -746,7 +722,6 @@ func duckdbZipfSQL(g *Generator, e *Expr) string {
 	})) + ")"
 }
 
-// duckdbTobinarySQL mirrors tobinary_sql.
 func duckdbTobinarySQL(g *Generator, e *Expr) string {
 	value := e.This()
 	formatArg := e.ArgE("format")
@@ -789,7 +764,6 @@ func duckdbTobinarySQL(g *Generator, e *Expr) string {
 	return result
 }
 
-// duckdbTonumberSQL mirrors tonumber_sql.
 func duckdbTonumberSQL(g *Generator, e *Expr) string {
 	format := e.ArgE("format")
 	precision := e.ArgE("precision")
@@ -802,20 +776,16 @@ func duckdbTonumberSQL(g *Generator, e *Expr) string {
 	return g.baseTonumberSQL(e)
 }
 
-// duckdbGreatestLeastSQL mirrors _greatest_least_sql.
-//
-// Handle GREATEST/LEAST functions with dialect-aware NULL behavior.
+// duckdbGreatestLeastSQL renders GREATEST/LEAST with the source dialect's NULL behavior: native
+// (NULL-ignoring) when ignore_nulls is set, otherwise NULL if any argument is NULL.
 func duckdbGreatestLeastSQL(g *Generator, e *Expr) string {
-	// Get all arguments
 	allArgs := append([]*Expr{e.This()}, e.Expressions()...)
 	fallbackSQL := g.functionFallbackSQL(e)
 
 	if e.ArgB("ignore_nulls") {
-		// DuckDB/PostgreSQL behavior: use native GREATEST/LEAST (ignores NULLs)
 		return g.sql(fallbackSQL)
 	}
 
-	// return NULL if any argument is NULL
 	conds := make([]*Expr, 0, len(allArgs))
 	for _, arg := range allArgs {
 		conds = append(conds, duckdbIs(arg, Null()))
@@ -825,9 +795,7 @@ func duckdbGreatestLeastSQL(g *Generator, e *Expr) string {
 	return g.sql(caseExpr)
 }
 
-// duckdbGeneratorSQL mirrors generator_sql.
 func duckdbGeneratorSQL(g *Generator, e *Expr) string {
-	// Transpile Snowflake GENERATOR to DuckDB range()
 	rowcount := e.ArgE("rowcount")
 	timeLimit := e.ArgE("time_limit")
 
@@ -843,10 +811,11 @@ func duckdbGeneratorSQL(g *Generator, e *Expr) string {
 	return g.fn("range", rowcount)
 }
 
-// duckdbLambdaSQL mirrors lambda_sql.
+// duckdbLambdaSQL renders a lambda, using the `LAMBDA x : body` syntax from DuckDB 1.3 on and the
+// arrow syntax before it.
 func duckdbLambdaSQL(g *Generator, e *Expr, arrowSep string, wrap bool) string {
 	prefix := ""
-	if e.ArgB("colon") {
+	if !duckdbVersionLT(g.d, 1, 3) {
 		prefix = "LAMBDA "
 		arrowSep = ":"
 		wrap = false
@@ -856,7 +825,15 @@ func duckdbLambdaSQL(g *Generator, e *Expr, arrowSep string, wrap bool) string {
 	return prefix + lambdaSQL
 }
 
-// duckdbShowSQL mirrors show_sql.
+// duckdbAfterLimitModifiers returns the locking clauses; USING SAMPLE is rendered before ORDER BY.
+func duckdbAfterLimitModifiers(g *Generator, e *Expr) []string {
+	locks := g.expressions(e, exprsOpts{key: "locks", sep: strp2(" ")})
+	if locks != "" {
+		locks = " " + locks
+	}
+	return []string{locks}
+}
+
 func duckdbShowSQL(g *Generator, e *Expr) string {
 	from := g.sqlKey(e, "from_")
 	if from != "" {
@@ -865,42 +842,41 @@ func duckdbShowSQL(g *Generator, e *Expr) string {
 	return "SHOW " + e.Name() + from
 }
 
-// duckdbSortarraySQL mirrors sortarray_sql.
 func duckdbSortarraySQL(g *Generator, e *Expr) string {
 	arr := e.This()
 	asc := e.ArgE("asc")
+	if asc == nil {
+		asc = Boolean(true)
+	}
 	nullsFirst := e.ArgE("nulls_first")
-
-	if !asc.IsA(KBoolean) && !nullsFirst.IsA(KBoolean) {
-		return g.fn("LIST_SORT", arr, asc, nullsFirst)
-	}
-
-	nullsAreFirst := nullsFirst != nil && nullsFirst.Equal(Boolean(true))
-	var nullsFirstSQL *Expr
-	if nullsAreFirst {
-		nullsFirstSQL = LiteralString("NULLS FIRST")
-	}
-
-	if !asc.IsA(KBoolean) {
-		return g.fn("LIST_SORT", arr, asc, nullsFirstSQL)
-	}
-
-	descending := asc.Equal(Boolean(false))
-
-	if !descending && !nullsAreFirst {
+	if !asc.IsA(KBoolean) || (nullsFirst != nil && !nullsFirst.IsA(KBoolean)) {
+		g.unsupported("LIST_SORT only takes literal orders")
 		return g.fn("LIST_SORT", arr)
 	}
-	if !nullsAreFirst {
+
+	ascending := asc.ArgB("this")
+	if nullsFirst == nil || !nullsFirst.ArgB("this") {
+		if ascending {
+			return g.fn("LIST_SORT", arr)
+		}
 		return g.fn("ARRAY_REVERSE_SORT", arr)
 	}
 	order := "ASC"
-	if descending {
+	if !ascending {
 		order = "DESC"
 	}
 	return g.fn("LIST_SORT", arr, LiteralString(order), LiteralString("NULLS FIRST"))
 }
 
-// duckdbInstallSQL mirrors install_sql.
+// duckdbPlaceholderSQL renders a variable whose name is an identifier as $name, keeping its
+// quotes.
+func duckdbPlaceholderSQL(g *Generator, e *Expr) string {
+	if e.This().IsA(KIdentifier) {
+		return "$" + g.sqlKey(e, "this")
+	}
+	return g.basePlaceholderSQL(e)
+}
+
 func duckdbInstallSQL(g *Generator, e *Expr) string {
 	force := ""
 	if e.ArgB("force") {
@@ -909,13 +885,14 @@ func duckdbInstallSQL(g *Generator, e *Expr) string {
 	this := g.sqlKey(e, "this")
 	fromClause := ""
 	if f := e.Arg("from_"); truthy(f) {
-		// f-string formatting renders the expression with the default dialect
+		// duckdbPyStr renders an expression with the default dialect
 		fromClause = " FROM " + duckdbPyStr(f)
 	}
 	return force + "INSTALL " + this + fromClause
 }
 
-// duckdbStrpositionSQL mirrors strposition_sql.
+// duckdbStrpositionSQL renders STRPOS. Binary arguments are searched as hex strings and the
+// position converted back to bytes; clamp_position maps non-positive positions to 1.
 func duckdbStrpositionSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	substr := e.ArgE("substr")
@@ -924,7 +901,6 @@ func duckdbStrpositionSQL(g *Generator, e *Expr) string {
 	// For BINARY/BLOB: DuckDB's STRPOS doesn't support BLOB types
 	// Convert to HEX strings, use STRPOS, then convert hex position to byte position
 	if duckdbIsBinary(this) {
-		// Build expression: STRPOS(HEX(haystack), HEX(needle))
 		hexStrpos := New(
 			KStrPosition,
 			"this", New(KHex, "this", this),
@@ -934,7 +910,6 @@ func duckdbStrpositionSQL(g *Generator, e *Expr) string {
 		return g.sql(CastExpr(duckdbDiv(duckdbAdd(hexStrpos, 1), 2), DT_INT, true, nil))
 	}
 
-	// For VARCHAR: handle clamp_position
 	if e.ArgB("clamp_position") && position != nil {
 		e = e.Copy()
 		e.Set("position", New(
@@ -948,7 +923,6 @@ func duckdbStrpositionSQL(g *Generator, e *Expr) string {
 	return strpositionSQL(g, e, "STRPOS", false, false, true)
 }
 
-// duckdbSubstringSQL mirrors substring_sql.
 func duckdbSubstringSQL(g *Generator, e *Expr) string {
 	if e.ArgB("zero_start") {
 		start := e.ArgE("start")
@@ -967,8 +941,8 @@ func duckdbSubstringSQL(g *Generator, e *Expr) string {
 	return g.functionFallbackSQL(e)
 }
 
-// duckdbStrptimeDefaultYear mirrors _strptime_default_year. The formatted time is nil (None),
-// a string or an expression.
+// duckdbStrptimeDefaultYear returns the value and format for STRPTIME, prefixing both with the
+// default year when one is set. The format is nil (no format), a string or an expression.
 func duckdbStrptimeDefaultYear(g *Generator, e *Expr) (*Expr, any) {
 	value := e.This()
 	formattedTime := duckdbOptStr(g.formatTime(e, nil, nil))
@@ -981,9 +955,7 @@ func duckdbStrptimeDefaultYear(g *Generator, e *Expr) (*Expr, any) {
 	return value, formattedTime
 }
 
-// duckdbStrtotimeSQL mirrors strtotime_sql.
 func duckdbStrtotimeSQL(g *Generator, e *Expr) string {
-	// Check if target_type requires TIMESTAMPTZ (for LTZ/TZ variants)
 	targetType := e.ArgE("target_type")
 	needsTz := false
 	if targetType != nil {
@@ -1008,7 +980,6 @@ func duckdbStrtotimeSQL(g *Generator, e *Expr) string {
 	return baseSQL
 }
 
-// duckdbStrtodateSQL mirrors strtodate_sql.
 func duckdbStrtodateSQL(g *Generator, e *Expr) string {
 	value, formattedTime := duckdbStrptimeDefaultYear(g, e)
 	functionName := "STRPTIME"
@@ -1018,19 +989,16 @@ func duckdbStrtodateSQL(g *Generator, e *Expr) string {
 	return g.sql(duckdbCastAny(g.fn(functionName, value, formattedTime), duckdbNewTypeExpr(DT_DATE), true, nil))
 }
 
-// duckdbParsedatetimeSQL mirrors parsedatetime_sql.
 func duckdbParsedatetimeSQL(g *Generator, e *Expr) string {
 	value, formattedTime := duckdbStrptimeDefaultYear(g, e)
 	return g.fn("STRPTIME", value, formattedTime)
 }
 
-// duckdbParsetimeSQL mirrors parsetime_sql.
 func duckdbParsetimeSQL(g *Generator, e *Expr) string {
 	formattedTime := duckdbOptStr(g.formatTime(e, nil, nil))
 	return g.sql(duckdbCastAny(g.fn("STRPTIME", e.This(), formattedTime), duckdbNewTypeExpr(DT_TIME), true, nil))
 }
 
-// duckdbTsordstotimeSQL mirrors tsordstotime_sql.
 func duckdbTsordstotimeSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	timeFormat := g.formatTime(e, nil, nil)
@@ -1057,7 +1025,6 @@ func duckdbTsordstotimeSQL(g *Generator, e *Expr) string {
 	return g.sql(New(castExpr, "this", this, "to", timeType))
 }
 
-// duckdbCurrentdateSQL mirrors currentdate_sql.
 func duckdbCurrentdateSQL(g *Generator, e *Expr) string {
 	if e.This() == nil {
 		return "CURRENT_DATE"
@@ -1071,7 +1038,6 @@ func duckdbCurrentdateSQL(g *Generator, e *Expr) string {
 	return g.sql(expr)
 }
 
-// duckdbCheckjsonSQL mirrors checkjson_sql.
 func duckdbCheckjsonSQL(g *Generator, e *Expr) string {
 	arg := e.This()
 	c := duckdbWhen(duckdbCase(),
@@ -1081,7 +1047,6 @@ func duckdbCheckjsonSQL(g *Generator, e *Expr) string {
 	return g.sql(c)
 }
 
-// duckdbParsejsonSQL mirrors parsejson_sql.
 func duckdbParsejsonSQL(g *Generator, e *Expr) string {
 	arg := e.This()
 	if e.ArgB("safe") {
@@ -1092,7 +1057,6 @@ func duckdbParsejsonSQL(g *Generator, e *Expr) string {
 	return g.fn("JSON", arg)
 }
 
-// duckdbUnicodeSQL mirrors unicode_sql.
 func duckdbUnicodeSQL(g *Generator, e *Expr) string {
 	if e.ArgB("empty_is_zero") {
 		c := duckdbWhen(duckdbCase(), duckdbEQ(e.This(), LiteralString("")), LiteralInt(0), true)
@@ -1103,14 +1067,12 @@ func duckdbUnicodeSQL(g *Generator, e *Expr) string {
 	return g.fn("UNICODE", e.Arg("this"))
 }
 
-// duckdbStripnullvalueSQL mirrors stripnullvalue_sql.
 func duckdbStripnullvalueSQL(g *Generator, e *Expr) string {
 	c := duckdbWhen(duckdbCase(), duckdbEQ(duckdbFunc("json_type", e.This()), "NULL"), Null(), true)
 	c = duckdbElse(c, e.This(), true)
 	return g.sql(c)
 }
 
-// duckdbTruncSQL mirrors trunc_sql.
 func duckdbTruncSQL(g *Generator, e *Expr) string {
 	decimals := e.ArgE("decimals")
 	if e.ArgB("fractions_supported") && decimals != nil && !duckdbIsType(decimals, DT_INT) {
@@ -1120,9 +1082,8 @@ func duckdbTruncSQL(g *Generator, e *Expr) string {
 	return g.fn("TRUNC", e.Arg("this"), decimals)
 }
 
-// duckdbNormalSQL mirrors normal_sql.
-//
-// Transpile Snowflake's NORMAL(mean, stddev, gen) to DuckDB using the Box-Muller transform.
+// duckdbNormalSQL transpiles Snowflake's NORMAL(mean, stddev, gen) to DuckDB using the
+// Box-Muller transform.
 func duckdbNormalSQL(g *Generator, e *Expr) string {
 	mean := e.This()
 	stddev := e.ArgE("stddev")
@@ -1150,9 +1111,6 @@ func duckdbNormalSQL(g *Generator, e *Expr) string {
 	}))
 }
 
-// duckdbUniformSQL mirrors uniform_sql.
-//
-// Transpile Snowflake's UNIFORM(min, max, gen) to DuckDB.
 func duckdbUniformSQL(g *Generator, e *Expr) string {
 	minVal := e.This()
 	maxVal := e.Expression()
@@ -1162,7 +1120,6 @@ func duckdbUniformSQL(g *Generator, e *Expr) string {
 	// We do this to emulate Snowflake's behavior, INT -> INT, FLOAT -> FLOAT
 	isIntResult := minVal.IsInt() && maxVal.IsInt()
 
-	// Build the random value expression [0, 1)
 	var randomExpr *Expr
 	if !gen.IsA(KRand) {
 		// Seed value: (ABS(HASH(seed)) % 1000000) / 1000000.0
@@ -1198,7 +1155,9 @@ func duckdbUniformSQL(g *Generator, e *Expr) string {
 	return g.sql(result)
 }
 
-// duckdbTimefrompartsSQL mirrors timefromparts_sql.
+// duckdbTimefrompartsSQL renders TIME_FROM_PARTS as MAKE_TIME, folding nanoseconds into the
+// seconds. When overflow is allowed and the parts may be out of range, it adds an INTERVAL to
+// midnight instead.
 func duckdbTimefrompartsSQL(g *Generator, e *Expr) string {
 	nano := e.ArgE("nano")
 	overflow := e.ArgB("overflow")
@@ -1219,7 +1178,6 @@ func duckdbTimefrompartsSQL(g *Generator, e *Expr) string {
 			}
 		}
 
-		// Overflow or nanoseconds detected - use INTERVAL arithmetic
 		if nano != nil {
 			sec = duckdbAdd(sec, duckdbDiv(nano.Pop(), LiteralNumber("1000000000.0")))
 		}
@@ -1233,7 +1191,6 @@ func duckdbTimefrompartsSQL(g *Generator, e *Expr) string {
 		))
 	}
 
-	// Default: MAKE_TIME
 	if nano != nil {
 		e.Set("sec", duckdbAdd(e.ArgE("sec"), duckdbDiv(nano.Pop(), LiteralNumber("1000000000.0"))))
 	}
@@ -1241,9 +1198,6 @@ func duckdbTimefrompartsSQL(g *Generator, e *Expr) string {
 	return renameFunc("MAKE_TIME")(g, e)
 }
 
-// duckdbExtractSQL mirrors extract_sql.
-//
-// Transpile EXTRACT/DATE_PART for DuckDB, handling specifiers not natively supported.
 func duckdbExtractSQL(g *Generator, e *Expr) string {
 	this := e.This()
 	datetimeExpr := e.Expression()
@@ -1301,7 +1255,6 @@ func duckdbExtractSQL(g *Generator, e *Expr) string {
 	return g.baseExtractSQL(e)
 }
 
-// duckdbTimestampfrompartsSQL mirrors timestampfromparts_sql.
 func duckdbTimestampfrompartsSQL(g *Generator, e *Expr) string {
 	// Check if this is the date/time expression form: TIMESTAMP_FROM_PARTS(date_expr, time_expr)
 	dateExpr := e.This()
@@ -1333,13 +1286,17 @@ func duckdbTimestampfrompartsSQL(g *Generator, e *Expr) string {
 		e.Set("sec", sec)
 	}
 
+	// A time zone applies to the built local timestamp
+	if zone := e.ArgE("zone"); zone != nil {
+		return g.sql(New(KAtTimeZone, "this", e, "zone", zone.Pop()))
+	}
+
 	return renameFunc("MAKE_TIMESTAMP")(g, e)
 }
 
-// duckdbTimestampltzfrompartsSQL mirrors timestampltzfromparts_sql.
 func duckdbTimestampltzfrompartsSQL(g *Generator, e *Expr) string {
 	duckdbUnsupportedArgs(g, e, "nano")
-	// Pop nano so rename_func only passes args that MAKE_TIMESTAMP accepts
+	// Pop nano so renameFunc only passes args that MAKE_TIMESTAMP accepts
 	if nano := e.ArgE("nano"); nano != nil {
 		nano.Pop()
 	}
@@ -1348,12 +1305,10 @@ func duckdbTimestampltzfrompartsSQL(g *Generator, e *Expr) string {
 	return "CAST(" + timestamp + " AS TIMESTAMPTZ)"
 }
 
-// duckdbTimestamptzfrompartsSQL mirrors timestamptzfromparts_sql.
 func duckdbTimestamptzfrompartsSQL(g *Generator, e *Expr) string {
 	duckdbUnsupportedArgs(g, e, "nano")
-	// Extract zone before popping
 	zone := e.ArgE("zone")
-	// Pop zone and nano so rename_func only passes args that MAKE_TIMESTAMP accepts
+	// Pop zone and nano so renameFunc only passes args that MAKE_TIMESTAMP accepts
 	if zone != nil {
 		zone = zone.Pop()
 	}
@@ -1365,14 +1320,12 @@ func duckdbTimestamptzfrompartsSQL(g *Generator, e *Expr) string {
 	timestamp := renameFunc("MAKE_TIMESTAMP")(g, e)
 
 	if zone != nil {
-		// Use AT TIME ZONE to apply the explicit timezone
 		return timestamp + " AT TIME ZONE " + g.sql(zone)
 	}
 
 	return timestamp
 }
 
-// duckdbTablesampleSQL mirrors tablesample_sql.
 func duckdbTablesampleSQL(g *Generator, e *Expr, tablesampleKeyword string) string {
 	if !e.Parent().IsA(KSelect) {
 		// This sample clause only applies to a single source, not the entire resulting relation
@@ -1391,11 +1344,37 @@ func duckdbTablesampleSQL(g *Generator, e *Expr, tablesampleKeyword string) stri
 	return g.baseTablesampleSQL(e, tablesampleKeyword)
 }
 
-// duckdbJoinSQL mirrors join_sql.
+// duckdbIntervalSQL renders an interval, keeping a fractional amount written with its unit in one
+// string (INTERVAL '1.5 DAY') in that form, since DuckDB truncates INTERVAL '1.5' DAY to a day.
+func duckdbIntervalSQL(g *Generator, e *Expr) string {
+	this := e.This()
+	unit := e.ArgE("unit")
+	if e.ArgB("fraction_in_string") && this != nil && unit.IsA(KVar) {
+		return "INTERVAL '" + this.Name() + " " + g.sql(unit) + "'"
+	}
+	return g.baseIntervalSQL(e)
+}
+
+// duckdbJoinSQL renders a join. MARK, SINGLE and RIGHT SEMI/ANTI joins use the explicit JOIN BY
+// (TYPE ...) form; a condition-less plain, INNER or OUTER join loses its side and kind, or gets ON
+// TRUE when it joins UNNEST.
 func duckdbJoinSQL(g *Generator, e *Expr) string {
 	kind := e.KindText()
+	side := e.SideText()
+	if kind == "MARK" || kind == "SINGLE" || (side == "RIGHT" && e.IsSemiOrAntiJoin()) {
+		// These join types have no keyword form, only an explicit JOIN BY (TYPE <side>_<kind>)
+		parts := make([]string, 0, 2)
+		for _, part := range []string{side, kind} {
+			if part != "" {
+				parts = append(parts, part)
+			}
+		}
+		return g.joinSQLWithOp(e, "JOIN BY (TYPE "+strings.Join(parts, "_")+")")
+	}
+
 	if !e.ArgB("using") &&
 		!e.ArgB("on") &&
+		!e.ArgB("nearest") &&
 		e.MethodText() == "" &&
 		(kind == "" || kind == "INNER" || kind == "OUTER") {
 		// Some dialects support `LEFT/INNER JOIN UNNEST(...)` without an explicit ON clause
@@ -1411,7 +1390,7 @@ func duckdbJoinSQL(g *Generator, e *Expr) string {
 	return g.baseJoinSQL(e)
 }
 
-// duckdbCountifSQL mirrors countif_sql.
+// duckdbCountifSQL renders COUNT_IF; before DuckDB 1.2 it is rewritten as a SUM.
 func duckdbCountifSQL(g *Generator, e *Expr) string {
 	if !duckdbVersionLT(g.d, 1, 2) {
 		this := e.This()
@@ -1423,11 +1402,11 @@ func duckdbCountifSQL(g *Generator, e *Expr) string {
 		return g.functionFallbackSQL(e)
 	}
 
-	// https://github.com/tobymao/sqlglot/pull/4749
 	return countIfToSum(g, e)
 }
 
-// duckdbBracketSQL mirrors bracket_sql.
+// duckdbBracketSQL renders a subscript. Before DuckDB 1.2, array literals are parenthesized and
+// a map subscript is unwrapped with [1] unless returns_list_for_maps is set.
 func duckdbBracketSQL(g *Generator, e *Expr) string {
 	if !duckdbVersionLT(g.d, 1, 2) {
 		return g.baseBracketSQL(e)
@@ -1454,7 +1433,6 @@ func duckdbBracketSQL(g *Generator, e *Expr) string {
 	return bracket
 }
 
-// duckdbWithingroupSQL mirrors withingroup_sql.
 func duckdbWithingroupSQL(g *Generator, e *Expr) string {
 	fn := e.This()
 
@@ -1469,21 +1447,17 @@ func duckdbWithingroupSQL(g *Generator, e *Expr) string {
 		// Save the original column for FILTER clause (before wrapping with Order)
 		originalThis := fn.This()
 
-		// Move ORDER BY inside ARRAY_AGG by wrapping its argument with Order
-		// ArrayAgg.this should become Order(this=ArrayAgg.this, expressions=order.expressions)
 		fn.Set("this", New(
 			KOrder,
 			"this", fn.This().Copy(),
 			"expressions", order.Expressions(),
 		))
 
-		// Generate the ARRAY_AGG function with ORDER BY and add FILTER clause if needed
-		// Use original_this (not the Order-wrapped version) for the FILTER condition
+		// Use originalThis (not the Order-wrapped version) for the FILTER condition
 		arrayAggSQL := g.functionFallbackSQL(fn)
 		return g.addArrayaggNullFilter(arrayAggSQL, fn, originalThis)
 	}
 
-	// For other functions (like PERCENTILES), use existing logic
 	expressionSQL := g.sqlKey(e, "expression")
 
 	if fn.IsA(KPercentileCont, KPercentileDisc) {
@@ -1501,7 +1475,8 @@ func duckdbWithingroupSQL(g *Generator, e *Expr) string {
 	return this + expressionSQL + ")"
 }
 
-// duckdbLengthSQL mirrors length_sql.
+// duckdbLengthSQL renders LENGTH. A possibly binary argument that is not known to be text is
+// dispatched on TYPEOF: byte length for BLOBs, LENGTH otherwise.
 func duckdbLengthSQL(g *Generator, e *Expr) string {
 	arg := e.This()
 
@@ -1529,7 +1504,6 @@ func duckdbLengthSQL(g *Generator, e *Expr) string {
 	return g.sql(c)
 }
 
-// duckdbBitlengthSQL mirrors bitlength_sql.
 func duckdbBitlengthSQL(g *Generator, e *Expr) string {
 	arg := e.This()
 	if !duckdbIsBinary(arg) {
@@ -1540,7 +1514,6 @@ func duckdbBitlengthSQL(g *Generator, e *Expr) string {
 	return g.sql(duckdbMul(New(KByteLength, "this", blob), LiteralInt(8)))
 }
 
-// duckdbChrSQL mirrors chr_sql.
 func duckdbChrSQL(g *Generator, e *Expr, _ string) string {
 	arg := e.Expressions()[0]
 	if duckdbIsType(arg, DataType_REAL_TYPES.Items()...) {
@@ -1549,7 +1522,8 @@ func duckdbChrSQL(g *Generator, e *Expr, _ string) string {
 	return g.fn("CHR", arg)
 }
 
-// duckdbCollateSQL mirrors collate_sql.
+// duckdbCollateSQL translates Snowflake collation specifiers: defaults are dropped, the rest are
+// joined with dots, and ones with no DuckDB equivalent are reported as unsupported.
 func duckdbCollateSQL(g *Generator, e *Expr) string {
 	if !e.Expression().IsString() {
 		return g.baseCollateSQL(e)
@@ -1577,9 +1551,6 @@ func duckdbCollateSQL(g *Generator, e *Expr) string {
 	return g.baseCollateSQL(New(KCollate, "this", e.This(), "expression", VarChecked(strings.Join(parts, "."))))
 }
 
-// duckdbValidateRegexpFlags mirrors _validate_regexp_flags; "" mirrors None.
-//
-// Validate and filter regexp flags for DuckDB compatibility.
 func duckdbValidateRegexpFlags(g *Generator, flags *Expr, supportedFlags string) string {
 	if flags == nil {
 		return ""
@@ -1618,4 +1589,38 @@ func duckdbValidateRegexpFlags(g *Generator, flags *Expr, supportedFlags string)
 		}
 	}
 	return b.String()
+}
+
+var duckdbFormatPlaceholderRE = regexp.MustCompile(`%%|%s`)
+
+// duckdbFormatSQL renders FORMAT: a brace-style one as FORMAT, a printf format using only %s (and
+// %%) as an equivalent brace format, so that non-string arguments are accepted as in PostgreSQL,
+// and any other as PRINTF.
+func duckdbFormatSQL(g *Generator, e *Expr) string {
+	args := []any{e.This()}
+	for _, x := range e.Expressions() {
+		args = append(args, x)
+	}
+	if e.ArgB("is_fmt") {
+		return g.fn("FORMAT", args...)
+	}
+
+	format := e.Name()
+	if e.This().IsString() && format == "%S" && len(e.Expressions()) == 1 {
+		return g.fn("UPPER", g.fn("FORMAT", LiteralString("{}"), e.Expressions()[0]))
+	}
+
+	if e.This().IsString() && strings.Contains(format, "%s") && !strings.Contains(duckdbFormatPlaceholderRE.ReplaceAllString(format, ""), "%") {
+		format = strings.ReplaceAll(strings.ReplaceAll(format, "{", "{{"), "}", "}}")
+		format = duckdbFormatPlaceholderRE.ReplaceAllStringFunc(format, func(m string) string {
+			if m == "%%" {
+				return "%"
+			}
+			return "{}"
+		})
+		args[0] = LiteralString(format)
+		return g.fn("FORMAT", args...)
+	}
+
+	return g.fn("PRINTF", args...)
 }

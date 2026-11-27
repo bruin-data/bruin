@@ -1,9 +1,7 @@
 package sqlengine
 
-// Port of sqlglot/optimizer/isolate_table_selects.py.
-
-// IsolateTableSelects mirrors isolate_table_selects(expression, schema, dialect). A nil schema is
-// replaced by an empty MappingSchema for the dialect (ensure_schema).
+// IsolateTableSelects rewrites each table with known columns that shares its scope with other
+// sources into `(SELECT * FROM table AS alias) AS alias`. Tables must already carry an alias.
 func IsolateTableSelects(expression *Expr, schema *MappingSchema, d *Dialect) *Expr {
 	if schema == nil {
 		schema = NewMappingSchema(nil, nil, d, true, nil)
@@ -17,7 +15,7 @@ func IsolateTableSelects(expression *Expr, schema *MappingSchema, d *Dialect) *E
 		for _, selected := range scope.SelectedSources().Values() {
 			source := selected.Source
 
-			// assert source.parent
+			// Every source must be attached to a parent node.
 			if (source.Scope != nil && source.Scope.Parent == nil) || (source.Table != nil && source.Table.Parent() == nil) {
 				panic(&ValueError{Msg: ""})
 			}

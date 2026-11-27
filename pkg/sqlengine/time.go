@@ -2,7 +2,8 @@ package sqlengine
 
 import "strings"
 
-// formatTime mirrors sqlglot.time.format_time. Returns ("", false) for None.
+// formatTime converts a time format string by replacing each longest key of mapping found in s
+// (matched with tr, or a trie built from mapping) with its value.
 func formatTime(s string, mapping map[string]string, tr *trie) (string, bool) {
 	if s == "" {
 		return "", false
