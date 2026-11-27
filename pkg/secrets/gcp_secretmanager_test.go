@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/iterator"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -175,6 +176,53 @@ func TestGCPSecretManagerClient_GetConnection_PermissionDenied(t *testing.T) {
 
 	var unavailable *config.SecretsBackendUnavailableError
 	require.ErrorAs(t, c.LookupError("conn"), &unavailable)
+}
+
+func serviceDisabledError(t *testing.T, consumer string) error {
+	t.Helper()
+	st, err := status.New(codes.PermissionDenied, "Secret Manager API has not been used in project before or it is disabled.").
+		WithDetails(&errdetails.ErrorInfo{
+			Reason:   "SERVICE_DISABLED",
+			Domain:   "googleapis.com",
+			Metadata: map[string]string{"service": "secretmanager.googleapis.com", "consumer": consumer},
+		})
+	require.NoError(t, err)
+	return st.Err()
+}
+
+func TestGCPSecretManagerClient_ServiceDisabled(t *testing.T) {
+	t.Parallel()
+
+	t.Run("read names the API, not an IAM role", func(t *testing.T) {
+		t.Parallel()
+		c := newTestGCPClient(&mockGCPSecretManagerClient{err: serviceDisabledError(t, "projects/quota-project")}, "")
+
+		require.Nil(t, c.GetConnection("conn"))
+		_, err := c.ResolveConnection("conn")
+		require.ErrorContains(t, err, "the Secret Manager API is not enabled in GCP project 'quota-project'")
+		require.ErrorContains(t, err, "gcloud services enable secretmanager.googleapis.com --project quota-project")
+		require.NotContains(t, err.Error(), "roles/secretmanager.secretAccessor")
+
+		var unavailable *config.SecretsBackendUnavailableError
+		require.ErrorAs(t, c.LookupError("conn"), &unavailable)
+	})
+
+	t.Run("list names the API, not an IAM role", func(t *testing.T) {
+		t.Parallel()
+		c := newTestGCPClient(&mockGCPSecretManagerClient{listErr: serviceDisabledError(t, "projects/quota-project")}, "")
+
+		_, err := c.GetConnectionsConfig()
+		require.ErrorContains(t, err, "the Secret Manager API is not enabled in GCP project 'quota-project'")
+		require.NotContains(t, err.Error(), "secretmanager.secrets.list")
+	})
+
+	t.Run("falls back to the configured project without a consumer", func(t *testing.T) {
+		t.Parallel()
+		c := newTestGCPClient(&mockGCPSecretManagerClient{listErr: serviceDisabledError(t, "")}, "")
+
+		_, err := c.GetConnectionsConfig()
+		require.ErrorContains(t, err, "the Secret Manager API is not enabled in GCP project 'my-project'")
+	})
 }
 
 func TestGCPSecretManagerClient_GetConnection_ReturnsError(t *testing.T) {

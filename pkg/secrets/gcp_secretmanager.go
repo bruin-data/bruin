@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -336,6 +337,9 @@ func (c *GCPSecretManagerClient) readConnections(name string) (*config.Connectio
 
 func (c *GCPSecretManagerClient) accessError(secretID string, err error) error {
 	where := "secret '" + secretID + "' (version '" + c.version + "') in GCP project '" + c.project + "'"
+	if disabledErr := c.serviceDisabledError(err); disabledErr != nil {
+		return &config.SecretsBackendUnavailableError{Err: disabledErr}
+	}
 	switch status.Code(err) {
 	case codes.NotFound:
 		return newSecretNotFoundError("%s not found in GCP Secret Manager", where)
@@ -350,6 +354,30 @@ func (c *GCPSecretManagerClient) accessError(secretID string, err error) error {
 	default:
 		return &config.SecretsBackendUnavailableError{Err: errors.Wrapf(err, "failed to read %s from GCP Secret Manager", where)}
 	}
+}
+
+// serviceDisabledError returns a clear error when err says the Secret Manager API is disabled, and nil
+// otherwise. GCP reports a disabled API as PermissionDenied, which would otherwise read as a missing
+// IAM role. The project to enable it in is the request's consumer project, which for user credentials
+// is the quota project rather than the project holding the secrets.
+func (c *GCPSecretManagerClient) serviceDisabledError(err error) error {
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.PermissionDenied {
+		return nil
+	}
+	for _, detail := range st.Details() {
+		info, ok := detail.(*errdetails.ErrorInfo)
+		if !ok || info.GetReason() != "SERVICE_DISABLED" {
+			continue
+		}
+		project := strings.TrimPrefix(info.GetMetadata()["consumer"], "projects/")
+		if project == "" {
+			project = c.project
+		}
+		return errors.Errorf("the Secret Manager API is not enabled in GCP project '%s'; enable it with "+
+			"`gcloud services enable secretmanager.googleapis.com --project %s` and retry after a few minutes", project, project)
+	}
+	return nil
 }
 
 // listConnectionNames lists the secrets under the configured prefix and returns their IDs with the prefix removed.
@@ -367,6 +395,9 @@ func (c *GCPSecretManagerClient) listConnectionNames() ([]string, error) {
 			break
 		}
 		if err != nil {
+			if disabledErr := c.serviceDisabledError(err); disabledErr != nil {
+				return nil, disabledErr
+			}
 			if status.Code(err) == codes.PermissionDenied {
 				return nil, errors.Wrapf(err, "permission denied listing secrets in GCP project '%s': `connections list` needs the "+
 					"secretmanager.secrets.list permission on the project, e.g. from roles/secretmanager.viewer", c.project)

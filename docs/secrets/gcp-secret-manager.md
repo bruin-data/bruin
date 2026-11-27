@@ -418,6 +418,14 @@ The identity authenticated but can't read the secret. Grant `roles/secretmanager
 
 For `bruin connections list`, the error names `secretmanager.secrets.list`, which has to be granted on the project.
 
+### Secret Manager API Not Enabled
+
+```text
+the Secret Manager API is not enabled in GCP project 'my-project'; enable it with `gcloud services enable secretmanager.googleapis.com --project my-project` and retry after a few minutes
+```
+
+Run the command from the message. With user credentials from `gcloud auth application-default login`, the project named here is the credentials' quota project, which may differ from the project that holds the secrets. The change takes a few minutes to apply.
+
 ### Workload Identity Federation Errors
 
 If the token exchange fails, run with `--debug` to confirm Bruin uses `external_account` credentials from `GOOGLE_APPLICATION_CREDENTIALS`, then check that:
