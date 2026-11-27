@@ -656,8 +656,8 @@ type Series struct {
 // listDialects build a list of {x, y} points newest first, skipping a NULL y, from
 // x, y and the limit suffix (empty, or limit with N).
 var listDialects = map[string]struct{ list, limit string }{
-	"bigquery":              {"ARRAY_AGG(IF(%[2]s IS NULL, NULL, STRUCT(%[1]s AS x, CAST(%[2]s AS FLOAT64) AS y)) IGNORE NULLS ORDER BY %[1]s DESC%[3]s)", " LIMIT %d"},
-	"google_cloud_platform": {"ARRAY_AGG(IF(%[2]s IS NULL, NULL, STRUCT(%[1]s AS x, CAST(%[2]s AS FLOAT64) AS y)) IGNORE NULLS ORDER BY %[1]s DESC%[3]s)", " LIMIT %d"},
+	"bigquery":              {"ARRAY_AGG(IF(%[2]s IS NOT NULL, STRUCT(%[1]s AS x, CAST(%[2]s AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY %[1]s DESC%[3]s)", " LIMIT %d"},
+	"google_cloud_platform": {"ARRAY_AGG(IF(%[2]s IS NOT NULL, STRUCT(%[1]s AS x, CAST(%[2]s AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY %[1]s DESC%[3]s)", " LIMIT %d"},
 	"duckdb":                {"(ARRAY_AGG({'x': %[1]s, 'y': CAST(%[2]s AS DOUBLE)} ORDER BY %[1]s DESC) FILTER (WHERE %[2]s IS NOT NULL))%[3]s", "[1:%d]"},
 }
 

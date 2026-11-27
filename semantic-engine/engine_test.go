@@ -3100,8 +3100,8 @@ func TestAddSeriesSQL(t *testing.T) {
 	}
 	for _, want := range []string{
 		"SELECT __rows.*, __series_join_0.__series_0, __series_join_0.__series_1 FROM (" + detail + ") __rows",
-		"ARRAY_AGG(IF(revenue IS NULL, NULL, STRUCT(order_date AS x, CAST(revenue AS FLOAT64) AS y)) IGNORE NULLS ORDER BY order_date DESC LIMIT 30) AS __series_0",
-		"ARRAY_AGG(IF(order_count IS NULL, NULL, STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y)) IGNORE NULLS ORDER BY order_date DESC) AS __series_1",
+		"ARRAY_AGG(IF(revenue IS NOT NULL, STRUCT(order_date AS x, CAST(revenue AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY order_date DESC LIMIT 30) AS __series_0",
+		"ARRAY_AGG(IF(order_count IS NOT NULL, STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY order_date DESC) AS __series_1",
 		"GROUP BY country) __series_join_0",
 		"(__rows.country = __series_join_0.country OR (__rows.country IS NULL AND __series_join_0.country IS NULL))",
 		"ORDER BY __rows.revenue DESC, __rows.country ASC",
