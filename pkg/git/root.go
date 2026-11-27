@@ -233,7 +233,9 @@ func DefaultBranch(repoPath string) (string, error) {
 // ChangedFilesFromBase returns the list of file paths (relative to the repo root) that have changed
 // between the merge base of the given base branch and HEAD.
 func ChangedFilesFromBase(repoPath, baseBranch string) ([]string, error) {
-	cmd := exec.Command("git", "diff", "--name-only", baseBranch+"...HEAD")
+	// -z prints raw paths split by NUL. Without it git quotes paths with
+	// non-ASCII or special characters (core.quotePath), e.g. "m\303\274.sql".
+	cmd := exec.Command("git", "diff", "--name-only", "-z", baseBranch+"...HEAD")
 	cmd.Dir = repoPath
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -243,17 +245,10 @@ func ChangedFilesFromBase(repoPath, baseBranch string) ([]string, error) {
 		return nil, fmt.Errorf("failed to get changed files: %w: %s", err, stderr.String())
 	}
 
-	output := strings.TrimSpace(stdout.String())
-	if output == "" {
-		return nil, nil
-	}
-
-	lines := strings.Split(output, "\n")
-	files := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			files = append(files, line)
+	var files []string
+	for _, file := range strings.Split(stdout.String(), "\x00") {
+		if file != "" {
+			files = append(files, file)
 		}
 	}
 
