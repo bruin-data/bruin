@@ -85,11 +85,12 @@ For production environments, Bruin supports external secret management solutions
 | HashiCorp Vault | [Vault Integration](/secrets/vault) |
 | Doppler | [Doppler Integration](/secrets/doppler) |
 | AWS Secrets Manager | [AWS Secrets Manager](/secrets/aws-secrets-manager) |
-| Azure Key Vault | `--secrets-backend azure` |
+| Azure Key Vault | [Azure Key Vault](/secrets/azure-key-vault) |
+| GCP Secret Manager | [GCP Secret Manager](/secrets/gcp-secret-manager) |
 
 ### Using an External Provider
 
-Supported values for `--secrets-backend` (and `BRUIN_SECRETS_BACKEND`) are `vault`, `doppler`, `aws`, and `azure`.
+Supported values for `--secrets-backend` (and `BRUIN_SECRETS_BACKEND`) are `vault`, `doppler`, `aws`, `azure`, and `gcp`.
 
 Specify the secrets backend when running:
 
@@ -105,6 +106,9 @@ bruin run --secrets-backend aws
 
 # Use Azure Key Vault
 bruin run --secrets-backend azure
+
+# Use GCP Secret Manager
+bruin run --secrets-backend gcp
 ```
 
 Or set via environment variable:

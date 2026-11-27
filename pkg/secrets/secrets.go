@@ -11,18 +11,22 @@ var (
 	_ config.ConnectionAndDetailsGetter = (*DopplerClient)(nil)
 	_ config.ConnectionAndDetailsGetter = (*AWSSecretsManagerClient)(nil)
 	_ config.ConnectionAndDetailsGetter = (*AzureKeyVaultClient)(nil)
+	_ config.ConnectionAndDetailsGetter = (*GCPSecretManagerClient)(nil)
 
 	_ config.ConnectionResolver = (*Client)(nil)
 	_ config.ConnectionResolver = (*DopplerClient)(nil)
 	_ config.ConnectionResolver = (*AWSSecretsManagerClient)(nil)
 	_ config.ConnectionResolver = (*AzureKeyVaultClient)(nil)
+	_ config.ConnectionResolver = (*GCPSecretManagerClient)(nil)
 
 	_ config.ConnectionsConfigGetter = (*Client)(nil)
 	_ config.ConnectionsConfigGetter = (*AWSSecretsManagerClient)(nil)
 	_ config.ConnectionsConfigGetter = (*AzureKeyVaultClient)(nil)
+	_ config.ConnectionsConfigGetter = (*GCPSecretManagerClient)(nil)
 
 	_ config.ConnectionLookupErrors = (*Client)(nil)
 	_ config.ConnectionLookupErrors = (*DopplerClient)(nil)
 	_ config.ConnectionLookupErrors = (*AWSSecretsManagerClient)(nil)
 	_ config.ConnectionLookupErrors = (*AzureKeyVaultClient)(nil)
+	_ config.ConnectionLookupErrors = (*GCPSecretManagerClient)(nil)
 )
