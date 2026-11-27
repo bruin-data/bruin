@@ -1,7 +1,6 @@
 package trino
 
 import (
-	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -19,12 +18,11 @@ type Config struct {
 func (c Config) ToDSN() string {
 	hostPort := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 
-	userPart := c.Username
+	user := url.User(c.Username)
 	if c.Password != "" {
-		userPart = fmt.Sprintf("%s:%s", c.Username, c.Password)
+		user = url.UserPassword(c.Username, c.Password)
 	}
 
-	baseURL := fmt.Sprintf("http://%s@%s", userPart, hostPort)
 	params := url.Values{}
 	if c.Catalog != "" {
 		params.Set("catalog", c.Catalog)
@@ -32,10 +30,13 @@ func (c Config) ToDSN() string {
 	if c.Schema != "" {
 		params.Set("schema", c.Schema)
 	}
-	if len(params) > 0 {
-		return fmt.Sprintf("%s?%s", baseURL, params.Encode())
+	u := &url.URL{
+		Scheme:   "http",
+		Host:     hostPort,
+		User:     user,
+		RawQuery: params.Encode(),
 	}
-	return baseURL
+	return u.String()
 }
 
 func (c Config) GetIngestrURI() string {

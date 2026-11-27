@@ -18,6 +18,8 @@ In order to set up a Trino connection, you need to add a configuration item to `
           schema: "schema_name" # Optional 
 ```
 
+Enter `username` and `password` as literal values, without URL percent-encoding them. Bruin handles URL encoding when building the connection string, including reserved characters such as `@`, `/`, `#`, and `%`.
+
 ## Trino Assets
 
 ### `trino.sql`
