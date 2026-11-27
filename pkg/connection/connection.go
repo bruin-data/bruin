@@ -5,8 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"os"
-	"reflect"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -4725,8 +4723,6 @@ func (m *Manager) AddVerticaConnectionFromConfig(connection *config.VerticaConne
 	return nil
 }
 
-var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
-
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
 		return
@@ -4734,30 +4730,6 @@ func processConnections[T config.Named](connections []T, adder func(*T) error, w
 	for i := range connections {
 		conn := &connections[i]
 		wg.Go(func() {
-			// Check for environment variable placeholders in connection fields
-			v := reflect.ValueOf(conn).Elem()
-			for i := range v.NumField() {
-				field := v.Field(i)
-
-				// Only process string fields
-				if field.Kind() != reflect.String {
-					continue
-				}
-				if !field.CanSet() {
-					continue
-				}
-				strValue := strings.TrimSpace(field.String())
-				matches := envVarRegex.FindStringSubmatch(strValue)
-				for len(matches) > 0 {
-					envVarName := matches[1]
-					envValue := os.Getenv(envVarName)
-					strValue = strings.Replace(strValue, matches[0], envValue, 1)
-					field.SetString(strValue)
-					// Look for more matches after replacement
-					matches = envVarRegex.FindStringSubmatch(strValue)
-				}
-			}
-
 			err := adder(conn)
 			if err != nil {
 				mu.Lock()
@@ -4777,6 +4749,16 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 // NewManagerFromConfigWithContext creates a connection Manager using the provided context
 // for any connection initializations that support context (e.g., Postgres/Redshift).
 func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
+	if cm.HasExternalVaultConnections() {
+		return newExternalVaultManager(ctx, cm)
+	}
+
+	cm.SelectedEnvironment.Connections.ExpandEnvVarPlaceholders()
+	return buildManager(ctx, cm)
+}
+
+// buildManager builds the selected environment's connections with their settings used as they are.
+func buildManager(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 	connectionManager.AllConnectionDetails = make(map[string]any)

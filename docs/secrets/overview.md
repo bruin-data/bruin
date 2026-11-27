@@ -11,3 +11,4 @@ At the moment, Bruin supports the following:
 * [Doppler](./doppler)
 * [AWS Secrets Manager](./aws-secrets-manager)
 * [Azure Key Vault](./azure-key-vault)
+* [1Password](./1password) - per connection, by linking a connection in `.bruin.yml` to a 1Password item (experimental)

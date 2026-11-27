@@ -567,6 +567,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Doppler", link: "/secrets/doppler"},
                     {text: "AWS Secrets Manager", link: "/secrets/aws-secrets-manager"},
                     {text: "Azure Key Vault", link: "/secrets/azure-key-vault"},
+                    {text: "1Password", link: "/secrets/1password"},
                 ]
             },
             {
