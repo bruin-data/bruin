@@ -876,16 +876,50 @@ func (e *Engine) generateSimple(q *Query, plan *queryPlan) (string, error) {
 	if having != "" {
 		rest += " HAVING " + having
 	}
-	return e.selectSQL(exprs, aliases, rest) + e.buildOrderAndLimit(q, plan, false), nil
+	// ORDER BY may name a field the query doesn't select, which ClickHouse's
+	// wrapper must still pass through under that name.
+	var sortOnly []string
+	for _, sort := range q.Sort {
+		name := sort.Name
+		if binding := plan.sortBinding(sort.Name); binding != nil {
+			name = binding.outputAlias
+		}
+		if !slices.Contains(aliases, name) && !slices.Contains(sortOnly, name) {
+			sortOnly = append(sortOnly, name)
+		}
+	}
+	return e.selectSQL(exprs, aliases, sortOnly, rest) + e.buildOrderAndLimit(q, plan, false), nil
 }
 
-// selectSQL returns SELECT exprs AS aliases followed by rest.
-func (e *Engine) selectSQL(exprs, aliases []string, rest string) string {
-	sel := make([]string, 0, len(exprs))
-	for i := range exprs {
-		sel = append(sel, exprs[i]+" AS "+aliases[i])
+// selectSQL returns SELECT exprs AS aliases followed by rest. ClickHouse reads a
+// name that matches a SELECT alias as that alias, even in WHERE, so there the
+// aliases are internal names no column has, renamed by an outer query that
+// also passes through the sortOnly fields.
+func (e *Engine) selectSQL(exprs, aliases, sortOnly []string, rest string) string {
+	sel := make([]string, 0, len(exprs)+len(sortOnly))
+	if e.Dialect != "clickhouse" {
+		for i := range exprs {
+			sel = append(sel, exprs[i]+" AS "+aliases[i])
+		}
+		return "SELECT " + strings.Join(sel, ", ") + rest
 	}
-	return "SELECT " + strings.Join(sel, ", ") + rest
+	renamed := make([]string, len(exprs))
+	for i := range exprs {
+		// A repeated ref reuses its first name; one alias may not name two columns.
+		k := i
+		for j := range i {
+			if exprs[j] == exprs[i] && aliases[j] == aliases[i] {
+				k = j
+				break
+			}
+		}
+		sel = append(sel, fmt.Sprintf("%s AS __bruin_c%d", exprs[i], k))
+		renamed[i] = fmt.Sprintf("__bruin_c%d AS %s", k, aliases[i])
+	}
+	for _, name := range sortOnly {
+		sel = append(sel, name+" AS "+name)
+	}
+	return "SELECT " + strings.Join(renamed, ", ") + " FROM (SELECT " + strings.Join(sel, ", ") + rest + ") __bruin_q"
 }
 
 func (e *Engine) expandSimple(name string, visited map[string]bool, plan *queryPlan) (string, error) {
@@ -986,7 +1020,7 @@ func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 	if having != "" {
 		inner += " HAVING " + having
 	}
-	inner = e.selectSQL(innerExprs, innerAliases, inner)
+	inner = e.selectSQL(innerExprs, innerAliases, nil, inner)
 
 	var outerSel []string
 	for _, d := range q.Dimensions {

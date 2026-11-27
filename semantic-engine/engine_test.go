@@ -3142,3 +3142,75 @@ func TestAddSeriesSQL(t *testing.T) {
 		t.Fatal("merged a number x")
 	}
 }
+
+func TestGenerateSQL_ClickHouseFiltersReadColumnsNotAliases(t *testing.T) {
+	t.Parallel()
+
+	// ClickHouse resolves created_at in WHERE to a SELECT alias of that name,
+	// so the inner aliases must not match a column.
+	m := &Model{
+		Name: "events", Source: Source{Table: "events"},
+		Dimensions: []Dimension{
+			{Name: "created_at", Type: "time", Granularities: map[string]string{"week": "toMonday(created_at)"}},
+			{Name: "country", Type: "string"},
+			{Name: "region", Type: "string", Expression: "country"},
+		},
+		Metrics: []Metric{
+			{Name: "event_count", Expression: "count(*)"},
+			{Name: "units", Expression: "sum(CAST(amount AS Nullable(UInt64))) + sum(arrayCount(x -> [x, x][2] > 5, tags))"},
+			{Name: "running", Expression: "{event_count}", Window: &Window{Type: "running_total", OrderBy: "created_at"}},
+		},
+	}
+	e := minimalEngine(t, m)
+	e.Dialect = "clickhouse"
+	sql, err := e.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "created_at", Granularity: "week"}},
+		Metrics:    []string{"event_count", "units"},
+		Filters: []Filter{
+			{Dimension: "created_at", Operator: "gte", Value: "2026-08-12"},
+			{Expression: "`created_at` < '2026-08-21' AND {country} = 'US'"},
+		},
+		Sort: []SortSpec{{Name: "created_at"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "SELECT __bruin_c0 AS created_at, __bruin_c1 AS event_count, __bruin_c2 AS units FROM (SELECT toMonday(created_at) AS __bruin_c0, count(*) AS __bruin_c1," +
+		" sum(CAST(amount AS Nullable(UInt64))) + sum(arrayCount(x -> [x, x][2] > 5, tags)) AS __bruin_c2 FROM events" +
+		" WHERE created_at >= '2026-08-12' AND `created_at` < '2026-08-21' AND country = 'US' GROUP BY 1) __bruin_q ORDER BY created_at ASC"
+	if sql != want {
+		t.Fatalf("got  %s\nwant %s", sql, want)
+	}
+
+	week := DimensionRef{Name: "created_at", Granularity: "week"}
+	for _, tc := range []struct {
+		q    *Query
+		want string
+	}{
+		{
+			// Repeated refs share one inner column; ClickHouse rejects one alias on two.
+			&Query{Dimensions: []DimensionRef{{Name: "country"}, {Name: "country"}}, Metrics: []string{"event_count", "event_count"}},
+			"SELECT __bruin_c0 AS country, __bruin_c0 AS country, __bruin_c2 AS event_count, __bruin_c2 AS event_count" +
+				" FROM (SELECT country AS __bruin_c0, country AS __bruin_c0, count(*) AS __bruin_c2, count(*) AS __bruin_c2 FROM events GROUP BY 1, 2) __bruin_q",
+		},
+		{
+			&Query{Dimensions: []DimensionRef{week, {Name: "country"}, week}, Metrics: []string{"running"}},
+			"SELECT base.created_at, base.country, base.created_at, SUM(base.event_count) OVER (ORDER BY base.created_at ROWS UNBOUNDED PRECEDING) AS running" +
+				" FROM (SELECT __bruin_c0 AS created_at, __bruin_c1 AS country, __bruin_c0 AS created_at, __bruin_c3 AS event_count FROM (SELECT toMonday(created_at) AS __bruin_c0," +
+				" country AS __bruin_c1, toMonday(created_at) AS __bruin_c0, count(*) AS __bruin_c3 FROM events GROUP BY 1, 2, 3) __bruin_q) base",
+		},
+		{
+			// A sort field the query doesn't select passes through the wrapper.
+			&Query{Dimensions: []DimensionRef{{Name: "region"}}, Metrics: []string{"event_count"}, Sort: []SortSpec{{Name: "country"}}},
+			"SELECT __bruin_c0 AS region, __bruin_c1 AS event_count FROM (SELECT country AS __bruin_c0, count(*) AS __bruin_c1, country AS country FROM events GROUP BY 1) __bruin_q ORDER BY country ASC",
+		},
+	} {
+		sql, err := e.GenerateSQL(tc.q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sql != tc.want {
+			t.Fatalf("got  %s\nwant %s", sql, tc.want)
+		}
+	}
+}
