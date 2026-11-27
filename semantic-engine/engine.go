@@ -843,13 +843,13 @@ func (e *Engine) validateQuery(q *Query, plan *queryPlan) error {
 }
 
 func (e *Engine) generateSimple(q *Query, plan *queryPlan) (string, error) {
-	var sel []string
+	var exprs, aliases []string
 	groupBy := make([]string, 0, len(q.Dimensions))
 
 	for i, d := range q.Dimensions {
 		binding := plan.dimensionBinding(d)
-		expr := plan.dimensionSQL(binding)
-		sel = append(sel, expr+" AS "+binding.outputAlias)
+		exprs = append(exprs, plan.dimensionSQL(binding))
+		aliases = append(aliases, binding.outputAlias)
 		groupBy = append(groupBy, strconv.Itoa(i+1))
 	}
 
@@ -858,27 +858,34 @@ func (e *Engine) generateSimple(q *Query, plan *queryPlan) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		sel = append(sel, expanded+" AS "+name)
+		exprs = append(exprs, expanded)
+		aliases = append(aliases, name)
 	}
 
-	sql := "SELECT " + strings.Join(sel, ", ")
-	sql += plan.fromSQL()
-
+	rest := plan.fromSQL()
 	where, having, err := e.buildWhereHaving(q, plan)
 	if err != nil {
 		return "", err
 	}
 	if where != "" {
-		sql += " WHERE " + where
+		rest += " WHERE " + where
 	}
 	if len(groupBy) > 0 {
-		sql += " GROUP BY " + strings.Join(groupBy, ", ")
+		rest += " GROUP BY " + strings.Join(groupBy, ", ")
 	}
 	if having != "" {
-		sql += " HAVING " + having
+		rest += " HAVING " + having
 	}
-	sql += e.buildOrderAndLimit(q, plan, false)
-	return sql, nil
+	return e.selectSQL(exprs, aliases, rest) + e.buildOrderAndLimit(q, plan, false), nil
+}
+
+// selectSQL returns SELECT exprs AS aliases followed by rest.
+func (e *Engine) selectSQL(exprs, aliases []string, rest string) string {
+	sel := make([]string, 0, len(exprs))
+	for i := range exprs {
+		sel = append(sel, exprs[i]+" AS "+aliases[i])
+	}
+	return "SELECT " + strings.Join(sel, ", ") + rest
 }
 
 func (e *Engine) expandSimple(name string, visited map[string]bool, plan *queryPlan) (string, error) {
@@ -934,7 +941,7 @@ func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 	innerMetrics := e.collectInnerMetrics(q.Metrics)
 	innerDimensions := e.collectInnerDimensions(q)
 
-	var innerSel []string
+	var innerExprs, innerAliases []string
 	groupBy := make([]string, 0, len(innerDimensions))
 	for i, d := range innerDimensions {
 		binding := plan.dimensionBinding(d)
@@ -948,8 +955,8 @@ func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 				return "", err
 			}
 		}
-		expr := plan.dimensionSQL(binding)
-		innerSel = append(innerSel, expr+" AS "+binding.outputAlias)
+		innerExprs = append(innerExprs, plan.dimensionSQL(binding))
+		innerAliases = append(innerAliases, binding.outputAlias)
 		groupBy = append(groupBy, strconv.Itoa(i+1))
 	}
 	for _, name := range innerMetrics {
@@ -960,11 +967,11 @@ func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		innerSel = append(innerSel, expr+" AS "+name)
+		innerExprs = append(innerExprs, expr)
+		innerAliases = append(innerAliases, name)
 	}
 
-	inner := "SELECT " + strings.Join(innerSel, ", ")
-	inner += plan.fromSQL()
+	inner := plan.fromSQL()
 
 	where, having, err := e.buildWhereHaving(q, plan)
 	if err != nil {
@@ -979,6 +986,7 @@ func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 	if having != "" {
 		inner += " HAVING " + having
 	}
+	inner = e.selectSQL(innerExprs, innerAliases, inner)
 
 	var outerSel []string
 	for _, d := range q.Dimensions {
