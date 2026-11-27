@@ -353,7 +353,7 @@ With smart retries enabled, Bruin Cloud reads why each failed attempt failed, an
 |---------|--------------|
 | **Temporary**: a timeout, a rate limit, a dropped connection, or a service error from the database or API | Retried right away, or after [`rerun_cooldown`](#rerun-cooldown) if it's set. Up to 100 times in a run, and these retries don't use the asset's `retries`. |
 | **Out of memory** | Retried on the next larger instance, using one of the asset's `retries`. The larger instance is used for that run only and stays within your team's allowed instances. If the asset already runs on the largest one, it's retried on the same instance. |
-| **One a retry doesn't fix**: a SQL error, a missing connection, missing permissions, or an invalid configuration | Not retried, even with `retries` left. Fix the cause and rerun the asset. |
+| **One a retry doesn't fix**: a SQL error, a missing connection, missing permissions, an invalid configuration, a dataset in another location, a service account that no longer exists, or billing or plan limits at the provider (such as billing not enabled, payment required, or an ended trial) | Not retried, even with `retries` left. Fix the cause and rerun the asset. |
 | **Anything else** | Retried up to `retries` times, as without smart retries. |
 
 A few rules apply whatever the failure:
