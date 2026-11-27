@@ -1902,37 +1902,33 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 func TestPipeline_SmartRetries(t *testing.T) {
 	t.Parallel()
 
+	// Set for the pipeline's assets under default only; there is no top-level setting.
 	var p pipeline.Pipeline
-	require.NoError(t, yaml.Unmarshal([]byte("name: test\nsmart_retries:\n  enabled: true\ndefault:\n  smart_retries:\n    enabled: false\n"), &p))
-	require.NotNil(t, p.SmartRetries)
-	require.NotNil(t, p.SmartRetries.Enabled)
-	assert.True(t, *p.SmartRetries.Enabled)
+	require.NoError(t, yaml.Unmarshal([]byte("name: test\ndefault:\n  smart_retries:\n    enabled: true\n"), &p))
 	require.NotNil(t, p.DefaultValues)
 	require.NotNil(t, p.DefaultValues.SmartRetries)
 	require.NotNil(t, p.DefaultValues.SmartRetries.Enabled)
-	assert.False(t, *p.DefaultValues.SmartRetries.Enabled)
+	assert.True(t, *p.DefaultValues.SmartRetries.Enabled)
 
 	var unset pipeline.Pipeline
 	require.NoError(t, yaml.Unmarshal([]byte("name: test\n"), &unset))
-	assert.Nil(t, unset.SmartRetries)
+	assert.Nil(t, unset.DefaultValues)
 
 	var bare pipeline.Pipeline
-	require.ErrorContains(t, yaml.Unmarshal([]byte("name: test\nsmart_retries: true\n"), &bare), "cannot unmarshal !!bool `true` into pipeline.SmartRetriesConfig")
+	require.ErrorContains(t, yaml.Unmarshal([]byte("name: test\ndefault:\n  smart_retries: true\n"), &bare), "cannot unmarshal !!bool `true` into pipeline.SmartRetriesConfig")
 
-	// The pipeline and its assets carry it in the JSON the orchestrator reads, only when set.
-	encoded, err := json.Marshal(&pipeline.Pipeline{Name: "test", SmartRetries: p.SmartRetries, Assets: []*pipeline.Asset{
-		{Name: "on", SmartRetries: p.SmartRetries},
+	// The assets carry it in the JSON the orchestrator reads, only when set; the pipeline doesn't.
+	encoded, err := json.Marshal(&pipeline.Pipeline{Name: "test", Assets: []*pipeline.Asset{
+		{Name: "on", SmartRetries: p.DefaultValues.SmartRetries},
 		{Name: "unset"},
 	}})
 	require.NoError(t, err)
-	var decoded struct {
-		SmartRetries map[string]any `json:"smart_retries"`
-		Assets       []map[string]any
-	}
+	var decoded map[string]any
 	require.NoError(t, json.Unmarshal(encoded, &decoded))
-	assert.Equal(t, map[string]any{"enabled": true}, decoded.SmartRetries)
-	assert.Equal(t, map[string]any{"enabled": true}, decoded.Assets[0]["smart_retries"])
-	assert.NotContains(t, decoded.Assets[1], "smart_retries")
+	assert.NotContains(t, decoded, "smart_retries")
+	assets := decoded["assets"].([]any)
+	assert.Equal(t, map[string]any{"enabled": true}, assets[0].(map[string]any)["smart_retries"])
+	assert.NotContains(t, assets[1], "smart_retries")
 }
 
 func TestBuilder_SetupDefaultsFromPipelineMergesSmartRetries(t *testing.T) {

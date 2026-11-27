@@ -2531,7 +2531,6 @@ type Pipeline struct {
 	Catchup            CatchupMode            `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	SmartRetries       *SmartRetriesConfig    `json:"smart_retries,omitempty" yaml:"smart_retries,omitempty" mapstructure:"smart_retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
