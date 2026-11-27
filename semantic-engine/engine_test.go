@@ -2994,13 +2994,20 @@ func TestGenerateSeriesSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, last, "SELECT country, order_date, order_count FROM (SELECT points.*, ROW_NUMBER() OVER (PARTITION BY country ORDER BY order_date DESC) AS __series_rank FROM (")
-	expectContains(t, last, ") ranked WHERE __series_rank <= 30 ORDER BY order_date")
+	expectContains(t, last, "SELECT country, order_date, order_count FROM (SELECT points.*, CASE WHEN order_count IS NOT NULL THEN ROW_NUMBER() OVER (PARTITION BY country ORDER BY CASE WHEN order_count IS NULL THEN 1 ELSE 0 END, order_date DESC) END AS __series_rank_0 FROM (")
+	expectContains(t, last, ") ranked WHERE __series_rank_0 <= 30 ORDER BY order_date")
+	// Each metric skips its own NULL points.
+	two, err := e.GenerateSeriesSQL(q, day, []string{"order_count", "revenue"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, two, "CASE WHEN revenue IS NOT NULL THEN ROW_NUMBER() OVER (PARTITION BY country ORDER BY CASE WHEN revenue IS NULL THEN 1 ELSE 0 END, order_date DESC) END AS __series_rank_1")
+	expectContains(t, two, "WHERE __series_rank_0 <= 30 OR __series_rank_1 <= 30")
 	lastTotal, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 30, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, lastTotal, "ROW_NUMBER() OVER (ORDER BY order_date DESC)")
+	expectContains(t, lastTotal, "ROW_NUMBER() OVER (ORDER BY CASE WHEN order_count IS NULL THEN 1 ELSE 0 END, order_date DESC)")
 	// A daily table's row needs the points before its own day, which it may not show.
 	daily := &Query{Dimensions: []DimensionRef{{Name: "country"}, day}, Metrics: []string{"revenue"}, Limit: 10}
 	window, err := e.GenerateSeriesSQL(daily, day, []string{"order_count"}, 30, false)
@@ -3017,16 +3024,16 @@ func TestGenerateSeriesSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectNotContains(t, history, "INNER JOIN")
-	expectContains(t, history, "ROW_NUMBER() OVER (PARTITION BY category ORDER BY order_date DESC)")
+	expectContains(t, history, "ROW_NUMBER() OVER (PARTITION BY category ORDER BY CASE WHEN order_count IS NULL THEN 1 ELSE 0 END, order_date DESC)")
 	// The helper rank column steps around a field with the same name.
 	ranked := richTestModel()
-	ranked.Metrics = append(ranked.Metrics, Metric{Name: "__series_rank", Expression: "count(*)"})
-	named, err := minimalEngine(t, ranked).GenerateSeriesSQL(q, day, []string{"__series_rank"}, 30, false)
+	ranked.Metrics = append(ranked.Metrics, Metric{Name: "__series_rank_0", Expression: "count(*)"})
+	named, err := minimalEngine(t, ranked).GenerateSeriesSQL(q, day, []string{"__series_rank_0"}, 30, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, named, "AS __series_rank_ FROM (")
-	expectContains(t, named, "WHERE __series_rank_ <= 30")
+	expectContains(t, named, "AS __series_rank_0_ FROM (")
+	expectContains(t, named, "WHERE __series_rank_0_ <= 30")
 	// The total row's points cover only the rows the table shows.
 	total, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 0, true)
 	if err != nil {
@@ -3093,8 +3100,8 @@ func TestAddSeriesSQL(t *testing.T) {
 	}
 	for _, want := range []string{
 		"SELECT __rows.*, __series_join_0.__series_0, __series_join_0.__series_1 FROM (" + detail + ") __rows",
-		"ARRAY_AGG(STRUCT(order_date AS x, CAST(revenue AS FLOAT64) AS y) ORDER BY order_date DESC LIMIT 30) AS __series_0",
-		"ARRAY_AGG(STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y) ORDER BY order_date DESC) AS __series_1",
+		"ARRAY_AGG(IF(revenue IS NOT NULL, STRUCT(order_date AS x, CAST(revenue AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY order_date DESC LIMIT 30) AS __series_0",
+		"ARRAY_AGG(IF(order_count IS NOT NULL, STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY order_date DESC) AS __series_1",
 		"GROUP BY country) __series_join_0",
 		"(__rows.country = __series_join_0.country OR (__rows.country IS NULL AND __series_join_0.country IS NULL))",
 		"ORDER BY __rows.revenue DESC, __rows.country ASC",
@@ -3121,7 +3128,7 @@ func TestAddSeriesSQL(t *testing.T) {
 	if sql, ok, err = e.AddSeriesSQL(q, detail, series, false); err != nil || !ok {
 		t.Fatalf("ok=%v err=%v", ok, err)
 	}
-	expectContains(t, sql, "ARRAY_AGG({'x': order_date, 'y': CAST(revenue AS DOUBLE)} ORDER BY order_date DESC)[1:30] AS __series_0")
+	expectContains(t, sql, "(ARRAY_AGG({'x': order_date, 'y': CAST(revenue AS DOUBLE)} ORDER BY order_date DESC) FILTER (WHERE revenue IS NOT NULL))[1:30] AS __series_0")
 	e.Dialect = "snowflake"
 	if _, ok, _ := e.AddSeriesSQL(q, detail, series, false); ok {
 		t.Fatal("merged on a dialect without lists")
