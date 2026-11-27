@@ -118,6 +118,7 @@ variables:
 - [Catchup](#catchup)
 - [Metadata push](#metadata-push)
 - [Retries](#retries)
+- [Smart Retries](#smart-retries)
 - [Rerun Cooldown](#rerun-cooldown)
 - [Concurrency](#concurrency)
 - [Max Active Steps](#max-active-steps)
@@ -336,13 +337,9 @@ retries: 2
 
 **Inheritance:** The pipeline-level `retries` is the default for every asset and every quality check in the pipeline. An [asset can override it](../assets/definition-schema.md#retries) with its own `retries`, and a [check can override it](../quality/overview.md#retries) again, following the resolution chain **check → asset → pipeline**. An explicit value (including `0`, meaning no retries) at any level wins over the inherited default.
 
-<!-- Hidden until the orchestrator applies smart_retries (BRU-6587). When shown, also add
-"- [Smart Retries](#smart-retries)" to the contents after Retries, and this row to the default table:
-| smart_retries      | Object                     | —       | Default for [smart retries](#smart-retries) |
-
 ### Smart Retries
 
-Let Bruin Cloud retry failed assets based on why they failed, instead of always retrying up to `retries` times. Turn it on for all assets of the pipeline under [`default`](#default-pipeline-level-defaults):
+Let Bruin Cloud retry failed assets based on why they failed, instead of always retrying up to `retries` times. Turn it on for every asset in the pipeline under [`default`](#default-pipeline-level-defaults):
 
 ```yaml
 default:
@@ -350,22 +347,29 @@ default:
     enabled: true
 ```
 
-With smart retries enabled, a failed asset is retried as follows:
+With smart retries enabled, Bruin Cloud reads why each failed attempt failed, and retries it as follows:
 
-- **Temporary failures**, such as timeouts, rate limits and service errors, are retried right away (or after `rerun_cooldown`), up to 100 times, without using the asset's `retries`.
-- **Out of memory:** the asset is retried on the next larger instance, using one of its `retries`.
-- **Failures a retry doesn't fix**, such as a SQL error, a missing connection, missing permissions or disabled billing, aren't retried.
-- **Anything else** is retried up to `retries` times, as without smart retries.
+| Failure | What happens |
+|---------|--------------|
+| **Temporary**: a timeout, a rate limit, a dropped connection, or a service error from the database or API | Retried right away, or after [`rerun_cooldown`](#rerun-cooldown) if it's set. Up to 100 times in a run, and these retries don't use the asset's `retries`. |
+| **Out of memory** | Retried on the next larger instance, using one of the asset's `retries`. The larger instance is used for that run only and stays within your team's allowed instances. If the asset already runs on the largest one, it's retried on the same instance. |
+| **One a retry doesn't fix**: a SQL error, a missing connection, missing permissions, or an invalid configuration | Not retried, even with `retries` left. Fix the cause and rerun the asset. |
+| **Anything else** | Retried up to `retries` times, as without smart retries. |
 
-`retries: 0` still means no retries. Quality checks aren't affected.
+A few rules apply whatever the failure:
+
+- `retries: 0` still means no retries.
+- An asset isn't retried once its run is over, or after you mark it as failed.
+- Rerunning a run starts over: retries, the temporary-failure count and the instance size reset. An asset you rerun on its own isn't retried automatically, as without smart retries.
+- Quality checks aren't affected; they're retried up to their own [`retries`](../quality/overview.md#retries).
+
+In Bruin Cloud, an asset that uses smart retries shows a **Smart retries** badge in its details, and a banner explains what smart retries did, such as retrying temporary failures or not retrying a SQL error.
 
 - **Type:** `Object`
 - **Fields:**
   - `enabled` (`Boolean`, default `false`): turns smart retries on.
 
-**Inheritance:** `smart_retries` under `default` applies to every asset in the pipeline; there is no top-level `smart_retries`. An [asset can override it](../assets/definition-schema.md#smart_retries) with its own `smart_retries`; a field the asset leaves out is inherited from `default`.
-
--->
+**Inheritance:** `smart_retries` under `default` applies to every asset in the pipeline; there is no top-level `smart_retries`. An [asset can override it](../assets/definition-schema.md#smart-retries) with its own `smart_retries`; a field the asset leaves out is inherited from `default`.
 
 ### Rerun Cooldown
 
@@ -480,6 +484,7 @@ Fields:
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers). Applied automatically in Bruin Cloud; needs `--apply-interval-modifiers` on the CLI |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 | retries            | Integer                    | —       | Default asset retries            |
+| smart_retries      | Object                     | —       | Default for [smart retries](#smart-retries) |
 | timeout            | String (Go duration)       | —       | Default asset timeout (for example, `1h30m`) |
 | rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
