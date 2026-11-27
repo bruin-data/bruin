@@ -25,7 +25,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 
 	strategy := mat.Strategy
 	if asset.FullRefreshEnabled(m.fullRefresh) && mat.Type == pipeline.MaterializationTypeTable {
-		if mat.Strategy != pipeline.MaterializationStrategyDDL {
+		// Data Vault strategies have no CreateReplace equivalent here, so overriding them would
+		// silently build a plain table without the Data Vault loading rules.
+		if mat.Strategy != pipeline.MaterializationStrategyDDL && !mat.Strategy.IsDataVault() {
 			strategy = pipeline.MaterializationStrategyCreateReplace
 		}
 	}
