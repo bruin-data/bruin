@@ -1274,6 +1274,7 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 		name                 string
 		runFullRefresh       bool
 		parameters           pipeline.ParameterMap
+		firstRun             bool
 		expectedFullRefresh  bool
 		expectedRenderedText string
 	}{
@@ -1295,6 +1296,12 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			expectedFullRefresh:  true,
 			expectedRenderedText: "True",
 		},
+		{
+			name:                 "full_refresh is true on the first run of an incremental asset",
+			firstRun:             true,
+			expectedFullRefresh:  true,
+			expectedRenderedText: "True",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1310,6 +1317,9 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			asset := &pipeline.Asset{
 				Name:       "test-asset",
 				Parameters: tt.parameters,
+			}
+			if tt.firstRun {
+				asset = asset.FirstRun()
 			}
 
 			baseRenderer := NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", basePipeline.Variables.Value())

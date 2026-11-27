@@ -1255,6 +1255,31 @@ func TestManager_AddPeeringDBConnectionFromConfig(t *testing.T) {
 	assert.Equal(t, "peeringdb://?api_key=abc.123", uri)
 }
 
+func TestManager_AddBrevoConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	configuration := &config.BrevoConnection{
+		ConnectionMetadata: config.ConnectionMetadata{Name: "test"},
+		APIKey:             "xkeysib-abc123",
+	}
+
+	require.NoError(t, m.AddBrevoConnectionFromConfig(configuration))
+
+	res := m.GetConnection("test")
+	require.NotNil(t, res)
+	assert.Same(t, m.Brevo["test"], res)
+	assert.Same(t, configuration, m.GetConnectionDetails("test"))
+
+	uri, err := m.Brevo["test"].GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "brevo://?api_key=xkeysib-abc123", uri)
+}
+
 func TestManager_AddPrivatusConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 

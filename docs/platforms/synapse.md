@@ -175,7 +175,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `synapse.source`
 
-Defines Synapse source assets for documenting existing tables and views in your Synapse database. These assets are no-op (they don't execute), but are useful for:
+Defines Synapse source assets for documenting existing tables and views in your Synapse database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing Synapse tables and views
 - Adding column descriptions and metadata

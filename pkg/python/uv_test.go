@@ -811,6 +811,43 @@ func TestTailBuffer(t *testing.T) {
 	}
 }
 
+func TestWarningLines(t *testing.T) {
+	t.Parallel()
+
+	output := ">> loading rows\n>> WARNING: source returned 0 rows\n>> swarm of 10 rows loaded\n>> UserWarning: column dropped\n>> [CSV] Warning: Row 3: skipping row\n"
+
+	assert.Equal(t, []string{
+		"WARNING: source returned 0 rows",
+		"UserWarning: column dropped",
+		"[CSV] Warning: Row 3: skipping row",
+	}, warningLines([]byte(output)))
+	assert.Empty(t, warningLines([]byte(">> all good\n")))
+}
+
+func TestTailBufferKeepsWarningsItDropsFromTheTail(t *testing.T) {
+	t.Parallel()
+	tb := newTailBuffer(40)
+	for _, w := range []string{">> Warning: skipped 3 rows\n", ">> aaaaaaa\n", ">> bbbbbbb\n", ">> WARNING: late\n"} {
+		_, _ = tb.Write([]byte(w))
+	}
+
+	var out bytes.Buffer
+	tb.flushTo(&out)
+	require.NotContains(t, out.String(), "skipped 3 rows")
+	assert.Equal(t, []string{"Warning: skipped 3 rows", "WARNING: late"}, tb.warnings)
+}
+
+func TestTailBufferCapsWarningsAndCountsTheRest(t *testing.T) {
+	t.Parallel()
+	tb := newTailBuffer(20)
+	for _, w := range []string{">> Warning: one\n", ">> Warning: two\n", ">> Warning: three\n", ">> Warning: 4\n"} {
+		_, _ = tb.Write([]byte(w))
+	}
+
+	assert.Equal(t, []string{"Warning: one"}, tb.warnings)
+	assert.Equal(t, 3, tb.omittedWarnings)
+}
+
 func TestTailBufferNeverPrintsPartOfASecret(t *testing.T) {
 	t.Parallel()
 	const secret = "SECRETabcdefghij0123456789"

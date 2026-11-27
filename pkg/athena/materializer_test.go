@@ -73,3 +73,23 @@ func TestLogIfFullRefreshAndDDL(t *testing.T) {
 		})
 	}
 }
+
+func TestMaterializer_RenderFirstRunChecksOwnStrategy(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Name: "analytics.orders",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyDeleteInsert,
+		},
+	}
+
+	_, err := NewMaterializer(false).Render(asset.FirstRun(), "SELECT 1 AS id", "s3://bucket/path")
+	require.ErrorContains(t, err, "requires the `incremental_key` field")
+
+	asset.Materialization.IncrementalKey = "id"
+	queries, err := NewMaterializer(false).Render(asset.FirstRun(), "SELECT 1 AS id", "s3://bucket/path")
+	require.NoError(t, err)
+	require.NotEmpty(t, queries)
+}

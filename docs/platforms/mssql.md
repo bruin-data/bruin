@@ -278,7 +278,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `ms.source`
 
-Defines Microsoft SQL Server source assets for documenting existing tables and views in your SQL Server database. These assets are no-op (they don't execute), but are useful for:
+Defines Microsoft SQL Server source assets for documenting existing tables and views in your SQL Server database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing SQL Server tables and views
 - Adding column descriptions and metadata

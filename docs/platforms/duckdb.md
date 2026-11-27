@@ -471,7 +471,7 @@ FROM orders;
 
 ### `duckdb.source`
 
-Defines DuckDB source assets for documenting existing tables and views in your DuckDB database. These assets are no-op (they don't execute), but are useful for:
+Defines DuckDB source assets for documenting existing tables and views in your DuckDB database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing DuckDB tables and views
 - Adding column descriptions and metadata

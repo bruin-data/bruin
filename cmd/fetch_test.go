@@ -18,8 +18,10 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -773,6 +775,14 @@ func TestAddLimitToQuery(t *testing.T) {
 			expected: "SELECT TOP 20 * FROM (\nSELECT * FROM table\n) as t",
 		},
 		{
+			// Oracle has no LIMIT clause, so the fallback must use the connection's ROWNUM wrapper.
+			name:     "query with oracle connection",
+			query:    "SELECT id FROM orders AS OF TIMESTAMP SYSTIMESTAMP ORDER BY id;",
+			limit:    3,
+			conn:     &oracle.Client{},
+			expected: "SELECT * FROM (\nSELECT id FROM orders AS OF TIMESTAMP SYSTIMESTAMP ORDER BY id\n) WHERE ROWNUM <= 3",
+		},
+		{
 			name:     "complex query with joins",
 			query:    "SELECT a.*, b.name FROM table_a a JOIN table_b b ON a.id = b.id",
 			limit:    15,
@@ -956,6 +966,76 @@ func TestWriteQueryResultsCSV(t *testing.T) {
 		require.NoError(t, writeQueryResultsCSV(&out, result))
 		assert.Equal(t, "name\nbruin\n", out.String())
 	})
+}
+
+func pgNumeric(t *testing.T, text string) pgtype.Numeric {
+	t.Helper()
+	var n pgtype.Numeric
+	require.NoError(t, n.Scan(text))
+	return n
+}
+
+func TestFormatPgNumericCells(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		cell         interface{}
+		expectedText string
+		expectedJSON string
+	}{
+		{name: "rounded percentage", cell: pgNumeric(t, "42.86"), expectedText: "42.86", expectedJSON: "42.86"},
+		{name: "keeps scale", cell: pgNumeric(t, "-1.50"), expectedText: "-1.50", expectedJSON: "-1.50"},
+		{name: "integer", cell: pgNumeric(t, "100"), expectedText: "100", expectedJSON: "100"},
+		{name: "small fraction", cell: pgNumeric(t, "0.000001"), expectedText: "0.000001", expectedJSON: "0.000001"},
+		{
+			name:         "beyond float64 precision",
+			cell:         pgNumeric(t, "123456789012345678901234567890.123456789"),
+			expectedText: "123456789012345678901234567890.123456789",
+			expectedJSON: "123456789012345678901234567890.123456789",
+		},
+		{name: "NaN", cell: pgNumeric(t, "NaN"), expectedText: "NaN", expectedJSON: `"NaN"`},
+		{name: "infinity", cell: pgNumeric(t, "Infinity"), expectedText: "Infinity", expectedJSON: `"Infinity"`},
+		{name: "negative infinity", cell: pgNumeric(t, "-Infinity"), expectedText: "-Infinity", expectedJSON: `"-Infinity"`},
+		{name: "null", cell: pgtype.Numeric{}, expectedText: "", expectedJSON: "null"},
+		{
+			name:         "numeric array",
+			cell:         []interface{}{pgNumeric(t, "1.5"), pgNumeric(t, "2.25"), nil},
+			expectedText: "[1.5 2.25 <nil>]",
+			expectedJSON: "[1.5,2.25,null]",
+		},
+		{
+			name:         "numeric array with special values",
+			cell:         []interface{}{pgNumeric(t, "Infinity"), pgNumeric(t, "-Infinity"), pgNumeric(t, "NaN")},
+			expectedText: "[Infinity -Infinity NaN]",
+			expectedJSON: `["Infinity","-Infinity","NaN"]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assertQueryCellOutputs(t, tt.cell, tt.expectedText, tt.expectedJSON)
+		})
+	}
+}
+
+// assertQueryCellOutputs checks how a single cell prints in csv, table and JSON output.
+func assertQueryCellOutputs(t *testing.T, cell interface{}, expectedText, expectedJSON string) {
+	t.Helper()
+
+	row := []interface{}{cell}
+	assert.Equal(t, []string{expectedText}, formatQueryRowForCSV(row))
+
+	var table strings.Builder
+	renderTable(&table, []string{"value"}, [][]interface{}{row})
+	if expectedText != "" {
+		assert.Contains(t, table.String(), " "+expectedText+" ")
+	}
+
+	payload, err := json.Marshal(formatQueryRowForJSON(row))
+	require.NoError(t, err)
+	assert.Equal(t, "["+expectedJSON+"]", string(payload))
 }
 
 func TestWriteCSVFile(t *testing.T) {

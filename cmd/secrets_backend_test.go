@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
@@ -58,4 +59,23 @@ func TestConnectionManagerFromConfigRejectsUnknownSecretsBackend(t *testing.T) {
 	require.Nil(t, manager)
 	require.Len(t, errs, 1)
 	require.Contains(t, errs[0].Error(), `unsupported secrets backend "unknown"`)
+}
+
+func TestConnectionManagerFromConfigGCP(t *testing.T) {
+	// Offline: building the client only parses the credentials; no request is made.
+	t.Setenv("BRUIN_GCP_CREDENTIALS_JSON", `{"type": "authorized_user", "client_id": "id", "client_secret": "secret", "refresh_token": "refresh"}`)
+	t.Setenv("BRUIN_GCP_PROJECT", "my-project")
+	t.Setenv("BRUIN_GCP_SECRET_PREFIX", "")
+	ctx := context.WithValue(t.Context(), config.SecretsBackendContextKey, "gcp")
+
+	manager, errs := connectionManagerFromConfig(ctx, &config.Config{}, makeLogger(false))
+	require.Empty(t, errs)
+	require.IsType(t, &secrets.GCPSecretManagerClient{}, manager)
+	require.Implements(t, (*config.ConnectionsConfigGetter)(nil), manager)
+
+	t.Setenv("BRUIN_GCP_SECRET_PREFIX", "bruin/prod/")
+	manager, errs = connectionManagerFromConfig(ctx, &config.Config{}, makeLogger(false))
+	require.Nil(t, manager)
+	require.Len(t, errs, 1)
+	require.ErrorContains(t, errs[0], "failed to initialize GCP Secret Manager client: BRUIN_GCP_SECRET_PREFIX 'bruin/prod/' is not valid")
 }

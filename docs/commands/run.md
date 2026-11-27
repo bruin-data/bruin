@@ -57,7 +57,7 @@ table td:first-child {
 | `--use-pip` | bool | `false` | Deprecated compatibility flag; passing it now returns an explicit deprecation error. Python execution is uv-only. |
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
-| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`, `aws`, `azure`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
+| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`, `aws`, `azure`, `gcp`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
 | `--mask-credentials` | bool | `true` | Redact connection credential values from the run logs. On by default; set `--mask-credentials=false` to disable. |
 | `--no-validation` | bool | `false` | Skip validation for this run. |
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
@@ -129,7 +129,7 @@ When `--backfill-id` is set, the `run_id` is composed as `<backfill-id>__<start-
 
 ### Continue from the last failed asset
 
-If you want to continue from the last failed asset, you can use the `--continue` flag. This will run the pipeline/asset from the last failed asset. Bruin will automatically retrieve all the flags used in the last run.
+If you want to continue from the last failed asset, you can use the `--continue` flag. This will run the pipeline/asset from the last failed asset. Bruin will automatically retrieve all the flags used in the last run. The skipped assets are printed in a warning.
 
 ```bash
 bruin run --continue 

@@ -1092,6 +1092,15 @@ func (c PeeringDBConnection) GetName() string {
 	return c.Name
 }
 
+type BrevoConnection struct {
+	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
+	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`
+}
+
+func (c BrevoConnection) GetName() string {
+	return c.Name
+}
+
 type GranolaConnection struct {
 	ConnectionMetadata `yaml:",inline" mapstructure:",squash"`
 	APIKey             string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key" sensitive:"true"`

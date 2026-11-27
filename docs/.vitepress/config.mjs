@@ -138,6 +138,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Dashboards", link: "/cloud/dashboards"},
                     {text: "Semantic Layers", link: "/cloud/semantic-layers"},
                     {
+                        text: "Streams",
+                        collapsed: true,
+                        items: [
+                            {text: "Overview", link: "/cloud/streams/overview"},
+                            {text: "Start from an Existing Snapshot", link: "/cloud/streams/existing-snapshot"},
+                        ],
+                    },
+                    {
                         text: "AI Agents",
                         collapsed: true,
                         items: [
@@ -329,6 +337,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "BambooHR", link: "/ingestion/bamboohr"},
                                     {text: "Braze", link: "/ingestion/braze"},
                                     {text: "Breezy HR", link: "/ingestion/breezyhr"},
+                                    {text: "Brevo", link: "/ingestion/brevo"},
                                     {text: "Bruin", link: "/ingestion/bruin"},
                                     {text: "Cassandra", link: "/ingestion/cassandra"},
                                     {text: "Chargebee", link: "/ingestion/chargebee"},
@@ -558,6 +567,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Doppler", link: "/secrets/doppler"},
                     {text: "AWS Secrets Manager", link: "/secrets/aws-secrets-manager"},
                     {text: "Azure Key Vault", link: "/secrets/azure-key-vault"},
+                    {text: "GCP Secret Manager", link: "/secrets/gcp-secret-manager"},
                 ]
             },
             {

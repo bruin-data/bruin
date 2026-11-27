@@ -452,3 +452,21 @@ func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 		require.NoError(b, err)
 	}
 }
+
+func TestCreateTaskFromFileComments_smartRetries(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	content := "-- @bruin.name: analytics.events\n-- @bruin.type: sf.sql\n-- @bruin.smart_retries.enabled: true\n\nSELECT 1\n"
+	require.NoError(t, afero.WriteFile(fs, "events.sql", []byte(content), 0o644))
+
+	task, err := pipeline.CreateTaskFromFileComments(fs)("events.sql")
+	require.NoError(t, err)
+	require.NotNil(t, task.SmartRetries)
+	require.NotNil(t, task.SmartRetries.Enabled)
+	assert.True(t, *task.SmartRetries.Enabled)
+
+	require.NoError(t, afero.WriteFile(fs, "bad.sql", []byte("-- @bruin.name: analytics.bad\n-- @bruin.smart_retries.enabled: maybe\n\nSELECT 1\n"), 0o644))
+	_, err = pipeline.CreateTaskFromFileComments(fs)("bad.sql")
+	require.ErrorContains(t, err, "bad.sql", "a value that isn't a boolean fails the asset")
+}

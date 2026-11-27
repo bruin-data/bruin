@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -151,6 +152,77 @@ func TestMaterializer_RenderFullRefreshWithDataVaultStrategy(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported materialization type - strategy combination")
+	})
+}
+
+func TestMaterializer_RenderFirstRun(t *testing.T) {
+	t.Parallel()
+
+	materializer := Materializer{
+		MaterializationMap: AssetMaterializationMap{
+			MaterializationTypeTable: {
+				MaterializationStrategyMerge: func(_ *Asset, query string) (string, error) {
+					return "MERGE;" + query, nil
+				},
+				MaterializationStrategyCreateReplace: func(_ *Asset, query string) (string, error) {
+					return "CREATE OR REPLACE;" + query, nil
+				},
+			},
+		},
+	}
+
+	restricted := true
+	asset := &Asset{
+		Materialization: Materialization{
+			Type:     MaterializationTypeTable,
+			Strategy: MaterializationStrategyMerge,
+		},
+		RefreshRestricted: &restricted,
+	}
+
+	result, err := materializer.Render(asset, "SELECT 1")
+	require.NoError(t, err)
+	assert.Equal(t, "MERGE;SELECT 1", result)
+
+	result, err = materializer.Render(asset.FirstRun(), "SELECT 1")
+	require.NoError(t, err)
+	assert.Equal(t, "CREATE OR REPLACE;SELECT 1", result)
+}
+
+func TestMaterializer_RenderFirstRunChecksOwnStrategy(t *testing.T) {
+	t.Parallel()
+
+	createReplace := func(_ *Asset, query string) (string, error) {
+		return "CREATE OR REPLACE;" + query, nil
+	}
+	asset := func(strategy MaterializationStrategy) *Asset {
+		a := &Asset{Materialization: Materialization{Type: MaterializationTypeTable, Strategy: strategy}}
+		return a.FirstRun()
+	}
+
+	t.Run("unsupported strategy", func(t *testing.T) {
+		t.Parallel()
+
+		materializer := Materializer{MaterializationMap: AssetMaterializationMap{
+			MaterializationTypeTable: {MaterializationStrategyCreateReplace: createReplace},
+		}}
+		_, err := materializer.Render(asset(MaterializationStrategySCD2ByColumn), "SELECT 1")
+		require.EqualError(t, err, "unsupported materialization type - strategy combination: (`table` - `scd2_by_column`)")
+	})
+
+	t.Run("invalid configuration for the strategy", func(t *testing.T) {
+		t.Parallel()
+
+		materializer := Materializer{MaterializationMap: AssetMaterializationMap{
+			MaterializationTypeTable: {
+				MaterializationStrategyCreateReplace: createReplace,
+				MaterializationStrategyMerge: func(_ *Asset, _ string) (string, error) {
+					return "", errors.New("merge requires a primary key")
+				},
+			},
+		}}
+		_, err := materializer.Render(asset(MaterializationStrategyMerge), "SELECT 1")
+		require.EqualError(t, err, "merge requires a primary key")
 	})
 }
 

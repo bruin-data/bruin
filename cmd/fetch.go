@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"context"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
+	"net"
 	"os"
 	"os/signal"
 	path2 "path"
@@ -34,6 +37,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	semantic "github.com/bruin-data/bruin/semantic-engine"
 	"github.com/gofrs/flock"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake/v2"
@@ -1607,8 +1611,8 @@ func writeCSVFile(path string, columns []string, rows [][]interface{}) error {
 func formatQueryRowForCSV(row []interface{}) []string {
 	rowStrings := make([]string, len(row))
 	for i, val := range row {
-		if val != nil {
-			rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
+		if formatted := formatQueryCellForDisplay(val); formatted != nil {
+			rowStrings[i] = fmt.Sprintf("%v", formatted)
 		}
 	}
 	return rowStrings
@@ -2076,18 +2080,58 @@ func readQueryLogPreview(path string) (QueryLog, error) {
 }
 
 func formatQueryCellForDisplay(cell interface{}) interface{} {
+	if formatted, ok := formatPostgresValue(cell); ok {
+		return formatted
+	}
 	switch v := cell.(type) {
 	case *big.Rat:
 		return formatBigRatAsDecimal(v)
 	case big.Rat:
 		vcopy := v
 		return formatBigRatAsDecimal(&vcopy)
+	case pgtype.Numeric:
+		return formatPgNumeric(v)
+	case float64:
+		if text, ok := formatNonFiniteFloat(v); ok {
+			return text
+		}
+		return cell
+	case float32:
+		if text, ok := formatNonFiniteFloat(float64(v)); ok {
+			return text
+		}
+		return cell
+	case []byte:
+		// Binary values, such as Postgres bytea, print as hex like Postgres does rather than [222 173 …].
+		// JSON output keeps encoding/json's base64.
+		if v == nil {
+			return nil
+		}
+		return `\x` + hex.EncodeToString(v)
+	case map[string]interface{}:
+		// JSON objects, such as Postgres json and jsonb values, print as JSON rather than map[key:value].
+		var text strings.Builder
+		encoder := json.NewEncoder(&text)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(v); err != nil {
+			return cell
+		}
+		return strings.TrimSuffix(text.String(), "\n")
+	case []interface{}:
+		formatted := make([]interface{}, len(v))
+		for i, item := range v {
+			formatted[i] = formatQueryCellForDisplay(item)
+		}
+		return formatted
 	default:
 		return cell
 	}
 }
 
 func formatQueryCellForJSON(cell interface{}) interface{} {
+	if formatted, ok := formatPostgresValue(cell); ok {
+		return formatted
+	}
 	switch v := cell.(type) {
 	case *big.Rat:
 		if v == nil {
@@ -2097,8 +2141,50 @@ func formatQueryCellForJSON(cell interface{}) interface{} {
 	case big.Rat:
 		vcopy := v
 		return json.Number(formatBigRatAsDecimal(&vcopy))
+	case pgtype.Numeric:
+		formatted := formatPgNumeric(v)
+		if text, ok := formatted.(string); ok && !v.NaN && v.InfinityModifier == pgtype.Finite {
+			return json.Number(text)
+		}
+		// NaN and ±Infinity have no JSON number form, so they stay strings.
+		return formatted
+	case float64:
+		// encoding/json rejects NaN and ±Infinity, which would fail the whole result.
+		if text, ok := formatNonFiniteFloat(v); ok {
+			return text
+		}
+		return cell
+	case float32:
+		if text, ok := formatNonFiniteFloat(float64(v)); ok {
+			return text
+		}
+		return cell
+	case net.HardwareAddr:
+		// encoding/json would base64-encode the address bytes.
+		return v.String()
+	case []interface{}:
+		formatted := make([]interface{}, len(v))
+		for i, item := range v {
+			formatted[i] = formatQueryCellForJSON(item)
+		}
+		return formatted
 	default:
 		return cell
+	}
+}
+
+// formatNonFiniteFloat names NaN and ±Infinity the way Postgres does, and returns
+// false for finite values.
+func formatNonFiniteFloat(f float64) (string, bool) {
+	switch {
+	case math.IsNaN(f):
+		return "NaN", true
+	case math.IsInf(f, 1):
+		return "Infinity", true
+	case math.IsInf(f, -1):
+		return "-Infinity", true
+	default:
+		return "", false
 	}
 }
 

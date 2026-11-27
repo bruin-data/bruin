@@ -131,7 +131,7 @@ GROUP BY department_id
 
 ### `oracle.source`
 
-Defines Oracle source assets for documenting existing tables and views in your Oracle database. These assets are also no-op but useful for:
+Defines Oracle source assets for documenting existing tables and views in your Oracle database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing Oracle tables and views
 - Adding column descriptions and metadata

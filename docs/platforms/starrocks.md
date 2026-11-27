@@ -153,7 +153,7 @@ parameters:
 
 ### `starrocks.source`
 
-Defines an existing StarRocks table as a source asset for lineage and documentation.
+Defines an existing StarRocks table as a source asset for lineage and documentation. These assets don't execute, but their quality checks do.
 
 ```yaml
 name: analytics.raw_orders

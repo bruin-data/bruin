@@ -1,6 +1,6 @@
 # Freshdesk
 
-[Freshdesk](https://www.freshdesk.com/) is a cloud-based customer service platform that helps businesses manage customer support via multiple channels including email, phone, websites, and social media.
+[Freshdesk](https://www.freshworks.com/freshdesk/) is a cloud-based customer service platform that helps businesses manage customer support via multiple channels including email, phone, websites, and social media.
 
 Bruin supports Freshdesk as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Freshdesk into your data warehouse.
 

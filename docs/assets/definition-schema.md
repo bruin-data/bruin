@@ -297,6 +297,25 @@ The asset-level value is, in turn, the default for the asset's [quality checks](
 
 - **Type:** `Integer`
 
+## `smart_retries`
+
+Let Bruin Cloud retry the asset based on why it failed, instead of always retrying up to `retries` times. If not specified, the asset inherits the `smart_retries` set under the pipeline's [`default`](../pipelines/definition.md#smart-retries).
+
+```yaml
+smart_retries:
+  enabled: true
+```
+
+In a SQL or Python asset's comment header, use `@bruin.smart_retries.enabled: true`.
+
+To keep one asset on regular retries in a pipeline that turns smart retries on, set `enabled: false` on it.
+
+See [Smart Retries](../pipelines/definition.md#smart-retries) for how failures are retried. Only Bruin Cloud uses this setting; the CLI doesn't retry failed assets.
+
+- **Type:** `Object`
+- **Fields:**
+  - `enabled` (`Boolean`): turns smart retries on or off for the asset.
+
 ## `timeout`
 
 Sets the timeout for an asset. During `bruin run`, an execution step that exceeds this duration is cancelled and the asset fails with a timeout error. The value uses Go duration syntax, so it can combine units such as `1h30m` and supports `ns`, `us`/`µs`, `ms`, `s`, `m`, and `h`.

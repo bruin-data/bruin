@@ -20,7 +20,7 @@ Bruin automatically injects these variables into the Jinja context for templated
 | `execution_timestamp` | Execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-01T15:30:00.000000Z"` |
 | `pipeline` | Name of the currently executing pipeline | `"my_pipeline"` |
 | `run_id` | Unique identifier for the current pipeline run | `"run_1234567890"` |
-| `full_refresh` | Whether the run is a full refresh | `true` |
+| `full_refresh` | Whether the asset is fully refreshed: the run uses `--full-refresh`, or the asset's table is created on its [first run](../assets/materialization.md#first-run) | `true` |
 | `commit_hash` | The current git commit hash of the pipeline's repository | `"abc1234def5678..."` |
 | `schema_prefix` | The schema prefix from the selected environment configuration (empty string if not set) | `"dev_"` |
 | `this` | Name of the current asset being executed | `"analytics.daily_summary"` |

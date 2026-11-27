@@ -359,6 +359,12 @@ func TestLoadFromFile(t *testing.T) {
 					CompanyID:          "abc123",
 				},
 			},
+			Brevo: []BrevoConnection{
+				{
+					ConnectionMetadata: ConnectionMetadata{Name: "brevo-1"},
+					APIKey:             "brevo-api-key-123",
+				},
+			},
 			PeeringDB: []PeeringDBConnection{
 				{
 					ConnectionMetadata: ConnectionMetadata{Name: "peeringdb-1"},
@@ -1950,6 +1956,16 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Brevo connection",
+			envName:  "default",
+			connType: "brevo",
+			connName: "brevo-conn",
+			creds: map[string]interface{}{
+				"api_key": "xkeysib-123",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add PeeringDB connection",
 			envName:  "default",
 			connType: "peeringdb",
@@ -2275,6 +2291,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.connName, env.Connections.BreezyHR[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.BreezyHR[0].APIKey)
 					assert.Equal(t, tt.creds["company_id"], env.Connections.BreezyHR[0].CompanyID)
+				case "brevo":
+					assert.Len(t, env.Connections.Brevo, 1)
+					assert.Equal(t, tt.connName, env.Connections.Brevo[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Brevo[0].APIKey)
 				case "peeringdb":
 					assert.Len(t, env.Connections.PeeringDB, 1)
 					assert.Equal(t, tt.connName, env.Connections.PeeringDB[0].Name)
@@ -2448,6 +2468,25 @@ func TestDeleteConnection(t *testing.T) {
 							Connections: &Connections{
 								BreezyHR: []BreezyHRConnection{
 									{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr-conn"}, APIKey: "key_123", CompanyID: "abc123"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing Brevo connection",
+			envName:  "default",
+			connName: "brevo-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Brevo: []BrevoConnection{
+									{ConnectionMetadata: ConnectionMetadata{Name: "brevo-conn"}, APIKey: "xkeysib-123"},
 								},
 							},
 						},
@@ -3646,6 +3685,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
 				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
 				PeeringDB:           []PeeringDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb1"}}},
+				Brevo:               []BrevoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "brevo1"}}},
 			},
 			want: &Connections{
 				AwsConnection:       []AwsConnection{{ConnectionMetadata: ConnectionMetadata{Name: "aws1"}}},
@@ -3803,6 +3843,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				BreezyHR:            []BreezyHRConnection{{ConnectionMetadata: ConnectionMetadata{Name: "breezyhr1"}}},
 				Privatus:            []PrivatusConnection{{ConnectionMetadata: ConnectionMetadata{Name: "privatus1"}}},
 				PeeringDB:           []PeeringDBConnection{{ConnectionMetadata: ConnectionMetadata{Name: "peeringdb1"}}},
+				Brevo:               []BrevoConnection{{ConnectionMetadata: ConnectionMetadata{Name: "brevo1"}}},
 			},
 			expectedErr: false,
 		},

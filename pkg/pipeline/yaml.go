@@ -486,45 +486,46 @@ func notificationsOrNil(n Notifications) *Notifications {
 }
 
 type taskDefinition struct {
-	Name                  string            `yaml:"name"`
-	URI                   string            `yaml:"uri"`
-	Enabled               *TemplatedBool    `yaml:"enabled"`
-	Description           string            `yaml:"description"`
-	Type                  string            `yaml:"type"`
-	Depends               depends           `yaml:"depends"`
-	Parameters            ParameterMap      `yaml:"parameters"`
-	Connections           map[string]string `yaml:"connections"`
-	Secrets               []secretMapping   `yaml:"secrets"`
-	Connection            string            `yaml:"connection"`
-	Image                 string            `yaml:"image"`
-	Instance              string            `yaml:"instance"`
-	Materialization       materialization   `yaml:"materialization"`
-	Owner                 string            `yaml:"owner"`
-	Tier                  int               `yaml:"tier"`
-	StartDate             string            `yaml:"start_date"`
-	Extends               []string          `yaml:"extends"`
-	Columns               []column          `yaml:"columns"`
-	CustomChecks          []customCheck     `yaml:"custom_checks"`
-	UnitTests             []unitTest        `yaml:"unit_tests"`
-	Hooks                 Hooks             `yaml:"hooks"`
-	Tags                  []string          `yaml:"tags"`
-	Snowflake             snowflake         `yaml:"snowflake"`
-	Athena                athena            `yaml:"athena"`
-	BigQuery              bigquery          `yaml:"bigquery"`
-	ClickHouse            ClickHouseConfig  `yaml:"clickhouse"`
-	Doris                 doris             `yaml:"doris"`
-	StarRocks             starrocks         `yaml:"starrocks"`
-	Routing               *RoutingConfig    `yaml:"routing"`
-	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
-	Domains               []string          `yaml:"domains"`
-	Meta                  map[string]string `yaml:"meta"`
-	Metadata              map[string]string `yaml:"metadata"`
-	Retries               *int              `yaml:"retries"`
-	Timeout               DurationSeconds   `yaml:"timeout"`
-	RerunCooldown         *int              `yaml:"rerun_cooldown"`
-	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
-	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
-	Notifications         Notifications     `yaml:"notifications"`
+	Name                  string              `yaml:"name"`
+	URI                   string              `yaml:"uri"`
+	Enabled               *TemplatedBool      `yaml:"enabled"`
+	Description           string              `yaml:"description"`
+	Type                  string              `yaml:"type"`
+	Depends               depends             `yaml:"depends"`
+	Parameters            ParameterMap        `yaml:"parameters"`
+	Connections           map[string]string   `yaml:"connections"`
+	Secrets               []secretMapping     `yaml:"secrets"`
+	Connection            string              `yaml:"connection"`
+	Image                 string              `yaml:"image"`
+	Instance              string              `yaml:"instance"`
+	Materialization       materialization     `yaml:"materialization"`
+	Owner                 string              `yaml:"owner"`
+	Tier                  int                 `yaml:"tier"`
+	StartDate             string              `yaml:"start_date"`
+	Extends               []string            `yaml:"extends"`
+	Columns               []column            `yaml:"columns"`
+	CustomChecks          []customCheck       `yaml:"custom_checks"`
+	UnitTests             []unitTest          `yaml:"unit_tests"`
+	Hooks                 Hooks               `yaml:"hooks"`
+	Tags                  []string            `yaml:"tags"`
+	Snowflake             snowflake           `yaml:"snowflake"`
+	Athena                athena              `yaml:"athena"`
+	BigQuery              bigquery            `yaml:"bigquery"`
+	ClickHouse            ClickHouseConfig    `yaml:"clickhouse"`
+	Doris                 doris               `yaml:"doris"`
+	StarRocks             starrocks           `yaml:"starrocks"`
+	Routing               *RoutingConfig      `yaml:"routing"`
+	IntervalModifiers     IntervalModifiers   `yaml:"interval_modifiers"`
+	Domains               []string            `yaml:"domains"`
+	Meta                  map[string]string   `yaml:"meta"`
+	Metadata              map[string]string   `yaml:"metadata"`
+	Retries               *int                `yaml:"retries"`
+	SmartRetries          *SmartRetriesConfig `yaml:"smart_retries"`
+	Timeout               DurationSeconds     `yaml:"timeout"`
+	RerunCooldown         *int                `yaml:"rerun_cooldown"`
+	RefreshRestricted     *bool               `yaml:"refresh_restricted,omitempty"`
+	FullRefreshRestricted *bool               `yaml:"full_refresh_restricted,omitempty"`
+	Notifications         Notifications       `yaml:"notifications"`
 }
 
 func (d taskDefinition) refreshRestricted() *bool {
@@ -747,6 +748,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Meta:              definition.Meta,
 		Metadata:          definition.Metadata,
 		Retries:           definition.Retries,
+		SmartRetries:      definition.SmartRetries,
 		Timeout:           definition.Timeout,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),

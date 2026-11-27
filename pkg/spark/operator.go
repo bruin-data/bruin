@@ -164,6 +164,51 @@ func resolveClient(ctx context.Context, connections config.ConnectionGetter, nam
 	return connection, nil
 }
 
+// FirstRunBlocker keeps an asset with a one- or two-part name out of first
+// runs when its SQL runs a session statement: SET CATALOG,
+// SET spark.sql.defaultCatalog or USE can move the table to a catalog the table
+// check did not look in. The SQL is rendered the way the first run renders it,
+// so statements that a template produces count too.
+func (o BasicOperator) FirstRunBlocker(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) string {
+	if len(strings.Split(asset.Name, ".")) >= 3 {
+		return ""
+	}
+
+	const reason = "its SQL runs session statements such as SET or USE, which can change the catalog it is created in"
+	for _, statement := range query.SplitQueriesPreservingSessionStatements(asset.ExecutableFile.Content) {
+		if changesSparkSession(statement.Query) {
+			return reason
+		}
+	}
+
+	extractor, err := o.extractor.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return "its SQL could not be rendered to check it for session statements"
+	}
+	queries, err := extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
+	if err != nil {
+		return "its SQL could not be rendered to check it for session statements"
+	}
+	for _, queryObj := range queries {
+		for _, statement := range query.SplitQueriesPreservingSessionStatements(queryObj.Query) {
+			if changesSparkSession(statement.Query) {
+				return reason
+			}
+		}
+	}
+
+	return ""
+}
+
+func changesSparkSession(statement string) bool {
+	switch sparkLeadingKeyword(statement) {
+	case "RESET", "SET", "USE":
+		return true
+	default:
+		return false
+	}
+}
+
 func (o BasicOperator) renderQueries(asset *pipeline.Asset, queries []*query.Query) (string, error) {
 	return renderSparkQueries(asset, queries, o.materializer)
 }

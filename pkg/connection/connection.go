@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/braze"
 	"github.com/bruin-data/bruin/pkg/breezyhr"
+	"github.com/bruin-data/bruin/pkg/brevo"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/cassandra"
 	"github.com/bruin-data/bruin/pkg/chargebee"
@@ -329,6 +330,7 @@ type Manager struct {
 	Privatus             map[string]*privatus.Client
 	PeeringDB            map[string]*peeringdb.Client
 	BreezyHR             map[string]*breezyhr.Client
+	Brevo                map[string]*brevo.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	CleverTap            map[string]*clevertap.Client
@@ -4371,6 +4373,29 @@ func (m *Manager) AddPeeringDBConnectionFromConfig(connection *config.PeeringDBC
 	return nil
 }
 
+func (m *Manager) AddBrevoConnectionFromConfig(connection *config.BrevoConnection) error {
+	m.mutex.Lock()
+	if m.Brevo == nil {
+		m.Brevo = make(map[string]*brevo.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := brevo.NewClient(&brevo.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Brevo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPrivatusConnectionFromConfig(connection *config.PrivatusConnection) error {
 	m.mutex.Lock()
 	if m.Privatus == nil {
@@ -4937,6 +4962,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Privatus, connectionManager.AddPrivatusConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PeeringDB, connectionManager.AddPeeringDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.BreezyHR, connectionManager.AddBreezyHRConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Brevo, connectionManager.AddBrevoConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

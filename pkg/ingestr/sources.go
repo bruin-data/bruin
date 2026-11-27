@@ -1101,6 +1101,33 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "breakdown:<dimension>", PrimaryKey: "site_id,date,value", IncKey: "date", IncStrategy: "delete+insert"},
 	},
 
+	// Brevo - Email, SMS, and WhatsApp marketing platform with CRM and ecommerce objects. Event and
+	// report tables have no primary key and replace whole days by their date column.
+	"brevo": {
+		{Name: "contacts", PrimaryKey: "id", IncKey: "modifiedAt", IncStrategy: "merge"},
+		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "segments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "folders", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "contact_attributes", PrimaryKey: "category,name", IncKey: "", IncStrategy: "replace"},
+		{Name: "email_campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "sms_campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "email_templates", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "transactional_email_events", PrimaryKey: "", IncKey: "event_date", IncStrategy: "delete+insert"},
+		{Name: "transactional_email_reports", PrimaryKey: "", IncKey: "date", IncStrategy: "delete+insert"},
+		{Name: "blocked_contacts", PrimaryKey: "email", IncKey: "", IncStrategy: "replace"},
+		{Name: "companies", PrimaryKey: "id", IncKey: "modifiedAt", IncStrategy: "merge"},
+		{Name: "deals", PrimaryKey: "id", IncKey: "modifiedAt", IncStrategy: "merge"},
+		{Name: "crm_tasks", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "crm_notes", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "orders", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "id", IncKey: "modifiedAt", IncStrategy: "merge"},
+		{Name: "categories", PrimaryKey: "id", IncKey: "modifiedAt", IncStrategy: "merge"},
+		{Name: "sms_events", PrimaryKey: "", IncKey: "event_date", IncStrategy: "delete+insert"},
+		{Name: "whatsapp_events", PrimaryKey: "", IncKey: "event_date", IncStrategy: "delete+insert"},
+		{Name: "whatsapp_campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "custom_events", PrimaryKey: "", IncKey: "event_date", IncStrategy: "delete+insert"},
+	},
+
 	// PeeringDB - Public database of networks, exchanges, and facilities. Every table merges on id
 	// by its update time and keeps deleted objects with status "deleted".
 	"peeringdb": {

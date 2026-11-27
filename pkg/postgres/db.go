@@ -184,10 +184,14 @@ func (c *Client) streamWithSchema(ctx context.Context, queryObj *query.Query, h 
 		return nil, err
 	}
 
+	converters := resultValueConverters(fieldDescriptions, typeMap)
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to collect row values")
+		}
+		if converters != nil {
+			convertResultValues(converters, rows.RawValues(), values)
 		}
 		if err := h.Row(values); err != nil {
 			return nil, err
@@ -629,13 +633,20 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 	createQuery := query.Query{
 		Query: "CREATE SCHEMA IF NOT EXISTS " + quotedSchemaName,
 	}
-	if err := c.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+	// Assets running in parallel can create the same schema at once, and the one that
+	// loses fails with a unique violation although the schema now exists.
+	if err := c.RunQueryWithoutResult(ctx, &createQuery); err != nil && !isUniqueViolation(err) {
 		return errors.Wrapf(err, "failed to create or ensure schema: %s", schemaName)
 	}
 
 	// Cache the exact schema name (case-sensitive)
 	c.schemaCache.Store(schemaName, true)
 	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
@@ -1058,4 +1069,85 @@ func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 		targetTable,
 	)
 	return strings.TrimSpace(query), nil
+}
+
+// RelationExists reports whether a relation named tableName exists, so an
+// incremental asset can create its table on the first run. The materializer
+// writes the asset name with every part quoted, and the name is resolved the
+// way the server resolves that quoted name.
+func (c *Client) RelationExists(ctx context.Context, tableName string) (bool, error) {
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 3 {
+		return false, fmt.Errorf("table name must be in format `table`, `schema.table`, or `database.schema.table`, %q given", tableName)
+	}
+	for _, part := range parts {
+		// QuoteIdentifier does not escape double quotes, so such a name cannot be resolved.
+		if part == "" || strings.Contains(part, `"`) {
+			return false, fmt.Errorf("table name %q is not a valid identifier", tableName)
+		}
+	}
+
+	if _, ok := c.config.(RedShiftConfig); ok {
+		return c.redshiftRelationExists(ctx, tableName, parts)
+	}
+
+	// to_regclass resolves the quoted name like the materialized statements do:
+	// one-part names through search_path, every part case-sensitive. It returns
+	// NULL when the relation or its schema is missing, and fails for a database
+	// other than the current one or a schema the user cannot use.
+	exists, err := queryRow(ctx, c.connection, "SELECT to_regclass($1) IS NOT NULL", pgx.RowTo[bool], QuoteIdentifier(tableName))
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+
+	return exists, nil
+}
+
+// redshiftRelationExists looks the name up in the catalog, since Redshift has
+// no to_regclass. Redshift folds even quoted identifiers to lower case unless
+// enable_case_sensitive_identifier is on, so names are compared
+// case-insensitively, which can only match more relations than the server
+// resolves the name to.
+func (c *Client) redshiftRelationExists(ctx context.Context, tableName string, parts []string) (bool, error) {
+	if len(parts) == 3 && !strings.EqualFold(parts[0], c.config.GetDatabase()) {
+		return false, fmt.Errorf("table '%s' is not in the connection's database '%s'", tableName, c.config.GetDatabase())
+	}
+
+	// One-part names resolve through search_path, the way pg_table_is_visible checks them.
+	relationScope := "pg_catalog.pg_table_is_visible(c.oid)"
+	externalScope := ""
+	args := []any{parts[len(parts)-1]}
+	if len(parts) > 1 {
+		relationScope = "lower(n.nspname) = lower($2)"
+		externalScope = " AND lower(schemaname) = lower($2)"
+		args = append(args, parts[len(parts)-2])
+	}
+
+	// pg_class holds tables, views, late-binding views and materialized views.
+	relations, err := queryRow(ctx, c.connection, "SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE lower(c.relname) = lower($1) AND "+relationScope, pgx.RowTo[int64], args...)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether table '%s' exists: %w", tableName, err)
+	}
+	if relations > 0 {
+		return true, nil
+	}
+
+	// Spectrum external tables are not in pg_class. A one-part name matches them in every external schema.
+	externalTables, err := queryRow(ctx, c.connection, "SELECT count(*) FROM svv_external_tables WHERE lower(tablename) = lower($1)"+externalScope, pgx.RowTo[int64], args...)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether external table '%s' exists: %w", tableName, err)
+	}
+
+	return externalTables > 0, nil
+}
+
+//nolint:ireturn
+func queryRow[T any](ctx context.Context, conn connection, sql string, fn pgx.RowToFunc[T], args ...any) (T, error) {
+	rows, err := conn.Query(ctx, sql, args...)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+
+	return pgx.CollectExactlyOneRow(rows, fn)
 }

@@ -226,7 +226,7 @@ where event_name = "install"
 
 #### BigQuery table options
 
-The top-level `bigquery` block configures BigQuery-specific table options and partition-scoped merge behavior. Table options are applied when Bruin creates a table with a `create+replace` or `ddl` materialization. Partition expiration is also supported during an SCD2 full refresh.
+The top-level `bigquery` block configures BigQuery-specific table options and partition-scoped merge behavior. Table options are applied when Bruin creates a table with a `create+replace` or `ddl` materialization, or on the [first run](../assets/materialization.md#first-run) of an incremental asset. Partition expiration is also supported during an SCD2 full refresh.
 
 ```bruin-sql
 /* @bruin
@@ -456,7 +456,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ### `bq.source`
 
-Defines BigQuery source assets for documenting existing tables and views in your BigQuery database. These assets are no-op (they don't execute), but are useful for:
+Defines BigQuery source assets for documenting existing tables and views in your BigQuery database. These assets don't execute, but their quality checks do. They are useful for:
 
 - Documenting existing BigQuery tables and views
 - Adding column descriptions and metadata

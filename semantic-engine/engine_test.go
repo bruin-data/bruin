@@ -2957,3 +2957,260 @@ func TestFilterValueBackslashStaysInString(t *testing.T) {
 		expectContains(t, sql, want)
 	}
 }
+
+func TestGenerateSeriesSQL(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	day := DimensionRef{Name: "order_date", Granularity: "day"}
+	q := &Query{
+		Dimensions: []DimensionRef{{Name: "country"}},
+		Metrics:    []string{"revenue"},
+		Filters:    []Filter{{Dimension: "status", Operator: "equals", Value: "completed"}, {Expression: "sum(amount) > 100"}},
+		Sort:       []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 10,
+	}
+	rows, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Points cover only the rows the table shows; its HAVING filter and limit pick
+	// them, and applied per day they would drop points.
+	perDay, shownRows := splitShownGrandTotal(t, rows)
+	expectContains(t, shownRows, "HAVING sum(amount) > 100")
+	expectContains(t, shownRows, "LIMIT 10")
+	expectContains(t, perDay, "WHERE status = 'completed' GROUP BY 1, 2")
+	expectContains(t, perDay, ") grand_total) points WHERE order_date IS NOT NULL ORDER BY order_date")
+	for _, unwanted := range []string{"HAVING", "> 100", "LIMIT", "ROW_NUMBER"} {
+		expectNotContains(t, perDay, unwanted)
+	}
+	// Without a limit or HAVING filter every row is shown, so nothing is joined.
+	all, err := e.GenerateSeriesSQL(&Query{Dimensions: q.Dimensions, Metrics: q.Metrics}, day, []string{"order_count"}, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectNotContains(t, all, "INNER JOIN")
+	// A limit keeps each row's last points in SQL.
+	last, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, last, "SELECT country, order_date, order_count FROM (SELECT points.*, CASE WHEN order_count IS NOT NULL THEN ROW_NUMBER() OVER (PARTITION BY country ORDER BY CASE WHEN order_count IS NULL THEN 1 ELSE 0 END, order_date DESC) END AS __series_rank_0 FROM (")
+	expectContains(t, last, ") ranked WHERE __series_rank_0 <= 30 ORDER BY order_date")
+	// Each metric skips its own NULL points.
+	two, err := e.GenerateSeriesSQL(q, day, []string{"order_count", "revenue"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, two, "CASE WHEN revenue IS NOT NULL THEN ROW_NUMBER() OVER (PARTITION BY country ORDER BY CASE WHEN revenue IS NULL THEN 1 ELSE 0 END, order_date DESC) END AS __series_rank_1")
+	expectContains(t, two, "WHERE __series_rank_0 <= 30 OR __series_rank_1 <= 30")
+	lastTotal, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 30, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, lastTotal, "ROW_NUMBER() OVER (ORDER BY CASE WHEN order_count IS NULL THEN 1 ELSE 0 END, order_date DESC)")
+	// A daily table's row needs the points before its own day, which it may not show.
+	daily := &Query{Dimensions: []DimensionRef{{Name: "country"}, day}, Metrics: []string{"revenue"}, Limit: 10}
+	window, err := e.GenerateSeriesSQL(daily, day, []string{"order_count"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectNotContains(t, window, "ROW_NUMBER")
+	expectNotContains(t, window, "INNER JOIN")
+	// A window metric keys the shown rows by its order_date too, so joining them
+	// would drop the earlier days.
+	running := &Query{Dimensions: []DimensionRef{{Name: "category"}}, Metrics: []string{"running_revenue"}, Limit: 10}
+	history, err := e.GenerateSeriesSQL(running, day, []string{"order_count"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectNotContains(t, history, "INNER JOIN")
+	expectContains(t, history, "ROW_NUMBER() OVER (PARTITION BY category ORDER BY CASE WHEN order_count IS NULL THEN 1 ELSE 0 END, order_date DESC)")
+	// The helper rank column steps around a field with the same name.
+	ranked := richTestModel()
+	ranked.Metrics = append(ranked.Metrics, Metric{Name: "__series_rank_0", Expression: "count(*)"})
+	named, err := minimalEngine(t, ranked).GenerateSeriesSQL(q, day, []string{"__series_rank_0"}, 30, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, named, "AS __series_rank_0_ FROM (")
+	expectContains(t, named, "WHERE __series_rank_0_ <= 30")
+	// The total row's points cover only the rows the table shows.
+	total, err := e.GenerateSeriesSQL(q, day, []string{"order_count"}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, shown := splitShownGrandTotal(t, total)
+	expectContains(t, shown, "HAVING sum(amount) > 100")
+	expectContains(t, total, "SELECT order_date, order_count FROM (")
+
+	// A weekly table with a daily x would return two order_date columns.
+	weekly := &Query{Dimensions: []DimensionRef{{Name: "order_date", Granularity: "month"}}, Metrics: []string{"revenue"}}
+	if _, err := e.GenerateSeriesSQL(weekly, day, []string{"revenue"}, 0, false); err == nil || !strings.Contains(err.Error(), "both return column order_date") {
+		t.Fatalf("expected a column clash, got %v", err)
+	}
+	// Window metrics would be NULL at every point.
+	if _, err := e.GenerateSeriesSQL(q, day, []string{"running_revenue"}, 0, false); err == nil || !strings.Contains(err.Error(), "window metrics") {
+		t.Fatalf("expected a window metric error, got %v", err)
+	}
+}
+
+func TestGenerateSeriesSQLOrdersByJoinedGranularity(t *testing.T) {
+	t.Parallel()
+
+	customers := &Model{Name: "customers", Source: Source{Table: "customers"}, PrimaryKey: "id", Dimensions: []Dimension{
+		{Name: "signup", Type: "time", Granularities: map[string]string{"month": "date_trunc('month', signup)"}},
+	}}
+	orders := &Model{
+		Name: "orders", Source: Source{Table: "orders"},
+		Joins:      []Join{{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"}},
+		Dimensions: []Dimension{{Name: "status", Type: "string"}},
+		Metrics:    []Metric{{Name: "revenue", Expression: "sum(amount)"}},
+	}
+	e, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := e.GenerateSeriesSQL(&Query{Dimensions: []DimensionRef{{Name: "status"}}, Metrics: []string{"revenue"}}, DimensionRef{Name: "customers.signup", Granularity: "month"}, []string{"revenue"}, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "AS customers_signup_month")
+	expectContains(t, sql, "ORDER BY customers_signup_month")
+}
+
+func TestAddSeriesSQL(t *testing.T) {
+	t.Parallel()
+
+	e := minimalEngine(t, richTestModel())
+	e.Dialect = "bigquery"
+	day := DimensionRef{Name: "order_date", Granularity: "day"}
+	q := &Query{Dimensions: []DimensionRef{{Name: "country"}}, Metrics: []string{"revenue"}, Sort: []SortSpec{{Name: "revenue", Direction: "desc"}}, Limit: 5}
+	detail, err := e.GenerateSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	series := []Series{{By: day, Metric: "revenue", Limit: 30}, {By: day, Metric: "order_count"}}
+	sql, ok, err := e.AddSeriesSQL(q, detail, series, false)
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	// Columns sharing an x read one daily grouping.
+	if got := strings.Count(sql, "LEFT JOIN"); got != 1 {
+		t.Fatalf("expected one join, got %d\nSQL: %s", got, sql)
+	}
+	for _, want := range []string{
+		"SELECT __rows.*, __series_join_0.__series_0, __series_join_0.__series_1 FROM (" + detail + ") __rows",
+		"ARRAY_AGG(IF(revenue IS NOT NULL, STRUCT(order_date AS x, CAST(revenue AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY order_date DESC LIMIT 30) AS __series_0",
+		"ARRAY_AGG(IF(order_count IS NOT NULL, STRUCT(order_date AS x, CAST(order_count AS FLOAT64) AS y), NULL) IGNORE NULLS ORDER BY order_date DESC) AS __series_1",
+		"GROUP BY country) __series_join_0",
+		"(__rows.country = __series_join_0.country OR (__rows.country IS NULL AND __series_join_0.country IS NULL))",
+		"ORDER BY __rows.revenue DESC, __rows.country ASC",
+	} {
+		expectContains(t, sql, want)
+	}
+
+	total, err := e.GenerateGrandTotalSQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sql, ok, err = e.AddSeriesSQL(q, total, series, true); err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	expectContains(t, sql, "FROM ("+total+") __rows LEFT JOIN (SELECT ARRAY_AGG(")
+	expectContains(t, sql, ") __series_join_0 ON TRUE")
+
+	// A window cuts each row's points from its group, so every point is fetched.
+	daily := &Query{Dimensions: []DimensionRef{{Name: "country"}, day}, Metrics: []string{"revenue"}}
+	if _, ok, _ := e.AddSeriesSQL(daily, detail, series, false); ok {
+		t.Fatal("merged a window")
+	}
+	e.Dialect = "duckdb"
+	if sql, ok, err = e.AddSeriesSQL(q, detail, series, false); err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	expectContains(t, sql, "(ARRAY_AGG({'x': order_date, 'y': CAST(revenue AS DOUBLE)} ORDER BY order_date DESC) FILTER (WHERE revenue IS NOT NULL))[1:30] AS __series_0")
+	e.Dialect = "snowflake"
+	if _, ok, _ := e.AddSeriesSQL(q, detail, series, false); ok {
+		t.Fatal("merged on a dialect without lists")
+	}
+	// A DECIMAL x inside a list may not reach the caller, so a number x isn't merged.
+	model := richTestModel()
+	model.Dimensions = append(model.Dimensions, Dimension{Name: "amount", Type: "number"})
+	numeric := minimalEngine(t, model)
+	numeric.Dialect = "duckdb"
+	if _, ok, _ := numeric.AddSeriesSQL(q, detail, []Series{{By: DimensionRef{Name: "amount"}, Metric: "revenue"}}, false); ok {
+		t.Fatal("merged a number x")
+	}
+}
+
+func TestGenerateSQL_ClickHouseFiltersReadColumnsNotAliases(t *testing.T) {
+	t.Parallel()
+
+	// ClickHouse resolves created_at in WHERE to a SELECT alias of that name,
+	// so the inner aliases must not match a column.
+	m := &Model{
+		Name: "events", Source: Source{Table: "events"},
+		Dimensions: []Dimension{
+			{Name: "created_at", Type: "time", Granularities: map[string]string{"week": "toMonday(created_at)"}},
+			{Name: "country", Type: "string"},
+			{Name: "region", Type: "string", Expression: "country"},
+		},
+		Metrics: []Metric{
+			{Name: "event_count", Expression: "count(*)"},
+			{Name: "units", Expression: "sum(CAST(amount AS Nullable(UInt64))) + sum(arrayCount(x -> [x, x][2] > 5, tags))"},
+			{Name: "running", Expression: "{event_count}", Window: &Window{Type: "running_total", OrderBy: "created_at"}},
+		},
+	}
+	e := minimalEngine(t, m)
+	e.Dialect = "clickhouse"
+	sql, err := e.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "created_at", Granularity: "week"}},
+		Metrics:    []string{"event_count", "units"},
+		Filters: []Filter{
+			{Dimension: "created_at", Operator: "gte", Value: "2026-08-12"},
+			{Expression: "`created_at` < '2026-08-21' AND {country} = 'US'"},
+		},
+		Sort: []SortSpec{{Name: "created_at"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "SELECT __bruin_c0 AS created_at, __bruin_c1 AS event_count, __bruin_c2 AS units FROM (SELECT toMonday(created_at) AS __bruin_c0, count(*) AS __bruin_c1," +
+		" sum(CAST(amount AS Nullable(UInt64))) + sum(arrayCount(x -> [x, x][2] > 5, tags)) AS __bruin_c2 FROM events" +
+		" WHERE created_at >= '2026-08-12' AND `created_at` < '2026-08-21' AND country = 'US' GROUP BY 1) __bruin_q ORDER BY created_at ASC"
+	if sql != want {
+		t.Fatalf("got  %s\nwant %s", sql, want)
+	}
+
+	week := DimensionRef{Name: "created_at", Granularity: "week"}
+	for _, tc := range []struct {
+		q    *Query
+		want string
+	}{
+		{
+			// Repeated refs share one inner column; ClickHouse rejects one alias on two.
+			&Query{Dimensions: []DimensionRef{{Name: "country"}, {Name: "country"}}, Metrics: []string{"event_count", "event_count"}},
+			"SELECT __bruin_c0 AS country, __bruin_c0 AS country, __bruin_c2 AS event_count, __bruin_c2 AS event_count" +
+				" FROM (SELECT country AS __bruin_c0, country AS __bruin_c0, count(*) AS __bruin_c2, count(*) AS __bruin_c2 FROM events GROUP BY 1, 2) __bruin_q",
+		},
+		{
+			&Query{Dimensions: []DimensionRef{week, {Name: "country"}, week}, Metrics: []string{"running"}},
+			"SELECT base.created_at, base.country, base.created_at, SUM(base.event_count) OVER (ORDER BY base.created_at ROWS UNBOUNDED PRECEDING) AS running" +
+				" FROM (SELECT __bruin_c0 AS created_at, __bruin_c1 AS country, __bruin_c0 AS created_at, __bruin_c3 AS event_count FROM (SELECT toMonday(created_at) AS __bruin_c0," +
+				" country AS __bruin_c1, toMonday(created_at) AS __bruin_c0, count(*) AS __bruin_c3 FROM events GROUP BY 1, 2, 3) __bruin_q) base",
+		},
+		{
+			// A sort field the query doesn't select passes through the wrapper.
+			&Query{Dimensions: []DimensionRef{{Name: "region"}}, Metrics: []string{"event_count"}, Sort: []SortSpec{{Name: "country"}}},
+			"SELECT __bruin_c0 AS region, __bruin_c1 AS event_count FROM (SELECT country AS __bruin_c0, count(*) AS __bruin_c1, country AS country FROM events GROUP BY 1) __bruin_q ORDER BY country ASC",
+		},
+	} {
+		sql, err := e.GenerateSQL(tc.q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sql != tc.want {
+			t.Fatalf("got  %s\nwant %s", sql, tc.want)
+		}
+	}
+}

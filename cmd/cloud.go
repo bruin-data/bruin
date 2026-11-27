@@ -46,6 +46,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudInstances(),
 			CloudGlossary(),
 			CloudAgents(),
+			CloudQueries(),
 			CloudConnections(),
 			CloudConnectionSets(),
 			CloudDashboards(),
@@ -4455,6 +4456,127 @@ func cloudAgentsMessages() *cli.Command {
 	}
 }
 
+func CloudQueries() *cli.Command {
+	return &cli.Command{
+		Name:  "queries",
+		Usage: "Read the queries your team's agents ran",
+		Commands: []*cli.Command{
+			cloudQueriesList(),
+		},
+	}
+}
+
+func cloudQueriesList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List the queries agents ran (their own query log, kept 30 days), newest first, with the agent, thread and schedule behind each. Admins and AI admins only",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.IntFlag{
+				Name:  "agent-id",
+				Usage: "only this agent's queries",
+			},
+			&cli.IntFlag{
+				Name:  "thread-id",
+				Usage: "only this thread's queries",
+			},
+			&cli.StringFlag{
+				Name:  "since",
+				Usage: "only messages sent at or after this time (ISO 8601)",
+			},
+			&cli.StringFlag{
+				Name:  "until",
+				Usage: "only messages sent before this time (ISO 8601)",
+			},
+			&cli.IntFlag{
+				Name:  "limit",
+				Usage: "messages per page (each can hold several queries, max 100)",
+				Value: 20,
+			},
+			&cli.IntFlag{
+				Name:  "before",
+				Usage: "the next_before of the previous page",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			for _, name := range []string{"agent-id", "thread-id", "limit", "before"} {
+				if c.IsSet(name) && c.Int(name) <= 0 {
+					printError(fmt.Errorf("--%s must be a positive integer, got %d", name, c.Int(name)), output, "Invalid --"+name)
+					return cli.Exit("", 1)
+				}
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			page, err := client.ListAgentQueries(ctx, bruincloud.ListAgentQueriesOptions{
+				AgentID:  c.Int("agent-id"),
+				ThreadID: c.Int("thread-id"),
+				Since:    c.String("since"),
+				Until:    c.String("until"),
+				Limit:    c.Int("limit"),
+				Before:   c.Int("before"),
+			})
+			if err != nil {
+				printError(err, output, "Failed to list queries")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(page, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"When", "Agent", "Ran in", "Started By", "Connection", "OK", "Query"})
+			for _, q := range page.Queries {
+				t.AppendRow(table.Row{q.Timestamp, q.Agent.Name, agentQueryOrigin(q), agentQueryStarter(q), q.Connection, q.Success, agentQueryPreview(q.Query)})
+			}
+			t.Render()
+			if page.NextBefore != nil {
+				fmt.Printf("More: --before %d\n", *page.NextBefore)
+			}
+			return nil
+		},
+	}
+}
+
+// agentQueryOrigin names what ran a query: its scout or routine, else its thread.
+func agentQueryOrigin(q bruincloud.AgentQuery) string {
+	if q.ScheduledRun != nil && q.ScheduledRun.Title != nil {
+		return *q.ScheduledRun.Title
+	}
+	if q.Thread.Title != nil && *q.Thread.Title != "" {
+		return *q.Thread.Title
+	}
+	return fmt.Sprintf("thread %d", q.Thread.ID)
+}
+
+// agentQueryPreview is the query on one line, cut to fit the table.
+func agentQueryPreview(query string) string {
+	line := strings.Join(strings.Fields(query), " ")
+	if runes := []rune(line); len(runes) > 80 {
+		return string(runes[:80]) + "..."
+	}
+	return line
+}
+
+func agentQueryStarter(q bruincloud.AgentQuery) string {
+	if q.StartedBy == nil {
+		return ""
+	}
+	return q.StartedBy.Name
+}
+
 func CloudConnections() *cli.Command {
 	return &cli.Command{
 		Name:  "connections",
@@ -4889,12 +5011,13 @@ func cloudConnectionSetsCreate() *cli.Command {
 func cloudConnectionSetsUpdate() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
-		Usage: "Replace a connection set's connections with ones from the local .bruin.yml",
+		Usage: "Add or update connections in a connection set from the local .bruin.yml, keeping the rest",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
 			&cli.IntFlag{Name: "set-id", Usage: "connection set ID", Required: true},
-			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to include, read from the local .bruin.yml; repeat for multiple. The set becomes exactly these connections.", Required: true},
+			&cli.StringSliceFlag{Name: "connection", Usage: "a connection name to add or update, read from the local .bruin.yml; repeat for multiple", Required: true},
+			&cli.BoolFlag{Name: "replace", Usage: "drop the set's other connections, so the set becomes exactly these"},
 			&cli.StringFlag{Name: "environment", Usage: "the .bruin.yml environment to read from (default: selected environment)"},
 			&cli.StringFlag{Name: "config-file", Usage: "path to the .bruin.yml file"},
 			&cli.BoolFlag{Name: "skip-validation", Usage: "skip the live connection test"},
@@ -4920,15 +5043,42 @@ func cloudConnectionSetsUpdate() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if err := client.UpdateConnectionSet(ctx, c.Int("set-id"), inputs, c.Bool("skip-validation")); err != nil {
+			var retained []bruincloud.ConnectionSetRetain
+			if !c.Bool("replace") {
+				existing, err := client.ListConnectionSetConnections(ctx, c.Int("set-id"))
+				if err != nil {
+					printError(err, output, "Failed to read connection set")
+					return cli.Exit("", 1)
+				}
+				retained = connectionsToRetain(existing, inputs)
+			}
+
+			if err := client.UpdateConnectionSet(ctx, c.Int("set-id"), inputs, retained, c.Bool("skip-validation")); err != nil {
 				printError(err, output, "Failed to update connection set")
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Updated connection set %d (%d connection(s))", c.Int("set-id"), len(inputs)))
+			printSuccessForOutput(output, fmt.Sprintf("Updated connection set %d (%d connection(s))", c.Int("set-id"), len(inputs)+len(retained)))
 			return nil
 		},
 	}
+}
+
+// connectionsToRetain is the set's existing connections that inputs don't
+// replace. Names match exactly, so a case-only clash is refused by the API
+// rather than renaming the stored connection.
+func connectionsToRetain(existing []bruincloud.Connection, inputs []bruincloud.ConnectionSetInput) []bruincloud.ConnectionSetRetain {
+	replaced := make(map[string]bool, len(inputs))
+	for _, input := range inputs {
+		replaced[input.Name] = true
+	}
+	retained := make([]bruincloud.ConnectionSetRetain, 0, len(existing))
+	for _, connection := range existing {
+		if !replaced[connection.Name] {
+			retained = append(retained, bruincloud.ConnectionSetRetain{Type: connection.Type, Name: connection.Name})
+		}
+	}
+	return retained
 }
 
 func cloudConnectionSetsDelete() *cli.Command {
@@ -5772,6 +5922,10 @@ func cloudDashboardsList() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
+			&cli.BoolFlag{
+				Name:  "all",
+				Usage: "in an agent's run, list every dashboard the person it runs for can view, not just the agent's own",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -5783,7 +5937,7 @@ func cloudDashboardsList() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			dashboards, err := client.ListDashboards(ctx)
+			dashboards, err := client.ListDashboards(ctx, c.Bool("all"))
 			if err != nil {
 				printError(err, output, "Failed to list dashboards")
 				return cli.Exit("", 1)
@@ -5826,6 +5980,10 @@ func cloudDashboardsFolders() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
+			&cli.BoolFlag{
+				Name:  "all",
+				Usage: "count the same dashboards that `list --all` shows",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -5837,7 +5995,7 @@ func cloudDashboardsFolders() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			folders, err := client.ListDashboardFolders(ctx)
+			folders, err := client.ListDashboardFolders(ctx, c.Bool("all"))
 			if err != nil {
 				printError(err, output, "Failed to list dashboard folders")
 				return cli.Exit("", 1)
