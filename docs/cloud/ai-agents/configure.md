@@ -68,7 +68,7 @@ Open an agent from the agents list to change its settings at any time:
 - Add or remove integrations.
 - Swap the connection set.
 - Edit the system prompt.
-- **Manage access**: control which teams and members in your organization can use the agent.
+- **Manage access**: choose who can use the agent and who can act as it. See [Agent Access](/cloud/ai-agents/access).
 
 ## Next
 

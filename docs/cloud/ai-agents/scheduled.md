@@ -60,6 +60,14 @@ Once the configuration looks right:
 - Use **Run Now** to trigger it manually any time.
 - Open the **Runs** tab to see history and status, and jump into any specific run.
 
+## Run as the agent
+
+By default a scheduled agent runs as its owner: the person who set it up, limited by the agent's permissions. To run it with only the agent's own permissions and connections, open the scheduled agent, click **Runs as** and pick the agent.
+
+- Only someone who can [act as the agent](/cloud/ai-agents/access) can switch it, and they become the scheduled agent's owner.
+- Its runs never use a person's own access.
+- If its owner leaves the team or can no longer act as the agent, its runs are skipped, with the reason on the **Runs** tab, until someone who can act as the agent takes it over.
+
 ## Where the runs live
 
 Scheduled agents execute inside the AI **Chats** view. That means:
