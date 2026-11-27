@@ -632,12 +632,18 @@ func (e *Engine) seriesSQL(q *Query, by DimensionRef, metrics []string, limit in
 		partition = "PARTITION BY " + strings.Join(keys, ", ") + " "
 	}
 	cols = append(cols, metrics...)
-	rank := "__series_rank"
-	for slices.ContainsFunc(cols, func(c string) bool { return strings.EqualFold(c, rank) }) {
-		rank += "_"
+	// Each metric keeps its own last points that have a value, so a NULL y isn't counted.
+	ranks, kept := make([]string, len(metrics)), make([]string, len(metrics))
+	for i, m := range metrics {
+		rank := fmt.Sprintf("__series_rank_%d", i)
+		for slices.ContainsFunc(cols, func(c string) bool { return strings.EqualFold(c, rank) }) {
+			rank += "_"
+		}
+		ranks[i] = fmt.Sprintf("CASE WHEN %[1]s IS NOT NULL THEN ROW_NUMBER() OVER (%[2]sORDER BY CASE WHEN %[1]s IS NULL THEN 1 ELSE 0 END, %[3]s DESC) END AS %[4]s", m, partition, x, rank)
+		kept[i] = fmt.Sprintf("%s <= %d", rank, limit)
 	}
-	return fmt.Sprintf("SELECT %s FROM (SELECT points.*, ROW_NUMBER() OVER (%sORDER BY %s DESC) AS %s FROM (%s) points WHERE %s IS NOT NULL) ranked WHERE %s <= %d",
-		strings.Join(cols, ", "), partition, x, rank, sql, x, rank, limit), x, nil
+	return fmt.Sprintf("SELECT %s FROM (SELECT points.*, %s FROM (%s) points WHERE %s IS NOT NULL) ranked WHERE %s",
+		strings.Join(cols, ", "), strings.Join(ranks, ", "), sql, x, strings.Join(kept, " OR ")), x, nil
 }
 
 // Series is one list column for AddSeriesSQL.
@@ -647,11 +653,12 @@ type Series struct {
 	Limit  int          `json:"limit,omitempty"` // last N points; 0 keeps all
 }
 
-// listDialects build {x, y} points newest first, and keep the first N of a list.
-var listDialects = map[string]struct{ point, limit string }{
-	"bigquery":              {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", "ARRAY_AGG(%s ORDER BY %s DESC LIMIT %d)"},
-	"google_cloud_platform": {"STRUCT(%s AS x, CAST(%s AS FLOAT64) AS y)", "ARRAY_AGG(%s ORDER BY %s DESC LIMIT %d)"},
-	"duckdb":                {"{'x': %s, 'y': CAST(%s AS DOUBLE)}", "ARRAY_AGG(%s ORDER BY %s DESC)[1:%d]"},
+// listDialects build a list of {x, y} points newest first, skipping a NULL y, from
+// x, y and the limit suffix (empty, or limit with N).
+var listDialects = map[string]struct{ list, limit string }{
+	"bigquery":              {"ARRAY_AGG(IF(%[2]s IS NULL, NULL, STRUCT(%[1]s AS x, CAST(%[2]s AS FLOAT64) AS y)) IGNORE NULLS ORDER BY %[1]s DESC%[3]s)", " LIMIT %d"},
+	"google_cloud_platform": {"ARRAY_AGG(IF(%[2]s IS NULL, NULL, STRUCT(%[1]s AS x, CAST(%[2]s AS FLOAT64) AS y)) IGNORE NULLS ORDER BY %[1]s DESC%[3]s)", " LIMIT %d"},
+	"duckdb":                {"(ARRAY_AGG({'x': %[1]s, 'y': CAST(%[2]s AS DOUBLE)} ORDER BY %[1]s DESC) FILTER (WHERE %[2]s IS NOT NULL))%[3]s", "[1:%d]"},
 }
 
 // AddSeriesSQL joins each series' points, newest first, into sql (q's detail or,
@@ -720,11 +727,11 @@ func (e *Engine) AddSeriesSQL(q *Query, sql string, series []Series, total bool)
 			if s.By != by {
 				continue
 			}
-			point := fmt.Sprintf(dialect.point, x, s.Metric)
-			list := fmt.Sprintf("ARRAY_AGG(%s ORDER BY %s DESC)", point, x)
+			limit := ""
 			if s.Limit > 0 {
-				list = fmt.Sprintf(dialect.limit, point, x, s.Limit)
+				limit = fmt.Sprintf(dialect.limit, s.Limit)
 			}
+			list := fmt.Sprintf(dialect.list, x, s.Metric, limit)
 			col := fmt.Sprintf("__series_%d", i)
 			selects = append(selects, list+" AS "+col)
 			cols = append(cols, name+"."+col)
