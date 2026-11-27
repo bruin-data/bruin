@@ -52,6 +52,12 @@ deps: ingestr-hashes
 	@printf "$(OK_COLOR)==> Installing dependencies$(NO_COLOR)\n"
 	@go mod tidy
 
+.PHONY: dac-pins
+# Pin a new dac release for `bruin dac`: make dac-pins DAC_VERSION=0.33.0
+dac-pins:
+	@test -n "$(DAC_VERSION)" || { echo "usage: make dac-pins DAC_VERSION=x.y.z" >&2; exit 1; }
+	@python3 scripts/update_dac_pins.py "$(DAC_VERSION)"
+
 .PHONY: ingestr-hashes
 ingestr-hashes:
 	@if [ "$(INGESTR_HASHES_PREVERIFIED)" = "1" ]; then \
@@ -151,6 +157,7 @@ test-unit: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (fast)$(NO_COLOR)"
 	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
 	@python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
+	@python3 -m unittest discover -s scripts -p 'test_update_dac_pins.py'
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/... ./docs/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
@@ -159,6 +166,7 @@ test-full: ingestr-hashes
 	@echo "$(OK_COLOR)==> Running the unit tests (full)$(NO_COLOR)"
 	@python3 -m unittest discover -s scripts -p 'test_generate_ingestr_hashes.py'
 	@python3 -m unittest discover -s scripts -p 'test_check_ingestr_cdc_parity.py'
+	@python3 -m unittest discover -s scripts -p 'test_update_dac_pins.py'
 	@env SF_DISABLE_MINICORE=true go test -tags="no_duckdb_arrow" -race -p "$(TEST_CONCURRENCY)" -vet=off -timeout 10m ./cmd/... ./pkg/... ./templates/... ./docs/...
 	@echo "$(OK_COLOR)==> Running the semantic-engine module tests with race detection$(NO_COLOR)"
 	@cd semantic-engine && env SF_DISABLE_MINICORE=true go test -race -p "$(TEST_CONCURRENCY)" -timeout 10m ./...
