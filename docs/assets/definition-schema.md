@@ -301,7 +301,7 @@ The asset-level value is, in turn, the default for the asset's [quality checks](
 
 ## `smart_retries`
 
-Let Bruin Cloud retry the asset based on why it failed, instead of always retrying up to `retries` times. If not specified, the asset inherits the pipeline-level [`smart_retries`](../pipelines/definition.md#smart-retries).
+Let Bruin Cloud retry the asset based on why it failed, instead of always retrying up to `retries` times. If not specified, the asset inherits the `smart_retries` set under the pipeline's [`default`](../pipelines/definition.md#smart-retries).
 
 ```yaml
 smart_retries:

@@ -342,11 +342,12 @@ retries: 2
 
 ### Smart Retries
 
-Let Bruin Cloud retry failed assets based on why they failed, instead of always retrying up to `retries` times.
+Let Bruin Cloud retry failed assets based on why they failed, instead of always retrying up to `retries` times. Turn it on for all assets of the pipeline under [`default`](#default-pipeline-level-defaults):
 
 ```yaml
-smart_retries:
-  enabled: true
+default:
+  smart_retries:
+    enabled: true
 ```
 
 With smart retries enabled, a failed asset is retried as follows:
@@ -362,7 +363,7 @@ With smart retries enabled, a failed asset is retried as follows:
 - **Fields:**
   - `enabled` (`Boolean`, default `false`): turns smart retries on.
 
-**Inheritance:** The pipeline-level `smart_retries` is the default for every asset in the pipeline, and can be set for all assets under [`default`](#default-pipeline-level-defaults) as well. An [asset can override it](../assets/definition-schema.md#smart_retries) with its own `smart_retries`; a field the asset leaves out is inherited.
+**Inheritance:** `smart_retries` under `default` applies to every asset in the pipeline; there is no top-level `smart_retries`. An [asset can override it](../assets/definition-schema.md#smart_retries) with its own `smart_retries`; a field the asset leaves out is inherited from `default`.
 
 -->
 
